@@ -81,6 +81,8 @@
 //     }
 //   ]
 
+import type { ITrello } from "./types/task.type";
+
 /* drag drop list
 item = todo
 source = 0
@@ -98,7 +100,7 @@ drag drop task differ list
 
 
 // hash object (hash map)
-export const data = {
+export const data: ITrello = {
   columns: ['list1', 'list2', 'list3'],
   list: {
     list1: {
@@ -114,21 +116,38 @@ export const data = {
     list3: {
       id: 'list3',
       title: 'List 3',
-      tasks: ['']
+      tasks: []
     }
   },
   task: {
     task1: {
       id: 'task1',
-      title: 'Task 1'
+      title: 'Redesign tables card',
+      description: 'In _variables.scss on line 672 you define $table_variants. Each instance of "color-level" needs to be changed to "shift-color".',
+      assignees: [
+        { name: 'Bonnie Green', avatar: 'https://flowbite.com/application-ui/demo/images/users/bonnie-green.png' },
+        { name: 'Roberta Casas', avatar: 'https://flowbite.com/application-ui/demo/images/users/roberta-casas.png' }
+      ],
+      image: 'https://flowbite.com/application-ui/demo/images/kanban/task-1-dark.jpg',
+      daysLeft: 9
     },
     task2: {
       id: 'task2',
-      title: 'Task 2'
+      title: 'Fix responsive issues',
+      description: 'Resolve mobile view problems on the dashboard page.',
+      assignees: [
+        { name: 'Roberta Casas', avatar: 'https://flowbite.com/application-ui/demo/images/users/roberta-casas.png' }
+      ],
+      daysLeft: 3
     },
     task3: {
       id: 'task3',
-      title: 'Task 3'
+      title: 'Create Javascript elements',
+      description: 'Complete the implementation of dynamic form elements.',
+      assignees: [
+        { name: 'Bonnie Green', avatar: 'https://flowbite.com/application-ui/demo/images/users/bonnie-green.png' }
+      ],
+      isDone: true
     }
   }
 }
