@@ -1,4 +1,4 @@
-export interface ITrello {
+export interface IBoardData {
   columns: string[],
   list: IList,
   task: ITask

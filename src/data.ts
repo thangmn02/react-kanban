@@ -81,7 +81,7 @@
 //     }
 //   ]
 
-import type { ITrello } from "./types/task.type";
+import type { IBoardData } from "./types/task.type";
 
 /* drag drop list
 item = todo
@@ -100,7 +100,7 @@ drag drop task differ list
 
 
 // hash object (hash map)
-export const data: ITrello = {
+export const data: IBoardData = {
   columns: ['list1', 'list2', 'list3'],
   list: {
     list1: {
