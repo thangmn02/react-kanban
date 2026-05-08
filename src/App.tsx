@@ -6,13 +6,14 @@ import * as yup from 'yup';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
-import Typography from './components/ui/Typography';
-import Button from './components/ui/Button';
-import ButtonIcon from './components/ui/ButtonIcon';
+import Button from './components/atoms/Button';
+import ButtonIcon from './components/atoms/ButtonIcon';
 import TaskList from './components/task/TaskList';
 
 import { data } from './data';
 import type { ITaskItem, IBoardData } from './types/task.type';
+import DeleteDialog from './components/organisms/dialog/DeleteDialog';
+import AddGroupDialog from './components/organisms/dialog/AddGroupDialog';
 
 interface Task {
   id: number;
@@ -23,17 +24,6 @@ interface Task {
   image?: string;
   isDone?: boolean;
 }
-
-interface Column {
-  id: string;
-  title: string;
-  tasks: Task[];
-}
-
-const listSchema = yup.object({
-  title: yup.string().required('Title is required'),
-  description: yup.string()
-}).required();
 
 const cardSchema = yup.object({
   title: yup.string().required('Title is required'),
@@ -57,10 +47,6 @@ function App() {
   const [deleteItem, setDeleteItem] = useState<{ type: 'list' | 'card', listId: string, cardId?: string } | null>(null);
   const [editingTask, setEditingTask] = useState<ITaskItem | null>(null);
 
-  const { register: registerList, handleSubmit: handleSubmitList, formState: { errors: errorsList }, reset: resetList } = useForm({
-    resolver: yupResolver(listSchema)
-  });
-
   const { register: registerCard, handleSubmit: handleSubmitCard, formState: { errors: errorsCard }, reset: resetCard } = useForm({
     resolver: yupResolver(cardSchema)
   });
@@ -80,7 +66,6 @@ function App() {
       }
     }));
     setIsGroupModalOpen(false);
-    resetList();
     toast.success('List added successfully!', { theme: 'colored' });
   };
 
@@ -909,140 +894,20 @@ function App() {
         </div>
       )}
 
-      {/* div>
-      </div>
-
-      {/* Delete Confirmation Modal */}
-      {deleteItem !== null && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 bg-gray-900 opacity-50 transition-opacity"
-            onClick={() => setDeleteItem(null)}
-          ></div>
-
-          {/* Modal */}
-          <div className="flex min-h-screen items-center justify-center p-4">
-            <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-              {/* Close button */}
-              <button
-                onClick={() => setDeleteItem(null)}
-                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-
-              {/* Trash Icon */}
-              <div className="flex justify-center mb-4">
-                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
-                  <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </div>
-              </div>
-
-              {/* Message */}
-              <p className="text-center text-gray-700 mb-6">
-                Are you sure you want to delete this {deleteItem.type}?
-              </p>
-
-              {/* Buttons */}
-              <div className="flex justify-center space-x-3">
-                <button
-                  onClick={() => setDeleteItem(null)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-                >
-                  No, cancel
-                </button>
-                <button
-                  onClick={handleDeleteConfirm}
-                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700"
-                >
-                  Yes, I'm sure
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+      {deleteItem && (
+        <DeleteDialog 
+          onSubmit={handleDeleteConfirm}
+          onClose={() => setDeleteItem(null)}
+        >
+          Are you sure you want to delete this {deleteItem.type}?
+        </DeleteDialog>
       )}
-
-      {/* Add Group Modal */}
+      
       {isGroupModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 bg-gray-900 opacity-50 transition-opacity"
-            onClick={() => setIsGroupModalOpen(false)}
-          ></div>
-
-          {/* Modal */}
-          <div className="flex min-h-screen items-center justify-center p-4">
-            <form onSubmit={handleSubmitList(onSubmitList)} className="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-              {/* Header */}
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-semibold text-gray-900">Add new group</h3>
-                <button
-                  type="button"
-                  onClick={() => setIsGroupModalOpen(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              {/* Form Fields */}
-              <div className="space-y-4">
-                {/* Name */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Name
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Add title here"
-                    {...registerList('title')}
-                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  {errorsList.title && <span className="text-red-500 text-sm">{errorsList.title.message as string}</span>}
-                </div>
-
-                {/* Description */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Description
-                  </label>
-                  <textarea
-                    placeholder="Add a description here"
-                    {...registerList('description')}
-                    rows={5}
-                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                  ></textarea>
-                </div>
-              </div>
-
-              {/* Footer Buttons */}
-              <div className="flex justify-start space-x-3 mt-6">
-                <button type="submit" className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                  Add new group
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsGroupModalOpen(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <AddGroupDialog 
+          onClose={() => setIsGroupModalOpen(false)}
+          onSubmitGroup={onSubmitList}
+        />
       )}
 
       <ToastContainer />

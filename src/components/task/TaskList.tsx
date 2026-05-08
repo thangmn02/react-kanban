@@ -1,5 +1,5 @@
 import type { IListItem, ITaskItem } from '../../types/task.type';
-import Typography from '../ui/Typography';
+import Typography from '../atoms/Typography';
 import TaskItem from './TaskItem';
 import { Droppable } from 'react-beautiful-dnd';
 
