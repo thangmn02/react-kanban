@@ -81,6 +81,8 @@
 //     }
 //   ]
 
+import { addDays, format, subDays } from 'date-fns';
+
 import type { IBoardData } from "./types/task.type";
 
 /* drag drop list
@@ -128,8 +130,9 @@ export const data: IBoardData = {
         { name: 'Bonnie Green', avatar: 'https://flowbite.com/application-ui/demo/images/users/bonnie-green.png' },
         { name: 'Roberta Casas', avatar: 'https://flowbite.com/application-ui/demo/images/users/roberta-casas.png' }
       ],
+      priority: 'High',
+      dueDate: format(addDays(new Date(), 4), 'yyyy-MM-dd'),
       image: 'https://flowbite.com/application-ui/demo/images/kanban/task-1-dark.jpg',
-      daysLeft: 9
     },
     task2: {
       id: 'task2',
@@ -138,7 +141,8 @@ export const data: IBoardData = {
       assignees: [
         { name: 'Roberta Casas', avatar: 'https://flowbite.com/application-ui/demo/images/users/roberta-casas.png' }
       ],
-      daysLeft: 3
+      priority: 'Medium',
+      dueDate: format(new Date(), 'yyyy-MM-dd')
     },
     task3: {
       id: 'task3',
@@ -147,6 +151,8 @@ export const data: IBoardData = {
       assignees: [
         { name: 'Bonnie Green', avatar: 'https://flowbite.com/application-ui/demo/images/users/bonnie-green.png' }
       ],
+      priority: 'Lowest',
+      dueDate: format(subDays(new Date(), 2), 'yyyy-MM-dd'),
       isDone: true
     }
   }

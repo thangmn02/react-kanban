@@ -28,7 +28,11 @@ export interface ITaskItem {
   title: string,
   description: string,
   assignees: IAssignItem[],
+  priority?: 'High' | 'Medium' | 'Low' | 'Lowest',
+  startDate?: string,
+  dueDate?: string,
+  category1?: string,
+  category2?: string,
   image?: string,
-  daysLeft?: number,
   isDone?: boolean
 } 

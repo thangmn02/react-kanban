@@ -4,7 +4,6 @@ import TaskItem from './TaskItem';
 import { Droppable } from 'react-beautiful-dnd';
 
 interface TaskListProps {
-  index: number,
   listItem: IListItem,
   tasks: ITaskItem[],
   toggleMenu: (listId: string | null) => void,
@@ -15,7 +14,6 @@ interface TaskListProps {
 }
 
 function TaskList({
-  index,
   listItem,
   tasks,
   toggleMenu,
