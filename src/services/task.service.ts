@@ -1,0 +1,176 @@
+import type { RealtimeChannel } from '@supabase/supabase-js';
+
+import supabase from '../lib/supabase';
+import type { TaskInsert, TaskRow, TaskUpdate } from '../types/supabase.type';
+
+interface FetchTasksParams {
+  boardId?: string;
+  listId?: string;
+}
+
+interface UpdateTaskPositionPayload {
+  id: string;
+  list_id: string;
+  position: number;
+}
+
+export async function fetchTasks({ boardId, listId }: FetchTasksParams = {}): Promise<TaskRow[]> {
+  if (!supabase) {
+    return [];
+  }
+
+  let query = supabase
+    .from('tasks')
+    .select('*')
+    .is('deleted_at', null)
+    .order('position', { ascending: true })
+    .order('created_at', { ascending: true });
+
+  if (boardId) {
+    query = query.eq('board_id', boardId);
+  }
+
+  if (listId) {
+    query = query.eq('list_id', listId);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+export async function createTask(taskData: TaskInsert): Promise<TaskRow> {
+  if (!supabase) {
+    return {
+      id: `task-${Date.now()}`,
+      board_id: taskData.board_id,
+      list_id: taskData.list_id,
+      title: taskData.title,
+      description: taskData.description || '',
+      position: taskData.position ?? 0,
+      priority: taskData.priority || 'Low',
+      start_date: taskData.start_date || null,
+      due_date: taskData.due_date || null,
+      category1: taskData.category1 || null,
+      category2: taskData.category2 || null,
+      assignees: taskData.assignees || null,
+      image: taskData.image || null,
+      is_done: taskData.is_done || false,
+      created_at: new Date().toISOString(),
+      updated_at: null,
+      deleted_at: null,
+    };
+  }
+
+  const { data, error } = await supabase
+    .from('tasks')
+    .insert(taskData)
+    .select()
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+export async function updateTask(taskId: string, taskData: TaskUpdate): Promise<TaskRow> {
+  if (!supabase) {
+    return {
+      id: taskId,
+      ...taskData,
+    } as TaskRow;
+  }
+
+  const { data, error } = await supabase
+    .from('tasks')
+    .update(taskData)
+    .eq('id', taskId)
+    .select()
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+export async function deleteTask(taskId: string): Promise<void> {
+  if (!supabase) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from('tasks')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', taskId);
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function deleteTasksByListId(listId: string): Promise<void> {
+  if (!supabase) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from('tasks')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('list_id', listId);
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function updateTaskPositions(taskPositions: UpdateTaskPositionPayload[]): Promise<void> {
+  if (!supabase) {
+    return;
+  }
+
+  await Promise.all(taskPositions.map(async ({ id, list_id, position }) => {
+    const { error } = await supabase
+      .from('tasks')
+      .update({
+        list_id,
+        position,
+      })
+      .eq('id', id);
+
+    if (error) {
+      throw error;
+    }
+  }));
+}
+
+export function subscribeToTasksRealtime(boardId: string, onChange: () => void): RealtimeChannel {
+  if (!supabase) {
+    return {
+      unsubscribe: () => {},
+    } as any;
+  }
+
+  return supabase
+    .channel(`tasks-realtime-${boardId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'tasks',
+        filter: `board_id=eq.${boardId}`,
+      },
+      () => {
+        onChange();
+      }
+    )
+    .subscribe();
+}

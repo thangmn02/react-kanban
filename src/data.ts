@@ -83,7 +83,7 @@
 
 import { addDays, format, subDays } from 'date-fns';
 
-import type { IBoardData } from "./types/task.type";
+import type { BoardData } from "./types/task.type";
 
 /* drag drop list
 item = todo
@@ -102,7 +102,7 @@ drag drop task differ list
 
 
 // hash object (hash map)
-export const data: IBoardData = {
+export const data: BoardData = {
   columns: ['list1', 'list2', 'list3'],
   list: {
     list1: {

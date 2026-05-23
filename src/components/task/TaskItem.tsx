@@ -1,65 +1,175 @@
-import { Draggable } from 'react-beautiful-dnd'
-import type { ITaskItem } from '../../types/task.type'
-import { getDueDateMeta, getPriorityBadgeClass } from '../../utils/taskMetadata'
+import { memo, useState, type Dispatch, type SetStateAction } from 'react';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+import type { BoardDeleteItem, ITaskItem } from '../../types/task.type';
+import { getPriorityBadgeClass } from '../../utils/taskMetadata';
+import DueDateBadge from '../atoms/DueDateBadge';
+import { AVAILABLE_ASSIGNEES } from '../organisms/QuickSearch';
 
 interface TaskItemProps {
-  task: ITaskItem,
-  index: number
-  handleEditTask: any
-  listId: string
-  setDeleteItem: any
+  task: ITaskItem;
+  handleEditTask: (task: ITaskItem) => void;
+  listId: string;
+  setDeleteItem: Dispatch<SetStateAction<BoardDeleteItem | null>>;
+  isOverlay?: boolean;
+  onUpdateTask: (taskId: string, fields: Partial<ITaskItem>) => Promise<void>;
 }
 
 function TaskItem({
   task,
-  index,
   handleEditTask,
   listId,
-  setDeleteItem
+  setDeleteItem,
+  isOverlay = false,
+  onUpdateTask,
 }: TaskItemProps) {
-  const dueDateMeta = getDueDateMeta(task.dueDate)
-  const priorityBadgeClass = getPriorityBadgeClass(task.priority)
+  const [showPriorityMenu, setShowPriorityMenu] = useState(false);
+  const [showAssigneeMenu, setShowAssigneeMenu] = useState(false);
+
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: task.id,
+    disabled: isOverlay, // Disable sortable hooks inside the Overlay representation
+    data: {
+      type: 'task',
+      listId,
+    },
+    transition: {
+      duration: 200,
+      easing: 'cubic-bezier(0.25, 1, 0.5, 1)',
+    },
+  });
+
+  const priorityBadgeClass = getPriorityBadgeClass(task.priority);
   const descriptionPreview = (() => {
     if (typeof window === 'undefined') {
-      return task.description.replace(/<[^>]*>/g, ' ').trim()
+      return task.description.replace(/<[^>]*>/g, ' ').trim();
     }
 
-    const descriptionDocument = new DOMParser().parseFromString(task.description, 'text/html')
-    return descriptionDocument.body.textContent?.trim() || ''
-  })()
+    const descriptionDocument = new DOMParser().parseFromString(task.description, 'text/html');
+    return descriptionDocument.body.textContent?.trim() || '';
+  })();
+
+  const style = isOverlay ? {} : {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
 
   return (
-    <Draggable draggableId={task.id.toString()} index={index}>
-      {(provided) => (
+    <div
+      ref={isOverlay ? undefined : setNodeRef}
+      style={style}
+      className={`relative select-none ${
+        isDragging
+          ? 'opacity-20 border border-dashed border-gray-400 bg-gray-50 rounded-xl shadow-inner min-h-[140px]'
+          : isOverlay
+          ? 'shadow-2xl ring-1 ring-black/5'
+          : ''
+      }`}
+      {...(isOverlay ? {} : attributes)}
+      {...(isOverlay ? {} : listeners)}
+    >
+      {!isDragging && (
         <div
-          ref={provided.innerRef}
-          {...provided.draggableProps}
-          {...provided.dragHandleProps}
+          onClick={() => {
+            if (!isOverlay) {
+              handleEditTask(task);
+            }
+          }}
+          className={`bg-white border border-gray-200 rounded-xl p-4 transition-shadow relative ${
+            isOverlay
+              ? 'cursor-grabbing'
+              : 'cursor-pointer hover:shadow-md active:cursor-grabbing'
+          }`}
         >
-          <div className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer">
-            {/* Task Title */}
-            <div className="flex items-start justify-between mb-2 group">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start gap-2">
-                  <h3 className="text-base font-semibold text-gray-900 flex-1 min-w-0 break-all">
-                    {task.title}
-                  </h3>
-                  {task.priority && priorityBadgeClass && (
-                    <span className={`inline-flex shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${priorityBadgeClass}`}>
-                      {task.priority}
-                    </span>
-                  )}
-                </div>
-              </div>
+          {/* Top Line: Priority (Dropdown) & Action Buttons */}
+          <div className="flex items-start justify-between mb-2">
+            {/* Priority Badge with Inline Select */}
+            <div className="relative shrink-0">
+              {task.priority ? (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!isOverlay) setShowPriorityMenu(!showPriorityMenu);
+                  }}
+                  className={`inline-flex shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase transition-all duration-150 cursor-pointer ${priorityBadgeClass} ${
+                    isOverlay ? '' : 'hover:ring-1 hover:ring-offset-1 hover:ring-gray-300'
+                  }`}
+                  title={isOverlay ? undefined : "Click to change priority"}
+                >
+                  {task.priority}
+                </button>
+              ) : (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!isOverlay) setShowPriorityMenu(!showPriorityMenu);
+                  }}
+                  className="inline-flex shrink-0 rounded-full bg-gray-100 text-gray-500 px-2.5 py-0.5 text-[11px] font-medium transition-all duration-150 cursor-pointer hover:bg-gray-200"
+                  title="Click to add priority"
+                >
+                  Set Priority
+                </button>
+              )}
+
+              {/* Inline Priority Floating Dropdown */}
+              {showPriorityMenu && !isOverlay && (
+                <>
+                  <div
+                    className="fixed inset-0 z-20"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowPriorityMenu(false);
+                    }}
+                  />
+                  <div className="absolute left-0 mt-1.5 w-32 bg-white rounded-lg shadow-xl border border-gray-200 py-1.5 z-30 text-xs font-semibold">
+                    {(['High', 'Medium', 'Low', 'Lowest'] as const).map((p) => {
+                      const isActive = task.priority === p;
+                      return (
+                        <button
+                          key={p}
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            setShowPriorityMenu(false);
+                            await onUpdateTask(task.id, { priority: p });
+                          }}
+                          className={`w-full text-left px-3 py-2 flex items-center gap-2 transition-colors cursor-pointer ${
+                            isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          <span className={`w-2 h-2 rounded-full ${
+                            p === 'High' ? 'bg-red-500' : p === 'Medium' ? 'bg-amber-500' : p === 'Low' ? 'bg-emerald-500' : 'bg-gray-400'
+                          }`} />
+                          {p}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Task card edit and delete options */}
+            {!isOverlay && (
               <div className="flex items-center shrink-0">
                 <button
-                  onClick={() => handleEditTask(task)}
-                  className="ml-2 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleEditTask(task);
+                  }}
+                  className="ml-2 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer p-1 rounded-md hover:bg-gray-50"
                   title="Edit task"
                 >
-                  <svg className="w-[1.25rem] h-[1.25rem]" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24">
-                    <path fillRule="evenodd" d="M11.3 6.2H5a2 2 0 0 0-2 2V19a2 2 0 0 0 2 2h11c1.1 0 2-1 2-2.1V11l-4 4.2c-.3.3-.7.6-1.2.7l-2.7.6c-1.7.3-3.3-1.3-3-3.1l.6-2.9c.1-.5.4-1 .7-1.3l3-3.1Z" clipRule="evenodd"></path>
-                    <path fillRule="evenodd" d="M19.8 4.3a2.1 2.1 0 0 0-1-1.1 2 2 0 0 0-2.2.4l-.6.6 2.9 3 .5-.6a2.1 2.1 0 0 0 .6-1.5c0-.2 0-.5-.2-.8Zm-2.4 4.4-2.8-3-4.8 5-.1.3-.7 3c0 .3.3.7.6.6l2.7-.6.3-.1 4.7-5Z" clipRule="evenodd"></path>
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
+                    <path fillRule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clipRule="evenodd" />
                   </svg>
                 </button>
                 <button
@@ -67,65 +177,155 @@ function TaskItem({
                     e.stopPropagation();
                     setDeleteItem({ type: 'card', listId, cardId: task.id });
                   }}
-                  className="ml-2 text-gray-400 hover:text-red-600 transition-colors cursor-pointer"
+                  className="ml-1 text-gray-400 hover:text-red-600 transition-colors cursor-pointer p-1 rounded-md hover:bg-red-50"
                   title="Delete task"
                 >
-                  <svg className="w-[1.25rem] h-[1.25rem]" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0 1 16.138 21H7.862a2 2 0 0 1-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3M4 7h16" />
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0 1 16.138 21H7.862a2 2 0 0 1-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3M4 7h16" />
                   </svg>
                 </button>
               </div>
-            </div>
+            )}
+          </div>
 
-            {/* Task Image */}
-            {task.image && (
+          {/* Task Title */}
+          <h3 className="text-[15px] font-bold text-gray-900 mb-1.5 break-words line-clamp-2 leading-snug">
+            {task.title}
+          </h3>
+
+          {/* Task Description */}
+          {descriptionPreview && (
+            <p className="text-xs text-gray-500 mb-3.5 line-clamp-2 leading-relaxed">
+              {descriptionPreview}
+            </p>
+          )}
+
+          {/* Task Optional Image */}
+          {task.image && (
+            <div className="w-full max-h-36 overflow-hidden rounded-lg mb-3 shadow-inner bg-gray-100">
               <img
                 src={task.image}
                 alt={task.title}
-                className="w-full h-32 object-cover rounded-lg mb-3"
+                className="w-full object-cover"
+                draggable={false}
               />
-            )}
+            </div>
+          )}
 
-            {/* Task Description */}
-            <p className="text-sm text-gray-600 mb-4 line-clamp-2">
-              {descriptionPreview}
-            </p>
+          {/* Due Date Status Row */}
+          <div className="mb-3.5">
+            <DueDateBadge dueDate={task.dueDate} isDone={task.isDone} />
+          </div>
 
-            {/* Task Footer */}
-            <div className="flex items-center justify-between">
-              {/* Assignees */}
-              <div className="flex -space-x-2">
-                {task.assignees.map((assignee, index) => (
+          {/* Divider */}
+          <div className="border-t border-gray-100 my-2.5" />
+
+          {/* Task Footer: Assignees & Status */}
+          <div className="flex items-center justify-between select-none">
+            {/* Assignees Avatars list & Interactive Multi-assignment button */}
+            <div className="flex items-center gap-1.5">
+              <div className="flex -space-x-1.5 overflow-hidden">
+                {(task.assignees || []).map((assignee, index) => (
                   <img
                     key={index}
                     src={assignee.avatar}
                     alt={assignee.name}
-                    className="w-8 h-8 rounded-full border-2 border-white"
+                    className="w-7 h-7 rounded-full border-2 border-white object-cover"
                     title={assignee.name}
+                    draggable={false}
                   />
                 ))}
               </div>
 
-              {/* Days Left / Status */}
-              {task.isDone ? (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                  Done
-                </span>
-              ) : dueDateMeta && (
-                <span className={`inline-flex items-center gap-1 text-xs ${dueDateMeta.className}`}>
-                  <svg className="h-3.5 w-3.5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0Z" />
-                  </svg>
-                  {dueDateMeta.label}
-                </span>
+              {/* Mini Multi-select Assignee circular button */}
+              {!isOverlay && (
+                <div className="relative shrink-0">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowAssigneeMenu(!showAssigneeMenu);
+                    }}
+                    className="h-7 w-7 rounded-full border border-dashed border-gray-300 bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
+                    title="Manage assignees"
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                  </button>
+
+                  {showAssigneeMenu && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-20"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowAssigneeMenu(false);
+                        }}
+                      />
+                      <div className="absolute left-0 bottom-9.5 w-56 bg-white rounded-lg shadow-2xl border border-gray-200 p-2 z-30 text-xs font-medium">
+                        <div className="font-bold text-gray-500 px-2 pb-1.5 border-b border-gray-100 mb-1">
+                          Assign members
+                        </div>
+                        <div className="space-y-0.5 max-h-48 overflow-y-auto">
+                          {AVAILABLE_ASSIGNEES.map((member) => {
+                            const isAssigned = (task.assignees || []).some(a => a.name === member.name);
+                            return (
+                              <button
+                                key={member.name}
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  let newAssignees = [...(task.assignees || [])];
+                                  if (isAssigned) {
+                                    newAssignees = newAssignees.filter(a => a.name !== member.name);
+                                  } else {
+                                    newAssignees.push({ name: member.name, avatar: member.avatar });
+                                  }
+                                  await onUpdateTask(task.id, { assignees: newAssignees });
+                                }}
+                                className="w-full flex items-center justify-between px-2 py-1.5 rounded-md hover:bg-gray-50 text-gray-700 transition-colors cursor-pointer"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <img src={member.avatar} alt={member.name} className="h-5.5 w-5.5 rounded-full object-cover" />
+                                  <span className="truncate">{member.name}</span>
+                                </div>
+                                <input
+                                  type="checkbox"
+                                  checked={isAssigned}
+                                  onChange={() => {}} // Controlled purely by button click
+                                  className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                />
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
               )}
             </div>
+
+            {/* Done Switcher */}
+            {!isOverlay && (
+              <button
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  await onUpdateTask(task.id, { isDone: !task.isDone });
+                }}
+                className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-bold transition-all duration-150 cursor-pointer ${
+                  task.isDone
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                    : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'
+                }`}
+              >
+                {task.isDone ? 'Done ✓' : 'Mark Done'}
+              </button>
+            )}
           </div>
         </div>
       )}
-    </Draggable>
-
-  )
+    </div>
+  );
 }
 
-export default TaskItem
+export default memo(TaskItem);
