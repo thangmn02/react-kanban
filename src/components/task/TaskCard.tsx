@@ -2,6 +2,11 @@ import type { Dispatch, SetStateAction } from 'react';
 
 import type { BoardDeleteItem, ITaskItem } from '../../types/task.type';
 import { getPriorityBadgeClass } from '../../utils/taskMetadata';
+import {
+  getChecklistProgress,
+  getTaskLabelClass,
+  stripTaskHtml,
+} from '../../utils/taskCollections';
 import DueDateBadge from '../atoms/DueDateBadge';
 
 interface TaskCardProps {
@@ -24,14 +29,8 @@ function TaskCard({
   className = '',
 }: TaskCardProps) {
   const priorityBadgeClass = getPriorityBadgeClass(task.priority);
-  const descriptionPreview = (() => {
-    if (typeof window === 'undefined') {
-      return task.description.replace(/<[^>]*>/g, ' ').trim();
-    }
-
-    const descriptionDocument = new DOMParser().parseFromString(task.description, 'text/html');
-    return descriptionDocument.body.textContent?.trim() || '';
-  })();
+  const descriptionPreview = stripTaskHtml(task.description);
+  const checklistProgress = getChecklistProgress(task.checklistItems || []);
 
   return (
     <div
@@ -45,6 +44,18 @@ function TaskCard({
     >
       <div className="mb-2 flex items-start justify-between group">
         <div className="min-w-0 flex-1">
+          {task.labels.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-1.5">
+              {task.labels.slice(0, 2).map((label) => (
+                <span
+                  key={label.id}
+                  className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${getTaskLabelClass(label.color)}`}
+                >
+                  {label.name}
+                </span>
+              ))}
+            </div>
+          )}
           <div className="flex items-start gap-2">
             <h3 className="min-w-0 flex-1 break-all text-base font-semibold text-gray-900">
               {task.title}
@@ -96,11 +107,35 @@ function TaskCard({
         {descriptionPreview}
       </p>
 
+      {task.checklistItems.length > 0 && (
+        <div className="mb-3 rounded-lg border border-emerald-100 bg-emerald-50/70 px-3 py-2">
+          <div className="mb-1 flex items-center justify-between text-[11px] font-semibold text-emerald-700">
+            <span>Checklist</span>
+            <span>{checklistProgress.completed}/{checklistProgress.total}</span>
+          </div>
+          <div className="h-1.5 rounded-full bg-emerald-100">
+            <div
+              className="h-full rounded-full bg-emerald-500"
+              style={{ width: `${checklistProgress.percent}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {task.attachments.length > 0 && (
+        <div className="mb-3 flex items-center gap-2 text-xs font-medium text-blue-700">
+          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 11-5.656-5.656l1.5-1.5m7.328-1.328a4 4 0 010-5.656l3-3a4 4 0 115.656 5.656l-1.5 1.5" />
+          </svg>
+          <span>{task.attachments.length} attachment{task.attachments.length !== 1 ? 's' : ''}</span>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div className="flex -space-x-2">
-          {task.assignees.map((assignee, index) => (
+          {task.assignees.map((assignee) => (
             <img
-              key={index}
+              key={assignee.name}
               src={assignee.avatar}
               alt={assignee.name}
               className="h-8 w-8 rounded-full border-2 border-white"
