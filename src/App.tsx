@@ -1,16 +1,21 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 import { data } from './data';
-import type { BoardData, BoardDeleteItem, ITaskItem } from './types/task.type';
+import type { BoardData, BoardDeleteItem, ITaskItem, TaskDialogFormData } from './types/task.type';
+import type { BoardRow } from './types/supabase.type';
 import AddGroupDialog from './components/organisms/dialog/AddGroupDialog';
+import CreateBoardDialog from './components/organisms/dialog/CreateBoardDialog';
 import DeleteDialog from './components/organisms/dialog/DeleteDialog';
+import CalendarBoardView from './components/organisms/CalendarBoardView';
 import KanbanBoard from './components/organisms/KanbanBoard';
 import TaskDialog from './components/organisms/dialog/TaskDialog';
 import QuickSearch from './components/organisms/QuickSearch';
 import { useTaskRealtime } from './hooks/useTaskRealtime';
-import { fetchBoardSnapshot } from './services/board.service';
+import { createBoardFromTemplate, fetchBoardSnapshot, fetchBoards } from './services/board.service';
+import { replaceTaskChecklistItems } from './services/checklist.service';
+import { replaceTaskLabels } from './services/label.service';
 import { createList, deleteList, updateListPositions } from './services/list.service';
 import {
   createTask,
@@ -20,29 +25,40 @@ import {
   updateTaskPositions,
 } from './services/task.service';
 import { readBoardCache, writeBoardCache } from './utils/boardCache';
-import { buildTaskInsertPayload, buildTaskUpdatePayload } from './utils/boardDataMapper';
+import {
+  buildTaskFieldUpdatePayload,
+  buildTaskInsertPayload,
+  buildTaskUpdatePayload,
+} from './utils/boardDataMapper';
 import { isLocalDemoMode } from './lib/supabase';
 import { createActivity } from './services/activity.service';
 import BoardActivityDialog from './components/organisms/dialog/BoardActivityDialog';
 
+type BoardViewMode = 'board' | 'calendar';
 
-export interface TaskDialogFormData {
+interface CreateBoardDialogFormData {
   title: string;
   description: string;
-  priority?: ITaskItem['priority'];
-  dueDate?: string;
-  startDate?: string;
-  assignees?: ITaskItem['assignees'];
+  templateId: string;
+}
+
+interface BoardChangeActivity {
+  taskId: string;
+  description: string;
 }
 
 function App() {
   const cachedBoard = useMemo(() => readBoardCache(), []);
+  const initialBoardId = cachedBoard?.boardId || null;
   const [boardData, setBoardData] = useState<BoardData>(() => cachedBoard?.boardData || data);
-  const [activeBoardId, setActiveBoardId] = useState<string | null>(() => cachedBoard?.boardId || null);
+  const [activeBoardId, setActiveBoardId] = useState<string | null>(() => initialBoardId);
+  const [boardSummaries, setBoardSummaries] = useState<BoardRow[]>([]);
+  const [activeView, setActiveView] = useState<BoardViewMode>('board');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeListId, setActiveListId] = useState<string | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
+  const [isCreateBoardModalOpen, setIsCreateBoardModalOpen] = useState(false);
   const [isBoardActivityModalOpen, setIsBoardActivityModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterPriority, setFilterPriority] = useState('');
@@ -54,18 +70,35 @@ function App() {
   const [isBoardLoading, setIsBoardLoading] = useState(true);
   const [isSavingBoard, setIsSavingBoard] = useState(false);
   const [boardErrorMessage, setBoardErrorMessage] = useState<string | null>(null);
+  const activeBoardIdRef = useRef<string | null>(initialBoardId);
+  const activeBoardSummary = useMemo(() => (
+    boardSummaries.find((boardSummary) => boardSummary.id === activeBoardId) || null
+  ), [boardSummaries, activeBoardId]);
 
-  const syncBoardCache = (nextBoardId: string | null, nextBoardData: BoardData) => {
+  const syncBoardCache = useCallback((nextBoardId: string | null, nextBoardData: BoardData) => {
     writeBoardCache({
       boardId: nextBoardId,
       boardData: nextBoardData,
     });
-  };
+  }, []);
 
-  const refreshBoardData = async ({ showErrorToast = false }: { showErrorToast?: boolean } = {}) => {
+  const refreshBoardList = useCallback(async () => {
+    const boardRows = await fetchBoards();
+    setBoardSummaries(boardRows);
+    return boardRows;
+  }, []);
+
+  const refreshBoardData = useCallback(async ({
+    boardId,
+    showErrorToast = false,
+  }: {
+    boardId?: string | null;
+    showErrorToast?: boolean;
+  } = {}) => {
     try {
-      const boardSnapshot = await fetchBoardSnapshot();
+      const boardSnapshot = await fetchBoardSnapshot(boardId === undefined ? activeBoardIdRef.current : boardId);
 
+      activeBoardIdRef.current = boardSnapshot.boardId;
       setActiveBoardId(boardSnapshot.boardId);
       setBoardData(boardSnapshot.boardData);
       syncBoardCache(boardSnapshot.boardId, boardSnapshot.boardData);
@@ -81,15 +114,22 @@ function App() {
     } finally {
       setIsBoardLoading(false);
     }
-  };
+  }, [syncBoardCache]);
 
   useEffect(() => {
-    void refreshBoardData();
-  }, []);
+    activeBoardIdRef.current = activeBoardId;
+  }, [activeBoardId]);
+
+  useEffect(() => {
+    void (async () => {
+      await refreshBoardData({ boardId: initialBoardId });
+      await refreshBoardList();
+    })();
+  }, [initialBoardId, refreshBoardData, refreshBoardList]);
 
   useEffect(() => {
     syncBoardCache(activeBoardId, boardData);
-  }, [activeBoardId, boardData]);
+  }, [activeBoardId, boardData, syncBoardCache]);
 
   useTaskRealtime({
     boardId: activeBoardId,
@@ -165,6 +205,29 @@ function App() {
     }
   };
 
+  const handleCreateBoard = async (formData: CreateBoardDialogFormData) => {
+    setIsSavingBoard(true);
+
+    try {
+      const createdBoard = await createBoardFromTemplate({
+        title: formData.title,
+        description: formData.description,
+        templateId: formData.templateId,
+      });
+
+      await refreshBoardData({ boardId: createdBoard.id });
+      await refreshBoardList();
+      setIsCreateBoardModalOpen(false);
+      setActiveView('board');
+      toast.success('Board created successfully!', { theme: 'colored' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to create board.';
+      toast.error(message, { theme: 'colored' });
+    } finally {
+      setIsSavingBoard(false);
+    }
+  };
+
   const onSubmitCard = async (formData: TaskDialogFormData) => {
     if (!activeListId || !activeBoardId) return;
 
@@ -181,7 +244,14 @@ function App() {
         dueDate: formData.dueDate,
         position: boardData.list[activeListId].tasks.length,
         assignees: formData.assignees,
+        attachments: formData.attachments,
+        image: formData.image,
       }));
+
+      await Promise.all([
+        replaceTaskChecklistItems(createdTask.id, formData.checklistItems),
+        replaceTaskLabels(createdTask.id, activeBoardId, formData.labels),
+      ]);
 
       await createActivity(createdTask.id, 'create', {
         description: `Created task "${formData.title}"`,
@@ -301,7 +371,7 @@ function App() {
   };
 
   const onSubmitEditTask = async (formData: TaskDialogFormData) => {
-    if (!editingTask) return;
+    if (!editingTask || !activeBoardId) return;
 
     setIsSavingBoard(true);
 
@@ -313,7 +383,13 @@ function App() {
         startDate: formData.startDate,
         dueDate: formData.dueDate,
         assignees: formData.assignees,
+        attachments: formData.attachments,
+        image: formData.image,
       }));
+      await Promise.all([
+        replaceTaskChecklistItems(editingTask.id, formData.checklistItems),
+        replaceTaskLabels(editingTask.id, activeBoardId, formData.labels),
+      ]);
 
       const changes: string[] = [];
       if (formData.title !== editingTask.title) {
@@ -331,11 +407,23 @@ function App() {
       if (formData.dueDate !== editingTask.dueDate) {
         changes.push(`changed due date to ${formData.dueDate || 'none'}`);
       }
+      if ((formData.image || '') !== (editingTask.image || '')) {
+        changes.push(`updated cover image`);
+      }
 
       const prevAssignees = editingTask.assignees?.map(a => a.name).join(', ') || '';
       const nextAssignees = formData.assignees?.map(a => a.name).join(', ') || '';
       if (prevAssignees !== nextAssignees) {
         changes.push(`updated assignees to [${formData.assignees?.map(a => a.name).join(', ') || 'none'}]`);
+      }
+      if (JSON.stringify(formData.labels) !== JSON.stringify(editingTask.labels || [])) {
+        changes.push(`updated labels`);
+      }
+      if (JSON.stringify(formData.attachments) !== JSON.stringify(editingTask.attachments || [])) {
+        changes.push(`updated attachments`);
+      }
+      if (JSON.stringify(formData.checklistItems) !== JSON.stringify(editingTask.checklistItems || [])) {
+        changes.push(`updated checklist`);
       }
 
       const description = changes.length > 0
@@ -363,7 +451,11 @@ function App() {
     setOpenMenuId(openMenuId === listId ? null : listId);
   };
 
-  const handleBoardDataChange = async (nextBoardData: BoardData, changeType: 'list' | 'task') => {
+  const handleBoardDataChange = async (
+    nextBoardData: BoardData,
+    changeType: 'list' | 'task',
+    activity?: BoardChangeActivity,
+  ) => {
     const previousBoardData = boardData;
 
     setBoardData(nextBoardData);
@@ -381,6 +473,16 @@ function App() {
 
         if (taskPositions.length > 0) {
           await updateTaskPositions(taskPositions);
+
+          if (activity) {
+            try {
+              await createActivity(activity.taskId, 'move', {
+                description: activity.description,
+              });
+            } catch (activityError) {
+              console.error('Failed to create move activity:', activityError);
+            }
+          }
         }
       }
     } catch (error) {
@@ -412,10 +514,7 @@ function App() {
     });
 
     try {
-      const payload: any = {};
-      if ('priority' in fields) payload.priority = fields.priority;
-      if ('assignees' in fields) payload.assignees = fields.assignees;
-      if ('isDone' in fields) payload.is_done = fields.isDone;
+      const payload = buildTaskFieldUpdatePayload(fields);
 
       await updateTask(taskId, payload);
 
@@ -452,6 +551,7 @@ function App() {
       }
     } catch (error) {
       setBoardData(previousBoardData);
+      syncBoardCache(activeBoardId, previousBoardData);
       const message = error instanceof Error ? error.message : 'Unable to update task.';
       toast.error(message, { theme: 'colored' });
     }
@@ -461,9 +561,44 @@ function App() {
     <div className="min-h-screen bg-gray-50">
       <nav className="bg-white border-b border-gray-200">
         <div className="px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <h1 className="text-xl font-bold text-gray-900 tracking-tight">HVAC Editor</h1>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-blue-600">
+                  Active board
+                </p>
+                <div className="mt-1 flex flex-wrap items-center gap-3">
+                  <select
+                    value={activeBoardId || ''}
+                    onChange={(event) => {
+                      const nextBoardId = event.target.value || null;
+                      setIsBoardLoading(true);
+                      setActiveView('board');
+                      void refreshBoardData({ boardId: nextBoardId, showErrorToast: true });
+                    }}
+                    className="rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {boardSummaries.map((boardSummary) => (
+                      <option key={boardSummary.id} value={boardSummary.id}>
+                        {boardSummary.title}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => setIsCreateBoardModalOpen(true)}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+                  >
+                    <svg className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                    New board
+                  </button>
+                </div>
+                <p className="mt-2 text-sm text-gray-500">
+                  {activeBoardSummary?.description || 'Kanban workspace with realtime tasks, lists, and richer task details.'}
+                </p>
+              </div>
               {isLocalDemoMode && (
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700 border border-amber-200 shadow-sm">
                   <span className="relative flex h-1.5 w-1.5">
@@ -474,7 +609,31 @@ function App() {
                 </span>
               )}
             </div>
-            <div>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="inline-flex rounded-xl border border-gray-200 bg-gray-50 p-1 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setActiveView('board')}
+                  className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${
+                    activeView === 'board'
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  Board
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveView('calendar')}
+                  className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${
+                    activeView === 'calendar'
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  Calendar
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={() => setIsBoardActivityModalOpen(true)}
@@ -531,24 +690,35 @@ function App() {
         }}
       />
 
-      <KanbanBoard
-        boardData={boardData}
-        searchQuery={searchQuery}
-        filterPriority={filterPriority}
-        filterAssignee={filterAssignee}
-        filterDueDate={filterDueDate}
-        openMenuId={openMenuId}
-        toggleMenu={toggleMenu}
-        handleEditTask={handleEditTask}
-        setDeleteItem={setDeleteItem}
-        onBoardDataChange={handleBoardDataChange}
-        onUpdateTask={handleUpdateTask}
-        onOpenAddTask={(listId) => {
-          setActiveListId(listId);
-          setIsModalOpen(true);
-        }}
-        onOpenAddGroup={() => setIsGroupModalOpen(true)}
-      />
+      {activeView === 'board' ? (
+        <KanbanBoard
+          boardData={boardData}
+          searchQuery={searchQuery}
+          filterPriority={filterPriority}
+          filterAssignee={filterAssignee}
+          filterDueDate={filterDueDate}
+          openMenuId={openMenuId}
+          toggleMenu={toggleMenu}
+          handleEditTask={handleEditTask}
+          setDeleteItem={setDeleteItem}
+          onBoardDataChange={handleBoardDataChange}
+          onUpdateTask={handleUpdateTask}
+          onOpenAddTask={(listId) => {
+            setActiveListId(listId);
+            setIsModalOpen(true);
+          }}
+          onOpenAddGroup={() => setIsGroupModalOpen(true)}
+        />
+      ) : (
+        <CalendarBoardView
+          boardData={boardData}
+          searchQuery={searchQuery}
+          filterPriority={filterPriority}
+          filterAssignee={filterAssignee}
+          filterDueDate={filterDueDate}
+          onOpenTask={handleEditTask}
+        />
+      )}
 
       <TaskDialog
         isOpen={isModalOpen || isEditModalOpen}
@@ -575,6 +745,13 @@ function App() {
         <AddGroupDialog
           onClose={() => setIsGroupModalOpen(false)}
           onSubmitGroup={onSubmitList}
+        />
+      )}
+
+      {isCreateBoardModalOpen && (
+        <CreateBoardDialog
+          onClose={() => setIsCreateBoardModalOpen(false)}
+          onSubmitBoard={handleCreateBoard}
         />
       )}
 

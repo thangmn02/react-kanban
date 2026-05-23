@@ -1,5 +1,6 @@
-import supabase from '../lib/supabase';
+import supabase, { requireSupabaseClient } from '../lib/supabase';
 import type { ITaskActivity } from '../types/task.type';
+import type { Json, TaskActivityInsert, TaskActivityRow } from '../types/supabase.type';
 
 const cacheKey = 'kanban_activities_cache';
 
@@ -7,6 +8,16 @@ const DEFAULT_ACTOR = {
   name: 'You',
   avatar: 'https://flowbite.com/application-ui/demo/images/users/bonnie-green.png',
 };
+
+const TASK_ACTIVITY_ACTIONS: ITaskActivity['action'][] = [
+  'create',
+  'update',
+  'move',
+  'priority_change',
+  'assignee_change',
+  'status_change',
+  'deleted',
+];
 
 // Helper for local activities
 function getLocalActivities(): ITaskActivity[] {
@@ -25,6 +36,50 @@ function saveLocalActivities(activities: ITaskActivity[]) {
   window.localStorage.setItem(cacheKey, JSON.stringify(activities));
 }
 
+function normalizeActivityAction(action: string): ITaskActivity['action'] {
+  return TASK_ACTIVITY_ACTIONS.includes(action as ITaskActivity['action'])
+    ? action as ITaskActivity['action']
+    : 'update';
+}
+
+function normalizeActivityDetails(details: Json): ITaskActivity['details'] {
+  if (!details || typeof details !== 'object' || Array.isArray(details)) {
+    return { description: '' };
+  }
+
+  const description = typeof details.description === 'string' ? details.description : '';
+
+  return {
+    description,
+    field: typeof details.field === 'string' ? details.field : undefined,
+    oldValue: details.oldValue,
+    newValue: details.newValue,
+  };
+}
+
+function normalizeActivityActor(actor: Json): ITaskActivity['actor'] {
+  if (!actor || typeof actor !== 'object' || Array.isArray(actor)) {
+    return DEFAULT_ACTOR;
+  }
+
+  return {
+    name: typeof actor.name === 'string' ? actor.name : DEFAULT_ACTOR.name,
+    avatar: typeof actor.avatar === 'string' ? actor.avatar : DEFAULT_ACTOR.avatar,
+  };
+}
+
+function mapActivityRowToActivity(activityRow: TaskActivityRow, taskTitle?: string): ITaskActivity {
+  return {
+    id: activityRow.id,
+    task_id: activityRow.task_id,
+    task_title: taskTitle,
+    action: normalizeActivityAction(activityRow.action),
+    details: normalizeActivityDetails(activityRow.details),
+    actor: normalizeActivityActor(activityRow.actor),
+    created_at: activityRow.created_at,
+  };
+}
+
 export async function createActivity(
   taskId: string,
   action: ITaskActivity['action'],
@@ -32,26 +87,31 @@ export async function createActivity(
   actor = DEFAULT_ACTOR,
   taskTitle?: string
 ): Promise<ITaskActivity> {
-  const newActivity: Omit<ITaskActivity, 'id'> = {
+  const newActivity: TaskActivityInsert = {
     task_id: taskId,
-    task_title: taskTitle,
     action,
-    details,
-    actor,
+    details: details as Json,
+    actor: actor as Json,
     created_at: new Date().toISOString(),
   };
 
   if (!supabase) {
     const localActivity: ITaskActivity = {
       id: `act-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      ...newActivity,
+      task_id: taskId,
+      task_title: taskTitle,
+      action,
+      details,
+      actor,
+      created_at: new Date().toISOString(),
     };
     const current = getLocalActivities();
     saveLocalActivities([localActivity, ...current]);
     return localActivity;
   }
 
-  const { data, error } = await supabase
+  const client = requireSupabaseClient();
+  const { data, error } = await client
     .from('task_activities')
     .insert(newActivity)
     .select()
@@ -61,7 +121,7 @@ export async function createActivity(
     throw error;
   }
 
-  return data as ITaskActivity;
+  return mapActivityRowToActivity(data, taskTitle);
 }
 
 export async function fetchActivitiesForTask(taskId: string): Promise<ITaskActivity[]> {
@@ -72,7 +132,8 @@ export async function fetchActivitiesForTask(taskId: string): Promise<ITaskActiv
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }
 
-  const { data, error } = await supabase
+  const client = requireSupabaseClient();
+  const { data, error } = await client
     .from('task_activities')
     .select('*')
     .eq('task_id', taskId)
@@ -82,7 +143,7 @@ export async function fetchActivitiesForTask(taskId: string): Promise<ITaskActiv
     throw error;
   }
 
-  return data as ITaskActivity[];
+  return data.map((activityRow) => mapActivityRowToActivity(activityRow));
 }
 
 export async function fetchBoardActivities(boardId: string): Promise<ITaskActivity[]> {
@@ -91,7 +152,8 @@ export async function fetchBoardActivities(boardId: string): Promise<ITaskActivi
     return all.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }
 
-  const { data, error } = await supabase
+  const client = requireSupabaseClient();
+  const { data, error } = await client
     .from('task_activities')
     .select('*, tasks!inner(board_id)')
     .eq('tasks.board_id', boardId)
@@ -101,5 +163,5 @@ export async function fetchBoardActivities(boardId: string): Promise<ITaskActivi
     throw error;
   }
 
-  return data as ITaskActivity[];
+  return (data as TaskActivityRow[]).map((activityRow) => mapActivityRowToActivity(activityRow));
 }

@@ -3,9 +3,14 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
 import type { BoardDeleteItem, ITaskItem } from '../../types/task.type';
+import { AVAILABLE_ASSIGNEES } from '../../data/assignees';
 import { getPriorityBadgeClass } from '../../utils/taskMetadata';
+import {
+  getChecklistProgress,
+  getTaskLabelClass,
+  stripTaskHtml,
+} from '../../utils/taskCollections';
 import DueDateBadge from '../atoms/DueDateBadge';
-import { AVAILABLE_ASSIGNEES } from '../organisms/QuickSearch';
 
 interface TaskItemProps {
   task: ITaskItem;
@@ -48,14 +53,8 @@ function TaskItem({
   });
 
   const priorityBadgeClass = getPriorityBadgeClass(task.priority);
-  const descriptionPreview = (() => {
-    if (typeof window === 'undefined') {
-      return task.description.replace(/<[^>]*>/g, ' ').trim();
-    }
-
-    const descriptionDocument = new DOMParser().parseFromString(task.description, 'text/html');
-    return descriptionDocument.body.textContent?.trim() || '';
-  })();
+  const descriptionPreview = stripTaskHtml(task.description);
+  const checklistProgress = getChecklistProgress(task.checklistItems || []);
 
   const style = isOverlay ? {} : {
     transform: CSS.Transform.toString(transform),
@@ -189,6 +188,19 @@ function TaskItem({
           </div>
 
           {/* Task Title */}
+          {task.labels.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-1.5">
+              {task.labels.slice(0, 3).map((label) => (
+                <span
+                  key={label.id}
+                  className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${getTaskLabelClass(label.color)}`}
+                >
+                  {label.name}
+                </span>
+              ))}
+            </div>
+          )}
+
           <h3 className="text-[15px] font-bold text-gray-900 mb-1.5 break-words line-clamp-2 leading-snug">
             {task.title}
           </h3>
@@ -216,6 +228,34 @@ function TaskItem({
           <div className="mb-3.5">
             <DueDateBadge dueDate={task.dueDate} isDone={task.isDone} />
           </div>
+
+          {(task.checklistItems.length > 0 || task.attachments.length > 0) && (
+            <div className="mb-3.5 space-y-2">
+              {task.checklistItems.length > 0 && (
+                <div className="rounded-lg border border-emerald-100 bg-emerald-50/70 px-3 py-2">
+                  <div className="mb-1 flex items-center justify-between text-[11px] font-semibold text-emerald-700">
+                    <span>Checklist</span>
+                    <span>{checklistProgress.completed}/{checklistProgress.total}</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-emerald-100">
+                    <div
+                      className="h-full rounded-full bg-emerald-500 transition-[width] duration-200"
+                      style={{ width: `${checklistProgress.percent}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {task.attachments.length > 0 && (
+                <div className="flex items-center gap-2 text-[11px] font-medium text-blue-700">
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 11-5.656-5.656l1.5-1.5m7.328-1.328a4 4 0 010-5.656l3-3a4 4 0 115.656 5.656l-1.5 1.5" />
+                  </svg>
+                  <span>{task.attachments.length} attachment{task.attachments.length !== 1 ? 's' : ''}</span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Divider */}
           <div className="border-t border-gray-100 my-2.5" />

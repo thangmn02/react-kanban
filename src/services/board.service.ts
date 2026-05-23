@@ -1,16 +1,26 @@
 import { data as seedBoardData } from '../data';
-import supabase from '../lib/supabase';
-import type { BoardData } from '../types/task.type';
+import { getBoardTemplateById } from '../data/boardTemplates';
+import supabase, { requireSupabaseClient } from '../lib/supabase';
+import type { BoardData, ITaskItem } from '../types/task.type';
 import type { BoardInsert, BoardRow, ListRow, TaskInsert, TaskRow } from '../types/supabase.type';
 import { buildBoardDataFromRows } from '../utils/boardDataMapper';
+import { fetchChecklistItemsByTaskIds, replaceTaskChecklistItems } from './checklist.service';
+import { fetchLabelLinksByTaskIds, fetchLabelsByIds, replaceTaskLabels } from './label.service';
 
 export interface BoardSnapshot {
   boardId: string | null;
   boardData: BoardData;
 }
 
+export interface CreateBoardFromTemplateParams {
+  title: string;
+  description: string;
+  templateId: string;
+}
+
 async function createBoard(boardData: BoardInsert): Promise<BoardRow> {
-  const { data, error } = await supabase
+  const client = requireSupabaseClient();
+  const { data, error } = await client
     .from('boards')
     .insert(boardData)
     .select()
@@ -23,8 +33,19 @@ async function createBoard(boardData: BoardInsert): Promise<BoardRow> {
   return data;
 }
 
-async function fetchBoardRows(): Promise<BoardRow[]> {
-  const { data, error } = await supabase
+export async function fetchBoards(): Promise<BoardRow[]> {
+  if (!supabase) {
+    return [{
+      id: 'local-mock-board',
+      title: 'HVAC Editor',
+      description: 'Local demo board',
+      created_at: new Date().toISOString(),
+      updated_at: null,
+    }];
+  }
+
+  const client = requireSupabaseClient();
+  const { data, error } = await client
     .from('boards')
     .select('*')
     .order('created_at', { ascending: true });
@@ -37,7 +58,8 @@ async function fetchBoardRows(): Promise<BoardRow[]> {
 }
 
 async function fetchLists(boardId: string): Promise<ListRow[]> {
-  const { data, error } = await supabase
+  const client = requireSupabaseClient();
+  const { data, error } = await client
     .from('lists')
     .select('*')
     .eq('board_id', boardId)
@@ -52,11 +74,13 @@ async function fetchLists(boardId: string): Promise<ListRow[]> {
 }
 
 async function fetchTasksForBoard(boardId: string): Promise<TaskRow[]> {
-  const { data, error } = await supabase
+  const client = requireSupabaseClient();
+  const { data, error } = await client
     .from('tasks')
     .select('*')
     .eq('board_id', boardId)
     .is('deleted_at', null)
+    .is('archived_at', null)
     .order('position', { ascending: true })
     .order('created_at', { ascending: true });
 
@@ -68,6 +92,7 @@ async function fetchTasksForBoard(boardId: string): Promise<TaskRow[]> {
 }
 
 async function seedDefaultBoard(): Promise<BoardRow> {
+  const client = requireSupabaseClient();
   const boardRow = await createBoard({
     title: 'HVAC Editor',
     description: 'Seeded Kanban board',
@@ -77,7 +102,7 @@ async function seedDefaultBoard(): Promise<BoardRow> {
 
   for (const [listPosition, sourceListId] of seedBoardData.columns.entries()) {
     const sourceList = seedBoardData.list[sourceListId];
-    const { data: insertedList, error: listError } = await supabase
+    const { data: insertedList, error: listError } = await client
       .from('lists')
       .insert({
         board_id: boardRow.id,
@@ -95,6 +120,11 @@ async function seedDefaultBoard(): Promise<BoardRow> {
   }
 
   const taskInserts: TaskInsert[] = [];
+  const seededTaskDetails: Array<{
+    sourceTaskId: string;
+    checklistItems: ITaskItem['checklistItems'];
+    labels: ITaskItem['labels'];
+  }> = [];
 
   seedBoardData.columns.forEach((sourceListId) => {
     const sourceList = seedBoardData.list[sourceListId];
@@ -117,16 +147,76 @@ async function seedDefaultBoard(): Promise<BoardRow> {
         category2: sourceTask.category2 || null,
         assignees: sourceTask.assignees as unknown as TaskInsert['assignees'],
         image: sourceTask.image || null,
+        attachments: sourceTask.attachments as unknown as TaskInsert['attachments'],
         is_done: sourceTask.isDone || false,
         position: taskPosition,
+      });
+
+      seededTaskDetails.push({
+        sourceTaskId: taskId,
+        checklistItems: sourceTask.checklistItems,
+        labels: sourceTask.labels,
       });
     });
   });
 
   if (taskInserts.length) {
-    const { error } = await supabase
+    const { data: insertedTasks, error } = await client
       .from('tasks')
-      .insert(taskInserts);
+      .insert(taskInserts)
+      .select();
+
+    if (error) {
+      throw error;
+    }
+
+    for (const [index, insertedTask] of insertedTasks.entries()) {
+      const seededTaskDetail = seededTaskDetails[index];
+
+      if (!seededTaskDetail) {
+        continue;
+      }
+
+      await replaceTaskChecklistItems(insertedTask.id, seededTaskDetail.checklistItems);
+      await replaceTaskLabels(insertedTask.id, boardRow.id, seededTaskDetail.labels);
+    }
+  }
+
+  return boardRow;
+}
+
+export async function createBoardFromTemplate({
+  title,
+  description,
+  templateId,
+}: CreateBoardFromTemplateParams): Promise<BoardRow> {
+  if (!supabase) {
+    return {
+      id: `board-${Date.now()}`,
+      title,
+      description,
+      created_at: new Date().toISOString(),
+      updated_at: null,
+    };
+  }
+
+  const client = requireSupabaseClient();
+  const boardTemplate = getBoardTemplateById(templateId);
+  const boardRow = await createBoard({
+    title,
+    description: description || boardTemplate.description,
+  });
+
+  const templateLists = boardTemplate.lists.map((listTitle, index) => ({
+    board_id: boardRow.id,
+    title: listTitle,
+    position: index * 1000,
+  }));
+
+  if (templateLists.length > 0) {
+    const { error } = await client
+      .from('lists')
+      .insert(templateLists);
 
     if (error) {
       throw error;
@@ -136,7 +226,7 @@ async function seedDefaultBoard(): Promise<BoardRow> {
   return boardRow;
 }
 
-export async function fetchBoardSnapshot(): Promise<BoardSnapshot> {
+export async function fetchBoardSnapshot(requestedBoardId?: string | null): Promise<BoardSnapshot> {
   if (!supabase) {
     return {
       boardId: 'local-mock-board',
@@ -144,8 +234,8 @@ export async function fetchBoardSnapshot(): Promise<BoardSnapshot> {
     };
   }
 
-  const boardRows = await fetchBoardRows();
-  let activeBoard = boardRows[0];
+  const boardRows = await fetchBoards();
+  let activeBoard = boardRows.find((boardRow) => boardRow.id === requestedBoardId) || boardRows[0];
 
   if (!activeBoard) {
     activeBoard = await seedDefaultBoard();
@@ -155,9 +245,21 @@ export async function fetchBoardSnapshot(): Promise<BoardSnapshot> {
     fetchLists(activeBoard.id),
     fetchTasksForBoard(activeBoard.id),
   ]);
+  const taskIds = taskRows.map((taskRow) => taskRow.id);
+  const [checklistItemRows, taskLabelLinkRows] = await Promise.all([
+    fetchChecklistItemsByTaskIds(taskIds),
+    fetchLabelLinksByTaskIds(taskIds),
+  ]);
+  const taskLabelRows = await fetchLabelsByIds(taskLabelLinkRows.map((taskLabelLinkRow) => taskLabelLinkRow.label_id));
 
   return {
     boardId: activeBoard.id,
-    boardData: buildBoardDataFromRows(listRows, taskRows),
+    boardData: buildBoardDataFromRows(
+      listRows,
+      taskRows,
+      checklistItemRows,
+      taskLabelRows,
+      taskLabelLinkRows,
+    ),
   };
 }

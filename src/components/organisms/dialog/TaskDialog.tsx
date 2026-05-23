@@ -1,19 +1,29 @@
-import { useEffect, useState } from 'react';
-import { useForm, type Resolver } from 'react-hook-form';
+import { useCallback, useEffect, useState } from 'react';
+import { useForm, useWatch, type Resolver } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { EditorContent, useEditor } from '@tiptap/react';
 import Placeholder from '@tiptap/extension-placeholder';
 import StarterKit from '@tiptap/starter-kit';
+import { formatDistanceToNow, parseISO } from 'date-fns';
 
 import Button from '../../atoms/Button';
-import ContentDialog from '../../molecules/dialog/ContentDialog';
 import InputField from '../../molecules/InputField';
-import type { TaskDialogFormData } from '../../../App';
-import type { ITaskItem, ITaskActivity } from '../../../types/task.type';
-import { AVAILABLE_ASSIGNEES } from '../../organisms/QuickSearch';
-import { formatDistanceToNow, parseISO } from 'date-fns';
+import type {
+  ITaskActivity,
+  ITaskItem,
+  TaskDialogFormData,
+  TaskAttachment,
+  TaskChecklistItem,
+  TaskLabel,
+} from '../../../types/task.type';
+import { AVAILABLE_ASSIGNEES } from '../../../data/assignees';
 import { fetchActivitiesForTask } from '../../../services/activity.service';
+import {
+  getChecklistProgress,
+  getTaskLabelClass,
+  TASK_LABEL_COLOR_OPTIONS,
+} from '../../../utils/taskCollections';
 
 interface TaskDialogProps {
   isOpen: boolean;
@@ -28,6 +38,7 @@ const taskSchema = yup.object({
   priority: yup.string(),
   startDate: yup.string(),
   dueDate: yup.string(),
+  image: yup.string(),
   assignees: yup.array(),
 }).required();
 
@@ -39,7 +50,16 @@ interface TaskDialogValues {
   priority?: string;
   startDate?: string;
   dueDate?: string;
+  image?: string;
   assignees?: Array<{ name: string; avatar: string }>;
+}
+
+function createLocalId(prefix: string) {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
 function TaskDialog({ isOpen, onClose, onSubmitTask, taskData }: TaskDialogProps) {
@@ -47,8 +67,23 @@ function TaskDialog({ isOpen, onClose, onSubmitTask, taskData }: TaskDialogProps
   const [showAssigneeSelect, setShowAssigneeSelect] = useState(false);
   const [activities, setActivities] = useState<ITaskActivity[]>([]);
   const [isLoadingActivities, setIsLoadingActivities] = useState(false);
+  const [labels, setLabels] = useState<TaskLabel[]>([]);
+  const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
+  const [checklistItems, setChecklistItems] = useState<TaskChecklistItem[]>([]);
+  const [labelDraft, setLabelDraft] = useState('');
+  const [labelColorDraft, setLabelColorDraft] = useState<TaskLabel['color']>('sky');
+  const [attachmentNameDraft, setAttachmentNameDraft] = useState('');
+  const [attachmentUrlDraft, setAttachmentUrlDraft] = useState('');
+  const [checklistDraft, setChecklistDraft] = useState('');
 
-  const { register, handleSubmit, formState: { errors }, reset, setValue, watch } = useForm<TaskDialogValues>({
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+    setValue,
+    control,
+  } = useForm<TaskDialogValues>({
     resolver: yupResolver(taskSchema) as Resolver<TaskDialogValues>,
     defaultValues: {
       title: taskData?.title || '',
@@ -56,24 +91,27 @@ function TaskDialog({ isOpen, onClose, onSubmitTask, taskData }: TaskDialogProps
       priority: taskData?.priority || 'Low',
       startDate: taskData?.startDate || '',
       dueDate: taskData?.dueDate || '',
+      image: taskData?.image || '',
       assignees: taskData?.assignees || [],
     }
   });
 
-  const currentAssignees = watch('assignees') || [];
+  const currentAssignees = useWatch({ control, name: 'assignees' }) || [];
+  const imagePreview = useWatch({ control, name: 'image' });
+  const checklistProgress = getChecklistProgress(checklistItems);
 
   const editor = useEditor({
     extensions: [
       StarterKit,
       Placeholder.configure({
-        placeholder: 'Write a description here...',
+        placeholder: 'Capture context, notes, or acceptance criteria...',
       }),
     ],
     content: taskData?.description || '',
     immediatelyRender: false,
     editorProps: {
       attributes: {
-        class: 'min-h-[160px] px-3 py-2 text-sm text-gray-900 focus:outline-none',
+        class: 'min-h-[180px] px-4 py-3 text-sm text-gray-900 focus:outline-none',
       },
     },
     onUpdate: ({ editor: currentEditor }) => {
@@ -89,348 +127,698 @@ function TaskDialog({ isOpen, onClose, onSubmitTask, taskData }: TaskDialogProps
     register('assignees');
   }, [register]);
 
-  useEffect(() => {
-    if (!isOpen) {
-      if (editor) {
-        editor.commands.clearContent();
-      }
-      return;
-    }
+  const resetTransientDialogState = useCallback(() => {
+    setShowAssigneeSelect(false);
+    setActivities([]);
+    setIsLoadingActivities(false);
+  }, []);
 
+  const initializeDialogState = useCallback(() => {
     const nextValues = {
       title: taskData?.title || '',
       description: taskData?.description || '',
       priority: taskData?.priority || 'Low',
       startDate: taskData?.startDate || '',
       dueDate: taskData?.dueDate || '',
+      image: taskData?.image || '',
       assignees: taskData?.assignees || [],
     };
 
     reset(nextValues);
     setValue('description', nextValues.description);
     setValue('assignees', nextValues.assignees);
+    setShowAssigneeSelect(false);
+    setLabels(taskData?.labels || []);
+    setAttachments(taskData?.attachments || []);
+    setChecklistItems(taskData?.checklistItems || []);
+    setLabelDraft('');
+    setAttachmentNameDraft('');
+    setAttachmentUrlDraft('');
+    setChecklistDraft('');
+    setActivities([]);
 
     if (editor) {
       editor.commands.setContent(nextValues.description);
     }
-  }, [editor, isOpen, reset, setValue, taskData]);
+  }, [editor, reset, setValue, taskData]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      resetTransientDialogState();
+      return;
+    }
+
+    initializeDialogState();
+  }, [initializeDialogState, isOpen, resetTransientDialogState]);
+
+  const loadActivities = useCallback(async (taskId: string) => {
+    setIsLoadingActivities(true);
+
+    try {
+      const nextActivities = await fetchActivitiesForTask(taskId);
+      setActivities(nextActivities);
+    } catch (error) {
+      console.error('Failed to load activities:', error);
+      setActivities([]);
+    } finally {
+      setIsLoadingActivities(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (isOpen && isEditMode && taskData?.id) {
-      setIsLoadingActivities(true);
-      fetchActivitiesForTask(taskData.id)
-        .then((data) => setActivities(data))
-        .catch((err) => console.error('Failed to load activities:', err))
-        .finally(() => setIsLoadingActivities(false));
+      void loadActivities(taskData.id);
     } else {
-      setActivities([]);
+      resetTransientDialogState();
     }
-  }, [isOpen, isEditMode, taskData?.id]);
+  }, [isEditMode, isOpen, loadActivities, resetTransientDialogState, taskData?.id]);
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    return null;
+  }
 
   const handleFormSubmit = (formData: TaskDialogValues) => {
     onSubmitTask({
-      title: formData.title,
+      title: formData.title.trim(),
       description: formData.description || '',
       priority: formData.priority as TaskDialogFormData['priority'],
       startDate: formData.startDate || '',
       dueDate: formData.dueDate || '',
       assignees: formData.assignees || [],
+      image: formData.image?.trim() || '',
+      labels,
+      attachments,
+      checklistItems,
     });
   };
 
+  const handleAddLabel = () => {
+    const nextLabelName = labelDraft.trim();
+
+    if (!nextLabelName) {
+      return;
+    }
+
+    setLabels((currentLabels) => [
+      ...currentLabels,
+      {
+        id: createLocalId('label'),
+        name: nextLabelName,
+        color: labelColorDraft,
+      },
+    ]);
+    setLabelDraft('');
+  };
+
+  const handleAddAttachment = () => {
+    const nextAttachmentName = attachmentNameDraft.trim();
+    const nextAttachmentUrl = attachmentUrlDraft.trim();
+
+    if (!nextAttachmentName || !nextAttachmentUrl) {
+      return;
+    }
+
+    try {
+      new URL(nextAttachmentUrl);
+    } catch {
+      return;
+    }
+
+    setAttachments((currentAttachments) => [
+      ...currentAttachments,
+      {
+        id: createLocalId('attachment'),
+        name: nextAttachmentName,
+        url: nextAttachmentUrl,
+        type: 'link',
+      },
+    ]);
+    setAttachmentNameDraft('');
+    setAttachmentUrlDraft('');
+  };
+
+  const handleAddChecklistItem = () => {
+    const nextChecklistText = checklistDraft.trim();
+
+    if (!nextChecklistText) {
+      return;
+    }
+
+    setChecklistItems((currentChecklistItems) => [
+      ...currentChecklistItems,
+      {
+        id: createLocalId('checklist'),
+        text: nextChecklistText,
+        isDone: false,
+      },
+    ]);
+    setChecklistDraft('');
+  };
+
   return (
-    <ContentDialog
-      onSubmit={handleSubmit(handleFormSubmit)}
-      onClose={onClose}
-      title={(
-        <div className="mb-6 flex items-center justify-between">
-          <h3 className="text-xl font-bold text-gray-900">
-            {isEditMode ? 'Edit task' : 'Add new task'}
-          </h3>
+    <div className="fixed inset-0 z-50">
+      <div
+        className="absolute inset-0 bg-slate-950/35 backdrop-blur-[1px]"
+        onClick={onClose}
+      />
+
+      <aside className="absolute right-0 top-0 flex h-full w-full max-w-3xl flex-col overflow-hidden bg-white shadow-2xl">
+        <div className="flex items-start justify-between border-b border-gray-200 bg-white px-6 py-5">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-600">
+              {isEditMode ? 'Task Detail' : 'Create Task'}
+            </p>
+            <h3 className="mt-2 text-2xl font-bold tracking-tight text-gray-900">
+              {isEditMode ? 'Edit task in context' : 'Add a richer task'}
+            </h3>
+            <p className="mt-1 text-sm text-gray-500">
+              Keep the board visible while editing the task, checklist, labels, and attachments.
+            </p>
+          </div>
+
           <button
             type="button"
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 cursor-pointer"
+            className="rounded-full p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
           >
-            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
-      )}
-      modalFooter={(
-        <div className="mt-6 flex w-full justify-start space-x-3 border-t border-gray-200 pt-6">
-          <Button
-            text={isEditMode ? 'Save changes' : 'Add new task'}
-            variant="primary"
-            onClick={handleSubmit(handleFormSubmit)}
-            icon={!isEditMode ? (
-              <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-            ) : undefined}
-          />
-          <Button
-            text="Cancel"
-            variant="outline"
-            onClick={onClose}
-          />
-        </div>
-      )}
-      className="max-h-[90vh] w-full max-w-3xl overflow-y-auto p-6"
-    >
-      <form onSubmit={handleSubmit(handleFormSubmit)}>
-        <div className="grid gap-6 md:grid-cols-2">
-          {/* Title & Description section */}
-          <div className="flex flex-col space-y-4">
-            <InputField
-              label="Title"
-              messageError={errors.title?.message}
-              placeholder="Add title here"
-              {...register('title')}
-            />
 
-            <div className="flex flex-1 flex-col">
-              <label className="mb-2 block text-sm font-semibold text-gray-700">
-                Description
-              </label>
-
-              <div className="flex items-center space-x-2 rounded-t-lg border border-gray-300 border-b-0 bg-gray-50 px-2 py-1">
-                <button
-                  type="button"
-                  onClick={() => editor?.chain().focus().toggleBold().run()}
-                  className={`rounded p-1.5 ${editor?.isActive('bold') ? 'bg-gray-200 text-gray-900' : 'text-gray-500 hover:bg-gray-200 hover:text-gray-700'}`}
-                >
-                  <span className="px-1 font-bold">B</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => editor?.chain().focus().toggleItalic().run()}
-                  className={`rounded p-1.5 ${editor?.isActive('italic') ? 'bg-gray-200 text-gray-900' : 'text-gray-500 hover:bg-gray-200 hover:text-gray-700'}`}
-                >
-                  <span className="px-1 italic">I</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => editor?.chain().focus().toggleBulletList().run()}
-                  className={`rounded p-1.5 ${editor?.isActive('bulletList') ? 'bg-gray-200 text-gray-900' : 'text-gray-500 hover:bg-gray-200 hover:text-gray-700'}`}
-                >
-                  <span className="px-1">&bull;</span>
-                </button>
-              </div>
-
-              <div className="min-h-[160px] flex-1 overflow-hidden rounded-b-lg border border-gray-300 bg-white focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500">
-                <EditorContent editor={editor} className="w-full" />
-              </div>
-
-              {errors.description && (
-                <span className="mt-2 text-sm text-red-500">{errors.description.message}</span>
-              )}
-            </div>
-          </div>
-
-          {/* Members, Priority, and Dates section */}
-          <div className="space-y-6">
-            {/* Assignees (Interactive Checklist selection) */}
-            <div>
-              <label className="mb-2 block text-sm font-semibold text-gray-700">
-                Assignees
-              </label>
-              <div className="flex flex-wrap items-center gap-3">
-                {/* Visual Avatar Strip */}
-                {currentAssignees.length > 0 ? (
-                  <div className="flex -space-x-1.5 overflow-hidden">
-                    {currentAssignees.map((assignee, idx) => (
-                      <img
-                        key={idx}
-                        src={assignee.avatar}
-                        alt={assignee.name}
-                        className="h-8 w-8 rounded-full border-2 border-white object-cover"
-                        title={assignee.name}
-                      />
-                    ))}
+        <form onSubmit={handleSubmit(handleFormSubmit)} className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
+            <div className="grid gap-8 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)]">
+              <div className="space-y-8">
+                <section className="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-gray-500">
+                      Core details
+                    </h4>
+                    <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                      Board-first editing
+                    </span>
                   </div>
-                ) : (
-                  <span className="text-sm text-gray-400 italic">No one assigned yet</span>
-                )}
 
-                {/* Checklist Dropdown */}
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setShowAssigneeSelect(!showAssigneeSelect)}
-                    className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 shadow-sm cursor-pointer transition-colors"
-                  >
-                    <svg className="mr-1 h-3.5 w-3.5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                    </svg>
-                    Assign members
-                  </button>
+                  <InputField
+                    label="Title"
+                    messageError={errors.title?.message}
+                    placeholder="Refine the task title"
+                    {...register('title')}
+                  />
 
-                  {showAssigneeSelect && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-10"
-                        onClick={() => setShowAssigneeSelect(false)}
-                      />
-                      <div className="absolute left-0 mt-2 w-56 bg-white rounded-lg shadow-xl border border-gray-200 p-2 z-20 text-xs font-medium">
-                        <div className="font-bold text-gray-500 px-2 pb-1.5 border-b border-gray-100 mb-1">
-                          Select members
-                        </div>
-                        <div className="space-y-0.5 max-h-48 overflow-y-auto">
-                          {AVAILABLE_ASSIGNEES.map((member) => {
-                            const isSelected = currentAssignees.some((a) => a.name === member.name);
-                            return (
-                              <button
-                                type="button"
-                                key={member.name}
-                                onClick={() => {
-                                  let nextAssignees = [...currentAssignees];
-                                  if (isSelected) {
-                                    nextAssignees = nextAssignees.filter((a) => a.name !== member.name);
-                                  } else {
-                                    nextAssignees.push({ name: member.name, avatar: member.avatar });
-                                  }
-                                  setValue('assignees', nextAssignees, { shouldDirty: true, shouldValidate: true });
-                                }}
-                                className="w-full flex items-center justify-between px-2 py-1.5 rounded-md hover:bg-gray-50 text-gray-700 transition-colors cursor-pointer"
-                              >
-                                <div className="flex items-center gap-2">
-                                  <img src={member.avatar} alt={member.name} className="h-5.5 w-5.5 rounded-full object-cover" />
-                                  <span className="truncate">{member.name}</span>
-                                </div>
-                                <input
-                                  type="checkbox"
-                                  checked={isSelected}
-                                  onChange={() => {}} // Driven purely by button click
-                                  className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                                />
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-gray-700">
+                      Description
+                    </label>
+                    <div className="flex items-center gap-2 rounded-t-xl border border-gray-300 border-b-0 bg-gray-50 px-3 py-2">
+                      <button
+                        type="button"
+                        onClick={() => editor?.chain().focus().toggleBold().run()}
+                        className={`rounded-md px-2 py-1 text-sm ${
+                          editor?.isActive('bold') ? 'bg-gray-200 text-gray-900' : 'text-gray-500 hover:bg-gray-200 hover:text-gray-700'
+                        }`}
+                      >
+                        <span className="font-bold">B</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => editor?.chain().focus().toggleItalic().run()}
+                        className={`rounded-md px-2 py-1 text-sm ${
+                          editor?.isActive('italic') ? 'bg-gray-200 text-gray-900' : 'text-gray-500 hover:bg-gray-200 hover:text-gray-700'
+                        }`}
+                      >
+                        <span className="italic">I</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => editor?.chain().focus().toggleBulletList().run()}
+                        className={`rounded-md px-2 py-1 text-sm ${
+                          editor?.isActive('bulletList') ? 'bg-gray-200 text-gray-900' : 'text-gray-500 hover:bg-gray-200 hover:text-gray-700'
+                        }`}
+                      >
+                        •
+                      </button>
+                    </div>
 
-            {/* Priority Option Cards */}
-            <div>
-              <label className="mb-2 block text-sm font-semibold text-gray-700">
-                Priority
-              </label>
-              <div className="flex flex-wrap gap-3">
-                {priorityOptions.map((priority) => (
-                  <label
-                    key={priority}
-                    className="flex items-center border border-gray-200 rounded-lg px-3 py-2 bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer select-none"
-                  >
+                    <div className="overflow-hidden rounded-b-xl border border-gray-300 bg-white focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500">
+                      <EditorContent editor={editor} className="w-full" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-gray-700">
+                      Cover image URL
+                    </label>
                     <input
-                      type="radio"
-                      value={priority}
-                      {...register('priority')}
-                      className="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      type="url"
+                      {...register('image')}
+                      placeholder="https://example.com/cover.jpg"
+                      className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
-                    <span className="ml-2 text-xs font-semibold text-gray-700 uppercase tracking-wide">{priority}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
 
-            {/* Dates (Start date & Due date) */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-gray-700">Start date</label>
-                <input
-                  type="date"
-                  {...register('startDate')}
-                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                />
-              </div>
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-gray-700">Due date</label>
-                <input
-                  type="date"
-                  {...register('dueDate')}
-                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
+                    {imagePreview && (
+                      <div className="mt-3 overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
+                        <img
+                          src={imagePreview}
+                          alt="Task cover preview"
+                          className="h-44 w-full object-cover"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </section>
 
-        {isEditMode && taskData && (
-          <div className="mt-8 border-t border-gray-200 pt-6">
-            <div className="flex items-center justify-between mb-4">
-              <h4 className="text-sm font-semibold text-gray-900 uppercase tracking-wider flex items-center gap-2">
-                <svg className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Activity Log ({activities.length})
-              </h4>
-            </div>
+                <section className="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-gray-500">
+                        Checklist
+                      </h4>
+                      <p className="mt-1 text-sm text-gray-500">
+                        Break work into smaller steps and show progress directly on the card.
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                      {checklistProgress.completed}/{checklistProgress.total}
+                    </span>
+                  </div>
 
-            {isLoadingActivities ? (
-              <div className="py-4 text-center text-xs text-gray-500 italic">
-                Loading activity logs...
+                  <div className="h-2 rounded-full bg-gray-100">
+                    <div
+                      className="h-full rounded-full bg-emerald-500 transition-[width] duration-200"
+                      style={{ width: `${checklistProgress.percent}%` }}
+                    />
+                  </div>
+
+                  <div className="space-y-3">
+                    {checklistItems.length === 0 ? (
+                      <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-5 text-sm text-gray-400">
+                        No checklist items yet.
+                      </div>
+                    ) : (
+                      checklistItems.map((item) => (
+                        <div key={item.id} className="flex items-center gap-3 rounded-xl border border-gray-200 px-3 py-2.5">
+                          <input
+                            type="checkbox"
+                            checked={item.isDone}
+                            onChange={() => {
+                              setChecklistItems((currentChecklistItems) => currentChecklistItems.map((checklistItem) => (
+                                checklistItem.id === item.id
+                                  ? { ...checklistItem, isDone: !checklistItem.isDone }
+                                  : checklistItem
+                              )));
+                            }}
+                            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          <input
+                            type="text"
+                            value={item.text}
+                            onChange={(event) => {
+                              const nextValue = event.target.value;
+                              setChecklistItems((currentChecklistItems) => currentChecklistItems.map((checklistItem) => (
+                                checklistItem.id === item.id
+                                  ? { ...checklistItem, text: nextValue }
+                                  : checklistItem
+                              )));
+                            }}
+                            className={`flex-1 bg-transparent text-sm focus:outline-none ${item.isDone ? 'text-gray-400 line-through' : 'text-gray-700'}`}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setChecklistItems((currentChecklistItems) => currentChecklistItems.filter((checklistItem) => checklistItem.id !== item.id));
+                            }}
+                            className="rounded-md p-1 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                          >
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                      ))
+                    )}
+
+                    <div className="flex gap-3">
+                      <input
+                        type="text"
+                        value={checklistDraft}
+                        onChange={(event) => setChecklistDraft(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault();
+                            handleAddChecklistItem();
+                          }
+                        }}
+                        placeholder="Add a checklist item"
+                        className="flex-1 rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <Button text="Add item" variant="outline" onClick={handleAddChecklistItem} />
+                    </div>
+                  </div>
+                </section>
               </div>
-            ) : activities.length > 0 ? (
-              <div className="max-h-60 overflow-y-auto pr-2 space-y-4">
-                <div className="flow-root">
-                  <ul className="-mb-8">
-                    {activities.map((activity, index) => {
-                      const isLast = index === activities.length - 1;
-                      let relativeTime = '';
-                      try {
-                        relativeTime = formatDistanceToNow(parseISO(activity.created_at), { addSuffix: true });
-                      } catch {
-                        relativeTime = 'just now';
-                      }
 
-                      return (
-                        <li key={activity.id}>
-                          <div className="relative pb-6">
-                            {!isLast && (
-                              <span className="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true" />
-                            )}
-                            <div className="relative flex space-x-3 items-start">
-                              <div>
-                                <img
-                                  className="h-8 w-8 rounded-full bg-gray-400 flex items-center justify-center ring-4 ring-white object-cover"
-                                  src={activity.actor.avatar}
-                                  alt={activity.actor.name}
-                                />
+              <div className="space-y-8">
+                <section className="space-y-5 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                  <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-gray-500">
+                    Ownership and timing
+                  </h4>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-gray-700">
+                      Assignees
+                    </label>
+                    <div className="flex flex-wrap items-center gap-3">
+                      {currentAssignees.length > 0 ? (
+                        <div className="flex -space-x-2 overflow-hidden">
+                          {currentAssignees.map((assignee) => (
+                            <img
+                              key={assignee.name}
+                              src={assignee.avatar}
+                              alt={assignee.name}
+                              className="h-9 w-9 rounded-full border-2 border-white object-cover"
+                              title={assignee.name}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-sm italic text-gray-400">No one assigned yet</span>
+                      )}
+
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setShowAssigneeSelect((currentState) => !currentState)}
+                          className="inline-flex items-center rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+                        >
+                          <svg className="mr-2 h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                          </svg>
+                          Assign members
+                        </button>
+
+                        {showAssigneeSelect && (
+                          <>
+                            <div className="fixed inset-0 z-10" onClick={() => setShowAssigneeSelect(false)} />
+                            <div className="absolute left-0 z-20 mt-2 w-60 rounded-xl border border-gray-200 bg-white p-2 shadow-2xl">
+                              <div className="mb-2 border-b border-gray-100 px-2 pb-2 text-xs font-bold uppercase tracking-wider text-gray-500">
+                                Select members
                               </div>
-                              <div className="flex-1 min-w-0 pt-1.5">
-                                <p className="text-xs text-gray-600">
-                                  <span className="font-bold text-gray-900">{activity.actor.name}</span>{' '}
-                                  <span className="text-gray-500">{activity.details.description}</span>
-                                </p>
-                                <div className="text-[10px] text-gray-400 mt-0.5">
-                                  {relativeTime}
-                                </div>
+                              <div className="max-h-56 space-y-1 overflow-y-auto">
+                                {AVAILABLE_ASSIGNEES.map((member) => {
+                                  const isSelected = currentAssignees.some((assignee) => assignee.name === member.name);
+
+                                  return (
+                                    <button
+                                      type="button"
+                                      key={member.name}
+                                      onClick={() => {
+                                        const nextAssignees = isSelected
+                                          ? currentAssignees.filter((assignee) => assignee.name !== member.name)
+                                          : [...currentAssignees, { name: member.name, avatar: member.avatar }];
+
+                                        setValue('assignees', nextAssignees, { shouldDirty: true, shouldValidate: true });
+                                      }}
+                                      className="flex w-full items-center justify-between rounded-lg px-2 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50"
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <img src={member.avatar} alt={member.name} className="h-6 w-6 rounded-full object-cover" />
+                                        <span>{member.name}</span>
+                                      </div>
+                                      <input
+                                        type="checkbox"
+                                        checked={isSelected}
+                                        readOnly
+                                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                      />
+                                    </button>
+                                  );
+                                })}
                               </div>
                             </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-gray-700">
+                      Priority
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {priorityOptions.map((priority) => (
+                        <label
+                          key={priority}
+                          className="inline-flex cursor-pointer items-center rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100"
+                        >
+                          <input
+                            type="radio"
+                            value={priority}
+                            {...register('priority')}
+                            className="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span className="ml-2">{priority}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-2 block text-sm font-semibold text-gray-700">Start date</label>
+                      <input
+                        type="date"
+                        {...register('startDate')}
+                        className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-sm font-semibold text-gray-700">Due date</label>
+                      <input
+                        type="date"
+                        {...register('dueDate')}
+                        className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                </section>
+
+                <section className="space-y-5 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                  <div>
+                    <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-gray-500">
+                      Labels
+                    </h4>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Keep priority for urgency and use labels for category.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {labels.length === 0 && (
+                      <span className="text-sm italic text-gray-400">No labels added yet</span>
+                    )}
+                    {labels.map((label) => (
+                      <span
+                        key={label.id}
+                        className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${getTaskLabelClass(label.color)}`}
+                      >
+                        {label.name}
+                        <button
+                          type="button"
+                          onClick={() => setLabels((currentLabels) => currentLabels.filter((currentLabel) => currentLabel.id !== label.id))}
+                          className="rounded-full text-current/70 transition-colors hover:text-current"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+
+                  <div className="space-y-3">
+                    <input
+                      type="text"
+                      value={labelDraft}
+                      onChange={(event) => setLabelDraft(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault();
+                          handleAddLabel();
+                        }
+                      }}
+                      placeholder="Design, Backend, Presentation..."
+                      className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      {TASK_LABEL_COLOR_OPTIONS.map((color) => (
+                        <button
+                          key={color}
+                          type="button"
+                          onClick={() => setLabelColorDraft(color)}
+                          className={`rounded-full px-3 py-1 text-xs font-semibold capitalize transition-transform ${getTaskLabelClass(color)} ${
+                            labelColorDraft === color ? 'scale-105 ring-2 ring-gray-900/10' : ''
+                          }`}
+                        >
+                          {color}
+                        </button>
+                      ))}
+                    </div>
+
+                    <Button text="Add label" variant="outline" onClick={handleAddLabel} />
+                  </div>
+                </section>
+
+                <section className="space-y-5 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                  <div>
+                    <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-gray-500">
+                      Attachments
+                    </h4>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Lightweight link attachments for briefs, docs, boards, or repos.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    {attachments.length === 0 ? (
+                      <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-5 text-sm text-gray-400">
+                        No attachments yet.
+                      </div>
+                    ) : (
+                      attachments.map((attachment) => (
+                        <div key={attachment.id} className="flex items-center gap-3 rounded-xl border border-gray-200 px-3 py-3">
+                          <div className="rounded-lg bg-blue-50 p-2 text-blue-700">
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 11-5.656-5.656l1.5-1.5m7.328-1.328a4 4 0 010-5.656l3-3a4 4 0 115.656 5.656l-1.5 1.5" />
+                            </svg>
                           </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold text-gray-800">{attachment.name}</p>
+                            <a
+                              href={attachment.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="truncate text-xs text-blue-600 hover:text-blue-800"
+                            >
+                              {attachment.url}
+                            </a>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAttachments((currentAttachments) => currentAttachments.filter((currentAttachment) => currentAttachment.id !== attachment.id));
+                            }}
+                            className="rounded-md p-1 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                          >
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <div className="space-y-3">
+                    <input
+                      type="text"
+                      value={attachmentNameDraft}
+                      onChange={(event) => setAttachmentNameDraft(event.target.value)}
+                      placeholder="Attachment name"
+                      className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <input
+                      type="url"
+                      value={attachmentUrlDraft}
+                      onChange={(event) => setAttachmentUrlDraft(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault();
+                          handleAddAttachment();
+                        }
+                      }}
+                      placeholder="https://..."
+                      className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <Button text="Add attachment" variant="outline" onClick={handleAddAttachment} />
+                  </div>
+                </section>
+
+                {isEditMode && taskData && (
+                  <section className="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-gray-500">
+                        Activity log
+                      </h4>
+                      <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
+                        {activities.length} events
+                      </span>
+                    </div>
+
+                    {isLoadingActivities ? (
+                      <div className="py-4 text-center text-sm italic text-gray-500">
+                        Loading activity logs...
+                      </div>
+                    ) : activities.length > 0 ? (
+                      <div className="max-h-72 space-y-4 overflow-y-auto pr-2">
+                        {activities.map((activity) => {
+                          let relativeTime = 'just now';
+
+                          try {
+                            relativeTime = formatDistanceToNow(parseISO(activity.created_at), { addSuffix: true });
+                          } catch {
+                            relativeTime = 'just now';
+                          }
+
+                          return (
+                            <div key={activity.id} className="flex gap-3 rounded-xl border border-gray-100 bg-gray-50 px-3 py-3">
+                              <img
+                                className="h-9 w-9 rounded-full border border-white object-cover shadow-sm"
+                                src={activity.actor.avatar}
+                                alt={activity.actor.name}
+                              />
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm text-gray-600">
+                                  <span className="font-semibold text-gray-900">{activity.actor.name}</span>{' '}
+                                  {activity.details.description}
+                                </p>
+                                <p className="mt-1 text-xs text-gray-400">{relativeTime}</p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-5 text-sm italic text-gray-400">
+                        No activity logged for this task yet.
+                      </div>
+                    )}
+                  </section>
+                )}
               </div>
-            ) : (
-              <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 py-6 text-center text-xs text-gray-400 italic">
-                No activity logged for this task yet.
-              </div>
-            )}
+            </div>
           </div>
-        )}
-      </form>
-    </ContentDialog>
+
+          <div className="border-t border-gray-200 bg-white px-6 py-4">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="text-sm text-gray-500">
+                {isEditMode ? 'Changes save back into the same task record.' : 'New task will be created in the selected list.'}
+              </div>
+              <div className="flex items-center gap-3">
+                <Button text="Cancel" variant="outline" onClick={onClose} />
+                <Button
+                  text={isEditMode ? 'Save changes' : 'Add new task'}
+                  variant="primary"
+                  onClick={handleSubmit(handleFormSubmit)}
+                />
+              </div>
+            </div>
+          </div>
+        </form>
+      </aside>
+    </div>
   );
 }
 

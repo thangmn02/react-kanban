@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 import type { Database } from '../types/supabase.type';
 
@@ -8,7 +8,7 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 // Check if credentials are valid and present
 export const isLocalDemoMode = !supabaseUrl || !supabaseAnonKey || supabaseUrl.includes('placeholder') || supabaseAnonKey.includes('placeholder');
 
-let supabase: any = null;
+let supabase: SupabaseClient<Database> | null = null;
 
 if (!isLocalDemoMode) {
   try {
@@ -24,6 +24,14 @@ if (!isLocalDemoMode) {
   }
 } else {
   console.warn('Supabase credentials missing or invalid. App is running in Local Demo Mode with full drag & drop support.');
+}
+
+export function requireSupabaseClient(): SupabaseClient<Database> {
+  if (!supabase) {
+    throw new Error('Supabase client is not configured.');
+  }
+
+  return supabase;
 }
 
 export default supabase;

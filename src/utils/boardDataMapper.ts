@@ -1,5 +1,16 @@
 import type { BoardData, BoardListItem, BoardTaskItem } from '../types/task.type';
-import type { ListRow, TaskInsert, TaskRow, TaskUpdate } from '../types/supabase.type';
+import type {
+  Json,
+  ListRow,
+  TaskChecklistItemInsert,
+  TaskChecklistItemRow,
+  TaskInsert,
+  TaskLabelLinkRow,
+  TaskLabelRow,
+  TaskRow,
+  TaskUpdate,
+} from '../types/supabase.type';
+import { normalizeTaskAssignees, normalizeTaskAttachments } from './taskCollections';
 
 interface BuildTaskInsertParams {
   boardId: string;
@@ -11,6 +22,8 @@ interface BuildTaskInsertParams {
   dueDate?: string;
   position: number;
   assignees?: BoardTaskItem['assignees'];
+  attachments?: BoardTaskItem['attachments'];
+  image?: string;
 }
 
 interface BuildTaskUpdateParams {
@@ -20,6 +33,8 @@ interface BuildTaskUpdateParams {
   startDate?: string;
   dueDate?: string;
   assignees?: BoardTaskItem['assignees'];
+  attachments?: BoardTaskItem['attachments'];
+  image?: string;
 }
 
 export function createEmptyBoardData(): BoardData {
@@ -35,7 +50,7 @@ export function mapTaskRowToTaskItem(taskRow: TaskRow): BoardTaskItem {
     id: taskRow.id,
     title: taskRow.title,
     description: taskRow.description || '',
-    assignees: Array.isArray(taskRow.assignees) ? taskRow.assignees as unknown as BoardTaskItem['assignees'] : [],
+    assignees: normalizeTaskAssignees(taskRow.assignees),
     priority: taskRow.priority || undefined,
     startDate: taskRow.start_date || undefined,
     dueDate: taskRow.due_date || undefined,
@@ -43,12 +58,72 @@ export function mapTaskRowToTaskItem(taskRow: TaskRow): BoardTaskItem {
     category2: taskRow.category2 || undefined,
     image: taskRow.image || undefined,
     isDone: taskRow.is_done,
+    attachments: normalizeTaskAttachments(taskRow.attachments),
+    labels: [],
+    checklistItems: [],
   };
 }
 
-export function buildBoardDataFromRows(listRows: ListRow[], taskRows: TaskRow[]): BoardData {
+function serializeTaskAssignees(assignees: BoardTaskItem['assignees'] | undefined): Json {
+  return (assignees || []).map((assignee) => ({
+    name: assignee.name,
+    avatar: assignee.avatar,
+  }));
+}
+
+function serializeTaskAttachments(attachments: BoardTaskItem['attachments'] | undefined): Json {
+  return (attachments || []).map((attachment) => ({
+    id: attachment.id,
+    name: attachment.name,
+    url: attachment.url,
+    type: attachment.type,
+  }));
+}
+
+export function buildBoardDataFromRows(
+  listRows: ListRow[],
+  taskRows: TaskRow[],
+  checklistItemRows: TaskChecklistItemRow[] = [],
+  taskLabelRows: TaskLabelRow[] = [],
+  taskLabelLinkRows: TaskLabelLinkRow[] = [],
+): BoardData {
   const boardData = createEmptyBoardData();
   const sortedLists = [...listRows].sort((currentList, nextList) => currentList.position - nextList.position);
+  const checklistItemsByTaskId = new Map<string, BoardTaskItem['checklistItems']>();
+  const labelsById = new Map<string, BoardTaskItem['labels'][number]>();
+  const labelsByTaskId = new Map<string, BoardTaskItem['labels']>();
+
+  checklistItemRows
+    .sort((currentChecklistItem, nextChecklistItem) => currentChecklistItem.position - nextChecklistItem.position)
+    .forEach((checklistItemRow) => {
+      const currentChecklistItems = checklistItemsByTaskId.get(checklistItemRow.task_id) || [];
+      currentChecklistItems.push({
+        id: checklistItemRow.id,
+        text: checklistItemRow.content,
+        isDone: checklistItemRow.is_done,
+      });
+      checklistItemsByTaskId.set(checklistItemRow.task_id, currentChecklistItems);
+    });
+
+  taskLabelRows.forEach((taskLabelRow) => {
+    labelsById.set(taskLabelRow.id, {
+      id: taskLabelRow.id,
+      name: taskLabelRow.name,
+      color: taskLabelRow.color as BoardTaskItem['labels'][number]['color'],
+    });
+  });
+
+  taskLabelLinkRows.forEach((taskLabelLinkRow) => {
+    const linkedLabel = labelsById.get(taskLabelLinkRow.label_id);
+
+    if (!linkedLabel) {
+      return;
+    }
+
+    const currentLabels = labelsByTaskId.get(taskLabelLinkRow.task_id) || [];
+    currentLabels.push(linkedLabel);
+    labelsByTaskId.set(taskLabelLinkRow.task_id, currentLabels);
+  });
 
   sortedLists.forEach((listRow) => {
     const boardListItem: BoardListItem = {
@@ -64,7 +139,11 @@ export function buildBoardDataFromRows(listRows: ListRow[], taskRows: TaskRow[])
   const sortedTasks = [...taskRows].sort((currentTask, nextTask) => currentTask.position - nextTask.position);
 
   sortedTasks.forEach((taskRow) => {
-    boardData.task[taskRow.id] = mapTaskRowToTaskItem(taskRow);
+    boardData.task[taskRow.id] = {
+      ...mapTaskRowToTaskItem(taskRow),
+      labels: labelsByTaskId.get(taskRow.id) || [],
+      checklistItems: checklistItemsByTaskId.get(taskRow.id) || [],
+    };
 
     if (boardData.list[taskRow.list_id]) {
       boardData.list[taskRow.list_id].tasks.push(taskRow.id);
@@ -84,6 +163,8 @@ export function buildTaskInsertPayload({
   dueDate,
   position,
   assignees,
+  attachments,
+  image,
 }: BuildTaskInsertParams): TaskInsert {
   return {
     board_id: boardId,
@@ -93,9 +174,11 @@ export function buildTaskInsertPayload({
     priority: priority || 'Low',
     start_date: startDate || null,
     due_date: dueDate || null,
-    assignees: (assignees || []) as any,
+    assignees: serializeTaskAssignees(assignees),
+    attachments: serializeTaskAttachments(attachments),
     category1: 'Design',
     category2: 'Sprint',
+    image: image || null,
     is_done: false,
     position,
   };
@@ -108,6 +191,8 @@ export function buildTaskUpdatePayload({
   startDate,
   dueDate,
   assignees,
+  attachments,
+  image,
 }: BuildTaskUpdateParams): TaskUpdate {
   return {
     title,
@@ -115,6 +200,41 @@ export function buildTaskUpdatePayload({
     priority: priority || 'Low',
     start_date: startDate || null,
     due_date: dueDate || null,
-    assignees: (assignees || []) as any,
+    assignees: serializeTaskAssignees(assignees),
+    attachments: serializeTaskAttachments(attachments),
+    image: image || null,
   };
+}
+
+export function buildTaskFieldUpdatePayload(
+  fields: Partial<Pick<BoardTaskItem, 'priority' | 'assignees' | 'isDone'>>,
+): TaskUpdate {
+  const payload: TaskUpdate = {};
+
+  if ('priority' in fields) {
+    payload.priority = fields.priority ?? null;
+  }
+
+  if ('assignees' in fields) {
+    payload.assignees = serializeTaskAssignees(fields.assignees);
+  }
+
+  if ('isDone' in fields) {
+    payload.is_done = fields.isDone ?? false;
+  }
+
+  return payload;
+}
+
+export function buildChecklistItemInsertPayloads(
+  taskId: string,
+  checklistItems: BoardTaskItem['checklistItems'],
+): TaskChecklistItemInsert[] {
+  return checklistItems.map((checklistItem, position) => ({
+    id: checklistItem.id,
+    task_id: taskId,
+    content: checklistItem.text,
+    is_done: checklistItem.isDone,
+    position,
+  }));
 }

@@ -20,8 +20,7 @@ import TaskList from '../task/TaskList';
 import TaskItem from '../task/TaskItem';
 import TaskListOverlay from '../task/TaskListOverlay';
 import type { BoardData, BoardDeleteItem, ITaskItem } from '../../types/task.type';
-import { getDueDateStatus } from '../../utils/taskMetadata';
-import { createActivity } from '../../services/activity.service';
+import { doesTaskMatchFilters } from '../../utils/taskFilters';
 
 
 interface KanbanBoardProps {
@@ -36,7 +35,11 @@ interface KanbanBoardProps {
   setDeleteItem: Dispatch<SetStateAction<BoardDeleteItem | null>>;
   onOpenAddTask: (listId: string) => void;
   onOpenAddGroup: () => void;
-  onBoardDataChange: (boardData: BoardData, changeType: 'list' | 'task') => void;
+  onBoardDataChange: (
+    boardData: BoardData,
+    changeType: 'list' | 'task',
+    activity?: { taskId: string; description: string },
+  ) => Promise<void>;
   onUpdateTask: (taskId: string, fields: Partial<ITaskItem>) => Promise<void>;
 }
 
@@ -123,24 +126,12 @@ function KanbanBoard({
         .filter((task): task is ITaskItem => Boolean(task));
 
       const displayTasks = allTasks.filter((task) => {
-        if (searchQuery) {
-          const q = searchQuery.toLowerCase();
-          const matchesTitle = task.title.toLowerCase().includes(q);
-          const matchesDesc = task.description?.toLowerCase().includes(q);
-          if (!matchesTitle && !matchesDesc) return false;
-        }
-        if (filterPriority && task.priority !== filterPriority) {
-          return false;
-        }
-        if (filterAssignee) {
-          const hasAssignee = task.assignees?.some(a => a.name === filterAssignee);
-          if (!hasAssignee) return false;
-        }
-        if (filterDueDate) {
-          const dueStatus = getDueDateStatus(task.dueDate, task.isDone).status;
-          if (dueStatus !== filterDueDate) return false;
-        }
-        return true;
+        return doesTaskMatchFilters(task, {
+          searchQuery,
+          filterPriority,
+          filterAssignee,
+          filterDueDate,
+        });
       });
 
       return {
@@ -191,7 +182,7 @@ function KanbanBoard({
         return;
       }
 
-      onBoardDataChange({
+      void onBoardDataChange({
         ...boardData,
         columns: arrayMove(boardData.columns, sourceIndex, destinationIndex)
       }, 'list');
@@ -220,7 +211,7 @@ function KanbanBoard({
         : sourceList.tasks.length - 1;
 
       if (sourceIndex !== destinationIndex) {
-        onBoardDataChange({
+        void onBoardDataChange({
           ...boardData,
           list: {
             ...boardData.list,
@@ -229,9 +220,8 @@ function KanbanBoard({
               tasks: arrayMove(sourceList.tasks, sourceIndex, destinationIndex)
             }
           }
-        }, 'task');
-
-        void createActivity(active.id.toString(), 'move', {
+        }, 'task', {
+          taskId: active.id.toString(),
           description: `Reordered task within "${sourceList.title}"`,
         });
       }
@@ -250,7 +240,7 @@ function KanbanBoard({
 
     newDestinationTasks.splice(destinationIndex, 0, active.id.toString());
 
-    onBoardDataChange({
+    void onBoardDataChange({
       ...boardData,
       list: {
         ...boardData.list,
@@ -263,9 +253,8 @@ function KanbanBoard({
           tasks: newDestinationTasks
         }
       }
-    }, 'task');
-
-    void createActivity(active.id.toString(), 'move', {
+    }, 'task', {
+      taskId: active.id.toString(),
       description: `Moved task from "${sourceList.title}" to "${destinationList.title}"`,
     });
   };

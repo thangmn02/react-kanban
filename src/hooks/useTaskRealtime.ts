@@ -2,9 +2,15 @@ import { useEffect, useEffectEvent, useRef } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
-import supabase from '../lib/supabase';
+import supabase, { requireSupabaseClient } from '../lib/supabase';
 import type { BoardData } from '../types/task.type';
-import type { ListRow, TaskRow } from '../types/supabase.type';
+import type {
+  ListRow,
+  TaskChecklistItemRow,
+  TaskLabelLinkRow,
+  TaskLabelRow,
+  TaskRow,
+} from '../types/supabase.type';
 import {
   applyRealtimeTaskMutation,
   removeTaskFromBoardData,
@@ -13,7 +19,7 @@ import {
 interface UseTaskRealtimeParams {
   boardId: string | null;
   setBoardData: Dispatch<SetStateAction<BoardData>>;
-  refreshBoardData: (options?: { showErrorToast?: boolean }) => Promise<void>;
+  refreshBoardData: (options?: { boardId?: string | null; showErrorToast?: boolean }) => Promise<void>;
 }
 
 type TaskRealtimeSubscriptionStatus =
@@ -200,6 +206,45 @@ export function useTaskRealtime({
     scheduleBoardRefresh(`list-${payload.eventType.toLowerCase()}`);
   });
 
+  const handleChecklistRealtimeEvent = useEffectEvent((payload: RealtimePostgresChangesPayload<TaskChecklistItemRow>) => {
+    logRealtimeMessage('Received checklist realtime event.', {
+      boardId,
+      eventType: payload.eventType,
+      checklistItemId: payload.eventType === 'DELETE' ? payload.old.id : payload.new.id,
+      taskId: payload.eventType === 'DELETE' ? payload.old.task_id : payload.new.task_id,
+    });
+    scheduleBoardRefresh(`checklist-${payload.eventType.toLowerCase()}`);
+  });
+
+  const handleTaskLabelRealtimeEvent = useEffectEvent((payload: RealtimePostgresChangesPayload<TaskLabelRow>) => {
+    const matchingTaskLabelRow = payload.eventType === 'DELETE'
+      ? payload.old
+      : payload.new;
+
+    logRealtimeMessage('Received task label realtime event.', {
+      boardId,
+      eventType: payload.eventType,
+      labelId: matchingTaskLabelRow?.id,
+      payloadBoardId: matchingTaskLabelRow?.board_id,
+    });
+
+    if (matchingTaskLabelRow?.board_id && matchingTaskLabelRow.board_id !== boardId) {
+      return;
+    }
+
+    scheduleBoardRefresh(`task-label-${payload.eventType.toLowerCase()}`);
+  });
+
+  const handleTaskLabelLinkRealtimeEvent = useEffectEvent((payload: RealtimePostgresChangesPayload<TaskLabelLinkRow>) => {
+    logRealtimeMessage('Received task label link realtime event.', {
+      boardId,
+      eventType: payload.eventType,
+      taskId: payload.eventType === 'DELETE' ? payload.old.task_id : payload.new.task_id,
+      labelId: payload.eventType === 'DELETE' ? payload.old.label_id : payload.new.label_id,
+    });
+    scheduleBoardRefresh(`task-label-link-${payload.eventType.toLowerCase()}`);
+  });
+
   const handleRealtimeSubscriptionStatusChange = useEffectEvent((status: TaskRealtimeSubscriptionStatus) => {
     logRealtimeMessage('Realtime channel status changed.', {
       boardId,
@@ -229,12 +274,14 @@ export function useTaskRealtime({
       return;
     }
 
+    const client = requireSupabaseClient();
+
     logRealtimeMessage('Subscribing to task realtime channel.', {
       boardId,
       filter: `board_id=eq.${boardId}`,
     });
 
-    const taskRealtimeChannel = supabase
+    const taskRealtimeChannel = client
       .channel(`tasks-realtime-${boardId}`)
       .on(
         'postgres_changes',
@@ -248,7 +295,7 @@ export function useTaskRealtime({
       )
       .subscribe(handleRealtimeSubscriptionStatusChange);
 
-    const listRealtimeChannel = supabase
+    const listRealtimeChannel = client
       .channel(`lists-realtime-${boardId}`)
       .on(
         'postgres_changes',
@@ -262,13 +309,56 @@ export function useTaskRealtime({
       )
       .subscribe(handleRealtimeSubscriptionStatusChange);
 
+    const checklistRealtimeChannel = client
+      .channel(`task-checklist-realtime-${boardId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'task_checklist_items',
+        },
+        handleChecklistRealtimeEvent
+      )
+      .subscribe(handleRealtimeSubscriptionStatusChange);
+
+    const taskLabelRealtimeChannel = client
+      .channel(`task-labels-realtime-${boardId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'task_labels',
+          filter: `board_id=eq.${boardId}`,
+        },
+        handleTaskLabelRealtimeEvent
+      )
+      .subscribe(handleRealtimeSubscriptionStatusChange);
+
+    const taskLabelLinkRealtimeChannel = client
+      .channel(`task-label-links-realtime-${boardId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'task_label_links',
+        },
+        handleTaskLabelLinkRealtimeEvent
+      )
+      .subscribe(handleRealtimeSubscriptionStatusChange);
+
     return () => {
       logRealtimeMessage('Cleaning up task realtime channel.', {
         boardId,
       });
       clearPendingRealtimeRefresh();
-      void supabase.removeChannel(taskRealtimeChannel);
-      void supabase.removeChannel(listRealtimeChannel);
+      void client.removeChannel(taskRealtimeChannel);
+      void client.removeChannel(listRealtimeChannel);
+      void client.removeChannel(checklistRealtimeChannel);
+      void client.removeChannel(taskLabelRealtimeChannel);
+      void client.removeChannel(taskLabelLinkRealtimeChannel);
     };
-  }, [boardId, clearPendingRealtimeRefresh, handleListRealtimeEvent, handleRealtimeSubscriptionStatusChange, handleTaskRealtimeEvent, logRealtimeMessage]);
+  }, [boardId]);
 }

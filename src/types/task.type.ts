@@ -23,6 +23,27 @@ export interface TaskAssignee {
   avatar: string
 }
 
+export type TaskLabelColor = 'slate' | 'sky' | 'emerald' | 'amber' | 'rose' | 'violet';
+
+export interface TaskLabel {
+  id: string,
+  name: string,
+  color: TaskLabelColor
+}
+
+export interface TaskAttachment {
+  id: string,
+  name: string,
+  url: string,
+  type: 'link'
+}
+
+export interface TaskChecklistItem {
+  id: string,
+  text: string,
+  isDone: boolean
+}
+
 export interface BoardTaskItem {
   id: string,
   title: string,
@@ -34,8 +55,24 @@ export interface BoardTaskItem {
   category1?: string,
   category2?: string,
   image?: string,
-  isDone?: boolean
+  isDone?: boolean,
+  labels: TaskLabel[],
+  attachments: TaskAttachment[],
+  checklistItems: TaskChecklistItem[]
 } 
+
+export interface TaskDialogFormData {
+  title: string;
+  description: string;
+  priority?: BoardTaskItem['priority'];
+  dueDate?: string;
+  startDate?: string;
+  assignees?: BoardTaskItem['assignees'];
+  labels: BoardTaskItem['labels'];
+  attachments: BoardTaskItem['attachments'];
+  checklistItems: BoardTaskItem['checklistItems'];
+  image?: string;
+}
 
 export interface BoardDeleteItem {
   type: 'list' | 'card',
@@ -51,8 +88,8 @@ export interface ITaskActivity {
   details: {
     description: string;
     field?: string;
-    oldValue?: any;
-    newValue?: any;
+    oldValue?: unknown;
+    newValue?: unknown;
   };
   actor: {
     name: string;

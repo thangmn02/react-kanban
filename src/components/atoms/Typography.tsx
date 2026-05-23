@@ -1,7 +1,9 @@
+import type { ElementType } from 'react';
+
 interface TypographyProps {
   content: string,
   className?: string,
-  component?: any
+  component?: ElementType
 }
 
 function Typography({ content, className, component: Component = 'div' }: TypographyProps) {

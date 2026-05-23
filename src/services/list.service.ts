@@ -1,4 +1,4 @@
-import supabase from '../lib/supabase';
+import supabase, { requireSupabaseClient } from '../lib/supabase';
 import type { ListInsert, ListRow } from '../types/supabase.type';
 
 interface UpdateListPositionPayload {
@@ -18,7 +18,8 @@ export async function createList(listData: ListInsert): Promise<ListRow> {
     };
   }
 
-  const { data, error } = await supabase
+  const client = requireSupabaseClient();
+  const { data, error } = await client
     .from('lists')
     .insert(listData)
     .select()
@@ -36,7 +37,8 @@ export async function deleteList(listId: string): Promise<void> {
     return;
   }
 
-  const { error } = await supabase
+  const client = requireSupabaseClient();
+  const { error } = await client
     .from('lists')
     .delete()
     .eq('id', listId);
@@ -51,8 +53,9 @@ export async function updateListPositions(listPositions: UpdateListPositionPaylo
     return;
   }
 
+  const client = requireSupabaseClient();
   await Promise.all(listPositions.map(async ({ id, position }) => {
-    const { error } = await supabase
+    const { error } = await client
       .from('lists')
       .update({ position })
       .eq('id', id);

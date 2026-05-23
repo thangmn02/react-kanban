@@ -14,17 +14,27 @@ function BoardActivityDialog({ isOpen, onClose, boardId }: BoardActivityDialogPr
   const [activities, setActivities] = useState<ITaskActivity[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
+  const loadBoardActivities = async (currentBoardId: string) => {
+    setIsLoading(true);
+
+    try {
+      const data = await fetchBoardActivities(currentBoardId);
+      setActivities(data);
+    } catch (error) {
+      console.error('Failed to load board activities:', error);
+      setActivities([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (isOpen && boardId) {
-      setIsLoading(true);
-      fetchBoardActivities(boardId)
-        .then((data) => setActivities(data))
-        .catch((err) => console.error('Failed to load board activities:', err))
-        .finally(() => setIsLoading(false));
+      void loadBoardActivities(boardId);
     } else {
       setActivities([]);
     }
-  }, [isOpen, boardId]);
+  }, [boardId, isOpen]);
 
   if (!isOpen) return null;
 

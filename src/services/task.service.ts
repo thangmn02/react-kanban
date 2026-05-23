@@ -1,6 +1,6 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
-import supabase from '../lib/supabase';
+import supabase, { requireSupabaseClient } from '../lib/supabase';
 import type { TaskInsert, TaskRow, TaskUpdate } from '../types/supabase.type';
 
 interface FetchTasksParams {
@@ -19,10 +19,12 @@ export async function fetchTasks({ boardId, listId }: FetchTasksParams = {}): Pr
     return [];
   }
 
-  let query = supabase
+  const client = requireSupabaseClient();
+  let query = client
     .from('tasks')
     .select('*')
     .is('deleted_at', null)
+    .is('archived_at', null)
     .order('position', { ascending: true })
     .order('created_at', { ascending: true });
 
@@ -59,14 +61,17 @@ export async function createTask(taskData: TaskInsert): Promise<TaskRow> {
       category2: taskData.category2 || null,
       assignees: taskData.assignees || null,
       image: taskData.image || null,
+      attachments: taskData.attachments || [],
       is_done: taskData.is_done || false,
       created_at: new Date().toISOString(),
       updated_at: null,
       deleted_at: null,
+      archived_at: null,
     };
   }
 
-  const { data, error } = await supabase
+  const client = requireSupabaseClient();
+  const { data, error } = await client
     .from('tasks')
     .insert(taskData)
     .select()
@@ -87,7 +92,8 @@ export async function updateTask(taskId: string, taskData: TaskUpdate): Promise<
     } as TaskRow;
   }
 
-  const { data, error } = await supabase
+  const client = requireSupabaseClient();
+  const { data, error } = await client
     .from('tasks')
     .update(taskData)
     .eq('id', taskId)
@@ -106,7 +112,8 @@ export async function deleteTask(taskId: string): Promise<void> {
     return;
   }
 
-  const { error } = await supabase
+  const client = requireSupabaseClient();
+  const { error } = await client
     .from('tasks')
     .update({ deleted_at: new Date().toISOString() })
     .eq('id', taskId);
@@ -121,7 +128,8 @@ export async function deleteTasksByListId(listId: string): Promise<void> {
     return;
   }
 
-  const { error } = await supabase
+  const client = requireSupabaseClient();
+  const { error } = await client
     .from('tasks')
     .update({ deleted_at: new Date().toISOString() })
     .eq('list_id', listId);
@@ -136,8 +144,9 @@ export async function updateTaskPositions(taskPositions: UpdateTaskPositionPaylo
     return;
   }
 
+  const client = requireSupabaseClient();
   await Promise.all(taskPositions.map(async ({ id, list_id, position }) => {
-    const { error } = await supabase
+    const { error } = await client
       .from('tasks')
       .update({
         list_id,
@@ -155,10 +164,12 @@ export function subscribeToTasksRealtime(boardId: string, onChange: () => void):
   if (!supabase) {
     return {
       unsubscribe: () => {},
-    } as any;
+    } as unknown as RealtimeChannel;
   }
 
-  return supabase
+  const client = requireSupabaseClient();
+
+  return client
     .channel(`tasks-realtime-${boardId}`)
     .on(
       'postgres_changes',

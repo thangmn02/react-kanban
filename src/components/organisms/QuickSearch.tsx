@@ -1,10 +1,4 @@
-export const AVAILABLE_ASSIGNEES = [
-  { name: 'Bonnie Green', avatar: 'https://flowbite.com/application-ui/demo/images/users/bonnie-green.png' },
-  { name: 'Roberta Casas', avatar: 'https://flowbite.com/application-ui/demo/images/users/roberta-casas.png' },
-  { name: 'Michael Gough', fill: 'MG', avatar: 'https://flowbite.com/application-ui/demo/images/users/michael-gough.png' },
-  { name: 'Jese Leos', avatar: 'https://flowbite.com/application-ui/demo/images/users/jese-leos.png' },
-  { name: 'Leslie Livingston', avatar: 'https://flowbite.com/application-ui/demo/images/users/leslie-livingston.png' },
-];
+import { AVAILABLE_ASSIGNEES } from '../../data/assignees';
 
 interface QuickSearchProps {
   searchQuery: string;
@@ -44,7 +38,7 @@ export default function QuickSearch({
           type="text"
           value={searchQuery}
           onChange={(e) => onSearchQueryChange(e.target.value)}
-          placeholder="Search tasks by title or description..."
+          placeholder="Search tasks by title, description, label, or attachment..."
           className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
         />
         {searchQuery && (
