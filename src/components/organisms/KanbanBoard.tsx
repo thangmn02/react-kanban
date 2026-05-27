@@ -267,12 +267,12 @@ function KanbanBoard({
       onDragCancel={handleDragCancel}
       onDragEnd={handleDragEnd}
     >
-      <div className="p-6">
+      <div className="bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.95),rgba(248,249,250,0.95)_42%,rgba(239,246,255,0.42))] p-6">
         <SortableContext
           items={boardData.columns}
           strategy={horizontalListSortingStrategy}
         >
-          <div className="flex items-start overflow-x-auto pb-4">
+          <div className="flex items-start overflow-x-auto pb-6 pt-1">
             {boardColumns.map(({ columnId, listItem, displayTasks }) => (
                 <MemoizedTaskList
                   key={columnId}
@@ -290,7 +290,7 @@ function KanbanBoard({
             <div className="w-80 flex-shrink-0">
               <button
                 onClick={onOpenAddGroup}
-                className="w-full cursor-pointer rounded-lg border border-dashed border-gray-300 bg-white py-8 text-sm font-semibold text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+                className="w-full cursor-pointer rounded-[1.75rem] border border-dashed border-slate-300/80 bg-white/62 py-9 text-sm font-semibold text-slate-500 shadow-sm backdrop-blur-xl transition-[background,box-shadow,transform,color] hover:-translate-y-0.5 hover:bg-white hover:text-slate-700 hover:shadow-[0_18px_50px_rgba(15,23,42,0.10)] active:scale-[0.99]"
               >
                 + Add another group
               </button>
@@ -308,7 +308,7 @@ function KanbanBoard({
         }}
       >
         {activeId && activeType === 'list' && boardData.list[activeId] && (
-          <div className="scale-[1.02] rotate-1 shadow-2xl opacity-90 cursor-grabbing origin-center select-none">
+          <div className="origin-center scale-[1.02] rotate-1 cursor-grabbing select-none opacity-95 shadow-[0_32px_90px_rgba(15,23,42,0.25)]">
             <MemoizedTaskListOverlay
               listItem={boardData.list[activeId]}
               tasks={boardData.list[activeId].tasks
@@ -318,7 +318,7 @@ function KanbanBoard({
           </div>
         )}
         {activeId && activeType === 'task' && boardData.task[activeId] && (
-          <div className="scale-[1.04] rotate-2 shadow-2xl opacity-95 cursor-grabbing origin-center select-none">
+          <div className="origin-center scale-[1.04] rotate-2 cursor-grabbing select-none opacity-95 shadow-[0_32px_90px_rgba(15,23,42,0.25)]">
             <MemoizedTaskItem
               task={boardData.task[activeId]}
               listId=""

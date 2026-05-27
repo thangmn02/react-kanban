@@ -2,6 +2,7 @@ import { endOfMonth, format, startOfMonth } from 'date-fns';
 
 import { data as seedBoardData } from '../data';
 import { CURRENT_USER } from '../data/currentUser';
+import { VIETNAM_HOLIDAYS_2026, mapVietnamHolidayToRow } from '../data/vietnamHolidays';
 import supabase, { requireSupabaseClient } from '../lib/supabase';
 import type { TaskAssignee } from '../types/task.type';
 import type { HolidayRow } from '../types/supabase.type';
@@ -48,36 +49,7 @@ interface DashboardBoardRow {
   updated_at: string | null;
 }
 
-const fallbackVietnamHolidays: HolidayRow[] = [
-  {
-    id: 'vn-2026-01-01',
-    name: 'Tet Duong lich',
-    date: '2026-01-01',
-    country_code: 'VN',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'vn-2026-04-30',
-    name: 'Ngay Giai phong mien Nam',
-    date: '2026-04-30',
-    country_code: 'VN',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'vn-2026-05-01',
-    name: 'Quoc te Lao dong',
-    date: '2026-05-01',
-    country_code: 'VN',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'vn-2026-09-02',
-    name: 'Quoc khanh Viet Nam',
-    date: '2026-09-02',
-    country_code: 'VN',
-    created_at: new Date().toISOString(),
-  },
-];
+const fallbackVietnamHolidays: HolidayRow[] = VIETNAM_HOLIDAYS_2026.map(mapVietnamHolidayToRow);
 
 function isAssignedToCurrentUser(assignees: TaskAssignee[], currentUserName: string) {
   return assignees.some((assignee) => assignee.name === currentUserName);

@@ -14,6 +14,41 @@ interface UpdateTaskPositionPayload {
   position: number;
 }
 
+function buildStableTaskInsertPayload(taskData: TaskInsert): TaskInsert {
+  return {
+    board_id: taskData.board_id,
+    list_id: taskData.list_id,
+    title: taskData.title,
+    description: taskData.description ?? '',
+    priority: taskData.priority ?? 'Low',
+    start_date: taskData.start_date ?? null,
+    due_date: taskData.due_date ?? null,
+    assignees: taskData.assignees ?? [],
+    image: taskData.image ?? null,
+    is_done: taskData.is_done ?? false,
+    position: taskData.position ?? 0,
+  };
+}
+
+function buildStableTaskUpdatePayload(taskData: TaskUpdate): TaskUpdate {
+  const stablePayload: TaskUpdate = {};
+
+  if ('title' in taskData) stablePayload.title = taskData.title;
+  if ('description' in taskData) stablePayload.description = taskData.description ?? '';
+  if ('priority' in taskData) stablePayload.priority = taskData.priority ?? 'Low';
+  if ('start_date' in taskData) stablePayload.start_date = taskData.start_date ?? null;
+  if ('due_date' in taskData) stablePayload.due_date = taskData.due_date ?? null;
+  if ('assignees' in taskData) stablePayload.assignees = taskData.assignees ?? [];
+  if ('image' in taskData) stablePayload.image = taskData.image ?? null;
+  if ('is_done' in taskData) stablePayload.is_done = taskData.is_done ?? false;
+  if ('list_id' in taskData) stablePayload.list_id = taskData.list_id;
+  if ('position' in taskData) stablePayload.position = taskData.position;
+  if ('deleted_at' in taskData) stablePayload.deleted_at = taskData.deleted_at;
+  if ('archived_at' in taskData) stablePayload.archived_at = taskData.archived_at;
+
+  return stablePayload;
+}
+
 export async function fetchTasks({ boardId, listId }: FetchTasksParams = {}): Promise<TaskRow[]> {
   if (!supabase) {
     return [];
@@ -73,7 +108,7 @@ export async function createTask(taskData: TaskInsert): Promise<TaskRow> {
   const client = requireSupabaseClient();
   const { data, error } = await client
     .from('tasks')
-    .insert(taskData)
+    .insert(buildStableTaskInsertPayload(taskData))
     .select()
     .single();
 
@@ -95,7 +130,7 @@ export async function updateTask(taskId: string, taskData: TaskUpdate): Promise<
   const client = requireSupabaseClient();
   const { data, error } = await client
     .from('tasks')
-    .update(taskData)
+    .update(buildStableTaskUpdatePayload(taskData))
     .eq('id', taskId)
     .select()
     .single();

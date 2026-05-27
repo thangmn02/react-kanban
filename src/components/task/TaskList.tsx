@@ -73,12 +73,12 @@ function TaskList({
     <div
       ref={isOverlay ? undefined : setNodeRef}
       style={style}
-      className={`mr-6 w-80 flex-shrink-0 flex flex-col max-h-[85vh] rounded-xl bg-gray-50 border border-gray-200 p-4 transition-shadow duration-200 ${
+      className={`mr-6 flex max-h-[85vh] w-80 flex-shrink-0 flex-col rounded-[1.75rem] border border-white/80 bg-white/70 p-4 shadow-[0_14px_48px_rgba(15,23,42,0.08)] ring-1 ring-slate-900/[0.03] backdrop-blur-xl transition-[box-shadow,border,background,opacity] duration-200 ${
         isDragging
-          ? 'opacity-30 border-2 border-dashed border-gray-400 bg-gray-100 shadow-inner'
+          ? 'border-2 border-dashed border-sky-300 bg-sky-50/70 opacity-35 shadow-inner'
           : isOverlay
-          ? 'shadow-2xl ring-1 ring-black/5'
-          : 'hover:shadow-md'
+          ? 'shadow-2xl ring-1 ring-sky-100'
+          : 'hover:border-sky-100 hover:bg-white/86 hover:shadow-[0_22px_64px_rgba(15,23,42,0.12)]'
       }`}
     >
       {/* Header Container */}
@@ -87,8 +87,8 @@ function TaskList({
         <div
           {...(isOverlay ? {} : attributes)}
           {...(isOverlay ? {} : listeners)}
-          className={`flex items-center space-x-2 flex-1 p-1 rounded-lg transition-colors select-none ${
-            isOverlay ? 'cursor-grabbing' : 'cursor-grab hover:bg-gray-200/60 active:cursor-grabbing'
+          className={`flex flex-1 select-none items-center space-x-2 rounded-2xl p-2 transition-colors ${
+            isOverlay ? 'cursor-grabbing' : 'cursor-grab hover:bg-slate-100/80 active:cursor-grabbing'
           }`}
           title="Drag to reorder list"
         >
@@ -97,11 +97,11 @@ function TaskList({
             <path d="M7 2a2 2 0 10.001 4.001A2 2 0 007 2zm0 6a2 2 0 10.001 4.001A2 2 0 007 8zm0 6a2 2 0 10.001 4.001A2 2 0 007 14zm6-12a2 2 0 10.001 4.001A2 2 0 0013 2zm0 6a2 2 0 10.001 4.001A2 2 0 0013 8zm0 6a2 2 0 10.001 4.001A2 2 0 0013 14z" />
           </svg>
           <Typography
-            className="text-xs font-bold text-gray-700 uppercase tracking-wider flex-1 truncate"
+            className="flex-1 truncate text-xs font-semibold uppercase tracking-[0.16em] text-slate-700"
             content={listItem.title}
             component="h2"
           />
-          <span className="text-xs font-semibold text-gray-500 bg-white border border-gray-200 px-2 py-0.5 rounded-full shadow-sm">
+          <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-semibold text-slate-500 shadow-sm">
             {tasks.length.toString()}
           </span>
         </div>
@@ -111,7 +111,7 @@ function TaskList({
           <div className="relative shrink-0 ml-1">
             <button
               onClick={() => toggleMenu(listItem.id)}
-              className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-200/80 rounded-md cursor-pointer transition-colors"
+              className="cursor-pointer rounded-xl p-1.5 text-gray-400 transition-colors hover:bg-slate-100 hover:text-gray-600"
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
@@ -124,7 +124,7 @@ function TaskList({
                   className="fixed inset-0 z-10"
                   onClick={() => toggleMenu(null)}
                 ></div>
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
+                <div className="absolute right-0 z-20 mt-2 w-48 rounded-2xl border border-slate-200 bg-white py-1 shadow-[0_18px_50px_rgba(15,23,42,0.16)]">
                   <button
                     onClick={() => {
                       setDeleteItem({ type: 'list', listId: listItem.id });
@@ -151,7 +151,7 @@ function TaskList({
             ref={isOverlay ? undefined : setTaskAreaNodeRef}
             className="h-full"
           >
-            <div className="space-y-3 pb-4">
+            <div className="space-y-3.5 pb-4">
               {tasks.map((task) => (
                 <TaskItem
                   key={task.id}
@@ -164,7 +164,7 @@ function TaskList({
                 />
               ))}
               {tasks.length === 0 && !isDragging && (
-                <div className="flex flex-col items-center justify-center py-8 text-gray-400 border-2 border-dashed border-gray-200 rounded-lg">
+                <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-white/50 py-8 text-gray-400">
                   <svg className="h-8 w-8 mb-1.5 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
                   </svg>
@@ -180,7 +180,7 @@ function TaskList({
       {!isOverlay && (
         <button
           onClick={setIsModalOpen}
-          className="w-full py-2.5 mt-2 text-sm font-semibold text-gray-500 bg-white border border-gray-200 border-dashed rounded-lg hover:bg-gray-100 hover:text-gray-700 transition-all shadow-sm shrink-0 cursor-pointer"
+          className="mt-2 w-full shrink-0 cursor-pointer rounded-2xl border border-dashed border-slate-200 bg-white/72 py-3 text-sm font-semibold text-slate-500 shadow-sm transition-[background,box-shadow,transform,color] hover:-translate-y-0.5 hover:bg-white hover:text-slate-700 hover:shadow-md active:scale-[0.99]"
         >
           + Add new task
         </button>

@@ -7,6 +7,16 @@ import type {
   TaskLabelRow,
 } from '../types/supabase.type';
 
+function isMissingLabelTableError(error: unknown) {
+  return typeof error === 'object'
+    && error !== null
+    && 'message' in error
+    && (
+      String((error as { message?: unknown }).message).includes('task_labels')
+      || String((error as { message?: unknown }).message).includes('task_label_links')
+    );
+}
+
 function normalizeLabels(labels: BoardTaskItem['labels']): BoardTaskItem['labels'] {
   return labels.reduce<BoardTaskItem['labels']>((collectedLabels, label) => {
     const normalizedName = label.name.trim();
@@ -45,6 +55,11 @@ export async function fetchLabelLinksByTaskIds(taskIds: string[]): Promise<TaskL
     .in('task_id', taskIds);
 
   if (error) {
+    if (isMissingLabelTableError(error)) {
+      console.warn('[LabelService] Label tables are missing. Label links will be skipped.');
+      return [];
+    }
+
     throw error;
   }
 
@@ -64,6 +79,11 @@ export async function fetchLabelsByIds(labelIds: string[]): Promise<TaskLabelRow
     .order('created_at', { ascending: true });
 
   if (error) {
+    if (isMissingLabelTableError(error)) {
+      console.warn('[LabelService] Label tables are missing. Labels will be skipped.');
+      return [];
+    }
+
     throw error;
   }
 
@@ -97,6 +117,11 @@ export async function replaceTaskLabels(
       });
 
     if (upsertError) {
+      if (isMissingLabelTableError(upsertError)) {
+        console.warn('[LabelService] Label tables are missing. Label changes were skipped.');
+        return;
+      }
+
       throw upsertError;
     }
   }
@@ -107,6 +132,11 @@ export async function replaceTaskLabels(
     .eq('task_id', taskId);
 
   if (deleteLinksError) {
+    if (isMissingLabelTableError(deleteLinksError)) {
+      console.warn('[LabelService] Label tables are missing. Label changes were skipped.');
+      return;
+    }
+
     throw deleteLinksError;
   }
 
@@ -121,6 +151,11 @@ export async function replaceTaskLabels(
     .in('name', uniqueLabels.map((label: BoardTaskItem['labels'][number]) => label.name));
 
   if (persistedLabelsError) {
+    if (isMissingLabelTableError(persistedLabelsError)) {
+      console.warn('[LabelService] Label tables are missing. Label changes were skipped.');
+      return;
+    }
+
     throw persistedLabelsError;
   }
 
@@ -134,6 +169,11 @@ export async function replaceTaskLabels(
     .insert(labelLinks);
 
   if (insertLinksError) {
+    if (isMissingLabelTableError(insertLinksError)) {
+      console.warn('[LabelService] Label tables are missing. Label changes were skipped.');
+      return;
+    }
+
     throw insertLinksError;
   }
 }

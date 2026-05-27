@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useForm, useWatch, type Resolver } from 'react-hook-form';
+import { AnimatePresence, motion } from 'framer-motion';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { EditorContent, useEditor } from '@tiptap/react';
@@ -193,10 +194,6 @@ function TaskDialog({ isOpen, onClose, onSubmitTask, taskData }: TaskDialogProps
     }
   }, [isEditMode, isOpen, loadActivities, resetTransientDialogState, taskData?.id]);
 
-  if (!isOpen) {
-    return null;
-  }
-
   const handleFormSubmit = (formData: TaskDialogValues) => {
     onSubmitTask({
       title: formData.title.trim(),
@@ -276,13 +273,25 @@ function TaskDialog({ isOpen, onClose, onSubmitTask, taskData }: TaskDialogProps
   };
 
   return (
-    <div className="fixed inset-0 z-50">
-      <div
-        className="absolute inset-0 bg-slate-950/35 backdrop-blur-[1px]"
-        onClick={onClose}
-      />
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div className="fixed inset-0 z-50">
+          <motion.div
+            className="absolute inset-0 bg-slate-950/30 backdrop-blur-[3px]"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+            onClick={onClose}
+          />
 
-      <aside className="absolute right-0 top-0 flex h-full w-full max-w-3xl flex-col overflow-hidden bg-white shadow-2xl">
+          <motion.aside
+            className="absolute right-0 top-0 flex h-full w-full max-w-3xl flex-col overflow-hidden rounded-l-[2rem] bg-white shadow-[0_32px_100px_rgba(15,23,42,0.28)]"
+            initial={{ x: '100%', opacity: 0.72, scale: 0.98 }}
+            animate={{ x: 0, opacity: 1, scale: 1 }}
+            exit={{ x: '100%', opacity: 0, scale: 0.98 }}
+            transition={{ type: 'spring', stiffness: 220, damping: 26, mass: 0.9 }}
+          >
         <div className="flex items-start justify-between border-b border-gray-200 bg-white px-6 py-5">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-600">
@@ -817,8 +826,10 @@ function TaskDialog({ isOpen, onClose, onSubmitTask, taskData }: TaskDialogProps
             </div>
           </div>
         </form>
-      </aside>
-    </div>
+          </motion.aside>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 

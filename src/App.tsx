@@ -679,7 +679,7 @@ function App() {
 
   if (activeView === 'home') {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-[#F8F9FA]">
         {(isBoardLoading || isSavingBoard) && (
           <div className="border-b border-gray-200 bg-white px-4 py-2 text-sm text-gray-600">
             {isBoardLoading ? 'Preparing board data...' : 'Saving changes...'}
@@ -697,9 +697,9 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white border-b border-gray-200">
-        <div className="px-4 py-3">
+    <div className="min-h-screen bg-[#F8F9FA]">
+      <nav className="border-b border-slate-200/70 bg-white/82 shadow-[0_8px_30px_rgba(15,23,42,0.04)] backdrop-blur-xl">
+        <div className="px-6 py-4">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex flex-wrap items-center gap-3">
               <div>
@@ -715,7 +715,7 @@ function App() {
                       setActiveViewWithPath('board');
                       void refreshBoardData({ boardId: nextBoardId, showErrorToast: true });
                     }}
-                    className="rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="rounded-2xl border border-slate-200 bg-white/90 px-4 py-2.5 text-sm font-semibold text-slate-800 shadow-sm outline-none transition focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
                   >
                     {boardSummaries.map((boardSummary) => (
                       <option key={boardSummary.id} value={boardSummary.id}>
@@ -726,7 +726,7 @@ function App() {
                   <button
                     type="button"
                     onClick={() => setIsCreateBoardModalOpen(true)}
-                    className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+                    className="inline-flex items-center justify-center gap-1.5 rounded-2xl border border-slate-200 bg-white/90 px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-[background,box-shadow,transform] hover:-translate-y-0.5 hover:bg-white hover:shadow-md active:scale-[0.98]"
                   >
                     <svg className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -752,11 +752,11 @@ function App() {
               <button
                 type="button"
                 onClick={() => setActiveViewWithPath('home')}
-                className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+                className="rounded-2xl border border-slate-200 bg-white/90 px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-[background,box-shadow,transform] hover:-translate-y-0.5 hover:bg-white hover:shadow-md active:scale-[0.98]"
               >
                 Home
               </button>
-              <div className="inline-flex rounded-xl border border-gray-200 bg-gray-50 p-1 shadow-sm">
+              <div className="inline-flex rounded-2xl border border-slate-200 bg-slate-100/80 p-1 shadow-inner">
                 <button
                   type="button"
                   onClick={() => setActiveViewWithPath('board')}
@@ -783,7 +783,7 @@ function App() {
               <button
                 type="button"
                 onClick={() => setIsBoardActivityModalOpen(true)}
-                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer transition-colors"
+                className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-2xl border border-slate-200 bg-white/90 px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-[background,box-shadow,transform] hover:-translate-y-0.5 hover:bg-white hover:shadow-md focus:outline-none focus:ring-4 focus:ring-sky-100 active:scale-[0.98]"
               >
                 <svg className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
