@@ -9,6 +9,7 @@ import AddGroupDialog from './components/organisms/dialog/AddGroupDialog';
 import CreateBoardDialog from './components/organisms/dialog/CreateBoardDialog';
 import DeleteDialog from './components/organisms/dialog/DeleteDialog';
 import CalendarBoardView from './components/organisms/CalendarBoardView';
+import HomeDashboard from './components/organisms/HomeDashboard';
 import KanbanBoard from './components/organisms/KanbanBoard';
 import TaskDialog from './components/organisms/dialog/TaskDialog';
 import QuickSearch from './components/organisms/QuickSearch';
@@ -34,7 +35,7 @@ import { isLocalDemoMode } from './lib/supabase';
 import { createActivity } from './services/activity.service';
 import BoardActivityDialog from './components/organisms/dialog/BoardActivityDialog';
 
-type BoardViewMode = 'board' | 'calendar';
+type BoardViewMode = 'home' | 'board' | 'calendar';
 
 interface CreateBoardDialogFormData {
   title: string;
@@ -48,12 +49,28 @@ interface BoardChangeActivity {
 }
 
 function App() {
+  const getInitialView = (): BoardViewMode => {
+    if (typeof window === 'undefined') {
+      return 'home';
+    }
+
+    if (window.location.pathname.startsWith('/board')) {
+      return 'board';
+    }
+
+    if (window.location.pathname.startsWith('/calendar')) {
+      return 'calendar';
+    }
+
+    return 'home';
+  };
+
   const cachedBoard = useMemo(() => readBoardCache(), []);
   const initialBoardId = cachedBoard?.boardId || null;
   const [boardData, setBoardData] = useState<BoardData>(() => cachedBoard?.boardData || data);
   const [activeBoardId, setActiveBoardId] = useState<string | null>(() => initialBoardId);
   const [boardSummaries, setBoardSummaries] = useState<BoardRow[]>([]);
-  const [activeView, setActiveView] = useState<BoardViewMode>('board');
+  const [activeView, setActiveView] = useState<BoardViewMode>(() => getInitialView());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeListId, setActiveListId] = useState<string | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -74,6 +91,24 @@ function App() {
   const activeBoardSummary = useMemo(() => (
     boardSummaries.find((boardSummary) => boardSummary.id === activeBoardId) || null
   ), [boardSummaries, activeBoardId]);
+
+  const setActiveViewWithPath = useCallback((nextView: BoardViewMode) => {
+    setActiveView(nextView);
+
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const nextPath = nextView === 'home'
+      ? '/home'
+      : nextView === 'calendar'
+        ? '/calendar'
+        : '/board';
+
+    if (window.location.pathname !== nextPath) {
+      window.history.pushState({ view: nextView }, '', nextPath);
+    }
+  }, []);
 
   const syncBoardCache = useCallback((nextBoardId: string | null, nextBoardData: BoardData) => {
     writeBoardCache({
@@ -126,6 +161,15 @@ function App() {
       await refreshBoardList();
     })();
   }, [initialBoardId, refreshBoardData, refreshBoardList]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setActiveView(getInitialView());
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   useEffect(() => {
     syncBoardCache(activeBoardId, boardData);
@@ -218,7 +262,7 @@ function App() {
       await refreshBoardData({ boardId: createdBoard.id });
       await refreshBoardList();
       setIsCreateBoardModalOpen(false);
-      setActiveView('board');
+      setActiveViewWithPath('board');
       toast.success('Board created successfully!', { theme: 'colored' });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to create board.';
@@ -368,6 +412,35 @@ function App() {
   const handleEditTask = (task: ITaskItem) => {
     setEditingTask(task);
     setIsEditModalOpen(true);
+  };
+
+  const handleOpenBoardFromHome = async (boardId: string) => {
+    setIsBoardLoading(true);
+    await refreshBoardData({ boardId, showErrorToast: true });
+    setActiveViewWithPath('board');
+  };
+
+  const handleOpenTaskFromHome = async (taskId: string, boardId: string) => {
+    setIsBoardLoading(true);
+
+    try {
+      const boardSnapshot = await fetchBoardSnapshot(boardId);
+      activeBoardIdRef.current = boardSnapshot.boardId;
+      setActiveBoardId(boardSnapshot.boardId);
+      setBoardData(boardSnapshot.boardData);
+      syncBoardCache(boardSnapshot.boardId, boardSnapshot.boardData);
+
+      const task = boardSnapshot.boardData.task[taskId];
+      if (task) {
+        setEditingTask(task);
+        setIsEditModalOpen(true);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to open task.';
+      toast.error(message, { theme: 'colored' });
+    } finally {
+      setIsBoardLoading(false);
+    }
   };
 
   const onSubmitEditTask = async (formData: TaskDialogFormData) => {
@@ -557,6 +630,72 @@ function App() {
     }
   };
 
+  const sharedDialogs = (
+    <>
+      <TaskDialog
+        isOpen={isModalOpen || isEditModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          setIsEditModalOpen(false);
+          setActiveListId(null);
+          setEditingTask(null);
+        }}
+        taskData={isEditModalOpen ? editingTask : null}
+        onSubmitTask={isEditModalOpen ? onSubmitEditTask : onSubmitCard}
+      />
+
+      {deleteItem && (
+        <DeleteDialog
+          onSubmit={handleDeleteConfirm}
+          onClose={() => setDeleteItem(null)}
+        >
+          Are you sure you want to delete this {deleteItem.type}?
+        </DeleteDialog>
+      )}
+
+      {isGroupModalOpen && (
+        <AddGroupDialog
+          onClose={() => setIsGroupModalOpen(false)}
+          onSubmitGroup={onSubmitList}
+        />
+      )}
+
+      {isCreateBoardModalOpen && (
+        <CreateBoardDialog
+          onClose={() => setIsCreateBoardModalOpen(false)}
+          onSubmitBoard={handleCreateBoard}
+        />
+      )}
+
+      <BoardActivityDialog
+        isOpen={isBoardActivityModalOpen}
+        onClose={() => setIsBoardActivityModalOpen(false)}
+        boardId={activeBoardId}
+      />
+
+      <ToastContainer />
+    </>
+  );
+
+  if (activeView === 'home') {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        {(isBoardLoading || isSavingBoard) && (
+          <div className="border-b border-gray-200 bg-white px-4 py-2 text-sm text-gray-600">
+            {isBoardLoading ? 'Preparing board data...' : 'Saving changes...'}
+          </div>
+        )}
+
+        <HomeDashboard
+          onOpenTask={handleOpenTaskFromHome}
+          onOpenBoard={handleOpenBoardFromHome}
+        />
+
+        {sharedDialogs}
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <nav className="bg-white border-b border-gray-200">
@@ -573,7 +712,7 @@ function App() {
                     onChange={(event) => {
                       const nextBoardId = event.target.value || null;
                       setIsBoardLoading(true);
-                      setActiveView('board');
+                      setActiveViewWithPath('board');
                       void refreshBoardData({ boardId: nextBoardId, showErrorToast: true });
                     }}
                     className="rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -610,10 +749,17 @@ function App() {
               )}
             </div>
             <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setActiveViewWithPath('home')}
+                className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+              >
+                Home
+              </button>
               <div className="inline-flex rounded-xl border border-gray-200 bg-gray-50 p-1 shadow-sm">
                 <button
                   type="button"
-                  onClick={() => setActiveView('board')}
+                  onClick={() => setActiveViewWithPath('board')}
                   className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${
                     activeView === 'board'
                       ? 'bg-white text-gray-900 shadow-sm'
@@ -624,7 +770,7 @@ function App() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setActiveView('calendar')}
+                  onClick={() => setActiveViewWithPath('calendar')}
                   className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${
                     activeView === 'calendar'
                       ? 'bg-white text-gray-900 shadow-sm'
@@ -720,48 +866,7 @@ function App() {
         />
       )}
 
-      <TaskDialog
-        isOpen={isModalOpen || isEditModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setIsEditModalOpen(false);
-          setActiveListId(null);
-          setEditingTask(null);
-        }}
-        taskData={isEditModalOpen ? editingTask : null}
-        onSubmitTask={isEditModalOpen ? onSubmitEditTask : onSubmitCard}
-      />
-
-      {deleteItem && (
-        <DeleteDialog
-          onSubmit={handleDeleteConfirm}
-          onClose={() => setDeleteItem(null)}
-        >
-          Are you sure you want to delete this {deleteItem.type}?
-        </DeleteDialog>
-      )}
-
-      {isGroupModalOpen && (
-        <AddGroupDialog
-          onClose={() => setIsGroupModalOpen(false)}
-          onSubmitGroup={onSubmitList}
-        />
-      )}
-
-      {isCreateBoardModalOpen && (
-        <CreateBoardDialog
-          onClose={() => setIsCreateBoardModalOpen(false)}
-          onSubmitBoard={handleCreateBoard}
-        />
-      )}
-
-      <BoardActivityDialog
-        isOpen={isBoardActivityModalOpen}
-        onClose={() => setIsBoardActivityModalOpen(false)}
-        boardId={activeBoardId}
-      />
-
-      <ToastContainer />
+      {sharedDialogs}
     </div>
   );
 }

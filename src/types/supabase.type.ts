@@ -290,6 +290,30 @@ export interface Database {
           }
         ];
       };
+      holidays: {
+        Row: {
+          id: string;
+          name: string;
+          date: string;
+          country_code: string;
+          created_at: string;
+        };
+        Insert: {
+          id: string;
+          name: string;
+          date: string;
+          country_code?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          date?: string;
+          country_code?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -321,3 +345,6 @@ export type TaskLabelLinkUpdate = Database['public']['Tables']['task_label_links
 export type TaskActivityRow = Database['public']['Tables']['task_activities']['Row'];
 export type TaskActivityInsert = Database['public']['Tables']['task_activities']['Insert'];
 export type TaskActivityUpdate = Database['public']['Tables']['task_activities']['Update'];
+export type HolidayRow = Database['public']['Tables']['holidays']['Row'];
+export type HolidayInsert = Database['public']['Tables']['holidays']['Insert'];
+export type HolidayUpdate = Database['public']['Tables']['holidays']['Update'];
