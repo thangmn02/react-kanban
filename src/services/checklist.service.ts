@@ -35,7 +35,11 @@ export async function fetchChecklistItemsByTaskIds(taskIds: string[]): Promise<T
   return data;
 }
 
-export async function replaceTaskChecklistItems(taskId: string, checklistItems: BoardTaskItem['checklistItems']): Promise<void> {
+export async function replaceTaskChecklistItems(
+  taskId: string,
+  checklistItems: BoardTaskItem['checklistItems'],
+  workspaceId?: string | null,
+): Promise<void> {
   if (!supabase) {
     return;
   }
@@ -55,7 +59,11 @@ export async function replaceTaskChecklistItems(taskId: string, checklistItems: 
     throw deleteError;
   }
 
-  const checklistInsertPayloads: TaskChecklistItemInsert[] = buildChecklistItemInsertPayloads(taskId, checklistItems);
+  const checklistInsertPayloads: TaskChecklistItemInsert[] = buildChecklistItemInsertPayloads(taskId, checklistItems)
+    .map((checklistItem) => ({
+      ...checklistItem,
+      workspace_id: workspaceId ?? undefined,
+    }));
 
   if (checklistInsertPayloads.length === 0) {
     return;

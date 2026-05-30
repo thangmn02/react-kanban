@@ -4,9 +4,14 @@ import type { Database } from '../types/supabase.type';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+export const authMode = (import.meta.env.VITE_AUTH_MODE === 'supabase' ? 'supabase' : 'mock') as 'mock' | 'supabase';
 
 // Check if credentials are valid and present
-export const isLocalDemoMode = !supabaseUrl || !supabaseAnonKey || supabaseUrl.includes('placeholder') || supabaseAnonKey.includes('placeholder');
+export const isLocalDemoMode = authMode === 'mock'
+  || !supabaseUrl
+  || !supabaseAnonKey
+  || supabaseUrl.includes('placeholder')
+  || supabaseAnonKey.includes('placeholder');
 
 let supabase: SupabaseClient<Database> | null = null;
 

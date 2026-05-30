@@ -94,6 +94,7 @@ export async function replaceTaskLabels(
   taskId: string,
   boardId: string,
   labels: BoardTaskItem['labels'],
+  workspaceId?: string | null,
 ): Promise<void> {
   if (!supabase) {
     return;
@@ -105,6 +106,7 @@ export async function replaceTaskLabels(
   if (uniqueLabels.length > 0) {
     const labelInsertPayloads: TaskLabelInsert[] = uniqueLabels.map((label) => ({
       id: label.id,
+      workspace_id: workspaceId ?? undefined,
       board_id: boardId,
       name: label.name,
       color: label.color,
@@ -160,6 +162,7 @@ export async function replaceTaskLabels(
   }
 
   const labelLinks: TaskLabelLinkInsert[] = persistedLabels.map((label: TaskLabelRow) => ({
+    workspace_id: workspaceId ?? label.workspace_id,
     task_id: taskId,
     label_id: label.id,
   }));

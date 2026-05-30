@@ -6,7 +6,8 @@ import Button from '../../atoms/Button';
 import ContentDialog from '../../molecules/dialog/ContentDialog';
 import InputField from '../../molecules/InputField';
 import TextAreaField from '../../molecules/TextAreaField';
-import { BOARD_TEMPLATES, DEFAULT_BOARD_TEMPLATE_ID } from '../../../data/boardTemplates';
+import BoardTemplatePicker from '../../board/BoardTemplatePicker';
+import { DEFAULT_BOARD_TEMPLATE_ID } from '../../../data/boardTemplates';
 
 interface CreateBoardDialogProps {
   onClose: () => void;
@@ -32,6 +33,7 @@ function CreateBoardDialog({ onClose, onSubmitBoard }: CreateBoardDialogProps) {
     formState: { errors },
     reset,
     control,
+    setValue,
   } = useForm<CreateBoardDialogValues>({
     resolver: yupResolver(createBoardSchema) as Resolver<CreateBoardDialogValues>,
     defaultValues: {
@@ -82,50 +84,14 @@ function CreateBoardDialog({ onClose, onSubmitBoard }: CreateBoardDialogProps) {
           <label className="mb-3 block text-sm font-semibold text-gray-700">
             Template
           </label>
-          <div className="grid gap-3 md:grid-cols-3">
-            {BOARD_TEMPLATES.map((template) => {
-              const isSelected = selectedTemplateId === template.id;
-
-              return (
-                <label
-                  key={template.id}
-                  className={`cursor-pointer rounded-xl border p-4 transition-colors ${
-                    isSelected
-                      ? 'border-blue-500 bg-blue-50 shadow-sm'
-                      : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    value={template.id}
-                    {...register('templateId')}
-                    className="sr-only"
-                  />
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">{template.name}</p>
-                      <p className="mt-1 text-xs text-gray-500">{template.description}</p>
-                    </div>
-                    {isSelected && (
-                      <span className="rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
-                        Active
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {template.lists.map((listTitle) => (
-                      <span
-                        key={listTitle}
-                        className="rounded-full bg-white/80 px-2.5 py-1 text-[11px] font-medium text-gray-600 border border-gray-200"
-                      >
-                        {listTitle}
-                      </span>
-                    ))}
-                  </div>
-                </label>
-              );
+          <BoardTemplatePicker
+            selectedTemplateId={selectedTemplateId}
+            onTemplateChange={(templateId) => setValue('templateId', templateId, {
+              shouldDirty: true,
+              shouldValidate: true,
             })}
-          </div>
+          />
+          <input type="hidden" {...register('templateId')} />
         </div>
 
         <div className="flex items-center gap-3">

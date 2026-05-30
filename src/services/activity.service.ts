@@ -85,13 +85,21 @@ export async function createActivity(
   action: ITaskActivity['action'],
   details: ITaskActivity['details'],
   actor = DEFAULT_ACTOR,
-  taskTitle?: string
+  taskTitle?: string,
+  context?: {
+    workspaceId?: string | null;
+    boardId?: string | null;
+    actorId?: string | null;
+  }
 ): Promise<ITaskActivity> {
   const newActivity: TaskActivityInsert = {
     task_id: taskId,
     action,
     details: details as Json,
     actor: actor as Json,
+    workspace_id: context?.workspaceId ?? undefined,
+    board_id: context?.boardId ?? undefined,
+    actor_id: context?.actorId ?? undefined,
     created_at: new Date().toISOString(),
   };
 

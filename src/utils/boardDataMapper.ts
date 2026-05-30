@@ -51,14 +51,14 @@ export function mapTaskRowToTaskItem(taskRow: TaskRow): BoardTaskItem {
     title: taskRow.title,
     description: taskRow.description || '',
     assignees: normalizeTaskAssignees(taskRow.assignees),
-    priority: taskRow.priority || undefined,
+    priority: normalizeTaskPriority(taskRow.priority),
     startDate: taskRow.start_date || undefined,
     dueDate: taskRow.due_date || undefined,
     category1: taskRow.category1 || undefined,
     category2: taskRow.category2 || undefined,
     image: taskRow.image || undefined,
     isDone: taskRow.is_done,
-    attachments: normalizeTaskAttachments(taskRow.attachments),
+    attachments: normalizeTaskAttachments(taskRow.attachments ?? null),
     labels: [],
     checklistItems: [],
   };
@@ -71,13 +71,17 @@ function serializeTaskAssignees(assignees: BoardTaskItem['assignees'] | undefine
   }));
 }
 
-function serializeTaskAttachments(attachments: BoardTaskItem['attachments'] | undefined): Json {
-  return (attachments || []).map((attachment) => ({
-    id: attachment.id,
-    name: attachment.name,
-    url: attachment.url,
-    type: attachment.type,
-  }));
+function normalizeTaskPriority(priority: string | null): BoardTaskItem['priority'] | undefined {
+  if (
+    priority === 'High'
+    || priority === 'Medium'
+    || priority === 'Low'
+    || priority === 'Lowest'
+  ) {
+    return priority;
+  }
+
+  return undefined;
 }
 
 export function buildBoardDataFromRows(
@@ -166,6 +170,8 @@ export function buildTaskInsertPayload({
   attachments,
   image,
 }: BuildTaskInsertParams): TaskInsert {
+  void attachments;
+
   return {
     board_id: boardId,
     list_id: listId,
@@ -175,7 +181,6 @@ export function buildTaskInsertPayload({
     start_date: startDate || null,
     due_date: dueDate || null,
     assignees: serializeTaskAssignees(assignees),
-    attachments: serializeTaskAttachments(attachments),
     category1: 'Design',
     category2: 'Sprint',
     image: image || null,
@@ -194,6 +199,8 @@ export function buildTaskUpdatePayload({
   attachments,
   image,
 }: BuildTaskUpdateParams): TaskUpdate {
+  void attachments;
+
   return {
     title,
     description,
@@ -201,7 +208,6 @@ export function buildTaskUpdatePayload({
     start_date: startDate || null,
     due_date: dueDate || null,
     assignees: serializeTaskAssignees(assignees),
-    attachments: serializeTaskAttachments(attachments),
     image: image || null,
   };
 }

@@ -15,6 +15,10 @@ dist-ssr
 .env.*.local
 *.local
 
+# Local agent/config and manually managed Supabase workspace files
+.agent/
+supabase/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

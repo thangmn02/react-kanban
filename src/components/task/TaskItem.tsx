@@ -3,7 +3,9 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
 import type { BoardDeleteItem, ITaskItem } from '../../types/task.type';
-import { AVAILABLE_ASSIGNEES } from '../../data/assignees';
+import type { TaskAssignee } from '../../types/task.type';
+import { mapWorkspaceMembersToAssignees, mockWorkspaceMembers } from '../../utils/workspaceMembers';
+import type { WorkspaceMember } from '../../types/auth.type';
 import { getPriorityBadgeClass } from '../../utils/taskMetadata';
 import {
   getChecklistProgress,
@@ -19,6 +21,9 @@ interface TaskItemProps {
   setDeleteItem: Dispatch<SetStateAction<BoardDeleteItem | null>>;
   isOverlay?: boolean;
   onUpdateTask: (taskId: string, fields: Partial<ITaskItem>) => Promise<void>;
+  onToggleFocusTask: (task: ITaskItem) => void;
+  isFocusTask: boolean;
+  workspaceMembers?: WorkspaceMember[];
 }
 
 function TaskItem({
@@ -28,6 +33,9 @@ function TaskItem({
   setDeleteItem,
   isOverlay = false,
   onUpdateTask,
+  onToggleFocusTask,
+  isFocusTask,
+  workspaceMembers = mockWorkspaceMembers,
 }: TaskItemProps) {
   const [showPriorityMenu, setShowPriorityMenu] = useState(false);
   const [showAssigneeMenu, setShowAssigneeMenu] = useState(false);
@@ -55,6 +63,7 @@ function TaskItem({
   const priorityBadgeClass = getPriorityBadgeClass(task.priority);
   const descriptionPreview = stripTaskHtml(task.description);
   const checklistProgress = getChecklistProgress(task.checklistItems || []);
+  const assigneeOptions: TaskAssignee[] = mapWorkspaceMembersToAssignees(workspaceMembers);
 
   const style = isOverlay ? {} : {
     transform: CSS.Transform.toString(transform),
@@ -158,6 +167,23 @@ function TaskItem({
             {/* Task card edit and delete options */}
             {!isOverlay && (
               <div className="flex items-center shrink-0">
+                <button
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleFocusTask(task);
+                  }}
+                  className={`ml-2 cursor-pointer rounded-xl px-2 py-1 text-[11px] font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-sky-300 ${
+                    isFocusTask
+                      ? 'bg-sky-50 text-sky-700 ring-1 ring-sky-200'
+                      : 'bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+                  }`}
+                  title={isFocusTask ? 'Remove from Focus Dock' : 'Add to Focus Dock'}
+                  aria-pressed={isFocusTask}
+                  aria-label={`${isFocusTask ? 'Remove from' : 'Add to'} Focus Dock: ${task.title}`}
+                >
+                  {isFocusTask ? 'Focus' : '+ Focus'}
+                </button>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -307,7 +333,7 @@ function TaskItem({
                           Assign members
                         </div>
                         <div className="space-y-0.5 max-h-48 overflow-y-auto">
-                          {AVAILABLE_ASSIGNEES.map((member) => {
+                          {assigneeOptions.map((member) => {
                             const isAssigned = (task.assignees || []).some(a => a.name === member.name);
                             return (
                               <button

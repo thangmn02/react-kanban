@@ -10,11 +10,13 @@ export async function createList(listData: ListInsert): Promise<ListRow> {
   if (!supabase) {
     return {
       id: `list-${Date.now()}`,
+      workspace_id: listData.workspace_id ?? null,
       board_id: listData.board_id,
       title: listData.title,
       position: listData.position ?? 0,
       created_at: new Date().toISOString(),
       updated_at: null,
+      archived_at: null,
     };
   }
 

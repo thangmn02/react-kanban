@@ -20,6 +20,7 @@ import TaskList from '../task/TaskList';
 import TaskItem from '../task/TaskItem';
 import TaskListOverlay from '../task/TaskListOverlay';
 import type { BoardData, BoardDeleteItem, ITaskItem } from '../../types/task.type';
+import type { WorkspaceMember } from '../../types/auth.type';
 import { doesTaskMatchFilters } from '../../utils/taskFilters';
 
 
@@ -41,6 +42,9 @@ interface KanbanBoardProps {
     activity?: { taskId: string; description: string },
   ) => Promise<void>;
   onUpdateTask: (taskId: string, fields: Partial<ITaskItem>) => Promise<void>;
+  onToggleFocusTask: (task: ITaskItem) => void;
+  isFocusTask: (taskId: string) => boolean;
+  workspaceMembers?: WorkspaceMember[];
 }
 
 interface DragItemData {
@@ -78,6 +82,9 @@ function KanbanBoard({
   onOpenAddGroup,
   onBoardDataChange,
   onUpdateTask,
+  onToggleFocusTask,
+  isFocusTask,
+  workspaceMembers,
 }: KanbanBoardProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeType, setActiveType] = useState<'list' | 'task' | null>(null);
@@ -284,6 +291,9 @@ function KanbanBoard({
                   setDeleteItem={setDeleteItem}
                   setIsModalOpen={() => onOpenAddTask(listItem.id)}
                   onUpdateTask={onUpdateTask}
+                  onToggleFocusTask={onToggleFocusTask}
+                  isFocusTask={isFocusTask}
+                  workspaceMembers={workspaceMembers}
                 />
             ))}
 
@@ -326,6 +336,9 @@ function KanbanBoard({
               setDeleteItem={() => {}}
               isOverlay={true}
               onUpdateTask={onUpdateTask}
+              onToggleFocusTask={() => {}}
+              isFocusTask={false}
+              workspaceMembers={workspaceMembers}
             />
           </div>
         )}

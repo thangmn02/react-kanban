@@ -9,20 +9,25 @@ import {
   startOfWeek,
 } from 'date-fns';
 
-import { CURRENT_USER } from '../../data/currentUser';
 import { VIETNAM_HOLIDAYS_2026 } from '../../data/vietnamHolidays';
 import {
   fetchHomeDashboardData,
   type HomeDashboardData,
   type HomeTaskSummary,
 } from '../../services/home.service';
+import type { AppUser, WorkspaceSummary } from '../../types/auth.type';
 import { getPriorityBadgeClass } from '../../utils/taskMetadata';
 import AppleCard from '../atoms/AppleCard';
 import DueDateBadge from '../atoms/DueDateBadge';
+import MyTasksSummary from '../home/MyTasksSummary';
 
 interface HomeDashboardProps {
   onOpenTask: (taskId: string, boardId: string) => void;
   onOpenBoard: (boardId: string) => void;
+  onToggleFocusTask: (task: HomeTaskSummary) => void;
+  isFocusTask: (taskId: string) => boolean;
+  currentUser: AppUser;
+  activeWorkspace: WorkspaceSummary | null;
 }
 
 function getTasksDueThisWeek(tasks: HomeTaskSummary[]) {
@@ -102,7 +107,14 @@ const holidayCardVariants: Variants = {
   },
 };
 
-function HomeDashboard({ onOpenTask, onOpenBoard }: HomeDashboardProps) {
+function HomeDashboard({
+  onOpenTask,
+  onOpenBoard,
+  onToggleFocusTask,
+  isFocusTask,
+  currentUser,
+  activeWorkspace,
+}: HomeDashboardProps) {
   const [dashboardData, setDashboardData] = useState<HomeDashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -110,7 +122,10 @@ function HomeDashboard({ onOpenTask, onOpenBoard }: HomeDashboardProps) {
   useEffect(() => {
     let isMounted = true;
 
-    fetchHomeDashboardData()
+    fetchHomeDashboardData({
+      currentUser,
+      workspaceId: activeWorkspace?.id,
+    })
       .then((data) => {
         if (!isMounted) {
           return;
@@ -135,7 +150,7 @@ function HomeDashboard({ onOpenTask, onOpenBoard }: HomeDashboardProps) {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [activeWorkspace?.id, currentUser]);
 
   const myTasks = dashboardData?.myTasks || [];
   const recentBoards = dashboardData?.recentBoards || [];
@@ -217,19 +232,19 @@ function HomeDashboard({ onOpenTask, onOpenBoard }: HomeDashboardProps) {
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-blue-600">Home</p>
             <h1 className="mt-1 text-2xl font-bold text-gray-900">Personal dashboard</h1>
             <p className="mt-1 text-sm text-gray-500">
-              {CURRENT_USER.name}'s assigned tasks, recent boards, and due-date rhythm.
+              {currentUser.name}'s assigned tasks, recent boards, and due-date rhythm.
             </p>
           </div>
 
           <AppleCard className="flex items-center gap-3 px-3 py-2" interactive>
             <img
-              src={CURRENT_USER.avatar}
-              alt={CURRENT_USER.name}
+              src={currentUser.avatarUrl}
+              alt={currentUser.name}
               className="h-9 w-9 rounded-full object-cover"
             />
             <div>
-              <p className="text-sm font-semibold text-gray-900">{CURRENT_USER.name}</p>
-              <p className="text-xs text-gray-500">Current assignee</p>
+              <p className="text-sm font-semibold text-gray-900">{currentUser.name}</p>
+              <p className="text-xs text-gray-500">{activeWorkspace?.name || 'Current workspace'}</p>
             </div>
           </AppleCard>
         </div>
@@ -259,6 +274,8 @@ function HomeDashboard({ onOpenTask, onOpenBoard }: HomeDashboardProps) {
                 </span>
               </div>
 
+              <MyTasksSummary tasks={myTasks} />
+
               <div className="divide-y divide-gray-100/80">
                 {myTasks.length === 0 ? (
                   <div className="px-5 py-8 text-sm text-gray-400">No assigned tasks found.</div>
@@ -266,12 +283,21 @@ function HomeDashboard({ onOpenTask, onOpenBoard }: HomeDashboardProps) {
                   myTasks.map((task) => {
                     const priorityClassName = getPriorityBadgeClass(task.priority || undefined);
 
+                    const isFocused = isFocusTask(task.id);
+
                     return (
-                      <button
+                      <div
                         key={task.id}
-                        type="button"
+                        role="button"
+                        tabIndex={0}
                         onClick={() => onOpenTask(task.id, task.boardId)}
-                        className="grid w-full gap-3 px-5 py-4 text-left transition-[background,transform] duration-200 hover:bg-slate-50/90 active:scale-[0.995] md:grid-cols-[minmax(0,1fr)_auto_auto]"
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            onOpenTask(task.id, task.boardId);
+                          }
+                        }}
+                        className="grid w-full gap-3 px-5 py-4 text-left transition-[background,transform] duration-200 hover:bg-slate-50/90 active:scale-[0.995] md:grid-cols-[minmax(0,1fr)_auto_auto_auto] focus:outline-none focus:ring-2 focus:ring-sky-300"
                       >
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-gray-900">{task.title}</p>
@@ -293,7 +319,24 @@ function HomeDashboard({ onOpenTask, onOpenBoard }: HomeDashboardProps) {
                         <div className="flex items-center justify-start md:justify-end">
                           <DueDateBadge dueDate={task.dueDate || undefined} />
                         </div>
-                      </button>
+
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onToggleFocusTask(task);
+                          }}
+                          className={`rounded-2xl border px-3 py-1.5 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-sky-300 ${
+                            isFocused
+                              ? 'border-sky-200 bg-sky-50 text-sky-700'
+                              : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                          }`}
+                          aria-pressed={isFocused}
+                          aria-label={`${isFocused ? 'Remove from' : 'Add to'} Focus Dock: ${task.title}`}
+                        >
+                          {isFocused ? 'Focused' : 'Focus'}
+                        </button>
+                      </div>
                     );
                   })
                 )}

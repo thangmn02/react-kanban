@@ -6,6 +6,7 @@ import type { TaskInsert, TaskRow, TaskUpdate } from '../types/supabase.type';
 interface FetchTasksParams {
   boardId?: string;
   listId?: string;
+  workspaceId?: string | null;
 }
 
 interface UpdateTaskPositionPayload {
@@ -18,6 +19,7 @@ function buildStableTaskInsertPayload(taskData: TaskInsert): TaskInsert {
   return {
     board_id: taskData.board_id,
     list_id: taskData.list_id,
+    workspace_id: taskData.workspace_id ?? undefined,
     title: taskData.title,
     description: taskData.description ?? '',
     priority: taskData.priority ?? 'Low',
@@ -27,6 +29,7 @@ function buildStableTaskInsertPayload(taskData: TaskInsert): TaskInsert {
     image: taskData.image ?? null,
     is_done: taskData.is_done ?? false,
     position: taskData.position ?? 0,
+    created_by: taskData.created_by ?? undefined,
   };
 }
 
@@ -42,14 +45,17 @@ function buildStableTaskUpdatePayload(taskData: TaskUpdate): TaskUpdate {
   if ('image' in taskData) stablePayload.image = taskData.image ?? null;
   if ('is_done' in taskData) stablePayload.is_done = taskData.is_done ?? false;
   if ('list_id' in taskData) stablePayload.list_id = taskData.list_id;
+  if ('workspace_id' in taskData) stablePayload.workspace_id = taskData.workspace_id;
   if ('position' in taskData) stablePayload.position = taskData.position;
+  if ('created_by' in taskData) stablePayload.created_by = taskData.created_by;
+  if ('completed_at' in taskData) stablePayload.completed_at = taskData.completed_at;
   if ('deleted_at' in taskData) stablePayload.deleted_at = taskData.deleted_at;
   if ('archived_at' in taskData) stablePayload.archived_at = taskData.archived_at;
 
   return stablePayload;
 }
 
-export async function fetchTasks({ boardId, listId }: FetchTasksParams = {}): Promise<TaskRow[]> {
+export async function fetchTasks({ boardId, listId, workspaceId }: FetchTasksParams = {}): Promise<TaskRow[]> {
   if (!supabase) {
     return [];
   }
@@ -71,6 +77,10 @@ export async function fetchTasks({ boardId, listId }: FetchTasksParams = {}): Pr
     query = query.eq('list_id', listId);
   }
 
+  if (workspaceId) {
+    query = query.eq('workspace_id', workspaceId);
+  }
+
   const { data, error } = await query;
 
   if (error) {
@@ -84,6 +94,7 @@ export async function createTask(taskData: TaskInsert): Promise<TaskRow> {
   if (!supabase) {
     return {
       id: `task-${Date.now()}`,
+      workspace_id: taskData.workspace_id ?? null,
       board_id: taskData.board_id,
       list_id: taskData.list_id,
       title: taskData.title,
@@ -96,10 +107,11 @@ export async function createTask(taskData: TaskInsert): Promise<TaskRow> {
       category2: taskData.category2 || null,
       assignees: taskData.assignees || null,
       image: taskData.image || null,
-      attachments: taskData.attachments || [],
       is_done: taskData.is_done || false,
       created_at: new Date().toISOString(),
+      created_by: taskData.created_by ?? null,
       updated_at: null,
+      completed_at: taskData.completed_at ?? null,
       deleted_at: null,
       archived_at: null,
     };

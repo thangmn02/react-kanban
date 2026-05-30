@@ -4,6 +4,7 @@ import { data as seedBoardData } from '../data';
 import { CURRENT_USER } from '../data/currentUser';
 import { VIETNAM_HOLIDAYS_2026, mapVietnamHolidayToRow } from '../data/vietnamHolidays';
 import supabase, { requireSupabaseClient } from '../lib/supabase';
+import type { AppUser } from '../types/auth.type';
 import type { TaskAssignee } from '../types/task.type';
 import type { HolidayRow } from '../types/supabase.type';
 import { normalizeTaskAssignees } from '../utils/taskCollections';
@@ -15,6 +16,7 @@ export interface HomeTaskSummary {
   title: string;
   priority: 'High' | 'Medium' | 'Low' | 'Lowest' | null;
   dueDate: string | null;
+  assigneeAvatar?: string;
 }
 
 export interface RecentBoardSummary {
@@ -83,6 +85,7 @@ function getLocalDashboardData(): HomeDashboardData {
       title: task.title,
       priority: task.priority || null,
       dueDate: task.dueDate || null,
+      assigneeAvatar: task.assignees[0]?.avatar,
     }))
     .sort(sortTasksByDueDate);
 
@@ -102,7 +105,15 @@ function getLocalDashboardData(): HomeDashboardData {
   };
 }
 
-export async function fetchHomeDashboardData(currentUserName = CURRENT_USER.name): Promise<HomeDashboardData> {
+interface FetchHomeDashboardDataParams {
+  currentUser?: AppUser | null;
+  workspaceId?: string | null;
+}
+
+export async function fetchHomeDashboardData({
+  currentUser,
+  workspaceId,
+}: FetchHomeDashboardDataParams = {}): Promise<HomeDashboardData> {
   if (!supabase) {
     return getLocalDashboardData();
   }
@@ -111,19 +122,28 @@ export async function fetchHomeDashboardData(currentUserName = CURRENT_USER.name
   const visibleMonthStart = format(startOfMonth(new Date()), 'yyyy-MM-dd');
   const visibleMonthEnd = format(endOfMonth(new Date()), 'yyyy-MM-dd');
 
+  let boardsQuery = client
+    .from('boards')
+    .select('id,title,description,created_at,updated_at')
+    .is('archived_at', null)
+    .order('updated_at', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false })
+    .limit(6);
+  let tasksQuery = client
+    .from('tasks')
+    .select('id,board_id,title,priority,due_date,assignees')
+    .is('deleted_at', null)
+    .is('archived_at', null)
+    .order('due_date', { ascending: true, nullsFirst: false });
+
+  if (workspaceId) {
+    boardsQuery = boardsQuery.eq('workspace_id', workspaceId);
+    tasksQuery = tasksQuery.eq('workspace_id', workspaceId);
+  }
+
   const [boardsResult, tasksResult] = await Promise.all([
-    client
-      .from('boards')
-      .select('id,title,description,created_at,updated_at')
-      .order('updated_at', { ascending: false, nullsFirst: false })
-      .order('created_at', { ascending: false })
-      .limit(6),
-    client
-      .from('tasks')
-      .select('id,board_id,title,priority,due_date,assignees')
-      .is('deleted_at', null)
-      .is('archived_at', null)
-      .order('due_date', { ascending: true, nullsFirst: false }),
+    boardsQuery,
+    tasksQuery,
   ]);
 
   if (boardsResult.error) {
@@ -142,7 +162,23 @@ export async function fetchHomeDashboardData(currentUserName = CURRENT_USER.name
   ));
 
   if (import.meta.env.VITE_ENABLE_HOLIDAYS_TABLE === 'true') {
-    const holidaysResult = await client
+    const holidaysClient = client as unknown as {
+      from: (table: 'holidays') => {
+        select: (columns: string) => {
+          eq: (column: string, value: string) => {
+            gte: (column: string, value: string) => {
+              lte: (column: string, value: string) => {
+                order: (column: string, options: { ascending: boolean }) => Promise<{
+                  data: HolidayRow[] | null;
+                  error: Error | null;
+                }>;
+              };
+            };
+          };
+        };
+      };
+    };
+    const holidaysResult = await holidaysClient
       .from('holidays')
       .select('id,name,date,country_code,created_at')
       .eq('country_code', 'VN')
@@ -150,7 +186,7 @@ export async function fetchHomeDashboardData(currentUserName = CURRENT_USER.name
       .lte('date', visibleMonthEnd)
       .order('date', { ascending: true });
 
-    if (!holidaysResult.error && holidaysResult.data.length > 0) {
+    if (!holidaysResult.error && holidaysResult.data && holidaysResult.data.length > 0) {
       holidays = holidaysResult.data;
     } else if (holidaysResult.error && import.meta.env.DEV) {
       console.warn('[HomeDashboard] Falling back to local holiday data.', holidaysResult.error);
@@ -158,8 +194,26 @@ export async function fetchHomeDashboardData(currentUserName = CURRENT_USER.name
   }
 
   const myTasks = tasks
-    .filter((task) => isAssignedToCurrentUser(normalizeTaskAssignees(task.assignees), currentUserName))
+    .filter((task) => {
+      const assignees = normalizeTaskAssignees(task.assignees);
+
+      if (!currentUser || currentUser.isMock) {
+        return isAssignedToCurrentUser(assignees, CURRENT_USER.name);
+      }
+
+      return assignees.some((assignee) => (
+        assignee.name === currentUser.name
+        || assignee.name === currentUser.email
+      ));
+    })
     .map<HomeTaskSummary>((task) => ({
+      ...(() => {
+        const assignees = normalizeTaskAssignees(task.assignees);
+
+        return {
+          assigneeAvatar: assignees[0]?.avatar,
+        };
+      })(),
       id: task.id,
       boardId: task.board_id,
       boardTitle: boardTitleById.get(task.board_id) || 'Untitled board',

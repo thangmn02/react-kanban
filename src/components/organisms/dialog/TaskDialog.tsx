@@ -18,19 +18,23 @@ import type {
   TaskChecklistItem,
   TaskLabel,
 } from '../../../types/task.type';
-import { AVAILABLE_ASSIGNEES } from '../../../data/assignees';
+import type { WorkspaceMember } from '../../../types/auth.type';
 import { fetchActivitiesForTask } from '../../../services/activity.service';
 import {
   getChecklistProgress,
   getTaskLabelClass,
   TASK_LABEL_COLOR_OPTIONS,
 } from '../../../utils/taskCollections';
+import { mapWorkspaceMembersToAssignees, mockWorkspaceMembers } from '../../../utils/workspaceMembers';
 
 interface TaskDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmitTask: (data: TaskDialogFormData) => void;
   taskData?: ITaskItem | null;
+  isFocusTask?: boolean;
+  onToggleFocusTask?: () => void;
+  workspaceMembers?: WorkspaceMember[];
 }
 
 const taskSchema = yup.object({
@@ -63,7 +67,15 @@ function createLocalId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-function TaskDialog({ isOpen, onClose, onSubmitTask, taskData }: TaskDialogProps) {
+function TaskDialog({
+  isOpen,
+  onClose,
+  onSubmitTask,
+  taskData,
+  isFocusTask = false,
+  onToggleFocusTask,
+  workspaceMembers = mockWorkspaceMembers,
+}: TaskDialogProps) {
   const isEditMode = Boolean(taskData);
   const [showAssigneeSelect, setShowAssigneeSelect] = useState(false);
   const [activities, setActivities] = useState<ITaskActivity[]>([]);
@@ -98,6 +110,7 @@ function TaskDialog({ isOpen, onClose, onSubmitTask, taskData }: TaskDialogProps
   });
 
   const currentAssignees = useWatch({ control, name: 'assignees' }) || [];
+  const assigneeOptions = mapWorkspaceMembersToAssignees(workspaceMembers);
   const imagePreview = useWatch({ control, name: 'image' });
   const checklistProgress = getChecklistProgress(checklistItems);
 
@@ -305,15 +318,33 @@ function TaskDialog({ isOpen, onClose, onSubmitTask, taskData }: TaskDialogProps
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
-          >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-2">
+            {isEditMode && onToggleFocusTask && (
+              <button
+                type="button"
+                onClick={onToggleFocusTask}
+                className={`rounded-2xl border px-3 py-2 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-sky-300 ${
+                  isFocusTask
+                    ? 'border-sky-200 bg-sky-50 text-sky-700'
+                    : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                }`}
+                aria-pressed={isFocusTask}
+              >
+                {isFocusTask ? 'In Focus Dock' : 'Add Focus'}
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-full p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
+              aria-label="Close task drawer"
+            >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit(handleFormSubmit)} className="flex min-h-0 flex-1 flex-col">
@@ -536,7 +567,7 @@ function TaskDialog({ isOpen, onClose, onSubmitTask, taskData }: TaskDialogProps
                                 Select members
                               </div>
                               <div className="max-h-56 space-y-1 overflow-y-auto">
-                                {AVAILABLE_ASSIGNEES.map((member) => {
+                                {assigneeOptions.map((member) => {
                                   const isSelected = currentAssignees.some((assignee) => assignee.name === member.name);
 
                                   return (

@@ -8,6 +8,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 
 import type { BoardDeleteItem, IListItem, ITaskItem } from '../../types/task.type';
+import type { WorkspaceMember } from '../../types/auth.type';
 import Typography from '../atoms/Typography';
 import TaskItem from './TaskItem';
 
@@ -21,6 +22,9 @@ interface TaskListProps {
   setDeleteItem: Dispatch<SetStateAction<BoardDeleteItem | null>>;
   isOverlay?: boolean;
   onUpdateTask: (taskId: string, fields: Partial<ITaskItem>) => Promise<void>;
+  onToggleFocusTask: (task: ITaskItem) => void;
+  isFocusTask: (taskId: string) => boolean;
+  workspaceMembers?: WorkspaceMember[];
 }
 
 function TaskList({
@@ -33,6 +37,9 @@ function TaskList({
   setDeleteItem,
   isOverlay = false,
   onUpdateTask,
+  onToggleFocusTask,
+  isFocusTask,
+  workspaceMembers,
 }: TaskListProps) {
   const taskIds = tasks.map(task => task.id);
   const {
@@ -161,6 +168,9 @@ function TaskList({
                   setDeleteItem={setDeleteItem}
                   isOverlay={isOverlay}
                   onUpdateTask={onUpdateTask}
+                  onToggleFocusTask={onToggleFocusTask}
+                  isFocusTask={isFocusTask(task.id)}
+                  workspaceMembers={workspaceMembers}
                 />
               ))}
               {tasks.length === 0 && !isDragging && (

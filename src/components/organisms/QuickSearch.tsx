@@ -1,4 +1,6 @@
-import { AVAILABLE_ASSIGNEES } from '../../data/assignees';
+import type { TaskAssignee } from '../../types/task.type';
+import { mapWorkspaceMembersToAssignees, mockWorkspaceMembers } from '../../utils/workspaceMembers';
+import type { WorkspaceMember } from '../../types/auth.type';
 
 interface QuickSearchProps {
   searchQuery: string;
@@ -10,6 +12,7 @@ interface QuickSearchProps {
   filterDueDate: string;
   onFilterDueDateChange: (dueDateStatus: string) => void;
   onClearFilters: () => void;
+  workspaceMembers?: WorkspaceMember[];
 }
 
 export default function QuickSearch({
@@ -22,8 +25,10 @@ export default function QuickSearch({
   filterDueDate,
   onFilterDueDateChange,
   onClearFilters,
+  workspaceMembers = mockWorkspaceMembers,
 }: QuickSearchProps) {
   const hasActiveFilters = searchQuery !== '' || filterPriority !== '' || filterAssignee !== '' || filterDueDate !== '';
+  const assigneeOptions: TaskAssignee[] = mapWorkspaceMembersToAssignees(workspaceMembers);
 
   return (
     <div className="flex flex-col gap-4 border-b border-slate-200/70 bg-white/72 px-6 py-4 shadow-[0_8px_30px_rgba(15,23,42,0.035)] backdrop-blur-xl lg:flex-row lg:items-center lg:justify-between">
@@ -90,7 +95,7 @@ export default function QuickSearch({
         <div className="flex items-center space-x-2 border-l border-slate-200 pl-3 lg:pl-4">
           <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mr-1">Assignee:</label>
           <div className="flex items-center -space-x-1.5">
-            {AVAILABLE_ASSIGNEES.map((member) => {
+            {assigneeOptions.map((member) => {
               const isSelected = filterAssignee === member.name;
               return (
                 <button
