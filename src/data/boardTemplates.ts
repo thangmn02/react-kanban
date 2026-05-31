@@ -28,6 +28,10 @@ export const BOARD_TEMPLATES: BoardTemplateDefinition[] = [
 
 export const DEFAULT_BOARD_TEMPLATE_ID = BOARD_TEMPLATES[0].id;
 
+export function findBoardTemplateById(templateId: string) {
+  return BOARD_TEMPLATES.find((template) => template.id === templateId) || null;
+}
+
 export function getBoardTemplateById(templateId: string) {
-  return BOARD_TEMPLATES.find((template) => template.id === templateId) || BOARD_TEMPLATES[0];
+  return findBoardTemplateById(templateId) || BOARD_TEMPLATES[0];
 }

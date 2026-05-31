@@ -24,25 +24,37 @@ import type { WorkspaceMember } from '../../types/auth.type';
 import { doesTaskMatchFilters } from '../../utils/taskFilters';
 
 
-interface KanbanBoardProps {
-  boardData: BoardData;
+interface KanbanBoardFilters {
   searchQuery: string;
-  filterPriority: string;
-  filterAssignee: string;
-  filterDueDate: string;
+  priority: string;
+  assignee: string;
+  dueDate: string;
+}
+
+interface KanbanBoardUiState {
   openMenuId: string | null;
   toggleMenu: (listId: string | null) => void;
-  handleEditTask: (task: ITaskItem) => void;
-  setDeleteItem: Dispatch<SetStateAction<BoardDeleteItem | null>>;
+}
+
+interface KanbanBoardHandlers {
+  onEditTask: (task: ITaskItem) => void;
+  onDeleteItem: Dispatch<SetStateAction<BoardDeleteItem | null>>;
   onOpenAddTask: (listId: string) => void;
   onOpenAddGroup: () => void;
-  onBoardDataChange: (
+  onBoardPositionChange: (
     boardData: BoardData,
     changeType: 'list' | 'task',
     activity?: { taskId: string; description: string },
   ) => Promise<void>;
   onUpdateTask: (taskId: string, fields: Partial<ITaskItem>) => Promise<void>;
   onToggleFocusTask: (task: ITaskItem) => void;
+}
+
+interface KanbanBoardProps {
+  boardData: BoardData;
+  filters: KanbanBoardFilters;
+  ui: KanbanBoardUiState;
+  handlers: KanbanBoardHandlers;
   isFocusTask: (taskId: string) => boolean;
   workspaceMembers?: WorkspaceMember[];
 }
@@ -52,7 +64,17 @@ interface DragItemData {
   listId: string;
 }
 
-function resolveDestinationListId(overId: string, overData: DragItemData | undefined, columnIds: string[]): string | null {
+/**
+ * Resolves the destination list id for a drag-over target, validating it against the
+ * known board columns.
+ *
+ * Fallback order:
+ * 1. Prefer the over-target's own `listId` when it matches a known column id.
+ * 2. Otherwise fall back to `overId` itself when it matches a known column id
+ *    (e.g. when dropping directly onto a list container).
+ * 3. Return `null` when neither resolves to a valid, known column.
+ */
+function findValidDestinationListId(overId: string, overData: DragItemData | undefined, columnIds: string[]): string | null {
   if (overData?.listId && columnIds.includes(overData.listId)) {
     return overData.listId;
   }
@@ -70,19 +92,9 @@ const MemoizedTaskListOverlay = memo(TaskListOverlay);
 
 function KanbanBoard({
   boardData,
-  searchQuery,
-  filterPriority,
-  filterAssignee,
-  filterDueDate,
-  openMenuId,
-  toggleMenu,
-  handleEditTask,
-  setDeleteItem,
-  onOpenAddTask,
-  onOpenAddGroup,
-  onBoardDataChange,
-  onUpdateTask,
-  onToggleFocusTask,
+  filters,
+  ui,
+  handlers,
   isFocusTask,
   workspaceMembers,
 }: KanbanBoardProps) {
@@ -134,10 +146,10 @@ function KanbanBoard({
 
       const displayTasks = allTasks.filter((task) => {
         return doesTaskMatchFilters(task, {
-          searchQuery,
-          filterPriority,
-          filterAssignee,
-          filterDueDate,
+          searchQuery: filters.searchQuery,
+          filterPriority: filters.priority,
+          filterAssignee: filters.assignee,
+          filterDueDate: filters.dueDate,
         });
       });
 
@@ -148,7 +160,7 @@ function KanbanBoard({
         displayTasks,
       };
     }).filter((column): column is NonNullable<typeof column> => Boolean(column))
-  ), [boardData, searchQuery, filterPriority, filterAssignee, filterDueDate]);
+  ), [boardData, filters.searchQuery, filters.priority, filters.assignee, filters.dueDate]);
 
   const handleDragStart = ({ active }: DragStartEvent) => {
     const activeData = active.data.current as DragItemData | undefined;
@@ -176,7 +188,7 @@ function KanbanBoard({
 
     if (activeData.type === 'list') {
       const sourceListId = active.id.toString();
-      const destinationListId = resolveDestinationListId(over.id.toString(), overData, boardData.columns);
+      const destinationListId = findValidDestinationListId(over.id.toString(), overData, boardData.columns);
 
       if (!destinationListId || sourceListId === destinationListId) {
         return;
@@ -189,7 +201,7 @@ function KanbanBoard({
         return;
       }
 
-      void onBoardDataChange({
+      void handlers.onBoardPositionChange({
         ...boardData,
         columns: arrayMove(boardData.columns, sourceIndex, destinationIndex)
       }, 'list');
@@ -218,7 +230,7 @@ function KanbanBoard({
         : sourceList.tasks.length - 1;
 
       if (sourceIndex !== destinationIndex) {
-        void onBoardDataChange({
+        void handlers.onBoardPositionChange({
           ...boardData,
           list: {
             ...boardData.list,
@@ -247,7 +259,7 @@ function KanbanBoard({
 
     newDestinationTasks.splice(destinationIndex, 0, active.id.toString());
 
-    void onBoardDataChange({
+    void handlers.onBoardPositionChange({
       ...boardData,
       list: {
         ...boardData.list,
@@ -285,13 +297,13 @@ function KanbanBoard({
                   key={columnId}
                   listItem={listItem}
                   tasks={displayTasks}
-                  toggleMenu={toggleMenu}
-                  openMenuId={openMenuId}
-                  handleEditTask={handleEditTask}
-                  setDeleteItem={setDeleteItem}
-                  setIsModalOpen={() => onOpenAddTask(listItem.id)}
-                  onUpdateTask={onUpdateTask}
-                  onToggleFocusTask={onToggleFocusTask}
+                  toggleMenu={ui.toggleMenu}
+                  openMenuId={ui.openMenuId}
+                  handleEditTask={handlers.onEditTask}
+                  setDeleteItem={handlers.onDeleteItem}
+                  setIsModalOpen={() => handlers.onOpenAddTask(listItem.id)}
+                  onUpdateTask={handlers.onUpdateTask}
+                  onToggleFocusTask={handlers.onToggleFocusTask}
                   isFocusTask={isFocusTask}
                   workspaceMembers={workspaceMembers}
                 />
@@ -299,7 +311,7 @@ function KanbanBoard({
 
             <div className="w-80 flex-shrink-0">
               <button
-                onClick={onOpenAddGroup}
+                onClick={handlers.onOpenAddGroup}
                 className="w-full cursor-pointer rounded-[1.75rem] border border-dashed border-slate-300/80 bg-white/62 py-9 text-sm font-semibold text-slate-500 shadow-sm backdrop-blur-xl transition-[background,box-shadow,transform,color] hover:-translate-y-0.5 hover:bg-white hover:text-slate-700 hover:shadow-[0_18px_50px_rgba(15,23,42,0.10)] active:scale-[0.99]"
               >
                 + Add another group
@@ -335,7 +347,7 @@ function KanbanBoard({
               handleEditTask={() => {}}
               setDeleteItem={() => {}}
               isOverlay={true}
-              onUpdateTask={onUpdateTask}
+              onUpdateTask={handlers.onUpdateTask}
               onToggleFocusTask={() => {}}
               isFocusTask={false}
               workspaceMembers={workspaceMembers}

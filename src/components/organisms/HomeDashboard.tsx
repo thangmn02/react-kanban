@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { motion, useMotionValue, useSpring, useTransform, type Variants } from 'framer-motion';
+import { motion, useMotionValue, useReducedMotion, useSpring, useTransform, type Variants } from 'framer-motion';
 import {
   differenceInCalendarDays,
   endOfWeek,
@@ -16,6 +16,7 @@ import {
   type HomeTaskSummary,
 } from '../../services/home.service';
 import type { AppUser, WorkspaceSummary } from '../../types/auth.type';
+import { FOCUS_BUTTON_LABELS } from '../../constants';
 import { getPriorityBadgeClass } from '../../utils/taskMetadata';
 import AppleCard from '../atoms/AppleCard';
 import DueDateBadge from '../atoms/DueDateBadge';
@@ -57,6 +58,7 @@ function getHolidayCountdownLabel(daysRemaining: number) {
 }
 
 function AnimatedDayCount({ value }: { value: number }) {
+  const prefersReducedMotion = useReducedMotion();
   const counter = useMotionValue(0);
   const spring = useSpring(counter, {
     stiffness: 90,
@@ -71,6 +73,11 @@ function AnimatedDayCount({ value }: { value: number }) {
 
   if (value === 0) {
     return <span>Today</span>;
+  }
+
+  // Reduce Motion: skip the count-up animation and render the final value directly.
+  if (prefersReducedMotion) {
+    return <span>{Math.abs(value)}</span>;
   }
 
   return <motion.span>{roundedValue}</motion.span>;
@@ -334,7 +341,7 @@ function HomeDashboard({
                           aria-pressed={isFocused}
                           aria-label={`${isFocused ? 'Remove from' : 'Add to'} Focus Dock: ${task.title}`}
                         >
-                          {isFocused ? 'Focused' : 'Focus'}
+                          {isFocused ? FOCUS_BUTTON_LABELS.ACTIVE : FOCUS_BUTTON_LABELS.INACTIVE}
                         </button>
                       </div>
                     );

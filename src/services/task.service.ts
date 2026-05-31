@@ -1,6 +1,7 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 import supabase, { requireSupabaseClient } from '../lib/supabase';
+import { DEFAULT_TASK_PRIORITY } from '../constants';
 import type { TaskInsert, TaskRow, TaskUpdate } from '../types/supabase.type';
 
 interface FetchTasksParams {
@@ -15,35 +16,62 @@ interface UpdateTaskPositionPayload {
   position: number;
 }
 
-function buildStableTaskInsertPayload(taskData: TaskInsert): TaskInsert {
+/**
+ * Single source of truth for the default-coalescing applied to the task fields that the
+ * insert and update paths normalize identically. Each normalizer reproduces the exact
+ * `value ?? default` behavior of the original `buildStableTask*Payload` functions so both
+ * `normalizeTaskData` (insert) and `normalizeTaskDataPartial` (update) stay byte-identical.
+ */
+const STABLE_TASK_FIELD_NORMALIZERS = {
+  description: (value: TaskInsert['description']) => value ?? '',
+  priority: (value: TaskInsert['priority']) => value ?? DEFAULT_TASK_PRIORITY,
+  start_date: (value: TaskInsert['start_date']) => value ?? null,
+  due_date: (value: TaskInsert['due_date']) => value ?? null,
+  assignees: (value: TaskInsert['assignees']) => value ?? [],
+  image: (value: TaskInsert['image']) => value ?? null,
+  is_done: (value: TaskInsert['is_done']) => value ?? false,
+} as const;
+
+/**
+ * Insert path: emit every field. Shared fields run through the canonical normalizers; the
+ * insert-only coalescing (`workspace_id`/`created_by` -> undefined, `position` -> 0) and the
+ * raw `board_id`/`list_id`/`title` pass-throughs are preserved exactly as before.
+ */
+function normalizeTaskData(taskData: TaskInsert): TaskInsert {
   return {
     board_id: taskData.board_id,
     list_id: taskData.list_id,
     workspace_id: taskData.workspace_id ?? undefined,
     title: taskData.title,
-    description: taskData.description ?? '',
-    priority: taskData.priority ?? 'Low',
-    start_date: taskData.start_date ?? null,
-    due_date: taskData.due_date ?? null,
-    assignees: taskData.assignees ?? [],
-    image: taskData.image ?? null,
-    is_done: taskData.is_done ?? false,
+    description: STABLE_TASK_FIELD_NORMALIZERS.description(taskData.description),
+    priority: STABLE_TASK_FIELD_NORMALIZERS.priority(taskData.priority),
+    start_date: STABLE_TASK_FIELD_NORMALIZERS.start_date(taskData.start_date),
+    due_date: STABLE_TASK_FIELD_NORMALIZERS.due_date(taskData.due_date),
+    assignees: STABLE_TASK_FIELD_NORMALIZERS.assignees(taskData.assignees),
+    image: STABLE_TASK_FIELD_NORMALIZERS.image(taskData.image),
+    is_done: STABLE_TASK_FIELD_NORMALIZERS.is_done(taskData.is_done),
     position: taskData.position ?? 0,
     created_by: taskData.created_by ?? undefined,
   };
 }
 
-function buildStableTaskUpdatePayload(taskData: TaskUpdate): TaskUpdate {
+/**
+ * Update path: emit a field only when its key is present in the input. Shared fields reuse the
+ * canonical normalizers (matching the insert defaults); `title` and the pass-through keys
+ * (`list_id`, `workspace_id`, `position`, `created_by`, `completed_at`, `deleted_at`,
+ * `archived_at`) are assigned raw, exactly as the original update builder did.
+ */
+function normalizeTaskDataPartial(taskData: TaskUpdate): TaskUpdate {
   const stablePayload: TaskUpdate = {};
 
   if ('title' in taskData) stablePayload.title = taskData.title;
-  if ('description' in taskData) stablePayload.description = taskData.description ?? '';
-  if ('priority' in taskData) stablePayload.priority = taskData.priority ?? 'Low';
-  if ('start_date' in taskData) stablePayload.start_date = taskData.start_date ?? null;
-  if ('due_date' in taskData) stablePayload.due_date = taskData.due_date ?? null;
-  if ('assignees' in taskData) stablePayload.assignees = taskData.assignees ?? [];
-  if ('image' in taskData) stablePayload.image = taskData.image ?? null;
-  if ('is_done' in taskData) stablePayload.is_done = taskData.is_done ?? false;
+  if ('description' in taskData) stablePayload.description = STABLE_TASK_FIELD_NORMALIZERS.description(taskData.description);
+  if ('priority' in taskData) stablePayload.priority = STABLE_TASK_FIELD_NORMALIZERS.priority(taskData.priority);
+  if ('start_date' in taskData) stablePayload.start_date = STABLE_TASK_FIELD_NORMALIZERS.start_date(taskData.start_date);
+  if ('due_date' in taskData) stablePayload.due_date = STABLE_TASK_FIELD_NORMALIZERS.due_date(taskData.due_date);
+  if ('assignees' in taskData) stablePayload.assignees = STABLE_TASK_FIELD_NORMALIZERS.assignees(taskData.assignees);
+  if ('image' in taskData) stablePayload.image = STABLE_TASK_FIELD_NORMALIZERS.image(taskData.image);
+  if ('is_done' in taskData) stablePayload.is_done = STABLE_TASK_FIELD_NORMALIZERS.is_done(taskData.is_done);
   if ('list_id' in taskData) stablePayload.list_id = taskData.list_id;
   if ('workspace_id' in taskData) stablePayload.workspace_id = taskData.workspace_id;
   if ('position' in taskData) stablePayload.position = taskData.position;
@@ -120,7 +148,7 @@ export async function createTask(taskData: TaskInsert): Promise<TaskRow> {
   const client = requireSupabaseClient();
   const { data, error } = await client
     .from('tasks')
-    .insert(buildStableTaskInsertPayload(taskData))
+    .insert(normalizeTaskData(taskData))
     .select()
     .single();
 
@@ -142,7 +170,7 @@ export async function updateTask(taskId: string, taskData: TaskUpdate): Promise<
   const client = requireSupabaseClient();
   const { data, error } = await client
     .from('tasks')
-    .update(buildStableTaskUpdatePayload(taskData))
+    .update(normalizeTaskDataPartial(taskData))
     .eq('id', taskId)
     .select()
     .single();

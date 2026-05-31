@@ -45,7 +45,7 @@ function BoardActivityDialog({ isOpen, onClose, boardId }: BoardActivityDialogPr
       title={(
         <div className="mb-6 flex items-center justify-between">
           <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <svg className="h-6 w-6 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <svg className="h-6 w-6 text-blue-500" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             Board Activity
@@ -53,9 +53,11 @@ function BoardActivityDialog({ isOpen, onClose, boardId }: BoardActivityDialogPr
           <button
             type="button"
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 cursor-pointer"
+            aria-label="Close board activity"
+            title="Close"
+            className="cursor-pointer rounded-xl text-gray-400 transition-colors hover:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
           >
-            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-6 w-6" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>

@@ -43,7 +43,7 @@ export default function WorkspaceMemberRow({
           <select
             value={member.role}
             onChange={(event) => void onRoleChange(member.id, event.target.value as WorkspaceRole)}
-            className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold capitalize text-slate-700 outline-none transition focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
+            className="cursor-pointer rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold capitalize text-slate-700 outline-none transition focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
             aria-label={`Change role for ${member.name}`}
           >
             {editableRoles.map((role) => (
@@ -62,7 +62,7 @@ export default function WorkspaceMemberRow({
           <button
             type="button"
             onClick={() => void onRemoveMember(member.id)}
-            className="rounded-xl border border-rose-100 bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-600 transition hover:border-rose-200 hover:bg-rose-100 focus:outline-none focus:ring-4 focus:ring-rose-100"
+            className="cursor-pointer rounded-xl border border-rose-100 bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-600 transition hover:border-rose-200 hover:bg-rose-100 focus:outline-none focus:ring-4 focus:ring-rose-100"
           >
             Remove
           </button>

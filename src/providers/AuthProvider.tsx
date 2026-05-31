@@ -92,6 +92,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (error) {
       throw error;
     }
+
+    return {
+      requiresEmailConfirmation: false,
+    };
   }, []);
 
   const signUpWithPassword = useCallback(async (email: string, password: string, fullName?: string) => {
@@ -99,7 +103,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       throw new Error('Supabase auth is not configured.');
     }
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -112,6 +116,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (error) {
       throw error;
     }
+
+    return {
+      requiresEmailConfirmation: !data.session,
+    };
   }, []);
 
   const signOut = useCallback(async () => {

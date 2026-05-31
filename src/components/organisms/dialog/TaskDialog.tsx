@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 import { useForm, useWatch, type Resolver } from 'react-hook-form';
 import { AnimatePresence, motion } from 'framer-motion';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -11,7 +12,6 @@ import { formatDistanceToNow, parseISO } from 'date-fns';
 import Button from '../../atoms/Button';
 import InputField from '../../molecules/InputField';
 import type {
-  ITaskActivity,
   ITaskItem,
   TaskDialogFormData,
   TaskAttachment,
@@ -19,12 +19,15 @@ import type {
   TaskLabel,
 } from '../../../types/task.type';
 import type { WorkspaceMember } from '../../../types/auth.type';
-import { fetchActivitiesForTask } from '../../../services/activity.service';
+import { TASK_PRIORITIES } from '../../../constants';
+import { useTaskActivityData } from '../../../hooks/useTaskActivityData';
 import {
   getChecklistProgress,
   getTaskLabelClass,
   TASK_LABEL_COLOR_OPTIONS,
 } from '../../../utils/taskCollections';
+import { createLocalId } from '../../../utils/idGenerator';
+import { formatFocusSessionDuration } from '../../../utils/timeFormatting';
 import { mapWorkspaceMembersToAssignees, mockWorkspaceMembers } from '../../../utils/workspaceMembers';
 
 interface TaskDialogProps {
@@ -35,6 +38,7 @@ interface TaskDialogProps {
   isFocusTask?: boolean;
   onToggleFocusTask?: () => void;
   workspaceMembers?: WorkspaceMember[];
+  workspaceId?: string | null;
 }
 
 const taskSchema = yup.object({
@@ -47,7 +51,33 @@ const taskSchema = yup.object({
   assignees: yup.array(),
 }).required();
 
-const priorityOptions: Array<NonNullable<ITaskItem['priority']>> = ['High', 'Medium', 'Low', 'Lowest'];
+interface TaskFormDrafts {
+  label: { name: string; color: TaskLabel['color'] };
+  attachment: { name: string; url: string };
+  checklist: string;
+}
+
+const INITIAL_FORM_DRAFTS: TaskFormDrafts = {
+  label: { name: '', color: 'sky' },
+  attachment: { name: '', url: '' },
+  checklist: '',
+};
+
+interface AddDraftItemOptions<T> {
+  isValid: boolean;
+  build: () => T;
+  setList: Dispatch<SetStateAction<T[]>>;
+  clearDraft: () => void;
+}
+
+function addDraftItem<T>({ isValid, build, setList, clearDraft }: AddDraftItemOptions<T>): void {
+  if (!isValid) {
+    return;
+  }
+
+  setList((currentItems) => [...currentItems, build()]);
+  clearDraft();
+}
 
 interface TaskDialogValues {
   title: string;
@@ -59,14 +89,6 @@ interface TaskDialogValues {
   assignees?: Array<{ name: string; avatar: string }>;
 }
 
-function createLocalId(prefix: string) {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return `${prefix}-${crypto.randomUUID()}`;
-  }
-
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-}
-
 function TaskDialog({
   isOpen,
   onClose,
@@ -75,19 +97,29 @@ function TaskDialog({
   isFocusTask = false,
   onToggleFocusTask,
   workspaceMembers = mockWorkspaceMembers,
+  workspaceId = null,
 }: TaskDialogProps) {
   const isEditMode = Boolean(taskData);
   const [showAssigneeSelect, setShowAssigneeSelect] = useState(false);
-  const [activities, setActivities] = useState<ITaskActivity[]>([]);
-  const [isLoadingActivities, setIsLoadingActivities] = useState(false);
   const [labels, setLabels] = useState<TaskLabel[]>([]);
   const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
   const [checklistItems, setChecklistItems] = useState<TaskChecklistItem[]>([]);
-  const [labelDraft, setLabelDraft] = useState('');
-  const [labelColorDraft, setLabelColorDraft] = useState<TaskLabel['color']>('sky');
-  const [attachmentNameDraft, setAttachmentNameDraft] = useState('');
-  const [attachmentUrlDraft, setAttachmentUrlDraft] = useState('');
-  const [checklistDraft, setChecklistDraft] = useState('');
+  const [formDrafts, setFormDrafts] = useState<TaskFormDrafts>(INITIAL_FORM_DRAFTS);
+
+  const closeAssigneeSelect = useCallback(() => setShowAssigneeSelect(false), []);
+
+  const {
+    activities,
+    focusSessions,
+    isLoadingActivities,
+    isLoadingFocusSessions,
+  } = useTaskActivityData({
+    isOpen,
+    isEditMode,
+    taskId: taskData?.id,
+    workspaceId,
+    onIdleReset: closeAssigneeSelect,
+  });
 
   const {
     register,
@@ -141,13 +173,46 @@ function TaskDialog({
     register('assignees');
   }, [register]);
 
-  const resetTransientDialogState = useCallback(() => {
-    setShowAssigneeSelect(false);
-    setActivities([]);
-    setIsLoadingActivities(false);
-  }, []);
+  // Reset the dialog's local UI state when it opens or the active task changes.
+  // This runs during render (React's recommended pattern for resetting state
+  // when a prop changes) rather than inside an effect, which preserves the
+  // original "reset on open / reset on task change" behavior while avoiding the
+  // cascading-render that synchronous setState in an effect would cause. The
+  // close/idle reset (closing the assignee select and clearing activity and
+  // focus-session state) is owned by useTaskActivityData via resetActivityData
+  // and onIdleReset, so this block only resets when the dialog is open.
+  const [previousOpenContext, setPreviousOpenContext] = useState<{
+    isOpen: boolean;
+    taskData: ITaskItem | null | undefined;
+  } | null>(null);
 
-  const initializeDialogState = useCallback(() => {
+  if (
+    !previousOpenContext ||
+    previousOpenContext.isOpen !== isOpen ||
+    previousOpenContext.taskData !== taskData
+  ) {
+    setPreviousOpenContext({ isOpen, taskData });
+
+    if (isOpen) {
+      setShowAssigneeSelect(false);
+      setLabels(taskData?.labels || []);
+      setAttachments(taskData?.attachments || []);
+      setChecklistItems(taskData?.checklistItems || []);
+      setFormDrafts((prev) => ({
+        label: { name: '', color: prev.label.color },
+        attachment: { name: '', url: '' },
+        checklist: '',
+      }));
+    }
+  }
+
+  // Synchronize the form library and rich-text editor (external systems) with
+  // the active task whenever the dialog is open.
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
     const nextValues = {
       title: taskData?.title || '',
       description: taskData?.description || '',
@@ -161,51 +226,11 @@ function TaskDialog({
     reset(nextValues);
     setValue('description', nextValues.description);
     setValue('assignees', nextValues.assignees);
-    setShowAssigneeSelect(false);
-    setLabels(taskData?.labels || []);
-    setAttachments(taskData?.attachments || []);
-    setChecklistItems(taskData?.checklistItems || []);
-    setLabelDraft('');
-    setAttachmentNameDraft('');
-    setAttachmentUrlDraft('');
-    setChecklistDraft('');
-    setActivities([]);
 
     if (editor) {
       editor.commands.setContent(nextValues.description);
     }
-  }, [editor, reset, setValue, taskData]);
-
-  useEffect(() => {
-    if (!isOpen) {
-      resetTransientDialogState();
-      return;
-    }
-
-    initializeDialogState();
-  }, [initializeDialogState, isOpen, resetTransientDialogState]);
-
-  const loadActivities = useCallback(async (taskId: string) => {
-    setIsLoadingActivities(true);
-
-    try {
-      const nextActivities = await fetchActivitiesForTask(taskId);
-      setActivities(nextActivities);
-    } catch (error) {
-      console.error('Failed to load activities:', error);
-      setActivities([]);
-    } finally {
-      setIsLoadingActivities(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (isOpen && isEditMode && taskData?.id) {
-      void loadActivities(taskData.id);
-    } else {
-      resetTransientDialogState();
-    }
-  }, [isEditMode, isOpen, loadActivities, resetTransientDialogState, taskData?.id]);
+  }, [editor, isOpen, reset, setValue, taskData]);
 
   const handleFormSubmit = (formData: TaskDialogValues) => {
     onSubmitTask({
@@ -223,66 +248,61 @@ function TaskDialog({
   };
 
   const handleAddLabel = () => {
-    const nextLabelName = labelDraft.trim();
+    const nextLabelName = formDrafts.label.name.trim();
 
-    if (!nextLabelName) {
-      return;
-    }
-
-    setLabels((currentLabels) => [
-      ...currentLabels,
-      {
+    addDraftItem<TaskLabel>({
+      isValid: Boolean(nextLabelName),
+      build: () => ({
         id: createLocalId('label'),
         name: nextLabelName,
-        color: labelColorDraft,
-      },
-    ]);
-    setLabelDraft('');
+        color: formDrafts.label.color,
+      }),
+      setList: setLabels,
+      clearDraft: () => setFormDrafts((prev) => ({ ...prev, label: { ...prev.label, name: '' } })),
+    });
   };
 
   const handleAddAttachment = () => {
-    const nextAttachmentName = attachmentNameDraft.trim();
-    const nextAttachmentUrl = attachmentUrlDraft.trim();
+    const nextAttachmentName = formDrafts.attachment.name.trim();
+    const nextAttachmentUrl = formDrafts.attachment.url.trim();
 
-    if (!nextAttachmentName || !nextAttachmentUrl) {
-      return;
+    let isValidAttachment = false;
+
+    if (nextAttachmentName && nextAttachmentUrl) {
+      try {
+        new URL(nextAttachmentUrl);
+        isValidAttachment = true;
+      } catch {
+        isValidAttachment = false;
+      }
     }
 
-    try {
-      new URL(nextAttachmentUrl);
-    } catch {
-      return;
-    }
-
-    setAttachments((currentAttachments) => [
-      ...currentAttachments,
-      {
+    addDraftItem<TaskAttachment>({
+      isValid: isValidAttachment,
+      build: () => ({
         id: createLocalId('attachment'),
         name: nextAttachmentName,
         url: nextAttachmentUrl,
         type: 'link',
-      },
-    ]);
-    setAttachmentNameDraft('');
-    setAttachmentUrlDraft('');
+      }),
+      setList: setAttachments,
+      clearDraft: () => setFormDrafts((prev) => ({ ...prev, attachment: { name: '', url: '' } })),
+    });
   };
 
   const handleAddChecklistItem = () => {
-    const nextChecklistText = checklistDraft.trim();
+    const nextChecklistText = formDrafts.checklist.trim();
 
-    if (!nextChecklistText) {
-      return;
-    }
-
-    setChecklistItems((currentChecklistItems) => [
-      ...currentChecklistItems,
-      {
+    addDraftItem<TaskChecklistItem>({
+      isValid: Boolean(nextChecklistText),
+      build: () => ({
         id: createLocalId('checklist'),
         text: nextChecklistText,
         isDone: false,
-      },
-    ]);
-    setChecklistDraft('');
+      }),
+      setList: setChecklistItems,
+      clearDraft: () => setFormDrafts((prev) => ({ ...prev, checklist: '' })),
+    });
   };
 
   return (
@@ -337,10 +357,10 @@ function TaskDialog({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-full p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
+              className="cursor-pointer rounded-full p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
               aria-label="Close task drawer"
             >
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="h-5 w-5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
@@ -503,8 +523,8 @@ function TaskDialog({
                     <div className="flex gap-3">
                       <input
                         type="text"
-                        value={checklistDraft}
-                        onChange={(event) => setChecklistDraft(event.target.value)}
+                        value={formDrafts.checklist}
+                        onChange={(event) => setFormDrafts((prev) => ({ ...prev, checklist: event.target.value }))}
                         onKeyDown={(event) => {
                           if (event.key === 'Enter') {
                             event.preventDefault();
@@ -609,7 +629,7 @@ function TaskDialog({
                       Priority
                     </label>
                     <div className="flex flex-wrap gap-2">
-                      {priorityOptions.map((priority) => (
+                      {TASK_PRIORITIES.map((priority) => (
                         <label
                           key={priority}
                           className="inline-flex cursor-pointer items-center rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100"
@@ -680,8 +700,8 @@ function TaskDialog({
                   <div className="space-y-3">
                     <input
                       type="text"
-                      value={labelDraft}
-                      onChange={(event) => setLabelDraft(event.target.value)}
+                      value={formDrafts.label.name}
+                      onChange={(event) => setFormDrafts((prev) => ({ ...prev, label: { ...prev.label, name: event.target.value } }))}
                       onKeyDown={(event) => {
                         if (event.key === 'Enter') {
                           event.preventDefault();
@@ -697,9 +717,9 @@ function TaskDialog({
                         <button
                           key={color}
                           type="button"
-                          onClick={() => setLabelColorDraft(color)}
+                          onClick={() => setFormDrafts((prev) => ({ ...prev, label: { ...prev.label, color } }))}
                           className={`rounded-full px-3 py-1 text-xs font-semibold capitalize transition-transform ${getTaskLabelClass(color)} ${
-                            labelColorDraft === color ? 'scale-105 ring-2 ring-gray-900/10' : ''
+                            formDrafts.label.color === color ? 'scale-105 ring-2 ring-gray-900/10' : ''
                           }`}
                         >
                           {color}
@@ -764,15 +784,15 @@ function TaskDialog({
                   <div className="space-y-3">
                     <input
                       type="text"
-                      value={attachmentNameDraft}
-                      onChange={(event) => setAttachmentNameDraft(event.target.value)}
+                      value={formDrafts.attachment.name}
+                      onChange={(event) => setFormDrafts((prev) => ({ ...prev, attachment: { ...prev.attachment, name: event.target.value } }))}
                       placeholder="Attachment name"
                       className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     <input
                       type="url"
-                      value={attachmentUrlDraft}
-                      onChange={(event) => setAttachmentUrlDraft(event.target.value)}
+                      value={formDrafts.attachment.url}
+                      onChange={(event) => setFormDrafts((prev) => ({ ...prev, attachment: { ...prev.attachment, url: event.target.value } }))}
                       onKeyDown={(event) => {
                         if (event.key === 'Enter') {
                           event.preventDefault();
@@ -785,6 +805,55 @@ function TaskDialog({
                     <Button text="Add attachment" variant="outline" onClick={handleAddAttachment} />
                   </div>
                 </section>
+
+                {isEditMode && taskData && (
+                  <section className="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-gray-500">
+                        Focus history
+                      </h4>
+                      <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                        {focusSessions.length} sessions
+                      </span>
+                    </div>
+
+                    {isLoadingFocusSessions ? (
+                      <div className="py-4 text-center text-sm italic text-gray-500">
+                        Loading focus history...
+                      </div>
+                    ) : focusSessions.length > 0 ? (
+                      <div className="space-y-2">
+                        {focusSessions.map((session) => {
+                          let relativeTime = 'just now';
+
+                          try {
+                            relativeTime = formatDistanceToNow(parseISO(session.createdAt), { addSuffix: true });
+                          } catch {
+                            relativeTime = 'just now';
+                          }
+
+                          return (
+                            <div key={session.id} className="flex items-center justify-between gap-3 rounded-xl border border-blue-100 bg-blue-50/60 px-3 py-3">
+                              <div>
+                                <p className="text-sm font-semibold text-slate-800">
+                                  {formatFocusSessionDuration(session.durationSeconds)} · {session.status}
+                                </p>
+                                <p className="mt-1 text-xs text-slate-500">{relativeTime}</p>
+                              </div>
+                              <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold capitalize text-blue-700">
+                                {session.mode}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-5 text-sm italic text-gray-400">
+                        No focus sessions logged for this task yet.
+                      </div>
+                    )}
+                  </section>
+                )}
 
                 {isEditMode && taskData && (
                   <section className="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">

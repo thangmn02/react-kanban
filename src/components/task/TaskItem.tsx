@@ -6,7 +6,8 @@ import type { BoardDeleteItem, ITaskItem } from '../../types/task.type';
 import type { TaskAssignee } from '../../types/task.type';
 import { mapWorkspaceMembersToAssignees, mockWorkspaceMembers } from '../../utils/workspaceMembers';
 import type { WorkspaceMember } from '../../types/auth.type';
-import { getPriorityBadgeClass } from '../../utils/taskMetadata';
+import { TASK_PRIORITIES } from '../../constants';
+import { getPriorityBadgeClass, getPriorityDotClass } from '../../utils/taskMetadata';
 import {
   getChecklistProgress,
   getTaskLabelClass,
@@ -138,7 +139,7 @@ function TaskItem({
                     }}
                   />
                   <div className="absolute left-0 mt-1.5 w-32 bg-white rounded-lg shadow-xl border border-gray-200 py-1.5 z-30 text-xs font-semibold">
-                    {(['High', 'Medium', 'Low', 'Lowest'] as const).map((p) => {
+                    {TASK_PRIORITIES.map((p) => {
                       const isActive = task.priority === p;
                       return (
                         <button
@@ -152,9 +153,7 @@ function TaskItem({
                             isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
                           }`}
                         >
-                          <span className={`w-2 h-2 rounded-full ${
-                            p === 'High' ? 'bg-red-500' : p === 'Medium' ? 'bg-amber-500' : p === 'Low' ? 'bg-emerald-500' : 'bg-gray-400'
-                          }`} />
+                          <span className={`w-2 h-2 rounded-full ${getPriorityDotClass(p)}`} />
                           {p}
                         </button>
                       );
@@ -189,10 +188,11 @@ function TaskItem({
                     e.stopPropagation();
                     handleEditTask(task);
                   }}
-                  className="ml-2 cursor-pointer rounded-xl p-1 text-gray-400 transition-colors hover:bg-slate-50 hover:text-gray-600"
+                  className="ml-2 cursor-pointer rounded-xl p-1 text-gray-400 transition-colors hover:bg-slate-50 hover:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
                   title="Edit task"
+                  aria-label={`Edit task: ${task.title}`}
                 >
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <svg className="w-4 h-4" aria-hidden="true" fill="currentColor" viewBox="0 0 20 20">
                     <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
                     <path fillRule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clipRule="evenodd" />
                   </svg>
@@ -202,10 +202,11 @@ function TaskItem({
                     e.stopPropagation();
                     setDeleteItem({ type: 'card', listId, cardId: task.id });
                   }}
-                  className="ml-1 cursor-pointer rounded-xl p-1 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                  className="ml-1 cursor-pointer rounded-xl p-1 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
                   title="Delete task"
+                  aria-label={`Delete task: ${task.title}`}
                 >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <svg className="w-4 h-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0 1 16.138 21H7.862a2 2 0 0 1-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3M4 7h16" />
                   </svg>
                 </button>
@@ -274,7 +275,7 @@ function TaskItem({
 
               {task.attachments.length > 0 && (
                 <div className="flex items-center gap-2 text-[11px] font-medium text-blue-700">
-                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <svg className="h-3.5 w-3.5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 11-5.656-5.656l1.5-1.5m7.328-1.328a4 4 0 010-5.656l3-3a4 4 0 115.656 5.656l-1.5 1.5" />
                   </svg>
                   <span>{task.attachments.length} attachment{task.attachments.length !== 1 ? 's' : ''}</span>
@@ -311,10 +312,13 @@ function TaskItem({
                       e.stopPropagation();
                       setShowAssigneeMenu(!showAssigneeMenu);
                     }}
-                  className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border border-dashed border-gray-300 bg-gray-50 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+                  className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border border-dashed border-gray-300 bg-gray-50 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
                     title="Manage assignees"
+                    aria-label="Manage assignees"
+                    aria-haspopup="true"
+                    aria-expanded={showAssigneeMenu}
                   >
-                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                    <svg className="h-3.5 w-3.5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                     </svg>
                   </button>

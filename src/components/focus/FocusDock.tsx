@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion';
 
-import type { FocusTask, PomodoroMode, PomodoroTimerState } from '../../types/focus.type';
+import type { DailyFocusStats, FocusTask, PomodoroMode, PomodoroTimerState } from '../../types/focus.type';
 import { formatPomodoroTime } from '../../utils/pomodoroTime';
 import FocusDockHeader from './FocusDockHeader';
 import FocusTaskMiniCard from './FocusTaskMiniCard';
@@ -11,6 +11,7 @@ interface FocusDockProps {
   activeTaskId: string | null;
   isCollapsed: boolean;
   timerState: PomodoroTimerState;
+  dailyFocusStats: DailyFocusStats;
   remainingSeconds: number;
   onCollapseChange: (isCollapsed: boolean) => void;
   onActiveTaskChange: (taskId: string) => void;
@@ -18,9 +19,12 @@ interface FocusDockProps {
   onStartTimer: () => void;
   onPauseTimer: () => void;
   onResetTimer: () => void;
+  onPopOutTimer: () => void;
   onOpenTask: (task: FocusTask) => void;
   onMarkDone: (task: FocusTask) => void;
   onRemoveTask: (taskId: string) => void;
+  isPictureInPictureSupported: boolean;
+  isPictureInPictureOpen: boolean;
 }
 
 function FocusDock({
@@ -28,6 +32,7 @@ function FocusDock({
   activeTaskId,
   isCollapsed,
   timerState,
+  dailyFocusStats,
   remainingSeconds,
   onCollapseChange,
   onActiveTaskChange,
@@ -35,9 +40,12 @@ function FocusDock({
   onStartTimer,
   onPauseTimer,
   onResetTimer,
+  onPopOutTimer,
   onOpenTask,
   onMarkDone,
   onRemoveTask,
+  isPictureInPictureSupported,
+  isPictureInPictureOpen,
 }: FocusDockProps) {
   if (focusTasks.length === 0) {
     return null;
@@ -51,7 +59,7 @@ function FocusDock({
             key="focus-dock-pill"
             type="button"
             onClick={() => onCollapseChange(false)}
-            className="rounded-full border border-white/80 bg-slate-950/92 px-4 py-3 text-sm font-semibold text-white shadow-[0_20px_60px_rgba(15,23,42,0.25)] backdrop-blur-xl transition hover:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-sky-200 active:scale-[0.98]"
+            className="cursor-pointer rounded-full border border-white/80 bg-slate-950/92 px-4 py-3 text-sm font-semibold text-white shadow-[0_20px_60px_rgba(15,23,42,0.25)] backdrop-blur-xl transition hover:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-sky-200 active:scale-[0.98]"
             initial={{ opacity: 0, y: 16, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 16, scale: 0.96 }}
@@ -91,12 +99,17 @@ function FocusDock({
                 focusTasks={focusTasks}
                 activeTaskId={activeTaskId}
                 timerState={timerState}
+                dailyFocusStats={dailyFocusStats}
                 remainingSeconds={remainingSeconds}
                 onActiveTaskChange={onActiveTaskChange}
                 onModeChange={onModeChange}
                 onStart={onStartTimer}
                 onPause={onPauseTimer}
                 onReset={onResetTimer}
+                onPopOutTimer={onPopOutTimer}
+                canPopOutTimer={focusTasks.length > 0 || Boolean(timerState.activeTaskId)}
+                isPictureInPictureSupported={isPictureInPictureSupported}
+                isPictureInPictureOpen={isPictureInPictureOpen}
               />
             </div>
           </motion.aside>

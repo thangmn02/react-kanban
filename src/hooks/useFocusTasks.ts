@@ -3,30 +3,36 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { BoardData } from '../types/task.type';
 import type { FocusTask, FocusTaskInput } from '../types/focus.type';
 import { mapTaskToFocusTask } from '../utils/focusTaskMapper';
+import { STORAGE_KEYS, MAX_FOCUS_TASKS, FOCUS_LIMIT_MESSAGE } from '../constants';
 
-const focusTasksStorageKey = 'kanban_focus_tasks';
-const activeFocusTaskStorageKey = 'kanban_active_focus_task';
-const maxFocusTasks = 3;
-
-function readStoredFocusTasks(): FocusTask[] {
+function readFromLocalStorage<T>(key: string, fallback: T, parse?: (raw: string) => T): T {
   if (typeof window === 'undefined') {
-    return [];
+    return fallback;
   }
 
   try {
-    const storedValue = window.localStorage.getItem(focusTasksStorageKey);
-    return storedValue ? JSON.parse(storedValue) as FocusTask[] : [];
+    const storedValue = window.localStorage.getItem(key);
+
+    if (storedValue === null) {
+      return fallback;
+    }
+
+    return parse ? parse(storedValue) : (storedValue as unknown as T);
   } catch {
-    return [];
+    return fallback;
   }
 }
 
-function readStoredActiveFocusTaskId() {
-  if (typeof window === 'undefined') {
-    return null;
-  }
+function readStoredFocusTasks(): FocusTask[] {
+  return readFromLocalStorage<FocusTask[]>(
+    STORAGE_KEYS.FOCUS_TASKS,
+    [],
+    (raw) => JSON.parse(raw) as FocusTask[],
+  );
+}
 
-  return window.localStorage.getItem(activeFocusTaskStorageKey);
+function readStoredActiveFocusTaskId(): string | null {
+  return readFromLocalStorage<string | null>(STORAGE_KEYS.ACTIVE_FOCUS_TASK, null);
 }
 
 export function useFocusTasks(boardData: BoardData) {
@@ -35,18 +41,18 @@ export function useFocusTasks(boardData: BoardData) {
   const [limitMessage, setLimitMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    window.localStorage.setItem(focusTasksStorageKey, JSON.stringify(focusTasks));
+    window.localStorage.setItem(STORAGE_KEYS.FOCUS_TASKS, JSON.stringify(focusTasks));
   }, [focusTasks]);
 
   useEffect(() => {
     if (activeFocusTaskId) {
-      window.localStorage.setItem(activeFocusTaskStorageKey, activeFocusTaskId);
+      window.localStorage.setItem(STORAGE_KEYS.ACTIVE_FOCUS_TASK, activeFocusTaskId);
     } else {
-      window.localStorage.removeItem(activeFocusTaskStorageKey);
+      window.localStorage.removeItem(STORAGE_KEYS.ACTIVE_FOCUS_TASK);
     }
   }, [activeFocusTaskId]);
 
-  const focusTasksWithLiveData = useMemo(() => (
+  const focusTasksWithCurrentBoardState = useMemo(() => (
     focusTasks.map((focusTask) => {
       const liveTask = boardData.task[focusTask.id];
 
@@ -77,14 +83,14 @@ export function useFocusTasks(boardData: BoardData) {
   ), [focusTasks]);
 
   const resolvedActiveFocusTaskId = useMemo(() => (
-    focusTasksWithLiveData.some((focusTask) => focusTask.id === activeFocusTaskId)
+    focusTasksWithCurrentBoardState.some((focusTask) => focusTask.id === activeFocusTaskId)
       ? activeFocusTaskId
-      : focusTasksWithLiveData[0]?.id || null
-  ), [activeFocusTaskId, focusTasksWithLiveData]);
+      : focusTasksWithCurrentBoardState[0]?.id || null
+  ), [activeFocusTaskId, focusTasksWithCurrentBoardState]);
 
   const activeFocusTask = useMemo(() => (
-    focusTasksWithLiveData.find((focusTask) => focusTask.id === resolvedActiveFocusTaskId) || null
-  ), [focusTasksWithLiveData, resolvedActiveFocusTaskId]);
+    focusTasksWithCurrentBoardState.find((focusTask) => focusTask.id === resolvedActiveFocusTaskId) || null
+  ), [focusTasksWithCurrentBoardState, resolvedActiveFocusTaskId]);
 
   const removeFocusTask = useCallback((taskId: string) => {
     setFocusTasks((currentFocusTasks) => currentFocusTasks.filter((focusTask) => focusTask.id !== taskId));
@@ -101,7 +107,7 @@ export function useFocusTasks(boardData: BoardData) {
         ));
       }
 
-      if (currentFocusTasks.length >= maxFocusTasks) {
+      if (currentFocusTasks.length >= MAX_FOCUS_TASKS) {
         didHitLimit = true;
         return currentFocusTasks;
       }
@@ -110,7 +116,7 @@ export function useFocusTasks(boardData: BoardData) {
     });
 
     if (didHitLimit) {
-      setLimitMessage('Focus Dock supports up to 3 active tasks.');
+      setLimitMessage(FOCUS_LIMIT_MESSAGE);
       return false;
     }
 
@@ -139,11 +145,11 @@ export function useFocusTasks(boardData: BoardData) {
   }, []);
 
   return {
-    focusTasks: focusTasksWithLiveData,
+    focusTasks: focusTasksWithCurrentBoardState,
     activeFocusTask,
     activeFocusTaskId: resolvedActiveFocusTaskId,
     limitMessage,
-    maxFocusTasks,
+    maxFocusTasks: MAX_FOCUS_TASKS,
     isFocusTask: (taskId: string) => focusTaskIds.has(taskId),
     pinFocusTask,
     removeFocusTask,

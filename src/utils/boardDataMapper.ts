@@ -11,6 +11,7 @@ import type {
   TaskUpdate,
 } from '../types/supabase.type';
 import { normalizeTaskAssignees, normalizeTaskAttachments } from './taskCollections';
+import { DEFAULT_TASK_CATEGORIES, DEFAULT_TASK_PRIORITY, TASK_PRIORITIES } from '../constants';
 
 interface BuildTaskInsertParams {
   boardId: string;
@@ -71,31 +72,53 @@ function serializeTaskAssignees(assignees: BoardTaskItem['assignees'] | undefine
   }));
 }
 
+interface ApplyTaskDefaultsParams {
+  title: string;
+  description: string;
+  priority?: BoardTaskItem['priority'];
+  startDate?: string;
+  dueDate?: string;
+  assignees?: BoardTaskItem['assignees'];
+  image?: string;
+}
+
+type TaskDefaultsPayload = Pick<
+  TaskInsert,
+  'title' | 'description' | 'priority' | 'start_date' | 'due_date' | 'assignees' | 'image'
+>;
+
+function applyTaskDefaults({
+  title,
+  description,
+  priority,
+  startDate,
+  dueDate,
+  assignees,
+  image,
+}: ApplyTaskDefaultsParams): TaskDefaultsPayload {
+  return {
+    title,
+    description,
+    priority: priority || DEFAULT_TASK_PRIORITY,
+    start_date: startDate || null,
+    due_date: dueDate || null,
+    assignees: serializeTaskAssignees(assignees),
+    image: image || null,
+  };
+}
+
 function normalizeTaskPriority(priority: string | null): BoardTaskItem['priority'] | undefined {
-  if (
-    priority === 'High'
-    || priority === 'Medium'
-    || priority === 'Low'
-    || priority === 'Lowest'
-  ) {
-    return priority;
+  if (priority !== null && (TASK_PRIORITIES as readonly string[]).includes(priority)) {
+    return priority as BoardTaskItem['priority'];
   }
 
   return undefined;
 }
 
-export function buildBoardDataFromRows(
-  listRows: ListRow[],
-  taskRows: TaskRow[],
-  checklistItemRows: TaskChecklistItemRow[] = [],
-  taskLabelRows: TaskLabelRow[] = [],
-  taskLabelLinkRows: TaskLabelLinkRow[] = [],
-): BoardData {
-  const boardData = createEmptyBoardData();
-  const sortedLists = [...listRows].sort((currentList, nextList) => currentList.position - nextList.position);
+function buildChecklistItemsMap(
+  checklistItemRows: TaskChecklistItemRow[],
+): Map<string, BoardTaskItem['checklistItems']> {
   const checklistItemsByTaskId = new Map<string, BoardTaskItem['checklistItems']>();
-  const labelsById = new Map<string, BoardTaskItem['labels'][number]>();
-  const labelsByTaskId = new Map<string, BoardTaskItem['labels']>();
 
   checklistItemRows
     .sort((currentChecklistItem, nextChecklistItem) => currentChecklistItem.position - nextChecklistItem.position)
@@ -109,6 +132,12 @@ export function buildBoardDataFromRows(
       checklistItemsByTaskId.set(checklistItemRow.task_id, currentChecklistItems);
     });
 
+  return checklistItemsByTaskId;
+}
+
+function buildLabelsMap(taskLabelRows: TaskLabelRow[]): Map<string, BoardTaskItem['labels'][number]> {
+  const labelsById = new Map<string, BoardTaskItem['labels'][number]>();
+
   taskLabelRows.forEach((taskLabelRow) => {
     labelsById.set(taskLabelRow.id, {
       id: taskLabelRow.id,
@@ -116,6 +145,15 @@ export function buildBoardDataFromRows(
       color: taskLabelRow.color as BoardTaskItem['labels'][number]['color'],
     });
   });
+
+  return labelsById;
+}
+
+function buildLabelTaskRelationships(
+  taskLabelLinkRows: TaskLabelLinkRow[],
+  labelsById: Map<string, BoardTaskItem['labels'][number]>,
+): Map<string, BoardTaskItem['labels']> {
+  const labelsByTaskId = new Map<string, BoardTaskItem['labels']>();
 
   taskLabelLinkRows.forEach((taskLabelLinkRow) => {
     const linkedLabel = labelsById.get(taskLabelLinkRow.label_id);
@@ -128,6 +166,22 @@ export function buildBoardDataFromRows(
     currentLabels.push(linkedLabel);
     labelsByTaskId.set(taskLabelLinkRow.task_id, currentLabels);
   });
+
+  return labelsByTaskId;
+}
+
+export function buildBoardDataFromRows(
+  listRows: ListRow[],
+  taskRows: TaskRow[],
+  checklistItemRows: TaskChecklistItemRow[] = [],
+  taskLabelRows: TaskLabelRow[] = [],
+  taskLabelLinkRows: TaskLabelLinkRow[] = [],
+): BoardData {
+  const boardData = createEmptyBoardData();
+  const sortedLists = [...listRows].sort((currentList, nextList) => currentList.position - nextList.position);
+  const checklistItemsByTaskId = buildChecklistItemsMap(checklistItemRows);
+  const labelsById = buildLabelsMap(taskLabelRows);
+  const labelsByTaskId = buildLabelTaskRelationships(taskLabelLinkRows, labelsById);
 
   sortedLists.forEach((listRow) => {
     const boardListItem: BoardListItem = {
@@ -167,23 +221,14 @@ export function buildTaskInsertPayload({
   dueDate,
   position,
   assignees,
-  attachments,
   image,
 }: BuildTaskInsertParams): TaskInsert {
-  void attachments;
-
   return {
+    ...applyTaskDefaults({ title, description, priority, startDate, dueDate, assignees, image }),
     board_id: boardId,
     list_id: listId,
-    title,
-    description,
-    priority: priority || 'Low',
-    start_date: startDate || null,
-    due_date: dueDate || null,
-    assignees: serializeTaskAssignees(assignees),
-    category1: 'Design',
-    category2: 'Sprint',
-    image: image || null,
+    category1: DEFAULT_TASK_CATEGORIES.CATEGORY_1,
+    category2: DEFAULT_TASK_CATEGORIES.CATEGORY_2,
     is_done: false,
     position,
   };
@@ -196,20 +241,9 @@ export function buildTaskUpdatePayload({
   startDate,
   dueDate,
   assignees,
-  attachments,
   image,
 }: BuildTaskUpdateParams): TaskUpdate {
-  void attachments;
-
-  return {
-    title,
-    description,
-    priority: priority || 'Low',
-    start_date: startDate || null,
-    due_date: dueDate || null,
-    assignees: serializeTaskAssignees(assignees),
-    image: image || null,
-  };
+  return applyTaskDefaults({ title, description, priority, startDate, dueDate, assignees, image });
 }
 
 export function buildTaskFieldUpdatePayload(

@@ -1,5 +1,6 @@
 import { endOfMonth, format, startOfMonth } from 'date-fns';
 
+import { DEFAULT_BOARD_TITLE } from '../constants';
 import { data as seedBoardData } from '../data';
 import { CURRENT_USER } from '../data/currentUser';
 import { VIETNAM_HOLIDAYS_2026, mapVietnamHolidayToRow } from '../data/vietnamHolidays';
@@ -74,7 +75,7 @@ function sortTasksByDueDate(currentTask: HomeTaskSummary, nextTask: HomeTaskSumm
 }
 
 function getLocalDashboardData(): HomeDashboardData {
-  const boardTitle = 'HVAC Editor';
+  const boardTitle = DEFAULT_BOARD_TITLE;
   const tasks = Object.values(seedBoardData.task);
   const myTasks = tasks
     .filter((task) => isAssignedToCurrentUser(task.assignees, CURRENT_USER.name))

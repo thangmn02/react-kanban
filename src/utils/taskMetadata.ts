@@ -1,6 +1,7 @@
 import { differenceInCalendarDays, isToday, parseISO, startOfDay } from 'date-fns';
 
 import type { ITaskItem } from '../types/task.type';
+import type { TaskPriority } from '../constants';
 
 export interface DueDateStatusMeta {
   status: 'overdue' | 'today' | 'upcoming' | 'none';
@@ -19,6 +20,17 @@ const priorityClassMap: Record<NonNullable<ITaskItem['priority']>, string> = {
 export function getPriorityBadgeClass(priority?: ITaskItem['priority']) {
   if (!priority) return null;
   return priorityClassMap[priority];
+}
+
+const priorityDotClassMap: Record<TaskPriority, string> = {
+  High: 'bg-red-500',
+  Medium: 'bg-amber-500',
+  Low: 'bg-emerald-500',
+  Lowest: 'bg-gray-400',
+};
+
+export function getPriorityDotClass(priority: string): string {
+  return priorityDotClassMap[priority as TaskPriority] ?? 'bg-gray-400';
 }
 
 export function getDueDateStatus(dueDate?: string, isDone?: boolean): DueDateStatusMeta {

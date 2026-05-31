@@ -18,7 +18,7 @@ function FocusDockHeader({ taskCount, onCollapse }: FocusDockHeaderProps) {
       <button
         type="button"
         onClick={onCollapse}
-        className="rounded-2xl border border-slate-200 bg-white/80 px-3 py-2 text-xs font-semibold text-slate-500 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-300"
+        className="cursor-pointer rounded-2xl border border-slate-200 bg-white/80 px-3 py-2 text-xs font-semibold text-slate-500 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-300"
         aria-label="Minimize Focus Dock"
       >
         Minimize

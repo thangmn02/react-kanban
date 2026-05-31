@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import type { FocusTask, PomodoroMode, PomodoroTimerState } from '../types/focus.type';
-import { POMODORO_MODE_SECONDS, formatPomodoroTime } from '../utils/pomodoroTime';
+import type {
+  FocusTask,
+  PomodoroMode,
+  PomodoroSessionSnapshot,
+  PomodoroTimerState,
+} from '../types/focus.type';
+import { formatPomodoroTime, POMODORO_MODE_SECONDS } from '../utils/pomodoroTime';
 
 const pomodoroStorageKey = 'kanban_pomodoro_timer';
 
@@ -12,6 +17,8 @@ function createInitialPomodoroState(): PomodoroTimerState {
     isRunning: false,
     remainingSeconds: POMODORO_MODE_SECONDS.focus,
     endsAt: null,
+    startedAt: null,
+    plannedSeconds: null,
   };
 }
 
@@ -22,10 +29,12 @@ function readStoredPomodoroState(): PomodoroTimerState {
 
   try {
     const storedValue = window.localStorage.getItem(pomodoroStorageKey);
-    return storedValue ? {
-      ...createInitialPomodoroState(),
-      ...JSON.parse(storedValue) as Partial<PomodoroTimerState>,
-    } : createInitialPomodoroState();
+    return storedValue
+      ? {
+        ...createInitialPomodoroState(),
+        ...JSON.parse(storedValue) as Partial<PomodoroTimerState>,
+      }
+      : createInitialPomodoroState();
   } catch {
     return createInitialPomodoroState();
   }
@@ -41,13 +50,30 @@ function getRemainingSeconds(state: PomodoroTimerState) {
 
 interface UsePomodoroTimerParams {
   activeFocusTask: FocusTask | null;
-  onComplete?: (task: FocusTask | null, mode: PomodoroMode) => void;
+  onComplete?: (task: FocusTask | null, mode: PomodoroMode, session: PomodoroSessionSnapshot) => void;
+  onInterrupt?: (task: FocusTask | null, mode: PomodoroMode, session: PomodoroSessionSnapshot) => void;
 }
 
-export function usePomodoroTimer({ activeFocusTask, onComplete }: UsePomodoroTimerParams) {
+function buildSessionSnapshot(state: PomodoroTimerState, endedAt: number): PomodoroSessionSnapshot | null {
+  if (!state.startedAt || !state.plannedSeconds) {
+    return null;
+  }
+
+  return {
+    startedAt: state.startedAt,
+    endedAt,
+    durationSeconds: Math.max(0, Math.round((endedAt - state.startedAt) / 1000)),
+    plannedSeconds: state.plannedSeconds,
+  };
+}
+
+export function usePomodoroTimer({ activeFocusTask, onComplete, onInterrupt }: UsePomodoroTimerParams) {
   const [timerState, setTimerState] = useState<PomodoroTimerState>(readStoredPomodoroState);
   const [visibleRemainingSeconds, setVisibleRemainingSeconds] = useState(() => (
     getRemainingSeconds(readStoredPomodoroState())
+  ));
+  const [isPageHidden, setIsPageHidden] = useState(() => (
+    typeof document !== 'undefined' ? document.hidden : false
   ));
   const completionKeyRef = useRef<string | null>(null);
   const originalDocumentTitleRef = useRef<string | null>(null);
@@ -66,10 +92,15 @@ export function usePomodoroTimer({ activeFocusTask, onComplete }: UsePomodoroTim
 
       if (timerState.isRunning && nextRemainingSeconds === 0) {
         const completionKey = `${timerState.activeTaskId || 'none'}-${timerState.mode}-${timerState.endsAt || 'none'}`;
+        const endedAt = Date.now();
+        const sessionSnapshot = buildSessionSnapshot(timerState, endedAt);
 
-        if (completionKeyRef.current !== completionKey) {
+        if (completionKeyRef.current !== completionKey && sessionSnapshot) {
           completionKeyRef.current = completionKey;
-          onComplete?.(activeFocusTask, timerState.mode);
+          onComplete?.(activeFocusTask, timerState.mode, {
+            ...sessionSnapshot,
+            durationSeconds: timerState.plannedSeconds || sessionSnapshot.durationSeconds,
+          });
         }
 
         setTimerState((currentState) => ({
@@ -77,6 +108,8 @@ export function usePomodoroTimer({ activeFocusTask, onComplete }: UsePomodoroTim
           isRunning: false,
           remainingSeconds: POMODORO_MODE_SECONDS[currentState.mode],
           endsAt: null,
+          startedAt: null,
+          plannedSeconds: null,
         }));
       }
     };
@@ -92,17 +125,32 @@ export function usePomodoroTimer({ activeFocusTask, onComplete }: UsePomodoroTim
       return;
     }
 
+    const handleVisibilityChange = () => {
+      setIsPageHidden(document.hidden);
+      setVisibleRemainingSeconds(getRemainingSeconds(timerState));
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [timerState]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') {
+      return;
+    }
+
     if (originalDocumentTitleRef.current === null) {
       originalDocumentTitleRef.current = document.title;
     }
 
-    if (timerState.isRunning) {
-      document.title = `${formatPomodoroTime(visibleRemainingSeconds)} · ${activeFocusTask?.title || 'Focus session'}`;
+    if (timerState.isRunning && isPageHidden) {
+      document.title = `${formatPomodoroTime(visibleRemainingSeconds)} - ${activeFocusTask?.title || 'Focus session'}`;
       return;
     }
 
     document.title = originalDocumentTitleRef.current;
-  }, [activeFocusTask?.title, timerState.isRunning, visibleRemainingSeconds]);
+  }, [activeFocusTask?.title, isPageHidden, timerState.isRunning, visibleRemainingSeconds]);
 
   const selectedTimerTask = useMemo(() => (
     activeFocusTask?.id === timerState.activeTaskId ? activeFocusTask : null
@@ -118,6 +166,8 @@ export function usePomodoroTimer({ activeFocusTask, onComplete }: UsePomodoroTim
         isRunning: true,
         remainingSeconds,
         endsAt: Date.now() + remainingSeconds * 1000,
+        startedAt: currentState.startedAt || Date.now(),
+        plannedSeconds: currentState.plannedSeconds || remainingSeconds,
       };
     });
   }, [activeFocusTask?.id]);
@@ -132,13 +182,23 @@ export function usePomodoroTimer({ activeFocusTask, onComplete }: UsePomodoroTim
   }, []);
 
   const resetTimer = useCallback(() => {
-    setTimerState((currentState) => ({
-      ...currentState,
-      isRunning: false,
-      remainingSeconds: POMODORO_MODE_SECONDS[currentState.mode],
-      endsAt: null,
-    }));
-  }, []);
+    setTimerState((currentState) => {
+      const sessionSnapshot = buildSessionSnapshot(currentState, Date.now());
+
+      if (currentState.isRunning && sessionSnapshot && sessionSnapshot.durationSeconds > 60) {
+        onInterrupt?.(activeFocusTask, currentState.mode, sessionSnapshot);
+      }
+
+      return {
+        ...currentState,
+        isRunning: false,
+        remainingSeconds: POMODORO_MODE_SECONDS[currentState.mode],
+        endsAt: null,
+        startedAt: null,
+        plannedSeconds: null,
+      };
+    });
+  }, [activeFocusTask, onInterrupt]);
 
   const setMode = useCallback((mode: PomodoroMode) => {
     setTimerState((currentState) => ({
@@ -147,6 +207,8 @@ export function usePomodoroTimer({ activeFocusTask, onComplete }: UsePomodoroTim
       isRunning: false,
       remainingSeconds: POMODORO_MODE_SECONDS[mode],
       endsAt: null,
+      startedAt: null,
+      plannedSeconds: null,
     }));
   }, []);
 

@@ -36,6 +36,16 @@ interface ProfileRow {
 
 const fallbackAvatarUrl = 'https://flowbite.com/application-ui/demo/images/users/bonnie-green.png';
 
+type SupabaseRpcCaller = (
+  functionName: string,
+  args: Record<string, unknown>
+) => Promise<{ data: string | null; error: Error | null }>;
+
+function createBoundRpcCaller(): SupabaseRpcCaller {
+  const client = requireSupabaseClient();
+  return client.rpc.bind(client) as unknown as SupabaseRpcCaller;
+}
+
 function normalizeWorkspaceRole(role: string): WorkspaceRole {
   return ['owner', 'admin', 'member', 'viewer'].includes(role)
     ? role as WorkspaceRole
@@ -125,18 +135,13 @@ export async function createWorkspaceForCurrentUser(workspaceName: string): Prom
     };
   }
 
-  const client = requireSupabaseClient();
   const trimmedWorkspaceName = workspaceName.trim();
 
   if (!trimmedWorkspaceName) {
     throw new Error('Workspace name is required.');
   }
 
-  const rpc = client.rpc as unknown as (
-    functionName: string,
-    args: Record<string, unknown>
-  ) => Promise<{ data: string | null; error: Error | null }>;
-
+  const rpc = createBoundRpcCaller();
   const { data: workspaceId, error } = await rpc('create_workspace_with_owner', {
     workspace_name: trimmedWorkspaceName,
   });
@@ -209,12 +214,7 @@ export async function addWorkspaceMemberByEmail(
     throw new Error('Member email is required.');
   }
 
-  const client = requireSupabaseClient();
-  const rpc = client.rpc as unknown as (
-    functionName: string,
-    args: Record<string, unknown>
-  ) => Promise<{ data: string | null; error: Error | null }>;
-
+  const rpc = createBoundRpcCaller();
   const { error } = await rpc('add_workspace_member_by_email', {
     target_workspace_id: workspaceId,
     member_email: trimmedEmail,

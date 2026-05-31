@@ -26,10 +26,15 @@ function ContentDialog({
       <div
         className="fixed inset-0 bg-gray-900 opacity-50 transition-opacity"
         onClick={onClose}
+        aria-hidden="true"
       />
 
       <div className="flex min-h-screen items-center justify-center p-4">
-        <div className={`relative bg-white rounded-lg shadow-xl ${className}`}>
+        <div
+          className={`relative bg-white rounded-lg shadow-xl ${className}`}
+          role="dialog"
+          aria-modal="true"
+        >
           {/* modal header */}
           {title}
 

@@ -7,24 +7,31 @@ interface ButtonProps {
   variant?: 'primary' | 'secondary' | 'outline' | 'text',
   size?: 'sm' | 'md' | 'lg'
   onClick?: () => void,
-  type?: 'button' | 'submit'
-} 
+  type?: 'button' | 'submit',
+  disabled?: boolean,
+}
 
-function Button({ 
-  text, 
-  icon, 
+// Shared base: every variant gets a consistent focus-visible ring, smooth color
+// transition, and a uniform disabled treatment (no pointer + reduced opacity).
+const baseClasses =
+  'inline-flex items-center justify-center cursor-pointer transition-colors focus:outline-none focus-visible:ring-4 focus-visible:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-60';
+
+function Button({
+  text,
+  icon,
   className,
   onClick,
   type = 'button',
   variant = 'primary',
-  size = 'sm'
+  size = 'sm',
+  disabled = false,
 }: ButtonProps) {
 
   const variantClasses = {
-    primary: 'inline-flex items-center text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700',
-    secondary: 'text-body bg-neutral-secondary-medium box-border border border-default-medium hover:bg-neutral-tertiary-medium hover:text-heading focus:ring-4 focus:ring-neutral-tertiary shadow-xs font-medium leading-5 rounded-base text-sm px-4 py-2.5 focus:outline-none',
-    text: 'text-heading bg-transparent box-border border border-transparent hover:bg-neutral-secondary-medium focus:ring-4 focus:ring-neutral-tertiary font-medium leading-5 rounded-base text-sm px-4 py-2.5 focus:outline-none',
-    outline: 'text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50'
+    primary: 'text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus-visible:ring-blue-200',
+    secondary: 'text-body bg-neutral-secondary-medium box-border border border-default-medium hover:bg-neutral-tertiary-medium hover:text-heading focus-visible:ring-neutral-tertiary shadow-xs font-medium leading-5 rounded-base text-sm px-4 py-2.5',
+    text: 'text-heading bg-transparent box-border border border-transparent hover:bg-neutral-secondary-medium focus-visible:ring-neutral-tertiary font-medium leading-5 rounded-base text-sm px-4 py-2.5',
+    outline: 'text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus-visible:ring-slate-200'
   }
 
   const sizeClasses = {
@@ -34,10 +41,11 @@ function Button({
   }
 
   return (
-    <button 
-      className={`cursor-pointer ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
+    <button
+      className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className ?? ''}`}
       onClick={onClick}
       type={type}
+      disabled={disabled}
     >
       {icon}
       {text}

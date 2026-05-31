@@ -29,4 +29,50 @@ export interface PomodoroTimerState {
   isRunning: boolean;
   remainingSeconds: number;
   endsAt: number | null;
+  startedAt: number | null;
+  plannedSeconds: number | null;
+}
+
+export type FocusSessionStatus = 'completed' | 'interrupted' | 'cancelled';
+
+export interface FocusSessionLogInput {
+  workspaceId: string;
+  boardId?: string | null;
+  taskId?: string | null;
+  userId: string;
+  mode: PomodoroMode;
+  status: FocusSessionStatus;
+  startedAt: string;
+  endedAt?: string | null;
+  durationSeconds: number;
+  plannedSeconds: number;
+}
+
+export interface FocusSessionSummary {
+  id: string;
+  workspaceId: string;
+  boardId: string | null;
+  taskId: string | null;
+  userId: string;
+  mode: PomodoroMode;
+  status: FocusSessionStatus;
+  startedAt: string;
+  endedAt: string | null;
+  durationSeconds: number;
+  plannedSeconds: number;
+  createdAt: string;
+}
+
+export interface DailyFocusStats {
+  focusedMinutes: number;
+  completedSessions: number;
+  interruptedSessions: number;
+  topTaskTitle: string | null;
+}
+
+export interface PomodoroSessionSnapshot {
+  startedAt: number;
+  endedAt: number;
+  durationSeconds: number;
+  plannedSeconds: number;
 }
