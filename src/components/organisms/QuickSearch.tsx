@@ -31,7 +31,7 @@ export default function QuickSearch({
   const assigneeOptions: TaskAssignee[] = mapWorkspaceMembersToAssignees(workspaceMembers);
 
   return (
-    <div className="flex flex-col gap-4 border-b border-slate-200/70 bg-white/72 px-6 py-4 shadow-[0_8px_30px_rgba(15,23,42,0.035)] backdrop-blur-xl lg:flex-row lg:items-center lg:justify-between">
+    <div className="flex flex-col gap-4 border-b border-slate-200/70 bg-white/72 px-6 py-4 shadow-card backdrop-blur-xl lg:flex-row lg:items-center lg:justify-between">
       {/* Search Input */}
       <div className="relative flex-1 max-w-md">
         <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">

@@ -18,6 +18,7 @@ dist-ssr
 # Local agent/config and manually managed Supabase workspace files
 .agent/
 supabase/
+.kiro/
 
 # Editor directories and files
 .vscode/*

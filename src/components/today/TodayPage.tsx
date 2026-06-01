@@ -109,7 +109,7 @@ export default function TodayPage({
   const hasUrgentTasks = todayData.overdueTasks.length > 0 || todayData.dueTodayTasks.length > 0;
 
   return (
-    <main className="min-h-screen bg-[#F8F9FA] px-5 py-7 sm:px-7" aria-busy={isLoading}>
+    <main className="min-h-screen bg-canvas px-5 py-7 sm:px-7" aria-busy={isLoading}>
       <section className="mx-auto max-w-7xl">
         <PageHeader
           eyebrow="Today"
@@ -120,7 +120,7 @@ export default function TodayPage({
             <button
               type="button"
               onClick={onQuickCreateTask}
-              className="cursor-pointer rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-[0_14px_34px_rgba(37,99,235,0.26)] transition hover:-translate-y-0.5 hover:bg-blue-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-100"
+              className="cursor-pointer rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-blue-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-100"
             >
               Quick add task
             </button>
@@ -195,11 +195,11 @@ export default function TodayPage({
               <SectionCard className="p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <h2 className="text-sm font-bold uppercase tracking-[0.18em] text-slate-600">
+                    <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-slate-600">
                       Daily Focus Plan
                     </h2>
                     <p className="mt-1 text-sm text-slate-500">
-                      Choose up to 3 tasks. This reuses the existing Focus Dock.
+                      Up to 3 tasks, in recommended order. This reuses the existing Focus Dock.
                     </p>
                   </div>
                   <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
@@ -223,7 +223,7 @@ export default function TodayPage({
                       )}
                     />
                   ) : (
-                    focusTasks.map((focusTask) => {
+                    focusTasks.map((focusTask, focusIndex) => {
                       const taskSummary: TodayTaskSummary = {
                         id: focusTask.id,
                         boardId: focusTask.boardId,
@@ -240,14 +240,23 @@ export default function TodayPage({
                       };
 
                       return (
-                        <TodayTaskCard
-                          key={focusTask.id}
-                          task={taskSummary}
-                          isFocusTask
-                          onOpenTask={onOpenTask}
-                          onStartFocus={onStartFocus}
-                          onToggleTodayFocus={onToggleTodayFocus}
-                        />
+                        <div key={focusTask.id} className="flex items-start gap-3">
+                          <span
+                            aria-hidden="true"
+                            className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white"
+                          >
+                            {focusIndex + 1}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <TodayTaskCard
+                              task={taskSummary}
+                              isFocusTask
+                              onOpenTask={onOpenTask}
+                              onStartFocus={onStartFocus}
+                              onToggleTodayFocus={onToggleTodayFocus}
+                            />
+                          </div>
+                        </div>
                       );
                     })
                   )}

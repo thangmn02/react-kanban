@@ -191,6 +191,9 @@ function HomeDashboard({
 
   const myTasks = dashboardData?.myTasks || [];
   const recentBoards = dashboardData?.recentBoards || [];
+  const heroTask = myTasks[0] ?? null;
+  const heroPriorityClass = heroTask ? getPriorityBadgeClass(heroTask.priority || undefined) : null;
+  const heroIsFocused = heroTask ? isFocusTask(heroTask.id) : false;
   const tasksDueThisWeek = getTasksDueThisWeek(myTasks);
   const upcomingHolidays = useMemo(() => {
     const today = new Date();
@@ -228,7 +231,7 @@ function HomeDashboard({
       : `${tasksDueThisWeek.length} task đến hạn tuần này`;
 
   return (
-    <div className="flex min-h-screen bg-[#F8F9FA]">
+    <div className="flex min-h-screen bg-canvas">
       <aside className="hidden w-64 shrink-0 border-r border-slate-200/70 bg-white px-4 py-5 lg:block">
         <div className="mb-8">
           <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-blue-600">Kanban</p>
@@ -242,7 +245,7 @@ function HomeDashboard({
         </nav>
 
         <div className="mt-8">
-          <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+          <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
             Recent boards
           </p>
           <div className="space-y-2">
@@ -339,11 +342,104 @@ function HomeDashboard({
         )}
 
         {!isLoading && !errorMessage && (
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
+          <div className="space-y-6">
+            {/* Focus Now hero — the decisive "what to do now" surface. Uses the
+                top due-sorted assigned task and only existing handlers (open /
+                toggle focus); no timer logic here (Focus Dock is Phase 4). */}
+            {heroTask ? (
+              <section
+                aria-labelledby="home-focus-now-title"
+                className="rounded-3xl border border-blue-200/70 bg-blue-50/50 p-6 sm:p-7"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-blue-600" aria-hidden="true" />
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-blue-700">
+                    Focus now
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => onOpenTask(heroTask.id, heroTask.boardId)}
+                  className="mt-2 block w-full cursor-pointer rounded-2xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                >
+                  <h2
+                    id="home-focus-now-title"
+                    className="truncate text-2xl font-semibold tracking-[-0.03em] text-slate-950 sm:text-3xl"
+                  >
+                    {heroTask.title}
+                  </h2>
+                </button>
+
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {heroTask.priority && heroPriorityClass && (
+                    <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase ${heroPriorityClass}`}>
+                      {heroTask.priority}
+                    </span>
+                  )}
+                  <DueDateBadge dueDate={heroTask.dueDate || undefined} />
+                  <span className="rounded-full bg-white px-2.5 py-0.5 text-[11px] font-semibold text-slate-600">
+                    {heroTask.boardTitle}
+                  </span>
+                </div>
+
+                <p className="mt-3 max-w-md text-sm leading-6 text-slate-600">
+                  Your highest-priority assigned task. Open it to start, or pin it to your Focus Dock to
+                  work on it next.
+                </p>
+
+                <div className="mt-5 flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => onOpenTask(heroTask.id, heroTask.boardId)}
+                    className="inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-200"
+                  >
+                    <svg className="h-4 w-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                    </svg>
+                    Open task
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onToggleFocusTask(heroTask)}
+                    aria-pressed={heroIsFocused}
+                    className={`inline-flex cursor-pointer items-center rounded-2xl border px-4 py-3 text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 ${
+                      heroIsFocused
+                        ? 'border-sky-200 bg-sky-50 text-sky-700'
+                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    {heroIsFocused ? 'In Focus Dock' : 'Add to Focus Dock'}
+                  </button>
+                </div>
+              </section>
+            ) : (
+              <section className="rounded-3xl border border-slate-200/80 bg-white p-6 sm:p-7">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-blue-700">Focus now</p>
+                <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+                  Nothing assigned to you yet
+                </h2>
+                <p className="mt-2 max-w-md text-sm leading-6 text-slate-600">
+                  When a task is assigned to you it shows up here first. Create a board to start planning
+                  your work.
+                </p>
+                {onCreateBoard && (
+                  <button
+                    type="button"
+                    onClick={onCreateBoard}
+                    className="mt-5 inline-flex cursor-pointer items-center rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-200"
+                  >
+                    Create a board
+                  </button>
+                )}
+              </section>
+            )}
+
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
             <SectionCard>
               <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
                 <div>
-                  <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-slate-600">My Tasks</h2>
+                  <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-slate-600">Up next</h2>
                   <p className="mt-1 text-sm text-slate-500">{myTasks.length} assigned tasks sorted by due date</p>
                 </div>
                 <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
@@ -501,7 +597,7 @@ function HomeDashboard({
               >
                 <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
                   <div>
-                    <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">
                       Lazy Calendar
                     </p>
                     <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
@@ -581,17 +677,18 @@ function HomeDashboard({
 
                   <div className="grid gap-3 pt-2 sm:grid-cols-2">
                     <div className="rounded-2xl border border-slate-200/80 bg-slate-50 px-4 py-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">This week</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">This week</p>
                       <p className="mt-1 text-sm font-semibold text-slate-900">{tasksDueThisWeek.length} tasks due</p>
                     </div>
                     <div className="rounded-2xl border border-slate-200/80 bg-slate-50 px-4 py-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-500">Holiday signal</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-sky-600">Holiday signal</p>
                       <p className="mt-1 text-sm font-semibold text-slate-900">{holidaySummary}</p>
                     </div>
                   </div>
                 </motion.div>
               </motion.section>
             </div>
+          </div>
           </div>
         )}
       </main>

@@ -29,7 +29,7 @@ export default function BoardHeader({
     <section className="border-b border-slate-200/70 bg-white/72 px-4 py-5 backdrop-blur-xl sm:px-6">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-blue-600">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-blue-600">
             Active board
           </p>
 
@@ -57,7 +57,7 @@ export default function BoardHeader({
           <button
             type="button"
             onClick={onOpenMembers}
-            className="inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-slate-200 bg-white/90 px-3 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md focus:outline-none focus:ring-4 focus:ring-sky-100"
+            className="inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-slate-200 bg-white/90 px-3 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"
           >
             <span className="flex -space-x-2">
               {workspaceMembers.slice(0, 3).map((member) => (

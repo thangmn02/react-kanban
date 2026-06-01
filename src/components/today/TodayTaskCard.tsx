@@ -20,11 +20,11 @@ export default function TodayTaskCard({
   const priorityClassName = getPriorityBadgeClass(task.priority || undefined);
 
   return (
-    <article className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-card transition hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-[0_18px_50px_rgba(15,23,42,0.10)]">
+    <article className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-card transition hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-md">
       <button
         type="button"
         onClick={() => onOpenTask(task)}
-        className="block w-full cursor-pointer text-left focus:outline-none focus:ring-4 focus:ring-sky-100"
+        className="block w-full cursor-pointer text-left focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -68,7 +68,7 @@ export default function TodayTaskCard({
         <button
           type="button"
           onClick={() => onStartFocus(task)}
-          className="cursor-pointer rounded-2xl bg-slate-950 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-slate-200 active:scale-[0.98]"
+          className="cursor-pointer rounded-2xl bg-slate-950 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:-translate-y-0.5 focus:outline-none focus-visible:ring-4 focus-visible:ring-slate-200 active:scale-[0.98]"
           aria-label={`Start focus session for ${task.title}`}
         >
           Start focus
@@ -76,7 +76,7 @@ export default function TodayTaskCard({
         <button
           type="button"
           onClick={() => onToggleTodayFocus(task)}
-          className={`cursor-pointer rounded-2xl border px-3 py-2 text-xs font-semibold transition focus:outline-none focus:ring-4 focus:ring-sky-100 active:scale-[0.98] ${
+          className={`cursor-pointer rounded-2xl border px-3 py-2 text-xs font-semibold transition focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 active:scale-[0.98] ${
             isFocusTask
               ? 'border-sky-200 bg-sky-50 text-sky-700'
               : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'

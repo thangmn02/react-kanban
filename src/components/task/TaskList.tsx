@@ -85,7 +85,7 @@ function TaskList({
           ? 'border-2 border-dashed border-sky-300 bg-sky-50/70 opacity-35 shadow-inner'
           : isOverlay
           ? 'shadow-2xl ring-1 ring-sky-100'
-          : 'hover:border-sky-200 hover:shadow-[0_22px_64px_rgba(15,23,42,0.12)]'
+          : 'hover:border-sky-200 hover:shadow-md'
       }`}
     >
       {/* Header Container */}
@@ -104,7 +104,7 @@ function TaskList({
             <path d="M7 2a2 2 0 10.001 4.001A2 2 0 007 2zm0 6a2 2 0 10.001 4.001A2 2 0 007 8zm0 6a2 2 0 10.001 4.001A2 2 0 007 14zm6-12a2 2 0 10.001 4.001A2 2 0 0013 2zm0 6a2 2 0 10.001 4.001A2 2 0 0013 8zm0 6a2 2 0 10.001 4.001A2 2 0 0013 14z" />
           </svg>
           <Typography
-            className="flex-1 truncate text-xs font-semibold uppercase tracking-[0.16em] text-slate-700"
+            className="flex-1 truncate text-xs font-semibold uppercase tracking-[0.2em] text-slate-700"
             content={listItem.title}
             component="h2"
           />
@@ -134,7 +134,7 @@ function TaskList({
                   className="fixed inset-0 z-10"
                   onClick={() => toggleMenu(null)}
                 ></div>
-                <div className="absolute right-0 z-20 mt-2 w-48 rounded-2xl border border-slate-200 bg-white py-1 shadow-[0_18px_50px_rgba(15,23,42,0.16)]">
+                <div className="absolute right-0 z-20 mt-2 w-48 rounded-2xl border border-slate-200 bg-white py-1 shadow-md">
                   <button
                     onClick={() => {
                       setDeleteItem({ type: 'list', listId: listItem.id });
@@ -193,7 +193,7 @@ function TaskList({
       {!isOverlay && (
         <button
           onClick={setIsModalOpen}
-          className="mt-2 w-full shrink-0 cursor-pointer rounded-2xl border border-dashed border-slate-200 bg-white/72 py-3 text-sm font-semibold text-slate-500 shadow-sm transition-[background,box-shadow,transform,color] hover:-translate-y-0.5 hover:bg-white hover:text-slate-700 hover:shadow-md active:scale-[0.99]"
+          className="mt-2 w-full shrink-0 cursor-pointer rounded-2xl border border-dashed border-slate-200 bg-white/72 py-3 text-sm font-semibold text-slate-500 shadow-sm transition-[background,box-shadow,transform,color] hover:-translate-y-0.5 hover:bg-white hover:text-slate-700 hover:shadow-md active:scale-[0.99] focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"
         >
           + Add new task
         </button>
