@@ -57,7 +57,7 @@ export default function BoardHeader({
           <button
             type="button"
             onClick={onOpenMembers}
-            className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white/90 px-3 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md focus:outline-none focus:ring-4 focus:ring-sky-100"
+            className="inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-slate-200 bg-white/90 px-3 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md focus:outline-none focus:ring-4 focus:ring-sky-100"
           >
             <span className="flex -space-x-2">
               {workspaceMembers.slice(0, 3).map((member) => (

@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { CommandPaletteAction } from '../../types/command.type';
@@ -27,6 +27,7 @@ function doesActionMatchQuery(action: CommandPaletteAction, query: string) {
 export default function CommandPalette({ isOpen, actions, onClose }: CommandPaletteProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [query, setQuery] = useState('');
+  const shouldReduceMotion = useReducedMotion();
 
   useEffect(() => {
     if (isOpen) {
@@ -61,10 +62,10 @@ export default function CommandPalette({ isOpen, actions, onClose }: CommandPale
         >
           <motion.section
             className="w-full max-w-2xl overflow-hidden rounded-[2rem] border border-white/70 bg-white/94 shadow-[0_30px_100px_rgba(15,23,42,0.24)] backdrop-blur-xl"
-            initial={{ y: 20, scale: 0.98, opacity: 0 }}
+            initial={shouldReduceMotion ? false : { y: 20, scale: 0.98, opacity: 0 }}
             animate={{ y: 0, scale: 1, opacity: 1 }}
-            exit={{ y: 16, scale: 0.98, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 260, damping: 24 }}
+            exit={shouldReduceMotion ? { opacity: 0 } : { y: 16, scale: 0.98, opacity: 0 }}
+            transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 260, damping: 24 }}
             onClick={(event) => event.stopPropagation()}
           >
             <div className="border-b border-slate-100 px-5 py-4">
@@ -102,7 +103,7 @@ export default function CommandPalette({ isOpen, actions, onClose }: CommandPale
                     key={action.id}
                     type="button"
                     onClick={() => runAction(action)}
-                    className="flex w-full items-center justify-between gap-4 rounded-2xl px-4 py-3 text-left transition hover:bg-slate-50 focus:bg-slate-50 focus:outline-none"
+                    className="flex w-full cursor-pointer items-center justify-between gap-4 rounded-2xl px-4 py-3 text-left transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
                   >
                     <div>
                       <Typography

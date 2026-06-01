@@ -77,7 +77,7 @@ function TaskItem({
       style={style}
       className={`relative select-none ${
         isDragging
-          ? 'opacity-20 border border-dashed border-gray-400 bg-gray-50 rounded-xl shadow-inner min-h-[140px]'
+          ? 'opacity-20 border border-dashed border-slate-300 bg-slate-50 rounded-xl shadow-inner min-h-[140px]'
           : isOverlay
           ? 'shadow-2xl ring-1 ring-black/5'
           : ''
@@ -87,15 +87,33 @@ function TaskItem({
     >
       {!isDragging && (
         <div
+          role={isOverlay ? undefined : 'button'}
+          tabIndex={isOverlay ? undefined : 0}
+          aria-label={isOverlay ? undefined : `Open task: ${task.title}`}
           onClick={() => {
             if (!isOverlay) {
               handleEditTask(task);
             }
           }}
-          className={`relative rounded-[1.35rem] border border-white/80 bg-white/90 p-4 shadow-[0_10px_28px_rgba(15,23,42,0.07)] ring-1 ring-slate-900/[0.03] transition-[box-shadow,transform,border,background] duration-200 ${
+          onKeyDown={(event) => {
+            if (isOverlay) {
+              return;
+            }
+            // Only activate when the card itself is focused — not when a nested
+            // control (priority / focus / edit / delete / assignee / done) bubbles
+            // its own Enter/Space up to the card.
+            if (event.target !== event.currentTarget) {
+              return;
+            }
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              handleEditTask(task);
+            }
+          }}
+          className={`relative rounded-2xl border border-slate-200/80 bg-white p-4 shadow-card ring-1 ring-slate-900/[0.02] transition-[box-shadow,transform,border,background] duration-200 ${
             isOverlay
               ? 'cursor-grabbing'
-              : 'cursor-pointer hover:-translate-y-0.5 hover:border-sky-100 hover:bg-white hover:shadow-[0_18px_48px_rgba(15,23,42,0.13)] active:scale-[0.99] active:cursor-grabbing'
+              : 'cursor-pointer hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-[0_18px_48px_rgba(15,23,42,0.13)] active:scale-[0.99] active:cursor-grabbing focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300'
           }`}
         >
           {/* Top Line: Priority (Dropdown) & Action Buttons */}
@@ -108,10 +126,11 @@ function TaskItem({
                     e.stopPropagation();
                     if (!isOverlay) setShowPriorityMenu(!showPriorityMenu);
                   }}
-                  className={`inline-flex shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase transition-all duration-150 cursor-pointer ${priorityBadgeClass} ${
-                    isOverlay ? '' : 'hover:ring-1 hover:ring-offset-1 hover:ring-gray-300'
+                  className={`inline-flex shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase transition-all duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 ${priorityBadgeClass} ${
+                    isOverlay ? '' : 'hover:ring-1 hover:ring-offset-1 hover:ring-slate-300'
                   }`}
                   title={isOverlay ? undefined : "Click to change priority"}
+                  aria-label={`Change priority for ${task.title}`}
                 >
                   {task.priority}
                 </button>
@@ -121,8 +140,9 @@ function TaskItem({
                     e.stopPropagation();
                     if (!isOverlay) setShowPriorityMenu(!showPriorityMenu);
                   }}
-                  className="inline-flex shrink-0 rounded-full bg-gray-100 text-gray-500 px-2.5 py-0.5 text-[11px] font-medium transition-all duration-150 cursor-pointer hover:bg-gray-200"
+                  className="inline-flex shrink-0 rounded-full bg-slate-100 text-slate-500 px-2.5 py-0.5 text-[11px] font-medium transition-all duration-150 cursor-pointer hover:bg-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
                   title="Click to add priority"
+                  aria-label={`Set priority for ${task.title}`}
                 >
                   Set Priority
                 </button>
@@ -138,7 +158,7 @@ function TaskItem({
                       setShowPriorityMenu(false);
                     }}
                   />
-                  <div className="absolute left-0 mt-1.5 w-32 bg-white rounded-lg shadow-xl border border-gray-200 py-1.5 z-30 text-xs font-semibold">
+                  <div className="absolute left-0 mt-1.5 w-32 bg-white rounded-lg shadow-xl border border-slate-200 py-1.5 z-30 text-xs font-semibold">
                     {TASK_PRIORITIES.map((p) => {
                       const isActive = task.priority === p;
                       return (
@@ -149,8 +169,8 @@ function TaskItem({
                             setShowPriorityMenu(false);
                             await onUpdateTask(task.id, { priority: p });
                           }}
-                          className={`w-full text-left px-3 py-2 flex items-center gap-2 transition-colors cursor-pointer ${
-                            isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
+                          className={`w-full text-left px-3 py-2 flex items-center gap-2 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-300 ${
+                            isActive ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50'
                           }`}
                         >
                           <span className={`w-2 h-2 rounded-full ${getPriorityDotClass(p)}`} />
@@ -188,7 +208,7 @@ function TaskItem({
                     e.stopPropagation();
                     handleEditTask(task);
                   }}
-                  className="ml-2 cursor-pointer rounded-xl p-1 text-gray-400 transition-colors hover:bg-slate-50 hover:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                  className="ml-2 cursor-pointer rounded-xl p-2.5 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
                   title="Edit task"
                   aria-label={`Edit task: ${task.title}`}
                 >
@@ -202,7 +222,7 @@ function TaskItem({
                     e.stopPropagation();
                     setDeleteItem({ type: 'card', listId, cardId: task.id });
                   }}
-                  className="ml-1 cursor-pointer rounded-xl p-1 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
+                  className="ml-1 cursor-pointer rounded-xl p-2.5 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
                   title="Delete task"
                   aria-label={`Delete task: ${task.title}`}
                 >
@@ -228,20 +248,20 @@ function TaskItem({
             </div>
           )}
 
-          <h3 className="mb-1.5 line-clamp-2 break-words text-[15px] font-semibold leading-snug tracking-[-0.01em] text-slate-950">
+          <h3 className="mb-1.5 line-clamp-2 break-words text-[15px] font-semibold leading-snug tracking-[-0.01em] text-slate-900">
             {task.title}
           </h3>
 
           {/* Task Description */}
           {descriptionPreview && (
-            <p className="text-xs text-gray-500 mb-3.5 line-clamp-2 leading-relaxed">
+            <p className="text-xs text-slate-500 mb-3.5 line-clamp-2 leading-relaxed">
               {descriptionPreview}
             </p>
           )}
 
           {/* Task Optional Image */}
           {task.image && (
-            <div className="mb-3 max-h-36 w-full overflow-hidden rounded-2xl bg-gray-100 shadow-inner">
+            <div className="mb-3 max-h-36 w-full overflow-hidden rounded-xl bg-slate-100 shadow-inner">
               <img
                 src={task.image}
                 alt={task.title}
@@ -285,7 +305,7 @@ function TaskItem({
           )}
 
           {/* Divider */}
-          <div className="border-t border-gray-100 my-2.5" />
+          <div className="border-t border-slate-100 my-2.5" />
 
           {/* Task Footer: Assignees & Status */}
           <div className="flex items-center justify-between select-none">
@@ -312,7 +332,7 @@ function TaskItem({
                       e.stopPropagation();
                       setShowAssigneeMenu(!showAssigneeMenu);
                     }}
-                  className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border border-dashed border-gray-300 bg-gray-50 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                  className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border border-dashed border-slate-300 bg-slate-50 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
                     title="Manage assignees"
                     aria-label="Manage assignees"
                     aria-haspopup="true"
@@ -333,7 +353,7 @@ function TaskItem({
                         }}
                       />
                       <div className="absolute bottom-9.5 left-0 z-30 w-56 rounded-2xl border border-slate-200 bg-white p-2 text-xs font-medium shadow-[0_18px_60px_rgba(15,23,42,0.18)]">
-                        <div className="font-bold text-gray-500 px-2 pb-1.5 border-b border-gray-100 mb-1">
+                        <div className="font-bold text-slate-500 px-2 pb-1.5 border-b border-slate-100 mb-1">
                           Assign members
                         </div>
                         <div className="space-y-0.5 max-h-48 overflow-y-auto">
@@ -352,7 +372,7 @@ function TaskItem({
                                   }
                                   await onUpdateTask(task.id, { assignees: newAssignees });
                                 }}
-                                className="w-full flex items-center justify-between px-2 py-1.5 rounded-md hover:bg-gray-50 text-gray-700 transition-colors cursor-pointer"
+                                className="w-full flex items-center justify-between px-2 py-1.5 rounded-md hover:bg-slate-50 text-slate-700 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-300"
                               >
                                 <div className="flex items-center gap-2">
                                   <img src={member.avatar} alt={member.name} className="h-5.5 w-5.5 rounded-full object-cover" />
@@ -362,7 +382,7 @@ function TaskItem({
                                   type="checkbox"
                                   checked={isAssigned}
                                   onChange={() => {}} // Controlled purely by button click
-                                  className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                  className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                                 />
                               </button>
                             );
@@ -382,11 +402,13 @@ function TaskItem({
                   e.stopPropagation();
                   await onUpdateTask(task.id, { isDone: !task.isDone });
                 }}
-                className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-bold transition-all duration-150 cursor-pointer ${
+                className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-bold transition-all duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 ${
                   task.isDone
                     ? 'border border-emerald-200 bg-emerald-100 text-emerald-800'
                     : 'border border-slate-200 bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
+                aria-pressed={task.isDone}
+                aria-label={`${task.isDone ? 'Mark not done' : 'Mark done'}: ${task.title}`}
               >
                 {task.isDone ? 'Done ✓' : 'Mark Done'}
               </button>

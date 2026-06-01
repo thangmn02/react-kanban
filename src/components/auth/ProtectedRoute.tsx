@@ -19,7 +19,7 @@ export default function ProtectedRoute({ children, onRequireAuth }: ProtectedRou
 
   if (isAuthLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#F8F9FA] text-sm font-medium text-slate-500">
+      <div className="flex min-h-screen items-center justify-center bg-canvas text-sm font-medium text-slate-500">
         Checking session...
       </div>
     );

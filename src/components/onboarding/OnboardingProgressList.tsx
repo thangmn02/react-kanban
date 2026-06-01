@@ -8,7 +8,7 @@ const onboardingSteps = [
 
 export default function OnboardingProgressList() {
   return (
-    <aside className="rounded-[36px] border border-blue-100 bg-blue-50/80 p-8 shadow-[0_24px_70px_rgba(37,99,235,0.08)]">
+    <aside className="rounded-3xl border border-blue-100 bg-blue-50/80 p-8 shadow-[0_24px_70px_rgba(37,99,235,0.08)]">
       <Typography
         component="p"
         content="What happens next"

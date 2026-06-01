@@ -198,6 +198,23 @@ export async function deleteTask(taskId: string): Promise<void> {
   }
 }
 
+/**
+ * Restore a soft-deleted task by clearing its `deleted_at` timestamp.
+ *
+ * Reuses the existing task update path (`updateTask` -> `normalizeTaskDataPartial`,
+ * which already passes `deleted_at` through), so no schema change is needed. The
+ * task's `list_id` and `position` are untouched by `deleteTask`, so a restored
+ * task reappears in its prior list and position once the board refreshes.
+ *
+ * - Returns the updated task whose `deleted_at` is `null`.
+ * - Surfaces any update error to the caller (via `updateTask`).
+ * - Without a configured Supabase client, returns a task representation with
+ *   `deleted_at: null` without raising, matching the existing local-demo behavior.
+ */
+export async function restoreTask(taskId: string): Promise<TaskRow> {
+  return updateTask(taskId, { deleted_at: null });
+}
+
 export async function deleteTasksByListId(listId: string): Promise<void> {
   if (!supabase) {
     return;

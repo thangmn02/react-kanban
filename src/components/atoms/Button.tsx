@@ -29,8 +29,8 @@ function Button({
 
   const variantClasses = {
     primary: 'text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus-visible:ring-blue-200',
-    secondary: 'text-body bg-neutral-secondary-medium box-border border border-default-medium hover:bg-neutral-tertiary-medium hover:text-heading focus-visible:ring-neutral-tertiary shadow-xs font-medium leading-5 rounded-base text-sm px-4 py-2.5',
-    text: 'text-heading bg-transparent box-border border border-transparent hover:bg-neutral-secondary-medium focus-visible:ring-neutral-tertiary font-medium leading-5 rounded-base text-sm px-4 py-2.5',
+    secondary: 'text-sm font-medium text-slate-700 bg-slate-100 border border-slate-200 rounded-lg hover:bg-slate-200 hover:text-slate-900 focus-visible:ring-slate-200',
+    text: 'text-sm font-medium text-slate-700 bg-transparent border border-transparent rounded-lg hover:bg-slate-100 focus-visible:ring-slate-200',
     outline: 'text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus-visible:ring-slate-200'
   }
 

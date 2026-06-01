@@ -80,12 +80,12 @@ function TaskList({
     <div
       ref={isOverlay ? undefined : setNodeRef}
       style={style}
-      className={`mr-6 flex max-h-[85vh] w-80 flex-shrink-0 flex-col rounded-[1.75rem] border border-white/80 bg-white/70 p-4 shadow-[0_14px_48px_rgba(15,23,42,0.08)] ring-1 ring-slate-900/[0.03] backdrop-blur-xl transition-[box-shadow,border,background,opacity] duration-200 ${
+      className={`flex max-h-[85vh] w-80 flex-shrink-0 flex-col rounded-2xl border border-slate-200/80 bg-white p-4 shadow-card ring-1 ring-slate-900/[0.02] transition-[box-shadow,border,background,opacity] duration-200 ${
         isDragging
           ? 'border-2 border-dashed border-sky-300 bg-sky-50/70 opacity-35 shadow-inner'
           : isOverlay
           ? 'shadow-2xl ring-1 ring-sky-100'
-          : 'hover:border-sky-100 hover:bg-white/86 hover:shadow-[0_22px_64px_rgba(15,23,42,0.12)]'
+          : 'hover:border-sky-200 hover:shadow-[0_22px_64px_rgba(15,23,42,0.12)]'
       }`}
     >
       {/* Header Container */}
@@ -140,7 +140,7 @@ function TaskList({
                       setDeleteItem({ type: 'list', listId: listItem.id });
                       toggleMenu(null);
                     }}
-                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-50 flex items-center"
+                    className="w-full cursor-pointer text-left px-4 py-2 text-sm text-rose-600 transition-colors hover:bg-rose-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-rose-300 flex items-center"
                   >
                     Delete group
                   </button>
@@ -177,7 +177,7 @@ function TaskList({
                 />
               ))}
               {tasks.length === 0 && !isDragging && (
-                <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-white/50 py-8 text-gray-400">
+                <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 py-8 text-slate-400">
                   <svg className="h-8 w-8 mb-1.5 opacity-50" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
                   </svg>

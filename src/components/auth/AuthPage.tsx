@@ -88,26 +88,26 @@ export default function AuthPage({ onAuthenticated }: AuthPageProps) {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,#eef6ff,transparent_34%),#F8F9FA] px-5 py-10">
-      <section className="grid w-full max-w-5xl overflow-hidden rounded-[36px] border border-white/80 bg-white/92 shadow-[0_28px_90px_rgba(15,23,42,0.13)] backdrop-blur-xl lg:grid-cols-[0.95fr_1.05fr]">
-        <aside className="hidden bg-[linear-gradient(145deg,#eff6ff,#ffffff_48%,#f8fafc)] p-8 lg:flex lg:flex-col lg:justify-between">
+    <main className="flex min-h-screen items-center justify-center bg-canvas px-5 py-10">
+      <section className="grid w-full max-w-5xl overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-card lg:grid-cols-[0.95fr_1.05fr]">
+        <aside className="hidden bg-slate-950 p-8 lg:flex lg:flex-col lg:justify-between">
           <div>
             <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600 text-lg font-semibold text-white shadow-[0_14px_36px_rgba(37,99,235,0.28)]">
               K
             </div>
-            <h1 className="mt-8 text-4xl font-semibold tracking-[-0.04em] text-slate-950">
+            <h1 className="mt-8 text-4xl font-semibold tracking-[-0.04em] text-white">
               Kanban Workspace
             </h1>
-            <p className="mt-4 max-w-sm text-base leading-7 text-slate-600">
+            <p className="mt-4 max-w-sm text-base leading-7 text-slate-300">
               Focus-first Kanban for personal work and small teams.
             </p>
           </div>
 
-          <div className="space-y-3 text-sm text-slate-600">
-            <div className="rounded-3xl border border-white/80 bg-white/80 p-4 shadow-sm">
+          <div className="space-y-3 text-sm text-slate-300">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
               Workspace-isolated boards protected by Supabase RLS.
             </div>
-            <div className="rounded-3xl border border-white/80 bg-white/80 p-4 shadow-sm">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
               Realtime Kanban, Focus Dock, Pomodoro, and lightweight team flow.
             </div>
           </div>
@@ -130,7 +130,7 @@ export default function AuthPage({ onAuthenticated }: AuthPageProps) {
             <button
               type="button"
               onClick={() => handleModeChange('sign-in')}
-              className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
+              className={`cursor-pointer rounded-xl px-4 py-2.5 text-sm font-semibold transition focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 ${
                 formMode === 'sign-in'
                   ? 'bg-white text-slate-950 shadow-sm'
                   : 'text-slate-500 hover:text-slate-700'
@@ -141,7 +141,7 @@ export default function AuthPage({ onAuthenticated }: AuthPageProps) {
             <button
               type="button"
               onClick={() => handleModeChange('sign-up')}
-              className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
+              className={`cursor-pointer rounded-xl px-4 py-2.5 text-sm font-semibold transition focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 ${
                 formMode === 'sign-up'
                   ? 'bg-white text-slate-950 shadow-sm'
                   : 'text-slate-500 hover:text-slate-700'
@@ -209,13 +209,13 @@ export default function AuthPage({ onAuthenticated }: AuthPageProps) {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(37,99,235,0.28)] transition hover:-translate-y-0.5 hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-60"
+              className="w-full cursor-pointer rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-blue-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-100 disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-60"
             >
               {getSubmitButtonLabel(formMode, isSubmitting)}
             </button>
           </form>
 
-          <p className="mt-5 text-center text-xs leading-5 text-slate-400">
+          <p className="mt-5 text-center text-xs leading-5 text-slate-500">
             {formMode === 'sign-in'
               ? 'New here? Create an account to set up your first workspace.'
               : 'Already have an account? Switch back to sign in.'}

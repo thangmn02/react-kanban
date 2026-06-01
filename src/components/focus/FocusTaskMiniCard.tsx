@@ -23,7 +23,7 @@ function FocusTaskMiniCard({
 
   return (
     <article
-      className={`rounded-[1.25rem] border bg-white/80 p-3 shadow-sm transition-[border,background,box-shadow,transform] hover:-translate-y-0.5 hover:shadow-md ${
+      className={`rounded-2xl border bg-white/80 p-3 shadow-sm transition-[border,background,box-shadow,transform] hover:-translate-y-0.5 hover:shadow-md ${
         isActive ? 'border-sky-200 ring-2 ring-sky-100' : 'border-white/80'
       }`}
     >
@@ -81,7 +81,7 @@ function FocusTaskMiniCard({
         <button
           type="button"
           onClick={() => onMarkDone(task)}
-          className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+          className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
           disabled={task.isDone}
         >
           {task.isDone ? 'Done' : 'Mark done'}

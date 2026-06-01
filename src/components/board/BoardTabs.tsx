@@ -12,7 +12,7 @@ export default function BoardTabs({
   onOpenActivity,
 }: BoardTabsProps) {
   const tabClassName = (tab: BoardTabId) => (
-    `rounded-xl px-3 py-2 text-sm font-semibold transition ${
+    `cursor-pointer rounded-xl px-3 py-2 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 ${
       activeTab === tab
         ? 'bg-white text-slate-950 shadow-sm'
         : 'text-slate-500 hover:text-slate-800'
@@ -43,7 +43,7 @@ export default function BoardTabs({
       <button
         type="button"
         onClick={onOpenActivity}
-        className="rounded-2xl border border-slate-200 bg-white/90 px-3 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md focus:outline-none focus:ring-4 focus:ring-sky-100"
+        className="cursor-pointer rounded-2xl border border-slate-200 bg-white/90 px-3 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md focus:outline-none focus:ring-4 focus:ring-sky-100"
       >
         Activity
       </button>

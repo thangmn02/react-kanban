@@ -46,9 +46,9 @@ export default function OnboardingPage({
   };
 
   return (
-    <main className="min-h-screen bg-[#F8F9FA] px-6 py-10">
+    <main className="min-h-screen bg-canvas px-6 py-10">
       <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
-        <section className="rounded-[36px] border border-white/80 bg-white p-8 shadow-[0_24px_70px_rgba(15,23,42,0.08)]">
+        <section className="rounded-3xl border border-slate-200/80 bg-white p-8 shadow-card">
           <Typography
             component="p"
             content="Workspace setup"
@@ -57,7 +57,7 @@ export default function OnboardingPage({
           <Typography
             component="h1"
             content="Set up your first board"
-            className="mt-4 text-4xl font-semibold tracking-tight text-slate-950"
+            className="mt-4 text-4xl font-semibold tracking-[-0.04em] text-slate-950"
           />
           <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-500">
             Hi {userName}. Create a workspace and choose a starter board template.
@@ -116,14 +116,14 @@ export default function OnboardingPage({
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(37,99,235,0.28)] transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                className="cursor-pointer rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-blue-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-100 disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-60"
               >
                 {isSubmitting ? 'Creating workspace...' : 'Create workspace and board'}
               </button>
               <button
                 type="button"
                 onClick={() => void onSignOut()}
-                className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                className="cursor-pointer rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"
               >
                 Sign out
               </button>

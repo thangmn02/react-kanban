@@ -19,6 +19,7 @@ import {
 import TaskList from '../task/TaskList';
 import TaskItem from '../task/TaskItem';
 import TaskListOverlay from '../task/TaskListOverlay';
+import EmptyState from '../atoms/EmptyState';
 import type { BoardData, BoardDeleteItem, ITaskItem } from '../../types/task.type';
 import type { WorkspaceMember } from '../../types/auth.type';
 import { doesTaskMatchFilters } from '../../utils/taskFilters';
@@ -162,6 +163,13 @@ function KanbanBoard({
     }).filter((column): column is NonNullable<typeof column> => Boolean(column))
   ), [boardData, filters.searchQuery, filters.priority, filters.assignee, filters.dueDate]);
 
+  const hasActiveFilters = Boolean(
+    filters.searchQuery || filters.priority || filters.assignee || filters.dueDate
+  );
+  const hasAnyTasks = boardColumns.some((column) => column.allTasks.length > 0);
+  const hasVisibleTasks = boardColumns.some((column) => column.displayTasks.length > 0);
+  const showNoResults = hasActiveFilters && hasAnyTasks && !hasVisibleTasks;
+
   const handleDragStart = ({ active }: DragStartEvent) => {
     const activeData = active.data.current as DragItemData | undefined;
     setActiveId(active.id.toString());
@@ -286,12 +294,21 @@ function KanbanBoard({
       onDragCancel={handleDragCancel}
       onDragEnd={handleDragEnd}
     >
-      <div className="bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.95),rgba(248,249,250,0.95)_42%,rgba(239,246,255,0.42))] p-6">
+      <div className="bg-[#F8F9FA] p-6">
+        {showNoResults && (
+          <div className="mb-4">
+            <EmptyState
+              title="No matching tasks"
+              description="No tasks match your current search or filters. Try adjusting them."
+              compact
+            />
+          </div>
+        )}
         <SortableContext
           items={boardData.columns}
           strategy={horizontalListSortingStrategy}
         >
-          <div className="flex items-start overflow-x-auto pb-6 pt-1">
+          <div className="flex items-start gap-5 overflow-x-auto pb-6 pt-1">
             {boardColumns.map(({ columnId, listItem, displayTasks }) => (
                 <MemoizedTaskList
                   key={columnId}
@@ -312,7 +329,7 @@ function KanbanBoard({
             <div className="w-80 flex-shrink-0">
               <button
                 onClick={handlers.onOpenAddGroup}
-                className="w-full cursor-pointer rounded-[1.75rem] border border-dashed border-slate-300/80 bg-white/62 py-9 text-sm font-semibold text-slate-500 shadow-sm backdrop-blur-xl transition-[background,box-shadow,transform,color] hover:-translate-y-0.5 hover:bg-white hover:text-slate-700 hover:shadow-[0_18px_50px_rgba(15,23,42,0.10)] active:scale-[0.99]"
+                className="w-full cursor-pointer rounded-2xl border border-dashed border-slate-300 bg-white/60 py-9 text-sm font-semibold text-slate-500 shadow-card transition-[background,box-shadow,transform,color] hover:-translate-y-0.5 hover:border-sky-200 hover:bg-white hover:text-slate-700 hover:shadow-[0_18px_50px_rgba(15,23,42,0.10)] active:scale-[0.99] focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"
               >
                 + Add another group
               </button>

@@ -1,12 +1,17 @@
-import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+import { useCallback, useEffect, useState } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 
 import { fetchTodayPageData, type TodayPageData, type TodayTaskSummary } from '../../services/today.service';
 import type { AppUser, WorkspaceSummary } from '../../types/auth.type';
 import type { DailyFocusStats, FocusTask } from '../../types/focus.type';
-import AppleCard from '../atoms/AppleCard';
+import PageHeader from '../atoms/PageHeader';
+import FocusStatsCard from '../atoms/FocusStatsCard';
+import SectionCard from '../atoms/SectionCard';
+import EmptyState from '../atoms/EmptyState';
+import ErrorState from '../atoms/ErrorState';
 import TodayTaskSection from './TodayTaskSection';
 import TodayTaskCard from './TodayTaskCard';
+import { Skeleton, SkeletonTaskCard } from '../atoms/skeleton';
 
 interface TodayPageProps {
   currentUser: AppUser;
@@ -42,14 +47,31 @@ export default function TodayPage({
 }: TodayPageProps) {
   const [todayData, setTodayData] = useState<TodayPageData>(getEmptyTodayData);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRetrying, setIsRetrying] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const prefersReducedMotion = useReducedMotion();
+
+  const workspaceId = activeWorkspace?.id;
+
+  const loadTodayData = useCallback(async () => {
+    try {
+      const data = await fetchTodayPageData({
+        currentUser,
+        workspaceId: workspaceId || null,
+      });
+      setTodayData(data);
+      setErrorMessage(null);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to load Today data.');
+    }
+  }, [workspaceId, currentUser]);
 
   useEffect(() => {
     let isMounted = true;
 
     fetchTodayPageData({
       currentUser,
-      workspaceId: activeWorkspace?.id || null,
+      workspaceId: workspaceId || null,
     })
       .then((data) => {
         if (!isMounted) {
@@ -75,75 +97,102 @@ export default function TodayPage({
     return () => {
       isMounted = false;
     };
-  }, [activeWorkspace?.id, currentUser]);
+  }, [workspaceId, currentUser]);
+
+  const handleRetry = useCallback(() => {
+    setIsRetrying(true);
+    void loadTodayData().finally(() => {
+      setIsRetrying(false);
+    });
+  }, [loadTodayData]);
 
   const hasUrgentTasks = todayData.overdueTasks.length > 0 || todayData.dueTodayTasks.length > 0;
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,#eef6ff,transparent_34%),#F8F9FA] px-5 py-7 sm:px-7">
+    <main className="min-h-screen bg-[#F8F9FA] px-5 py-7 sm:px-7" aria-busy={isLoading}>
       <section className="mx-auto max-w-7xl">
-        <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.26em] text-blue-600">
-              Today
-            </p>
-            <h1 className="mt-2 text-4xl font-semibold tracking-[-0.05em] text-slate-950">
-              My Day
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-              Pick the few tasks that matter today, then start a focused work session without opening the full board.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={onQuickCreateTask}
-            className="cursor-pointer rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-[0_14px_34px_rgba(37,99,235,0.26)] transition hover:-translate-y-0.5 hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-100"
-          >
-            Quick add task
-          </button>
-        </div>
+        <PageHeader
+          eyebrow="Today"
+          title="My Day"
+          description="Pick the few tasks that matter today, then start a focused work session without opening the full board."
+          className="mb-7"
+          actions={(
+            <button
+              type="button"
+              onClick={onQuickCreateTask}
+              className="cursor-pointer rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-[0_14px_34px_rgba(37,99,235,0.26)] transition hover:-translate-y-0.5 hover:bg-blue-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-100"
+            >
+              Quick add task
+            </button>
+          )}
+        />
 
         <div className="mb-6 grid gap-3 md:grid-cols-3">
-          <AppleCard className="p-4">
-            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Today</p>
-            <p className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-slate-950">
-              {dailyFocusStats.completedSessions} sessions
-            </p>
-            <p className="mt-1 text-sm text-slate-500">{dailyFocusStats.focusedMinutes} focused minutes</p>
-          </AppleCard>
-          <AppleCard className="p-4">
-            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Interruptions</p>
-            <p className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-slate-950">
-              {dailyFocusStats.interruptedSessions}
-            </p>
-            <p className="mt-1 text-sm text-slate-500">sessions stopped after 60s</p>
-          </AppleCard>
-          <AppleCard className="p-4">
-            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Top focus</p>
-            <p className="mt-2 truncate text-lg font-semibold tracking-[-0.03em] text-slate-950">
-              {dailyFocusStats.topTaskTitle || 'No focus sessions yet'}
-            </p>
-            <p className="mt-1 text-sm text-slate-500">Pick one task and start a session.</p>
-          </AppleCard>
+          <FocusStatsCard
+            label="Today"
+            value={`${dailyFocusStats.completedSessions} sessions`}
+            caption={`${dailyFocusStats.focusedMinutes} focused minutes`}
+          />
+          <FocusStatsCard
+            label="Interruptions"
+            value={String(dailyFocusStats.interruptedSessions)}
+            caption="sessions stopped after 60s"
+          />
+          <FocusStatsCard
+            label="Top focus"
+            value={dailyFocusStats.topTaskTitle || 'No focus sessions yet'}
+            caption="Pick one task and start a session."
+            tone="sky"
+          />
         </div>
 
         {isLoading && (
-          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500 shadow-sm">
-            Loading today planning data...
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+            <div className="space-y-6">
+              <SectionCard className="p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <Skeleton className="h-4 w-36" />
+                    <Skeleton className="mt-2 h-3 w-56" />
+                  </div>
+                  <Skeleton className="h-6 w-12" rounded="rounded-full" />
+                </div>
+                <div className="mt-4 grid gap-3">
+                  <SkeletonTaskCard />
+                  <SkeletonTaskCard />
+                </div>
+              </SectionCard>
+            </div>
+
+            <div className="space-y-6">
+              {Array.from({ length: 3 }).map((_, sectionIndex) => (
+                <SectionCard key={sectionIndex} className="p-5">
+                  <Skeleton className="h-4 w-28" />
+                  <Skeleton className="mt-2 h-3 w-48" />
+                  <div className="mt-4 grid gap-3">
+                    <SkeletonTaskCard />
+                    <SkeletonTaskCard />
+                  </div>
+                </SectionCard>
+              ))}
+            </div>
           </div>
         )}
 
-        {errorMessage && (
-          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-            {errorMessage}
-          </div>
+        {!isLoading && errorMessage && (
+          <ErrorState
+            title="Couldn't load your day"
+            description="Something went wrong while loading today's planning data."
+            details={errorMessage}
+            onRetry={handleRetry}
+            isRetrying={isRetrying}
+          />
         )}
 
         {!isLoading && !errorMessage && (
           <div className="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
             <div className="space-y-6">
-              <AppleCard className="p-5">
+              <SectionCard className="p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h2 className="text-sm font-bold uppercase tracking-[0.18em] text-slate-600">
@@ -160,9 +209,19 @@ export default function TodayPage({
 
                 <div className="mt-4 grid gap-3">
                   {focusTasks.length === 0 ? (
-                    <div className="rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50/70 px-4 py-8 text-center text-sm text-slate-500">
-                      No urgent tasks. Choose one task to focus on.
-                    </div>
+                    <EmptyState
+                      title="No focus tasks yet"
+                      description="Choose one task to focus on and start a session."
+                      action={(
+                        <button
+                          type="button"
+                          onClick={onQuickCreateTask}
+                          className="inline-flex cursor-pointer items-center rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-100"
+                        >
+                          Quick add task
+                        </button>
+                      )}
+                    />
                   ) : (
                     focusTasks.map((focusTask) => {
                       const taskSummary: TodayTaskSummary = {
@@ -193,12 +252,12 @@ export default function TodayPage({
                     })
                   )}
                 </div>
-              </AppleCard>
+              </SectionCard>
 
               {!hasUrgentTasks && (
                 <motion.div
-                  className="rounded-[2rem] border border-sky-100 bg-sky-50/70 p-5 text-slate-700 shadow-sm"
-                  initial={{ opacity: 0, y: 12 }}
+                  className="rounded-2xl border border-sky-100 bg-sky-50/70 p-5 text-slate-700 shadow-card"
+                  initial={prefersReducedMotion ? false : { opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ type: 'spring', stiffness: 160, damping: 20 }}
                 >

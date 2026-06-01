@@ -36,7 +36,7 @@ function PomodoroTimer({
   isPictureInPictureOpen,
 }: PomodoroTimerProps) {
   return (
-    <section className="rounded-[1.35rem] border border-white/80 bg-white/76 p-4 shadow-sm">
+    <section className="rounded-2xl border border-white/80 bg-white/76 p-4 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">

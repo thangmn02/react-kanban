@@ -20,7 +20,7 @@ export default function BoardTemplatePicker({
         return (
           <label
             key={template.id}
-            className={`cursor-pointer rounded-2xl border p-4 transition-[background,border,box-shadow,transform] hover:-translate-y-0.5 ${
+            className={`cursor-pointer rounded-2xl border p-4 transition-[background,border,box-shadow,transform] hover:-translate-y-0.5 focus-within:outline-none focus-within:ring-4 focus-within:ring-sky-100 ${
               isSelected
                 ? 'border-blue-500 bg-blue-50 shadow-sm'
                 : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'

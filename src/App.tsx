@@ -21,6 +21,9 @@ import CommandPalette from './components/command/CommandPalette';
 import OnboardingPage from './components/onboarding/OnboardingPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import AppHeader from './components/layout/AppHeader';
+import { SkeletonBoardColumn } from './components/atoms/skeleton';
+import ErrorState from './components/atoms/ErrorState';
+import NotFoundPage from './components/error/NotFoundPage';
 import { useAuth } from './hooks/useAuth';
 import { useAppDialogState } from './hooks/useAppDialogState';
 import { useBoardDataManagement } from './hooks/useBoardDataManagement';
@@ -91,6 +94,7 @@ function App() {
     changeMemberRole,
     removeMember,
     cancelInvite,
+    reloadMembers,
   } = useWorkspaceMembers(activeWorkspaceId);
 
   const {
@@ -143,6 +147,8 @@ function App() {
   const [deleteItem, setDeleteItem] = useState<BoardDeleteItem | null>(null);
   const [isFocusDockCollapsed, setIsFocusDockCollapsed] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [isRetryingWorkspace, setIsRetryingWorkspace] = useState(false);
+  const [isRetryingBoard, setIsRetryingBoard] = useState(false);
   const [dailyFocusStats, setDailyFocusStats] = useState<DailyFocusStats>({
     focusedMinutes: 0,
     completedSessions: 0,
@@ -150,8 +156,30 @@ function App() {
     topTaskTitle: null,
   });
 
+  const handleRetryWorkspace = useCallback(() => {
+    setIsRetryingWorkspace(true);
+    void reloadWorkspaces().finally(() => {
+      setIsRetryingWorkspace(false);
+    });
+  }, [reloadWorkspaces]);
+
+  const handleRetryBoard = useCallback(() => {
+    setIsRetryingBoard(true);
+    setIsBoardLoading(true);
+    void refreshBoardData({ showErrorToast: true }).finally(() => {
+      setIsRetryingBoard(false);
+    });
+  }, [refreshBoardData, setIsBoardLoading]);
+
   useEffect(() => {
     if (isAuthLoading || isWorkspaceLoading) {
+      return;
+    }
+
+    // Unknown route: show the 404 surface regardless of auth state and skip
+    // the auth/workspace redirects below.
+    if (activeView === 'not-found') {
+      setIsBoardLoading(false);
       return;
     }
 
@@ -692,6 +720,7 @@ function App() {
           onRoleChange={changeMemberRole}
           onRemoveMember={removeMember}
           onCancelInvite={cancelInvite}
+          onRetry={reloadMembers}
         />
       )}
 
@@ -725,9 +754,21 @@ function App() {
     </>
   );
 
+  if (activeView === 'not-found') {
+    return (
+      <>
+        <NotFoundPage
+          onGoDashboard={() => setActiveViewWithPath('home')}
+          onGoToday={() => setActiveViewWithPath('today')}
+        />
+        <ToastContainer />
+      </>
+    );
+  }
+
   if (isAuthLoading || (authMode === 'supabase' && user && isWorkspaceLoading)) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#F8F9FA] text-sm font-medium text-slate-500">
+      <div className="flex min-h-screen items-center justify-center bg-canvas text-sm font-medium text-slate-500">
         Preparing secure workspace...
       </div>
     );
@@ -790,7 +831,7 @@ function App() {
   if (activeView === 'today') {
     return (
       <ProtectedRoute onRequireAuth={() => setActiveViewWithPath('auth')}>
-        <div className="min-h-screen bg-[#F8F9FA]">
+        <div className="min-h-screen bg-canvas">
           {appHeader}
 
           <TodayPage
@@ -814,7 +855,7 @@ function App() {
   if (activeView === 'home') {
     return (
       <ProtectedRoute onRequireAuth={() => setActiveViewWithPath('auth')}>
-        <div className="min-h-screen bg-[#F8F9FA]">
+        <div className="min-h-screen bg-canvas">
           {appHeader}
 
           {(isBoardLoading || isSavingBoard) && (
@@ -824,8 +865,15 @@ function App() {
           )}
 
           {workspaceErrorMessage && (
-            <div className="border-b border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {workspaceErrorMessage}
+            <div className="px-4 py-3">
+              <ErrorState
+                title="Couldn't load your workspace"
+                description="We couldn't load your workspace data. Check your connection and try again."
+                details={workspaceErrorMessage}
+                onRetry={handleRetryWorkspace}
+                isRetrying={isRetryingWorkspace}
+                compact
+              />
             </div>
           )}
 
@@ -836,6 +884,7 @@ function App() {
             isFocusTask={isFocusTask}
             currentUser={user}
             activeWorkspace={activeWorkspace}
+            onCreateBoard={openCreateBoardDialog}
           />
 
           {sharedDialogs}
@@ -846,7 +895,7 @@ function App() {
 
   return (
     <ProtectedRoute onRequireAuth={() => setActiveViewWithPath('auth')}>
-      <div className="min-h-screen bg-[#F8F9FA]">
+      <div className="min-h-screen bg-canvas">
       {appHeader}
       <BoardHeader
         activeBoardId={activeBoardId}
@@ -871,20 +920,15 @@ function App() {
       )}
 
       {boardErrorMessage && (
-        <div className="border-b border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          <div className="flex items-center justify-between gap-4">
-            <span>{boardErrorMessage}</span>
-            <button
-              type="button"
-              onClick={() => {
-                setIsBoardLoading(true);
-                void refreshBoardData({ showErrorToast: true });
-              }}
-              className="cursor-pointer rounded-md border border-red-300 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-100"
-            >
-              Retry
-            </button>
-          </div>
+        <div className="px-4 py-3">
+          <ErrorState
+            title="Couldn't load this board"
+            description="We couldn't load the board data. Check your connection and try again."
+            details={boardErrorMessage}
+            onRetry={handleRetryBoard}
+            isRetrying={isRetryingBoard}
+            compact
+          />
         </div>
       )}
 
@@ -911,6 +955,14 @@ function App() {
           workspaceName={activeWorkspace?.name}
           onCreateBoard={openCreateBoardDialog}
         />
+      ) : activeView === 'board' && isBoardLoading && boardData.columns.length === 0 ? (
+        <div className="bg-canvas p-6" aria-busy="true">
+          <div className="flex items-start gap-5 overflow-x-auto pb-6 pt-1">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <SkeletonBoardColumn key={index} />
+            ))}
+          </div>
+        </div>
       ) : activeView === 'board' ? (
         <KanbanBoard
           boardData={boardData}

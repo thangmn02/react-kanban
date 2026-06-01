@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import type { BoardTabId } from '../components/board/BoardTabs';
 
-export type BoardViewMode = 'auth' | 'onboarding' | 'invite' | 'home' | 'today' | 'board' | 'calendar';
+export type BoardViewMode = 'auth' | 'onboarding' | 'invite' | 'home' | 'today' | 'board' | 'calendar' | 'not-found';
 
 export interface UseViewRoutingResult {
   activeView: BoardViewMode;
@@ -41,7 +41,13 @@ const getInitialView = (): BoardViewMode => {
     return 'calendar';
   }
 
-  return 'home';
+  // Root and the canonical dashboard path map to home; anything else that is
+  // not a known route is treated as not-found (catch-all).
+  if (window.location.pathname === '/' || window.location.pathname.startsWith('/home')) {
+    return 'home';
+  }
+
+  return 'not-found';
 };
 
 const getInviteTokenFromPath = (): string | null => {

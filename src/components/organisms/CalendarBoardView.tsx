@@ -107,21 +107,21 @@ function CalendarBoardView({
             <button
               type="button"
               onClick={() => setActiveMonth((currentMonth) => subMonths(currentMonth, 1))}
-              className="rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+              className="cursor-pointer rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"
             >
               Previous
             </button>
             <button
               type="button"
               onClick={() => setActiveMonth(startOfMonth(new Date()))}
-              className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100"
+              className="cursor-pointer rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-100"
             >
               Today
             </button>
             <button
               type="button"
               onClick={() => setActiveMonth((currentMonth) => addMonths(currentMonth, 1))}
-              className="rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+              className="cursor-pointer rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"
             >
               Next
             </button>
@@ -187,7 +187,8 @@ function CalendarBoardView({
                           key={task.id}
                           type="button"
                           onClick={() => onOpenTask(task)}
-                          className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-left shadow-sm transition-colors hover:border-blue-300 hover:bg-blue-50"
+                          className="w-full cursor-pointer rounded-xl border border-gray-200 bg-white px-3 py-2 text-left shadow-sm transition-colors hover:border-blue-300 hover:bg-blue-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                          aria-label={`Open task: ${task.title}`}
                         >
                           <div className="mb-1 flex flex-wrap gap-1">
                             {task.labels.slice(0, 1).map((label) => (

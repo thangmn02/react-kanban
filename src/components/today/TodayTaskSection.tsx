@@ -1,4 +1,6 @@
 import type { TodayTaskSummary } from '../../services/today.service';
+import SectionCard from '../atoms/SectionCard';
+import EmptyState from '../atoms/EmptyState';
 import TodayTaskCard from './TodayTaskCard';
 
 interface TodayTaskSectionProps {
@@ -23,7 +25,7 @@ export default function TodayTaskSection({
   onToggleTodayFocus,
 }: TodayTaskSectionProps) {
   return (
-    <section className="rounded-[2rem] border border-white/80 bg-white/72 p-5 shadow-[0_20px_70px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+    <SectionCard className="p-5">
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
           <h2 className="text-sm font-bold uppercase tracking-[0.18em] text-slate-600">{title}</h2>
@@ -35,9 +37,7 @@ export default function TodayTaskSection({
       </div>
 
       {tasks.length === 0 ? (
-        <div className="rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50/70 px-4 py-8 text-center text-sm text-slate-500">
-          {emptyMessage}
-        </div>
+        <EmptyState title={emptyMessage} compact />
       ) : (
         <div className="grid gap-3">
           {tasks.map((task) => (
@@ -52,6 +52,6 @@ export default function TodayTaskSection({
           ))}
         </div>
       )}
-    </section>
+    </SectionCard>
   );
 }

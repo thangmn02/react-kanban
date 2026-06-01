@@ -20,7 +20,7 @@ export default function TodayTaskCard({
   const priorityClassName = getPriorityBadgeClass(task.priority || undefined);
 
   return (
-    <article className="rounded-[1.5rem] border border-white/80 bg-white/86 p-4 shadow-[0_14px_40px_rgba(15,23,42,0.07)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_50px_rgba(15,23,42,0.10)]">
+    <article className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-card transition hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-[0_18px_50px_rgba(15,23,42,0.10)]">
       <button
         type="button"
         onClick={() => onOpenTask(task)}

@@ -16,6 +16,7 @@ import {
   createTask,
   deleteTask,
   deleteTasksByListId,
+  restoreTask,
   updateTask,
   updateTaskPositions,
 } from '../services/task.service';
@@ -24,6 +25,7 @@ import {
   buildTaskInsertPayload,
   buildTaskUpdatePayload,
 } from '../utils/boardDataMapper';
+import { showUndoToast } from '../components/organisms/toast/showUndoToast';
 
 interface BoardChangeActivity {
   taskId: string;
@@ -275,6 +277,17 @@ export function useTaskOperations({
     }
   };
 
+  const handleRestoreTask = async (taskId: string) => {
+    try {
+      await restoreTask(taskId);
+      await refreshBoardData();
+      toast.success('Task restored.', { theme: 'colored' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to restore task.';
+      toast.error(message, { theme: 'colored' });
+    }
+  };
+
   const handleDeleteConfirm = async () => {
     if (!deleteItem) return;
 
@@ -365,7 +378,15 @@ export function useTaskOperations({
       }
 
       await refreshBoardData();
-      toast.success(`${itemToDelete.type === 'list' ? 'List' : 'Card'} deleted successfully!`, { theme: 'colored' });
+
+      if (itemToDelete.type === 'list') {
+        toast.success('List deleted successfully!', { theme: 'colored' });
+      } else if (itemToDelete.cardId) {
+        const deletedCardId = itemToDelete.cardId;
+        showUndoToast('Task deleted', () => {
+          void handleRestoreTask(deletedCardId);
+        });
+      }
     } catch (error) {
       // Rollback optimistic update on error
       setBoardData(previousBoardData);

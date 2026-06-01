@@ -14,6 +14,11 @@
   /* Shadow scale — subtle for cards, stronger reserved for focus surfaces. */
   --shadow-card: 0 10px 28px rgba(15, 23, 42, 0.07);
   --shadow-focus-surface: 0 20px 60px rgba(15, 23, 42, 0.25);
+
+  /* Quiet Velocity canvas (light-first). Named alias for the app background so
+   * surfaces stop hardcoding bg-[#F8F9FA]; generates the `bg-canvas` utility.
+   * Same value the app already uses — additive, no visual change. */
+  --color-canvas: #f8f9fa;
 }
 
 /*
