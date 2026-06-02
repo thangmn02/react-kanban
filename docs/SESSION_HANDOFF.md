@@ -1,7 +1,64 @@
 # Session Handoff — React Kanban (Focus-first)
 
 > Purpose: let a fresh session continue without re-discovering context.
-> Last updated: 2026-05-31. Read this top-to-bottom before doing anything.
+> Last updated: 2026-06-01. Read this top-to-bottom before doing anything.
+
+---
+
+## CURRENT HANDOFF (2026-06-01) — Quiet Velocity UI rollout
+
+### Where we are
+Running the **Quiet Velocity UI** redesign (design language: "Calm surface, decisive execution";
+signature concept = **Focus Layer**, reserved ONLY for focus surfaces). Spec lives at
+`.kiro/specs/quiet-velocity-redesign/` (requirements.md, design.md, tasks.md). Every phase gates on
+`npm run build` (exit 0) + `npm run lint` (0/0) + `hig-doctor` audit + manual QA. NOT a clone of
+Apple/Linear/Notion/Trello/Jira/Raycast/Superhuman — borrow principles only.
+
+### Phase status
+- **Phase 0 — Design Lab**: DONE. Preview-only routes `/design-lab/quiet-{home,today,board,focus}` in
+  `src/design-lab/`. Gated by `shouldMountDesignLab()` (dev OR `VITE_ENABLE_DESIGN_LAB==="true"`),
+  branched in `main.tsx` before `<App/>`. Do NOT change this guard.
+- **Phase 0.5 — Lab refinement**: DONE. Promoted canvas token `--color-canvas:#f8f9fa` (→ `bg-canvas`)
+  in `index.css`; focus-first quiet-home; contrast fixes.
+- **Phase 1 — Shared surfaces**: DONE + reviewed + **COMMITTED** (`cfb603f`). App shell `bg-canvas`,
+  AppHeader/Auth/Onboarding/ProtectedRoute polish, focus-visible standardization, shadow normalization.
+- **Phase 2 — Home + Today**: DONE + reviewed, **UNCOMMITTED**. Focus-first "Focus Now" hero on Home
+  (uses `myTasks[0]` + existing `onOpenTask`/`onToggleFocusTask`; no-task empty state). Today numbered
+  focus plan + token/focus polish. Files: `HomeDashboard.tsx`, `MyTasksSummary.tsx`, `TodayPage.tsx`,
+  `TodayTaskCard.tsx`.
+- **Phase 3A — Board shell + columns**: DONE, **UNCOMMITTED**. `bg-canvas` on board surfaces, arbitrary
+  shadows → `shadow-card`/`shadow-md`, focus-visible + eyebrow tracking normalization, add-task focus
+  ring. Files: `KanbanBoard.tsx`, `TaskList.tsx`, `BoardHeader.tsx`, `BoardTabs.tsx`, `QuickSearch.tsx`,
+  `BoardEmptyState.tsx`. NO dnd-kit wiring touched.
+
+### Gates: build exit 0, lint 0/0, hig-doctor board/today/home 0 critical (all green as of this handoff).
+
+### NEXT: Phase 3B — Task card polish (`src/components/task/TaskItem.tsx`)
+- Visual-only: arbitrary `hover:shadow-[0_18px_48px…]` → `hover:shadow-md`; assignee-menu
+  `shadow-[0_18px_60px…]` → `shadow-md`; Focus-toggle button `focus:ring`→`focus-visible:ring`;
+  metadata/badge calm polish.
+- **CRITICAL — preserve dnd-kit**: do NOT touch `useSortable`, `setNodeRef`, `{...attributes}`,
+  `{...listeners}`, `transform`/`transition` style, `isDragging`/`isOverlay` branches, `stopPropagation`,
+  or `onPointerDown`. Do NOT convert the inner `role="button"` div → `<button>` (that's deferred 3C,
+  unproven safe). Manual drag QA gate required (within list / across lists / reorder lists / overlay).
+- **Phase 3C** (inner div→button a11y conversion): DEFERRED until DnD-safety can be proven.
+
+### First actions for the new chat
+1. Read this section + `docs/design-guidelines.md` + `.kiro/specs/quiet-velocity-redesign/*`.
+2. **Recommend committing Phase 2 + 3A first** so the DnD-coupled 3B gets an isolated diff. Suggested:
+   `git add` the 10 files → `feat(ui): quiet velocity phase 2 (home+today) + phase 3A (board shell)`.
+   (User commits explicitly — ask first; pushing not done.)
+3. Confirm gates green, then proceed to Phase 3B as a separate, carefully-reviewed unit.
+
+### Pattern notes / gotchas
+- **React Compiler lint** is strict: avoid synchronous `setState` in effects and `useCallback` dep
+  mismatches. The Home/Today data effects keep an **opaque inline-fetch in `useEffect`** (not the
+  extracted callback) specifically to satisfy `react-hooks/set-state-in-effect`. Don't "simplify" that.
+- **react-refresh/only-export-components**: a `.tsx` file must export only components — put helpers in a
+  separate `.ts` (see `showUndoToast.ts`, `isDesignLabRoute.ts`).
+- Windows + PowerShell: use `;` not `&&`. `.env` is gitignored (verified) — safe to `git add .`.
+- hig-doctor flags hardcoded dark-surface colors as "critical" but that's N/A for this web app (focus
+  surfaces intentionally use `bg-slate-900`). Use it for a11y/structure signal.
 
 ---
 

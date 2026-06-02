@@ -110,10 +110,14 @@ function TaskItem({
               handleEditTask(task);
             }
           }}
-          className={`relative rounded-2xl border border-slate-200/80 bg-white p-4 shadow-card ring-1 ring-slate-900/[0.02] transition-[box-shadow,transform,border,background] duration-200 ${
+          className={`relative rounded-2xl border bg-white p-4 shadow-card ring-1 transition-[box-shadow,transform,border,background] duration-200 ${
+            isFocusTask && !isOverlay
+              ? 'border-sky-200 ring-sky-100'
+              : 'border-slate-200/80 ring-slate-900/[0.02]'
+          } ${
             isOverlay
               ? 'cursor-grabbing'
-              : 'cursor-pointer hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-[0_18px_48px_rgba(15,23,42,0.13)] active:scale-[0.99] active:cursor-grabbing focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300'
+              : 'cursor-pointer hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-md active:scale-[0.99] active:cursor-grabbing focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300'
           }`}
         >
           {/* Top Line: Priority (Dropdown) & Action Buttons */}
@@ -158,7 +162,7 @@ function TaskItem({
                       setShowPriorityMenu(false);
                     }}
                   />
-                  <div className="absolute left-0 mt-1.5 w-32 bg-white rounded-lg shadow-xl border border-slate-200 py-1.5 z-30 text-xs font-semibold">
+                  <div className="absolute left-0 mt-1.5 w-32 bg-white rounded-lg shadow-md border border-slate-200 py-1.5 z-30 text-xs font-semibold">
                     {TASK_PRIORITIES.map((p) => {
                       const isActive = task.priority === p;
                       return (
@@ -192,7 +196,7 @@ function TaskItem({
                     e.stopPropagation();
                     onToggleFocusTask(task);
                   }}
-                  className={`ml-2 cursor-pointer rounded-xl px-2 py-1 text-[11px] font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-sky-300 ${
+                  className={`ml-2 cursor-pointer rounded-xl px-2 py-1 text-[11px] font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 ${
                     isFocusTask
                       ? 'bg-sky-50 text-sky-700 ring-1 ring-sky-200'
                       : 'bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-700'
@@ -248,7 +252,9 @@ function TaskItem({
             </div>
           )}
 
-          <h3 className="mb-1.5 line-clamp-2 break-words text-[15px] font-semibold leading-snug tracking-[-0.01em] text-slate-900">
+          <h3 className={`mb-1.5 line-clamp-2 break-words text-[15px] font-semibold leading-snug tracking-[-0.01em] ${
+            task.isDone ? 'text-slate-400 line-through decoration-slate-300' : 'text-slate-900'
+          }`}>
             {task.title}
           </h3>
 
@@ -294,7 +300,7 @@ function TaskItem({
               )}
 
               {task.attachments.length > 0 && (
-                <div className="flex items-center gap-2 text-[11px] font-medium text-blue-700">
+                <div className="flex items-center gap-2 text-[11px] font-medium text-slate-500">
                   <svg className="h-3.5 w-3.5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 11-5.656-5.656l1.5-1.5m7.328-1.328a4 4 0 010-5.656l3-3a4 4 0 115.656 5.656l-1.5 1.5" />
                   </svg>
@@ -352,7 +358,7 @@ function TaskItem({
                           setShowAssigneeMenu(false);
                         }}
                       />
-                      <div className="absolute bottom-9.5 left-0 z-30 w-56 rounded-2xl border border-slate-200 bg-white p-2 text-xs font-medium shadow-[0_18px_60px_rgba(15,23,42,0.18)]">
+                      <div className="absolute bottom-9.5 left-0 z-30 w-56 rounded-2xl border border-slate-200 bg-white p-2 text-xs font-medium shadow-md">
                         <div className="font-bold text-slate-500 px-2 pb-1.5 border-b border-slate-100 mb-1">
                           Assign members
                         </div>
