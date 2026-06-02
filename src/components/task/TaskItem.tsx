@@ -87,26 +87,8 @@ function TaskItem({
     >
       {!isDragging && (
         <div
-          role={isOverlay ? undefined : 'button'}
-          tabIndex={isOverlay ? undefined : 0}
-          aria-label={isOverlay ? undefined : `Open task: ${task.title}`}
           onClick={() => {
             if (!isOverlay) {
-              handleEditTask(task);
-            }
-          }}
-          onKeyDown={(event) => {
-            if (isOverlay) {
-              return;
-            }
-            // Only activate when the card itself is focused — not when a nested
-            // control (priority / focus / edit / delete / assignee / done) bubbles
-            // its own Enter/Space up to the card.
-            if (event.target !== event.currentTarget) {
-              return;
-            }
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault();
               handleEditTask(task);
             }
           }}
@@ -117,7 +99,7 @@ function TaskItem({
           } ${
             isOverlay
               ? 'cursor-grabbing'
-              : 'cursor-pointer hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-md active:scale-[0.99] active:cursor-grabbing focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300'
+              : 'cursor-pointer hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-md active:scale-[0.99] active:cursor-grabbing'
           }`}
         >
           {/* Top Line: Priority (Dropdown) & Action Buttons */}
@@ -254,10 +236,22 @@ function TaskItem({
             </div>
           )}
 
-          <h3 className={`mb-1.5 line-clamp-2 break-words text-[15px] font-semibold leading-snug tracking-[-0.01em] ${
-            task.isDone ? 'text-slate-400 line-through decoration-slate-300' : 'text-slate-900'
-          }`}>
-            {task.title}
+          <h3 className="mb-1.5">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!isOverlay) {
+                  handleEditTask(task);
+                }
+              }}
+              aria-label={`Open task: ${task.title}`}
+              className={`block w-full cursor-pointer rounded text-left line-clamp-2 break-words text-[15px] font-semibold leading-snug tracking-[-0.01em] focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 ${
+                task.isDone ? 'text-slate-400 line-through decoration-slate-300' : 'text-slate-900'
+              }`}
+            >
+              {task.title}
+            </button>
           </h3>
 
           {/* Task Description */}
