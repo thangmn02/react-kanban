@@ -157,6 +157,8 @@ function TaskItem({
                 <>
                   <div
                     className="fixed inset-0 z-20"
+                    aria-hidden="true"
+                    role="presentation"
                     onClick={(e) => {
                       e.stopPropagation();
                       setShowPriorityMenu(false);
@@ -212,7 +214,7 @@ function TaskItem({
                     e.stopPropagation();
                     handleEditTask(task);
                   }}
-                  className="ml-2 cursor-pointer rounded-xl p-2.5 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                  className="ml-2 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
                   title="Edit task"
                   aria-label={`Edit task: ${task.title}`}
                 >
@@ -226,7 +228,7 @@ function TaskItem({
                     e.stopPropagation();
                     setDeleteItem({ type: 'card', listId, cardId: task.id });
                   }}
-                  className="ml-1 cursor-pointer rounded-xl p-2.5 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
+                  className="ml-1 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
                   title="Delete task"
                   aria-label={`Delete task: ${task.title}`}
                 >
@@ -338,7 +340,7 @@ function TaskItem({
                       e.stopPropagation();
                       setShowAssigneeMenu(!showAssigneeMenu);
                     }}
-                  className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border border-dashed border-slate-300 bg-slate-50 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                  className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-dashed border-slate-300 bg-slate-50 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
                     title="Manage assignees"
                     aria-label="Manage assignees"
                     aria-haspopup="true"
@@ -353,6 +355,8 @@ function TaskItem({
                     <>
                       <div
                         className="fixed inset-0 z-20"
+                        aria-hidden="true"
+                        role="presentation"
                         onClick={(e) => {
                           e.stopPropagation();
                           setShowAssigneeMenu(false);

@@ -118,10 +118,11 @@ function TaskList({
           <div className="relative shrink-0 ml-1">
             <button
               onClick={() => toggleMenu(listItem.id)}
-              className="cursor-pointer rounded-xl p-1.5 text-gray-400 transition-colors hover:bg-slate-100 hover:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+              className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-gray-400 transition-colors hover:bg-slate-100 hover:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
               aria-label={`List options: ${listItem.title}`}
-              aria-haspopup="true"
+              aria-haspopup="menu"
               aria-expanded={openMenuId === listItem.id}
+              aria-controls={`list-menu-${listItem.id}`}
             >
               <svg className="w-5 h-5" aria-hidden="true" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
@@ -132,9 +133,14 @@ function TaskList({
               <>
                 <div
                   className="fixed inset-0 z-10"
+                  aria-hidden="true"
+                  role="presentation"
                   onClick={() => toggleMenu(null)}
                 ></div>
-                <div className="absolute right-0 z-20 mt-2 w-48 rounded-2xl border border-slate-200 bg-white py-1 shadow-md">
+                <div
+                  id={`list-menu-${listItem.id}`}
+                  className="absolute right-0 z-20 mt-2 w-48 rounded-2xl border border-slate-200 bg-white py-1 shadow-md"
+                >
                   <button
                     onClick={() => {
                       setDeleteItem({ type: 'list', listId: listItem.id });
