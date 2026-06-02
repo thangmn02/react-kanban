@@ -34,8 +34,8 @@ const floatingTimerStyles = `
   body {
     margin: 0;
     min-height: 100vh;
-    background: linear-gradient(145deg, #f8fbff 0%, #ffffff 50%, #eef6ff 100%);
-    color: #0f172a;
+    background: #0f172a;
+    color: #f8fafc;
   }
 
   .timer-shell {
@@ -48,7 +48,7 @@ const floatingTimerStyles = `
 
   .eyebrow {
     margin: 0;
-    color: #2563eb;
+    color: #7dd3fc;
     font-size: 10px;
     font-weight: 800;
     letter-spacing: 0.2em;
@@ -59,7 +59,7 @@ const floatingTimerStyles = `
     margin: 8px 0 0;
     max-width: 310px;
     overflow: hidden;
-    color: #0f172a;
+    color: #f8fafc;
     font-size: 15px;
     font-weight: 700;
     line-height: 1.35;
@@ -75,10 +75,10 @@ const floatingTimerStyles = `
   }
 
   .badge {
-    border: 1px solid #dbeafe;
+    border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 999px;
-    background: #eff6ff;
-    color: #1d4ed8;
+    background: rgba(255, 255, 255, 0.08);
+    color: #e0f2fe;
     font-size: 11px;
     font-weight: 700;
     padding: 5px 9px;
@@ -90,6 +90,7 @@ const floatingTimerStyles = `
     font-weight: 750;
     letter-spacing: -0.08em;
     line-height: 0.95;
+    font-variant-numeric: tabular-nums;
   }
 
   .actions {
@@ -110,24 +111,24 @@ const floatingTimerStyles = `
   }
 
   button:focus-visible {
-    outline: 3px solid rgba(37, 99, 235, 0.22);
+    outline: 3px solid rgba(125, 211, 252, 0.5);
   }
 
   .primary {
-    background: #0f172a;
+    background: #2563eb;
     color: #ffffff;
   }
 
   .secondary {
-    border: 1px solid #e2e8f0;
-    background: rgba(255, 255, 255, 0.82);
-    color: #334155;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.1);
+    color: #e2e8f0;
   }
 
   .close {
-    border: 1px solid #e2e8f0;
-    background: rgba(255, 255, 255, 0.82);
-    color: #64748b;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.1);
+    color: #cbd5e1;
     padding-inline: 12px;
   }
 `;

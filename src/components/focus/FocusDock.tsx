@@ -61,19 +61,22 @@ function FocusDock({
             key="focus-dock-pill"
             type="button"
             onClick={() => onCollapseChange(false)}
-            className="cursor-pointer rounded-full border border-white/80 bg-slate-950/92 px-4 py-3 text-sm font-semibold text-white shadow-[0_20px_60px_rgba(15,23,42,0.25)] backdrop-blur-xl transition hover:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-sky-200 active:scale-[0.98]"
+            className="cursor-pointer rounded-full border border-white/60 bg-slate-900/90 px-4 py-3 text-sm font-semibold text-white shadow-focus-surface backdrop-blur-md transition hover:-translate-y-0.5 focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-300 active:scale-[0.98]"
             initial={shouldReduceMotion ? false : { opacity: 0, y: 16, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 16, scale: 0.96 }}
             transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 260, damping: 24 }}
             aria-label="Expand Focus Dock"
           >
-            {focusTasks.length} focus task{focusTasks.length === 1 ? '' : 's'} · {formatPomodoroTime(remainingSeconds)}
+            <span className="inline-flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-emerald-400" aria-hidden="true" />
+              {focusTasks.length} focus task{focusTasks.length === 1 ? '' : 's'} · <span className="tabular-nums">{formatPomodoroTime(remainingSeconds)}</span>
+            </span>
           </motion.button>
         ) : (
           <motion.aside
             key="focus-dock-panel"
-            className="w-[min(420px,calc(100vw-2.5rem))] rounded-3xl border border-white/80 bg-white/82 p-4 shadow-focus-surface ring-1 ring-slate-900/[0.04] backdrop-blur-2xl"
+            className="w-[min(420px,calc(100vw-2.5rem))] rounded-3xl border border-white/60 bg-slate-900/90 p-4 shadow-focus-surface backdrop-blur-md"
             initial={shouldReduceMotion ? false : { opacity: 0, y: 24, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 24, scale: 0.96 }}
