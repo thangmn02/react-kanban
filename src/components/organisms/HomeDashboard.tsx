@@ -192,6 +192,7 @@ function HomeDashboard({
   const myTasks = dashboardData?.myTasks || [];
   const recentBoards = dashboardData?.recentBoards || [];
   const heroTask = myTasks[0] ?? null;
+  const upNextTasks = heroTask ? myTasks.filter((task) => task.id !== heroTask.id).slice(0, 3) : myTasks.slice(0, 3);
   const heroPriorityClass = heroTask ? getPriorityBadgeClass(heroTask.priority || undefined) : null;
   const heroIsFocused = heroTask ? isFocusTask(heroTask.id) : false;
   const tasksDueThisWeek = getTasksDueThisWeek(myTasks);
@@ -231,49 +232,15 @@ function HomeDashboard({
       : `${tasksDueThisWeek.length} task đến hạn tuần này`;
 
   return (
-    <div className="flex min-h-screen bg-canvas">
-      <aside className="hidden w-64 shrink-0 border-r border-slate-200/70 bg-white px-4 py-5 lg:block">
-        <div className="mb-8">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-blue-600">Kanban</p>
-          <h2 className="mt-1 text-lg font-bold text-slate-900">Workspace</h2>
-        </div>
-
-        <nav className="space-y-2">
-          <div className="rounded-xl bg-slate-950 px-3 py-2 text-sm font-semibold text-white shadow-sm">
-            Home
-          </div>
-        </nav>
-
-        <div className="mt-8">
-          <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
-            Recent boards
-          </p>
-          <div className="space-y-2">
-            {recentBoards.slice(0, 4).map((board) => (
-              <button
-                key={board.id}
-                type="button"
-                onClick={() => onOpenBoard(board.id)}
-                className="w-full cursor-pointer rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
-              >
-                {board.title}
-              </button>
-            ))}
-            {!isLoading && recentBoards.length === 0 && (
-              <p className="px-3 py-2 text-xs text-slate-400">No boards yet.</p>
-            )}
-          </div>
-        </div>
-      </aside>
-
-      <main className="min-w-0 flex-1 px-6 py-6" aria-busy={isLoading}>
+    <div className="min-h-screen bg-canvas">
+      <main className="mx-auto max-w-7xl px-5 py-6 sm:px-7" aria-busy={isLoading}>
         <PageHeader
           eyebrow="Home"
-          title="Personal dashboard"
-          description={`${currentUser.name}'s assigned tasks, recent boards, and due-date rhythm.`}
+          title="Start your day"
+          description="Pick one task, plan what matters, then move into focus."
           className="mb-6"
           actions={(
-            <div className="flex items-center gap-3 rounded-2xl border border-slate-200/80 bg-white px-3 py-2 shadow-card">
+            <div className="hidden items-center gap-3 rounded-2xl border border-slate-200/80 bg-white px-3 py-2 shadow-card sm:flex">
               <img
                 src={currentUser.avatarUrl}
                 alt={currentUser.name}
@@ -281,8 +248,8 @@ function HomeDashboard({
               />
               <div>
                 <p className="text-sm font-semibold text-slate-900">{currentUser.name}</p>
-                <p className="text-xs text-slate-500">{activeWorkspace?.name || 'Current workspace'}</p>
-              </div>
+                  <p className="text-xs text-slate-500">{activeWorkspace?.name || 'Current workspace'}</p>
+                </div>
             </div>
           )}
         />
@@ -354,7 +321,7 @@ function HomeDashboard({
                 <div className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-blue-600" aria-hidden="true" />
                   <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-blue-700">
-                    Focus now
+                    Recommended next
                   </p>
                 </div>
 
@@ -397,7 +364,7 @@ function HomeDashboard({
                     <svg className="h-4 w-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
                     </svg>
-                    Open task
+                  Open task
                   </button>
                   <button
                     type="button"
@@ -409,13 +376,13 @@ function HomeDashboard({
                         : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                     }`}
                   >
-                    {heroIsFocused ? 'In Focus Dock' : 'Add to Focus Dock'}
+                    {heroIsFocused ? 'Ready to focus' : 'Plan for focus'}
                   </button>
                 </div>
               </section>
             ) : (
               <section className="rounded-3xl border border-slate-200/80 bg-white p-6 sm:p-7">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-blue-700">Focus now</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-blue-700">Start here</p>
                 <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
                   Nothing assigned to you yet
                 </h2>
@@ -435,19 +402,21 @@ function HomeDashboard({
               </section>
             )}
 
-            <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
             <SectionCard>
               <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
                 <div>
                   <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-slate-600">Up next</h2>
-                  <p className="mt-1 text-sm text-slate-500">{myTasks.length} assigned tasks sorted by due date</p>
+                  <p className="mt-1 text-sm text-slate-500">Only the next few tasks, sorted by due date.</p>
                 </div>
                 <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-                  Due first
+                  {myTasks.length} total
                 </span>
               </div>
 
-              <MyTasksSummary tasks={myTasks} />
+              <div className="border-b border-slate-100 px-5 py-3">
+                <MyTasksSummary tasks={myTasks} />
+              </div>
 
               <div className="divide-y divide-slate-100">
                 {myTasks.length === 0 ? (
@@ -459,7 +428,7 @@ function HomeDashboard({
                     />
                   </div>
                 ) : (
-                  myTasks.map((task) => {
+                  upNextTasks.map((task) => {
                     const priorityClassName = getPriorityBadgeClass(task.priority || undefined);
 
                     const isFocused = isFocusTask(task.id);
@@ -523,72 +492,42 @@ function HomeDashboard({
             </SectionCard>
 
             <div className="space-y-6">
+              {recentBoards.length > 0 && (
               <SectionCard>
                 <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
                   <div>
-                    <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-slate-600">Recent Boards</h2>
-                    <p className="mt-1 text-sm text-slate-500">Boards ordered by recent activity</p>
+                    <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-slate-600">Continue planning</h2>
+                    <p className="mt-1 text-sm text-slate-500">Recent boards, kept secondary to today's work.</p>
                   </div>
                 </div>
 
-                <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-1">
-                  {recentBoards.length === 0 ? (
-                    <EmptyState
-                      title="No boards yet"
-                      description="Create a board to start organizing your work."
-                      compact
-                      action={onCreateBoard ? (
-                        <button
-                          type="button"
-                          onClick={onCreateBoard}
-                          className="inline-flex cursor-pointer items-center rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-100"
-                        >
-                          Create board
-                        </button>
-                      ) : undefined}
-                    />
-                  ) : recentBoards.map((board) => (
+                <div className="grid gap-2 p-4">
+                  {recentBoards.slice(0, 4).map((board) => (
                     <button
                       key={board.id}
                       type="button"
                       onClick={() => onOpenBoard(board.id)}
-                      className="cursor-pointer rounded-2xl border border-slate-200/80 bg-white p-4 text-left shadow-card transition-[background,border,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-sky-200 hover:bg-sky-50/60 hover:shadow-md active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                      className="cursor-pointer rounded-2xl border border-slate-200/80 bg-white px-4 py-3 text-left transition-colors hover:border-sky-200 hover:bg-sky-50/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
                       aria-label={`Open board: ${board.title}`}
                     >
-                      <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-slate-900">{board.title}</p>
-                          <p className="mt-1 line-clamp-2 text-xs text-slate-500">{board.description || 'No description'}</p>
+                          <p className="mt-1 truncate text-xs text-slate-500">
+                            {board.updatedAt ? `Updated ${format(parseISO(board.updatedAt), 'MMM d')}` : 'No recent activity'}
+                          </p>
                         </div>
                         <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
                           {board.taskCount} tasks
-                        </span>
-                      </div>
-
-                      <div className="mt-4 flex items-center justify-between">
-                        <div className="flex -space-x-2">
-                          {board.memberAvatars.length === 0 ? (
-                            <span className="text-xs text-slate-400">No members</span>
-                          ) : (
-                            board.memberAvatars.map((avatar) => (
-                              <img
-                                key={avatar}
-                                src={avatar}
-                                alt=""
-                                className="h-7 w-7 rounded-full border-2 border-white object-cover"
-                              />
-                            ))
-                          )}
-                        </div>
-                        <span className="text-[11px] text-slate-400">
-                          {board.updatedAt ? format(parseISO(board.updatedAt), 'MMM d') : 'No activity'}
                         </span>
                       </div>
                     </button>
                   ))}
                 </div>
               </SectionCard>
+              )}
 
+              {(tasksDueThisWeek.length > 0 || holidaysThisWeek.length > 0) && (
               <motion.section
                 className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-card"
                 initial={prefersReducedMotion ? false : { opacity: 0, y: 18 }}
@@ -600,11 +539,11 @@ function HomeDashboard({
                     <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">
                       Lazy Calendar
                     </p>
-                    <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
-                      Upcoming Holidays
+                    <h2 className="mt-2 text-xl font-semibold tracking-[-0.03em] text-slate-950">
+                      Planning context
                     </h2>
                     <p className="mt-2 max-w-sm text-sm leading-6 text-slate-500">
-                      A softer countdown view for planning deadlines around the next real breaks.
+                      Deadline context only when it can affect today's plan.
                     </p>
                   </div>
                   <div className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-600">
@@ -618,7 +557,7 @@ function HomeDashboard({
                   initial={prefersReducedMotion ? false : 'hidden'}
                   animate="visible"
                 >
-                  {upcomingHolidays.slice(0, 6).map((holiday, index) => {
+                  {upcomingHolidays.slice(0, 3).map((holiday, index) => {
                     const isUpcoming = holiday.daysRemaining >= 0;
 
                     return (
@@ -687,6 +626,7 @@ function HomeDashboard({
                   </div>
                 </motion.div>
               </motion.section>
+              )}
             </div>
           </div>
           </div>

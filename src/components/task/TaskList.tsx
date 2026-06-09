@@ -80,7 +80,7 @@ function TaskList({
     <div
       ref={isOverlay ? undefined : setNodeRef}
       style={style}
-      className={`flex max-h-[85vh] w-80 flex-shrink-0 flex-col rounded-2xl border border-slate-200/80 bg-white p-4 shadow-card ring-1 ring-slate-900/[0.02] transition-[box-shadow,border,background,opacity] duration-200 ${
+      className={`group/list flex max-h-[85vh] w-80 flex-shrink-0 flex-col rounded-2xl border border-slate-200/80 bg-white p-4 shadow-card ring-1 ring-slate-900/[0.02] transition-[box-shadow,border,background,opacity] duration-200 ${
         isDragging
           ? 'border-2 border-dashed border-sky-300 bg-sky-50/70 opacity-35 shadow-inner'
           : isOverlay
@@ -118,7 +118,7 @@ function TaskList({
           <div className="relative shrink-0 ml-1">
             <button
               onClick={() => toggleMenu(listItem.id)}
-              className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-gray-400 transition-colors hover:bg-slate-100 hover:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+              className="pointer-events-none inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-gray-400 opacity-0 transition hover:bg-slate-100 hover:text-gray-600 hover:opacity-100 focus:pointer-events-auto focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 group-hover/list:pointer-events-auto group-hover/list:opacity-100"
               aria-label={`List options: ${listItem.title}`}
               aria-haspopup="menu"
               aria-expanded={openMenuId === listItem.id}

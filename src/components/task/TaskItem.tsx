@@ -65,6 +65,7 @@ function TaskItem({
   const descriptionPreview = stripTaskHtml(task.description);
   const checklistProgress = getChecklistProgress(task.checklistItems || []);
   const assigneeOptions: TaskAssignee[] = mapWorkspaceMembersToAssignees(workspaceMembers);
+  const hasTeamMembers = assigneeOptions.length > 1;
 
   const style = isOverlay ? {} : {
     transform: CSS.Transform.toString(transform),
@@ -92,7 +93,7 @@ function TaskItem({
               handleEditTask(task);
             }
           }}
-          className={`relative rounded-2xl border bg-white p-4 shadow-card ring-1 transition-[box-shadow,transform,border,background] duration-200 ${
+          className={`group relative rounded-2xl border bg-white p-4 shadow-card ring-1 transition-[box-shadow,transform,border,background] duration-200 ${
             isFocusTask && !isOverlay
               ? 'border-sky-200 ring-sky-100'
               : 'border-slate-200/80 ring-slate-900/[0.02]'
@@ -120,19 +121,7 @@ function TaskItem({
                 >
                   {task.priority}
                 </button>
-              ) : (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (!isOverlay) setShowPriorityMenu(!showPriorityMenu);
-                  }}
-                  className="inline-flex shrink-0 rounded-full bg-slate-100 text-slate-500 px-2.5 py-0.5 text-[11px] font-medium transition-all duration-150 cursor-pointer hover:bg-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
-                  title="Click to add priority"
-                  aria-label={`Set priority for ${task.title}`}
-                >
-                  Set Priority
-                </button>
-              )}
+              ) : null}
 
               {/* Inline Priority Floating Dropdown */}
               {showPriorityMenu && !isOverlay && (
@@ -146,7 +135,7 @@ function TaskItem({
                       setShowPriorityMenu(false);
                     }}
                   />
-                  <div className="absolute left-0 mt-1.5 w-32 bg-white rounded-lg shadow-md border border-slate-200 py-1.5 z-30 text-xs font-semibold">
+                  <div className="absolute left-0 z-40 mt-1.5 w-32 rounded-lg border border-slate-200 bg-white py-1.5 text-xs font-semibold shadow-md">
                     {TASK_PRIORITIES.map((p) => {
                       const isActive = task.priority === p;
                       return (
@@ -196,7 +185,7 @@ function TaskItem({
                     e.stopPropagation();
                     handleEditTask(task);
                   }}
-                  className="ml-2 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                  className="pointer-events-none ml-2 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-slate-400 opacity-0 transition hover:bg-slate-50 hover:text-slate-600 hover:opacity-100 focus:pointer-events-auto focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 group-hover:pointer-events-auto group-hover:opacity-100"
                   title="Edit task"
                   aria-label={`Edit task: ${task.title}`}
                 >
@@ -210,7 +199,7 @@ function TaskItem({
                     e.stopPropagation();
                     setDeleteItem({ type: 'card', listId, cardId: task.id });
                   }}
-                  className="ml-1 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
+                  className="pointer-events-none ml-1 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-slate-400 opacity-0 transition hover:bg-rose-50 hover:text-rose-600 hover:opacity-100 focus:pointer-events-auto focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 group-hover:pointer-events-auto group-hover:opacity-100"
                   title="Delete task"
                   aria-label={`Delete task: ${task.title}`}
                 >
@@ -281,17 +270,9 @@ function TaskItem({
           {(task.checklistItems.length > 0 || task.attachments.length > 0) && (
             <div className="mb-3.5 space-y-2">
               {task.checklistItems.length > 0 && (
-                <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 px-3 py-2">
-                  <div className="mb-1 flex items-center justify-between text-[11px] font-semibold text-emerald-700">
-                    <span>Checklist</span>
-                    <span>{checklistProgress.completed}/{checklistProgress.total}</span>
-                  </div>
-                  <div className="h-1.5 rounded-full bg-emerald-100">
-                    <div
-                      className="h-full rounded-full bg-emerald-500 transition-[width] duration-200"
-                      style={{ width: `${checklistProgress.percent}%` }}
-                    />
-                  </div>
+                <div className="flex items-center justify-between rounded-xl border border-emerald-100 bg-emerald-50/70 px-3 py-2 text-[11px] font-semibold text-emerald-700">
+                  <span>Checklist</span>
+                  <span>{checklistProgress.completed}/{checklistProgress.total}</span>
                 </div>
               )}
 
@@ -313,6 +294,7 @@ function TaskItem({
           <div className="flex items-center justify-between select-none">
             {/* Assignees Avatars list & Interactive Multi-assignment button */}
             <div className="flex items-center gap-1.5">
+              {hasTeamMembers && (
               <div className="flex -space-x-1.5 overflow-hidden">
                 {(task.assignees || []).map((assignee, index) => (
                   <img
@@ -325,16 +307,17 @@ function TaskItem({
                   />
                 ))}
               </div>
+              )}
 
               {/* Mini Multi-select Assignee circular button */}
-              {!isOverlay && (
+              {!isOverlay && hasTeamMembers && (
                 <div className="relative shrink-0">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       setShowAssigneeMenu(!showAssigneeMenu);
                     }}
-                  className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-dashed border-slate-300 bg-slate-50 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                  className="pointer-events-none flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-dashed border-slate-300 bg-slate-50 text-slate-500 opacity-0 transition hover:bg-slate-100 hover:text-slate-700 hover:opacity-100 focus:pointer-events-auto focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 group-hover:pointer-events-auto group-hover:opacity-100"
                     title="Manage assignees"
                     aria-label="Manage assignees"
                     aria-haspopup="true"
@@ -356,7 +339,7 @@ function TaskItem({
                           setShowAssigneeMenu(false);
                         }}
                       />
-                      <div className="absolute bottom-9.5 left-0 z-30 w-56 rounded-2xl border border-slate-200 bg-white p-2 text-xs font-medium shadow-md">
+                      <div className="absolute bottom-9.5 left-0 z-40 w-56 rounded-2xl border border-slate-200 bg-white p-2 text-xs font-medium shadow-md">
                         <div className="font-bold text-slate-500 px-2 pb-1.5 border-b border-slate-100 mb-1">
                           Assign members
                         </div>

@@ -89,7 +89,7 @@ export default function UserMenu({
               </button>
             ) : (
               <p className="rounded-xl px-3 py-2 text-sm text-slate-500" role="menuitem">
-                Local demo mode
+                Demo data is safe to edit and stored locally in this browser.
               </p>
             )}
           </div>

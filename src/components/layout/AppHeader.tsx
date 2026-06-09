@@ -69,9 +69,12 @@ export default function AppHeader({
         </button>
 
         {isLocalDemoMode && (
-          <span className="hidden items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 lg:inline-flex">
+          <span
+            className="hidden items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 lg:inline-flex"
+            title="Demo data is safe to edit and stored locally in this browser."
+          >
             <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-            Local demo
+            Demo data
           </span>
         )}
 

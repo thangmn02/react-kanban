@@ -5,7 +5,6 @@ import { fetchTodayPageData, type TodayPageData, type TodayTaskSummary } from '.
 import type { AppUser, WorkspaceSummary } from '../../types/auth.type';
 import type { DailyFocusStats, FocusTask } from '../../types/focus.type';
 import PageHeader from '../atoms/PageHeader';
-import FocusStatsCard from '../atoms/FocusStatsCard';
 import SectionCard from '../atoms/SectionCard';
 import EmptyState from '../atoms/EmptyState';
 import ErrorState from '../atoms/ErrorState';
@@ -107,6 +106,7 @@ export default function TodayPage({
   }, [loadTodayData]);
 
   const hasUrgentTasks = todayData.overdueTasks.length > 0 || todayData.dueTodayTasks.length > 0;
+  const hasSecondaryTasks = todayData.assignedTasks.length > 0 || todayData.recentlyActiveTasks.length > 0;
 
   return (
     <main className="min-h-screen bg-canvas px-5 py-7 sm:px-7" aria-busy={isLoading}>
@@ -114,7 +114,7 @@ export default function TodayPage({
         <PageHeader
           eyebrow="Today"
           title="My Day"
-          description="Pick the few tasks that matter today, then start a focused work session without opening the full board."
+          description="Choose up to 3 tasks, start focus, and finish the day without living in the board."
           className="mb-7"
           actions={(
             <button
@@ -127,23 +127,16 @@ export default function TodayPage({
           )}
         />
 
-        <div className="mb-6 grid gap-3 md:grid-cols-3">
-          <FocusStatsCard
-            label="Today"
-            value={`${dailyFocusStats.completedSessions} sessions`}
-            caption={`${dailyFocusStats.focusedMinutes} focused minutes`}
-          />
-          <FocusStatsCard
-            label="Interruptions"
-            value={String(dailyFocusStats.interruptedSessions)}
-            caption="sessions stopped after 60s"
-          />
-          <FocusStatsCard
-            label="Top focus"
-            value={dailyFocusStats.topTaskTitle || 'No focus sessions yet'}
-            caption="Pick one task and start a session."
-            tone="sky"
-          />
+        <div className="mb-6 rounded-2xl border border-slate-200/80 bg-white px-4 py-3 shadow-card">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm font-semibold text-slate-900">
+              Today: {dailyFocusStats.completedSessions} focus session{dailyFocusStats.completedSessions === 1 ? '' : 's'}
+            </p>
+            <p className="text-sm text-slate-500">
+              {dailyFocusStats.focusedMinutes} focused minutes
+              {dailyFocusStats.interruptedSessions > 0 ? ` · ${dailyFocusStats.interruptedSessions} interrupted` : ''}
+            </p>
+          </div>
         </div>
 
         {isLoading && (
@@ -196,10 +189,10 @@ export default function TodayPage({
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-slate-600">
-                      Daily Focus Plan
+                      Today's plan
                     </h2>
                     <p className="mt-1 text-sm text-slate-500">
-                      Up to 3 tasks, in recommended order. This reuses the existing Focus Dock.
+                      Up to 3 tasks, in the order you want to execute.
                     </p>
                   </div>
                   <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
@@ -279,49 +272,84 @@ export default function TodayPage({
             </div>
 
             <div className="space-y-6">
-              <TodayTaskSection
-                title="Overdue"
-                description="Clear these first if they still matter."
-                tasks={todayData.overdueTasks}
-                emptyMessage="No overdue tasks."
-                isFocusTask={isFocusTask}
-                onOpenTask={onOpenTask}
-                onStartFocus={onStartFocus}
-                onToggleTodayFocus={onToggleTodayFocus}
-              />
+              {(todayData.overdueTasks.length > 0 || todayData.dueTodayTasks.length > 0) && (
+                <SectionCard className="p-5">
+                  <div className="mb-4">
+                    <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-slate-600">
+                      Needs attention
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Decide whether these belong in today's plan.
+                    </p>
+                  </div>
+                  <div className="grid gap-5">
+                    {todayData.overdueTasks.length > 0 && (
+                      <TodayTaskSection
+                        title="Overdue"
+                        description="Clear these first if they still matter."
+                        tasks={todayData.overdueTasks}
+                        emptyMessage="No overdue tasks."
+                        isFocusTask={isFocusTask}
+                        onOpenTask={onOpenTask}
+                        onStartFocus={onStartFocus}
+                        onToggleTodayFocus={onToggleTodayFocus}
+                        compactShell
+                      />
+                    )}
 
-              <TodayTaskSection
-                title="Due today"
-                description="Deadline-driven work for this day."
-                tasks={todayData.dueTodayTasks}
-                emptyMessage="No urgent tasks. Choose one task to focus on."
-                isFocusTask={isFocusTask}
-                onOpenTask={onOpenTask}
-                onStartFocus={onStartFocus}
-                onToggleTodayFocus={onToggleTodayFocus}
-              />
+                    {todayData.dueTodayTasks.length > 0 && (
+                      <TodayTaskSection
+                        title="Due today"
+                        description="Deadline-driven work for this day."
+                        tasks={todayData.dueTodayTasks}
+                        emptyMessage="No urgent tasks. Choose one task to focus on."
+                        isFocusTask={isFocusTask}
+                        onOpenTask={onOpenTask}
+                        onStartFocus={onStartFocus}
+                        onToggleTodayFocus={onToggleTodayFocus}
+                        compactShell
+                      />
+                    )}
+                  </div>
+                </SectionCard>
+              )}
 
-              <TodayTaskSection
-                title="Assigned to me"
-                description="Your workload, sorted by due date."
-                tasks={todayData.assignedTasks}
-                emptyMessage="No assigned tasks in this workspace."
-                isFocusTask={isFocusTask}
-                onOpenTask={onOpenTask}
-                onStartFocus={onStartFocus}
-                onToggleTodayFocus={onToggleTodayFocus}
-              />
+              {hasSecondaryTasks && (
+                <details className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-card">
+                  <summary className="cursor-pointer text-sm font-bold uppercase tracking-[0.2em] text-slate-600">
+                    More tasks
+                  </summary>
+                  <div className="mt-5 grid gap-5">
+                    {todayData.assignedTasks.length > 0 && (
+                      <TodayTaskSection
+                        title="Assigned to me"
+                        description="Your workload, sorted by due date."
+                        tasks={todayData.assignedTasks}
+                        emptyMessage="No assigned tasks in this workspace."
+                        isFocusTask={isFocusTask}
+                        onOpenTask={onOpenTask}
+                        onStartFocus={onStartFocus}
+                        onToggleTodayFocus={onToggleTodayFocus}
+                        compactShell
+                      />
+                    )}
 
-              <TodayTaskSection
-                title="Recently active"
-                description="Tasks updated recently in this workspace."
-                tasks={todayData.recentlyActiveTasks}
-                emptyMessage="No recent task activity yet."
-                isFocusTask={isFocusTask}
-                onOpenTask={onOpenTask}
-                onStartFocus={onStartFocus}
-                onToggleTodayFocus={onToggleTodayFocus}
-              />
+                    {todayData.recentlyActiveTasks.length > 0 && (
+                      <TodayTaskSection
+                        title="Recently active"
+                        description="Tasks updated recently in this workspace."
+                        tasks={todayData.recentlyActiveTasks}
+                        emptyMessage="No recent task activity yet."
+                        isFocusTask={isFocusTask}
+                        onOpenTask={onOpenTask}
+                        onStartFocus={onStartFocus}
+                        onToggleTodayFocus={onToggleTodayFocus}
+                        compactShell
+                      />
+                    )}
+                  </div>
+                </details>
+              )}
             </div>
           </div>
         )}

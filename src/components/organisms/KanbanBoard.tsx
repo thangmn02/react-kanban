@@ -329,9 +329,9 @@ function KanbanBoard({
             <div className="w-80 flex-shrink-0">
               <button
                 onClick={handlers.onOpenAddGroup}
-                className="w-full cursor-pointer rounded-2xl border border-dashed border-slate-300 bg-white/60 py-9 text-sm font-semibold text-slate-500 shadow-card transition-[background,box-shadow,transform,color] hover:-translate-y-0.5 hover:border-sky-200 hover:bg-white hover:text-slate-700 hover:shadow-md active:scale-[0.99] focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"
+                className="w-full cursor-pointer rounded-2xl border border-dashed border-slate-200 bg-white/40 py-6 text-sm font-semibold text-slate-400 transition-[background,color] hover:bg-white hover:text-slate-600 focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"
               >
-                + Add another group
+                Add group
               </button>
             </div>
           </div>

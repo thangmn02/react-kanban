@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from 'react';
+
 import type { TaskAssignee } from '../../types/task.type';
 import { mapWorkspaceMembersToAssignees, mockWorkspaceMembers } from '../../utils/workspaceMembers';
 import type { WorkspaceMember } from '../../types/auth.type';
@@ -27,11 +29,42 @@ export default function QuickSearch({
   onClearFilters,
   workspaceMembers = mockWorkspaceMembers,
 }: QuickSearchProps) {
+  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
+  const filterPanelRef = useRef<HTMLDivElement | null>(null);
   const hasActiveFilters = searchQuery !== '' || filterPriority !== '' || filterAssignee !== '' || filterDueDate !== '';
   const assigneeOptions: TaskAssignee[] = mapWorkspaceMembersToAssignees(workspaceMembers);
+  const showFilterControls = isFilterPanelOpen;
+  const showAssigneeFilter = assigneeOptions.length > 1;
+
+  useEffect(() => {
+    if (!showFilterControls) {
+      return;
+    }
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (filterPanelRef.current && !filterPanelRef.current.contains(event.target as Node)) {
+        setIsFilterPanelOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsFilterPanelOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showFilterControls]);
 
   return (
-    <div className="flex flex-col gap-4 border-b border-slate-200/70 bg-white/72 px-6 py-4 shadow-card backdrop-blur-xl lg:flex-row lg:items-center lg:justify-between">
+    <div className="relative z-20 overflow-visible border-b border-slate-200/70 bg-white/72 px-6 py-3 shadow-card backdrop-blur-xl">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
       {/* Search Input */}
       <div className="relative flex-1 max-w-md">
         <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
@@ -43,7 +76,7 @@ export default function QuickSearch({
           type="text"
           value={searchQuery}
           onChange={(e) => onSearchQueryChange(e.target.value)}
-          placeholder="Search tasks by title, description, label, or attachment..."
+          placeholder="Search tasks..."
           className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 py-2.5 pl-10 pr-4 text-sm text-slate-800 shadow-inner outline-none transition focus:border-sky-200 focus:bg-white focus:ring-4 focus:ring-sky-100"
         />
         {searchQuery && (
@@ -61,85 +94,99 @@ export default function QuickSearch({
         )}
       </div>
 
-      {/* Filter Controls */}
-      <div className="flex flex-wrap items-center gap-3 lg:gap-4">
-        {/* Priority Filter */}
-        <div className="flex items-center space-x-2">
-          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Priority:</label>
-          <select
-            value={filterPriority}
-            onChange={(e) => onFilterPriorityChange(e.target.value)}
-            className="rounded-2xl border border-slate-200 bg-white/90 px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:ring-4 focus:ring-sky-100"
-          >
-            <option value="">All Priorities</option>
-            <option value="High">High</option>
-            <option value="Medium">Medium</option>
-            <option value="Low">Low</option>
-            <option value="Lowest">Lowest</option>
-          </select>
-        </div>
+      <div ref={filterPanelRef} className="relative shrink-0">
+        <button
+          type="button"
+          onClick={() => setIsFilterPanelOpen((currentValue) => !currentValue)}
+          className={`inline-flex w-full cursor-pointer items-center justify-center rounded-2xl border px-3 py-2 text-sm font-semibold transition focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 lg:w-auto lg:justify-start ${
+            hasActiveFilters
+              ? 'border-sky-200 bg-sky-50 text-sky-700'
+              : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+          }`}
+          aria-expanded={showFilterControls}
+        >
+          {hasActiveFilters ? 'Filters active' : 'Filter'}
+        </button>
 
-        {/* Due Date Status Filter */}
-        <div className="flex items-center space-x-2">
-          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Due date:</label>
-          <select
-            value={filterDueDate}
-            onChange={(e) => onFilterDueDateChange(e.target.value)}
-            className="rounded-2xl border border-slate-200 bg-white/90 px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:ring-4 focus:ring-sky-100"
-          >
-            <option value="">All Deadlines</option>
-            <option value="overdue">Overdue</option>
-            <option value="today">Due Today</option>
-            <option value="upcoming">Upcoming</option>
-          </select>
-        </div>
-
-        {/* Assignee Filter (Avatar strip with selectable border) */}
-        <div className="flex items-center space-x-2 border-l border-slate-200 pl-3 lg:pl-4">
-          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mr-1">Assignee:</label>
-          <div className="flex items-center -space-x-1.5">
-            {assigneeOptions.map((member) => {
-              const isSelected = filterAssignee === member.name;
-              return (
+        {/* Filter Controls */}
+        {showFilterControls && (
+        <div className="absolute right-0 top-full z-40 mt-2 w-[min(26rem,calc(100vw-2rem))] rounded-2xl border border-slate-200 bg-white p-3 shadow-md">
+          <div className="grid gap-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm font-semibold text-slate-700">Filter tasks</span>
+              {hasActiveFilters && (
                 <button
-                  key={member.name}
-                  onClick={() => onFilterAssigneeChange(isSelected ? '' : member.name)}
-                  className={`relative rounded-full transition-all duration-200 cursor-pointer ${
-                    isSelected ? 'z-10 scale-110 ring-2 ring-sky-500' : 'hover:z-10 hover:scale-105'
-                  }`}
-                  title={`Filter by ${member.name}`}
+                  onClick={onClearFilters}
+                  type="button"
+                  className="cursor-pointer rounded-xl border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-xs font-semibold text-sky-700 transition hover:bg-sky-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
                 >
-                  <img
-                    src={member.avatar}
-                    alt={member.name}
-                    className="h-8 w-8 rounded-full border border-white object-cover"
-                  />
-                  {isSelected && (
-                    <span className="absolute -bottom-0.5 -right-0.5 bg-blue-600 text-white rounded-full p-0.5 ring-1 ring-white">
-                      <svg className="h-2 w-2" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                    </span>
-                  )}
+                  Clear
                 </button>
-              );
-            })}
+              )}
+            </div>
+
+            <label className="grid gap-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500">
+              Priority
+              <select
+                value={filterPriority}
+                onChange={(e) => onFilterPriorityChange(e.target.value)}
+                className="rounded-2xl border border-slate-200 bg-white/90 px-3 py-2 text-sm normal-case tracking-normal text-slate-700 shadow-sm outline-none transition focus:ring-4 focus:ring-sky-100"
+              >
+                <option value="">All Priorities</option>
+                <option value="High">High</option>
+                <option value="Medium">Medium</option>
+                <option value="Low">Low</option>
+                <option value="Lowest">Lowest</option>
+              </select>
+            </label>
+
+            <label className="grid gap-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500">
+              Due date
+              <select
+                value={filterDueDate}
+                onChange={(e) => onFilterDueDateChange(e.target.value)}
+                className="rounded-2xl border border-slate-200 bg-white/90 px-3 py-2 text-sm normal-case tracking-normal text-slate-700 shadow-sm outline-none transition focus:ring-4 focus:ring-sky-100"
+              >
+                <option value="">All Deadlines</option>
+                <option value="overdue">Overdue</option>
+                <option value="today">Due Today</option>
+                <option value="upcoming">Upcoming</option>
+              </select>
+            </label>
+
+            {showAssigneeFilter && (
+              <div className="grid gap-2">
+                <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Assignee</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  {assigneeOptions.map((member) => {
+                    const isSelected = filterAssignee === member.name;
+                    return (
+                      <button
+                        key={member.name}
+                        onClick={() => onFilterAssigneeChange(isSelected ? '' : member.name)}
+                        className={`inline-flex cursor-pointer items-center gap-2 rounded-full border px-2 py-1 text-xs font-semibold transition ${
+                          isSelected
+                            ? 'border-sky-300 bg-sky-50 text-sky-700'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        }`}
+                        title={`Filter by ${member.name}`}
+                      >
+                        <img
+                          src={member.avatar}
+                          alt={member.name}
+                          className="h-6 w-6 rounded-full object-cover"
+                        />
+                        <span className="max-w-24 truncate">{member.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
-
-        {/* Clear Filters Button */}
-        {hasActiveFilters && (
-          <button
-            onClick={onClearFilters}
-            type="button"
-            className="flex cursor-pointer items-center gap-1.5 rounded-2xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-700 transition-[background,border,transform] hover:-translate-y-0.5 hover:border-sky-300 hover:bg-sky-100 focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 active:scale-[0.98]"
-          >
-            <svg className="h-4 w-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0 1 16.138 21H7.862a2 2 0 0 1-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3M4 7h16" />
-            </svg>
-            Clear Filters
-          </button>
         )}
+      </div>
       </div>
     </div>
   );

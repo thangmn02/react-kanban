@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from 'react';
+
 import type { BoardRow } from '../../types/supabase.type';
 import type { WorkspaceMember } from '../../types/auth.type';
 import BoardTabs, { type BoardTabId } from './BoardTabs';
@@ -25,19 +27,45 @@ export default function BoardHeader({
   onOpenMembers,
   onOpenActivity,
 }: BoardHeaderProps) {
-  return (
-    <section className="border-b border-slate-200/70 bg-white/72 px-4 py-5 backdrop-blur-xl sm:px-6">
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-blue-600">
-            Active board
-          </p>
+  const [isOptionsOpen, setIsOptionsOpen] = useState(false);
+  const optionsRef = useRef<HTMLDivElement | null>(null);
+  const hasTeamMembers = workspaceMembers.length > 1;
 
-          <div className="mt-2 flex flex-wrap items-center gap-3">
+  useEffect(() => {
+    if (!isOptionsOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (optionsRef.current && !optionsRef.current.contains(event.target as Node)) {
+        setIsOptionsOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsOptionsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOptionsOpen]);
+
+  return (
+    <section className="relative z-30 overflow-visible border-b border-slate-200/70 bg-white/72 px-4 py-4 backdrop-blur-xl sm:px-6">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-3">
             <select
               value={activeBoardId || ''}
               onChange={(event) => onBoardChange(event.target.value || null)}
-              className="max-w-full rounded-2xl border border-slate-200 bg-white/90 px-4 py-2.5 text-lg font-semibold tracking-[-0.02em] text-slate-950 shadow-sm outline-none transition focus:border-sky-300 focus:ring-4 focus:ring-sky-100 sm:min-w-64"
+              className="max-w-full rounded-2xl border border-slate-200 bg-white/90 px-4 py-2.5 text-base font-semibold tracking-[-0.02em] text-slate-950 shadow-sm outline-none transition focus:border-sky-300 focus:ring-4 focus:ring-sky-100 sm:min-w-64"
               aria-label="Active board"
             >
               {boardSummaries.map((boardSummary) => (
@@ -48,35 +76,61 @@ export default function BoardHeader({
             </select>
           </div>
 
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+          <p className="mt-2 hidden max-w-2xl text-sm leading-6 text-slate-500 md:block">
             {activeBoardSummary?.description || 'Kanban workspace with realtime tasks, lists, and richer task details.'}
           </p>
         </div>
 
-        <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
+        <div ref={optionsRef} className="relative shrink-0 self-start lg:self-auto">
           <button
             type="button"
-            onClick={onOpenMembers}
-            className="inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-slate-200 bg-white/90 px-3 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"
+            onClick={() => setIsOptionsOpen((currentValue) => !currentValue)}
+            className="inline-flex cursor-pointer items-center rounded-2xl border border-slate-200 bg-white/90 px-3 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:bg-white hover:shadow-md focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"
+            aria-expanded={isOptionsOpen}
           >
-            <span className="flex -space-x-2">
-              {workspaceMembers.slice(0, 3).map((member) => (
-                <img
-                  key={member.id}
-                  src={member.avatarUrl}
-                  alt={member.name}
-                  className="h-6 w-6 rounded-full border-2 border-white object-cover"
-                />
-              ))}
-            </span>
-            Members
+            Board options
           </button>
 
-          <BoardTabs
-            activeTab={activeTab}
-            onTabChange={onTabChange}
-            onOpenActivity={onOpenActivity}
-          />
+          {isOptionsOpen && (
+          <div className="absolute right-0 top-full z-50 mt-2 w-max min-w-52 max-w-[calc(100vw-2rem)] rounded-2xl border border-slate-200 bg-white p-2 shadow-md">
+            <div className="space-y-2">
+              {hasTeamMembers && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsOptionsOpen(false);
+                    onOpenMembers();
+                  }}
+                  className="inline-flex w-full cursor-pointer items-center gap-2 rounded-xl px-2 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                >
+                  <span className="flex -space-x-2">
+                    {workspaceMembers.slice(0, 3).map((member) => (
+                      <img
+                        key={member.id}
+                        src={member.avatarUrl}
+                        alt={member.name}
+                        className="h-6 w-6 rounded-full border-2 border-white object-cover"
+                      />
+                    ))}
+                  </span>
+                  Members
+                </button>
+              )}
+
+              <BoardTabs
+                activeTab={activeTab}
+                onTabChange={(tab) => {
+                  setIsOptionsOpen(false);
+                  onTabChange(tab);
+                }}
+                onOpenActivity={() => {
+                  setIsOptionsOpen(false);
+                  onOpenActivity();
+                }}
+              />
+            </div>
+          </div>
+          )}
         </div>
       </div>
     </section>

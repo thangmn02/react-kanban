@@ -12,6 +12,7 @@ interface TodayTaskSectionProps {
   onOpenTask: (task: TodayTaskSummary) => void;
   onStartFocus: (task: TodayTaskSummary) => void;
   onToggleTodayFocus: (task: TodayTaskSummary) => void;
+  compactShell?: boolean;
 }
 
 export default function TodayTaskSection({
@@ -23,9 +24,10 @@ export default function TodayTaskSection({
   onOpenTask,
   onStartFocus,
   onToggleTodayFocus,
+  compactShell = false,
 }: TodayTaskSectionProps) {
-  return (
-    <SectionCard className="p-5">
+  const content = (
+    <>
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
           <h2 className="text-sm font-bold uppercase tracking-[0.18em] text-slate-600">{title}</h2>
@@ -52,6 +54,16 @@ export default function TodayTaskSection({
           ))}
         </div>
       )}
+    </>
+  );
+
+  if (compactShell) {
+    return <div>{content}</div>;
+  }
+
+  return (
+    <SectionCard className="p-5">
+      {content}
     </SectionCard>
   );
 }
