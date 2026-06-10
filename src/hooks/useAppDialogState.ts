@@ -12,6 +12,10 @@ export interface AppDialogState {
     editingTask: ITaskItem | null;
   };
   groupDialog: { isOpen: boolean };
+  quickPlanDialog: {
+    isOpen: boolean;
+    activeListId: string | null;
+  };
   boardDialog: { isOpen: boolean };
   activityDialog: { isOpen: boolean };
   membersDialog: { isOpen: boolean };
@@ -24,6 +28,8 @@ export interface UseAppDialogStateResult {
   closeTaskDialog: () => void;
   openGroupDialog: () => void;
   closeGroupDialog: () => void;
+  openQuickPlanDialog: (listId?: string | null) => void;
+  closeQuickPlanDialog: () => void;
   openCreateBoardDialog: () => void;
   closeCreateBoardDialog: () => void;
   openActivityDialog: () => void;
@@ -40,6 +46,10 @@ const INITIAL_DIALOG_STATE: AppDialogState = {
     editingTask: null,
   },
   groupDialog: { isOpen: false },
+  quickPlanDialog: {
+    isOpen: false,
+    activeListId: null,
+  },
   boardDialog: { isOpen: false },
   activityDialog: { isOpen: false },
   membersDialog: { isOpen: false },
@@ -99,6 +109,26 @@ export function useAppDialogState(): UseAppDialogStateResult {
     setDialogState((prev) => ({ ...prev, groupDialog: { isOpen: false } }));
   }, []);
 
+  const openQuickPlanDialog = useCallback((listId?: string | null) => {
+    setDialogState((prev) => ({
+      ...prev,
+      quickPlanDialog: {
+        isOpen: true,
+        activeListId: listId ?? null,
+      },
+    }));
+  }, []);
+
+  const closeQuickPlanDialog = useCallback(() => {
+    setDialogState((prev) => ({
+      ...prev,
+      quickPlanDialog: {
+        isOpen: false,
+        activeListId: null,
+      },
+    }));
+  }, []);
+
   const openCreateBoardDialog = useCallback(() => {
     setDialogState((prev) => ({ ...prev, boardDialog: { isOpen: true } }));
   }, []);
@@ -130,6 +160,8 @@ export function useAppDialogState(): UseAppDialogStateResult {
     closeTaskDialog,
     openGroupDialog,
     closeGroupDialog,
+    openQuickPlanDialog,
+    closeQuickPlanDialog,
     openCreateBoardDialog,
     closeCreateBoardDialog,
     openActivityDialog,

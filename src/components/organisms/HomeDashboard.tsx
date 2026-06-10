@@ -1,15 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { motion, useMotionValue, useReducedMotion, useSpring, useTransform, type Variants } from 'framer-motion';
+import { useCallback, useEffect, useState } from 'react';
 import {
+  addDays,
   differenceInCalendarDays,
-  endOfWeek,
   format,
-  isWithinInterval,
+  isSameDay,
   parseISO,
-  startOfWeek,
+  startOfDay,
 } from 'date-fns';
 
-import { VIETNAM_HOLIDAYS_2026 } from '../../data/vietnamHolidays';
 import {
   fetchHomeDashboardData,
   type HomeDashboardData,
@@ -36,88 +34,61 @@ interface HomeDashboardProps {
   onCreateBoard?: () => void;
 }
 
-function getTasksDueThisWeek(tasks: HomeTaskSummary[]) {
-  const weekStart = startOfWeek(new Date());
-  const weekEnd = endOfWeek(new Date());
+function parseTaskDueDate(task: HomeTaskSummary) {
+  if (!task.dueDate) {
+    return null;
+  }
 
-  return tasks.filter((task) => {
-    if (!task.dueDate) {
-      return false;
+  const parsedDate = parseISO(task.dueDate);
+  return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
+}
+
+function getWeekGlance(tasks: HomeTaskSummary[]) {
+  const today = startOfDay(new Date());
+  const weekDays = Array.from({ length: 7 }, (_, index) => {
+    const date = addDays(today, index);
+
+    return {
+      date,
+      label: format(date, 'EEE'),
+      dayNumber: format(date, 'd'),
+      taskCount: 0,
+      isToday: index === 0,
+    };
+  });
+  const overdueTasks: HomeTaskSummary[] = [];
+  const upcomingTasks: HomeTaskSummary[] = [];
+
+  tasks.forEach((task) => {
+    const dueDate = parseTaskDueDate(task);
+
+    if (!dueDate) {
+      return;
     }
 
-    const dueDate = parseISO(task.dueDate);
-    return dueDate >= weekStart && dueDate <= weekEnd;
+    const dayOffset = differenceInCalendarDays(startOfDay(dueDate), today);
+
+    if (dayOffset < 0) {
+      overdueTasks.push(task);
+      return;
+    }
+
+    if (dayOffset <= 6) {
+      weekDays[dayOffset].taskCount += 1;
+      upcomingTasks.push(task);
+    }
   });
-}
 
-function getHolidayCountdownLabel(daysRemaining: number) {
-  if (daysRemaining === 0) {
-    return 'Hôm nay được nghỉ';
-  }
-
-  if (daysRemaining > 0) {
-    return 'ngày nữa';
-  }
-
-  return 'ngày đã qua';
-}
-
-function AnimatedDayCount({ value }: { value: number }) {
-  const prefersReducedMotion = useReducedMotion();
-  const counter = useMotionValue(0);
-  const spring = useSpring(counter, {
-    stiffness: 90,
-    damping: 18,
-    mass: 0.7,
+  upcomingTasks.sort((currentTask, nextTask) => {
+    return (currentTask.dueDate || '').localeCompare(nextTask.dueDate || '');
   });
-  const roundedValue = useTransform(spring, (latest) => Math.round(latest));
 
-  useEffect(() => {
-    counter.set(Math.abs(value));
-  }, [counter, value]);
-
-  if (value === 0) {
-    return <span>Today</span>;
-  }
-
-  // Reduce Motion: skip the count-up animation and render the final value directly.
-  if (prefersReducedMotion) {
-    return <span>{Math.abs(value)}</span>;
-  }
-
-  return <motion.span>{roundedValue}</motion.span>;
+  return {
+    weekDays,
+    overdueTasks,
+    upcomingTasks,
+  };
 }
-
-const holidayListVariants: Variants = {
-  hidden: {},
-  visible: {
-    transition: {
-      staggerChildren: 0.075,
-      delayChildren: 0.08,
-    },
-  },
-};
-
-const holidayCardVariants: Variants = {
-  hidden: {
-    opacity: 0,
-    y: 18,
-    scale: 0.98,
-    filter: 'blur(4px)',
-  },
-  visible: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    filter: 'blur(0px)',
-    transition: {
-      type: 'spring',
-      stiffness: 170,
-      damping: 22,
-      mass: 0.8,
-    },
-  },
-};
 
 function HomeDashboard({
   onOpenTask,
@@ -128,7 +99,6 @@ function HomeDashboard({
   activeWorkspace,
   onCreateBoard,
 }: HomeDashboardProps) {
-  const prefersReducedMotion = useReducedMotion();
   const [dashboardData, setDashboardData] = useState<HomeDashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRetrying, setIsRetrying] = useState(false);
@@ -195,41 +165,8 @@ function HomeDashboard({
   const upNextTasks = heroTask ? myTasks.filter((task) => task.id !== heroTask.id).slice(0, 3) : myTasks.slice(0, 3);
   const heroPriorityClass = heroTask ? getPriorityBadgeClass(heroTask.priority || undefined) : null;
   const heroIsFocused = heroTask ? isFocusTask(heroTask.id) : false;
-  const tasksDueThisWeek = getTasksDueThisWeek(myTasks);
-  const upcomingHolidays = useMemo(() => {
-    const today = new Date();
-
-    return VIETNAM_HOLIDAYS_2026
-      .map((holiday) => {
-        const holidayDate = parseISO(holiday.date);
-
-        return {
-          ...holiday,
-          daysRemaining: differenceInCalendarDays(holidayDate, today),
-        };
-      })
-      .sort((currentHoliday, nextHoliday) => {
-        const currentIsUpcoming = currentHoliday.daysRemaining >= 0;
-        const nextIsUpcoming = nextHoliday.daysRemaining >= 0;
-
-        if (currentIsUpcoming && !nextIsUpcoming) return -1;
-        if (!currentIsUpcoming && nextIsUpcoming) return 1;
-
-        return Math.abs(currentHoliday.daysRemaining) - Math.abs(nextHoliday.daysRemaining);
-      });
-  }, []);
-  const holidaysThisWeek = upcomingHolidays.filter((holiday) => {
-    const holidayDate = parseISO(holiday.date);
-    return isWithinInterval(holidayDate, {
-      start: startOfWeek(new Date()),
-      end: endOfWeek(new Date()),
-    });
-  });
-  const holidaySummary = holidaysThisWeek.length > 0
-    ? `Tuần này có ${holidaysThisWeek.length} ngày nghỉ lễ`
-    : tasksDueThisWeek.length >= 5
-      ? 'Tuần này workload cao'
-      : `${tasksDueThisWeek.length} task đến hạn tuần này`;
+  const weekGlance = getWeekGlance(myTasks);
+  const hasWeekPlanningData = myTasks.length > 0;
 
   return (
     <div className="min-h-screen bg-canvas">
@@ -527,105 +464,73 @@ function HomeDashboard({
               </SectionCard>
               )}
 
-              {(tasksDueThisWeek.length > 0 || holidaysThisWeek.length > 0) && (
-              <motion.section
-                className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-card"
-                initial={prefersReducedMotion ? false : { opacity: 0, y: 18 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ type: 'spring', stiffness: 120, damping: 18, delay: 0.05 }}
-              >
-                <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
+              {hasWeekPlanningData && (
+              <SectionCard className="p-4">
+                <div className="mb-3 flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">
-                      Lazy Calendar
-                    </p>
-                    <h2 className="mt-2 text-xl font-semibold tracking-[-0.03em] text-slate-950">
-                      Planning context
-                    </h2>
-                    <p className="mt-2 max-w-sm text-sm leading-6 text-slate-500">
-                      Deadline context only when it can affect today's plan.
-                    </p>
+                    <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-slate-600">This Week</h2>
+                    <p className="mt-1 text-sm text-slate-500">A quiet glance at upcoming due work.</p>
                   </div>
-                  <div className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-600">
-                    {holidaySummary}
-                  </div>
+                  {weekGlance.overdueTasks.length > 0 && (
+                    <span className="rounded-full bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700">
+                      {weekGlance.overdueTasks.length} overdue
+                    </span>
+                  )}
                 </div>
 
-                <motion.div
-                  className="relative space-y-3 px-4 py-5"
-                  variants={holidayListVariants}
-                  initial={prefersReducedMotion ? false : 'hidden'}
-                  animate="visible"
-                >
-                  {upcomingHolidays.slice(0, 3).map((holiday, index) => {
-                    const isUpcoming = holiday.daysRemaining >= 0;
-
-                    return (
-                      <motion.button
-                        key={holiday.id}
-                        type="button"
-                        className={`group w-full cursor-pointer rounded-2xl border bg-white p-4 text-left shadow-card transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 ${
-                          index === 0 && isUpcoming
-                            ? 'border-sky-200 ring-1 ring-sky-200/70'
-                            : 'border-slate-200/80'
-                        } ${!isUpcoming ? 'opacity-70' : ''}`}
-                        variants={holidayCardVariants}
-                        whileHover={prefersReducedMotion ? undefined : {
-                          scale: 1.02,
-                          y: -3,
-                          boxShadow: '0 22px 60px rgba(15, 23, 42, 0.13)',
-                        }}
-                        whileTap={prefersReducedMotion ? undefined : { scale: 0.985 }}
-                        transition={{ type: 'spring', stiffness: 300, damping: 22 }}
-                      >
-                        <div className="flex items-center gap-4">
-                          <motion.div
-                            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-50 to-sky-100 text-2xl shadow-inner ring-1 ring-white/80"
-                            whileHover={prefersReducedMotion ? undefined : { scale: 1.12, rotate: 2 }}
-                            transition={{ type: 'spring', stiffness: 320, damping: 18 }}
-                          >
-                            {holiday.icon}
-                          </motion.div>
-
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="truncate text-sm font-semibold tracking-[-0.01em] text-slate-950">
-                                {holiday.name}
-                              </h3>
-                              <span className="rounded-full border border-slate-200/80 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
-                                {holiday.vibe}
-                              </span>
-                            </div>
-                            <p className="mt-1 text-xs font-medium text-slate-400">
-                              {format(parseISO(holiday.date), 'dd/MM/yyyy')}
-                            </p>
-                          </div>
-
-                          <div className="min-w-[96px] text-right">
-                            <div className={`text-3xl font-semibold tracking-[-0.05em] ${isUpcoming ? 'text-slate-950' : 'text-slate-300'}`}>
-                              <AnimatedDayCount value={holiday.daysRemaining} />
-                            </div>
-                            <p className={`mt-1 text-[11px] font-semibold ${isUpcoming ? 'text-sky-600' : 'text-slate-400'}`}>
-                              {getHolidayCountdownLabel(holiday.daysRemaining)}
-                            </p>
-                          </div>
-                        </div>
-                      </motion.button>
-                    );
-                  })}
-
-                  <div className="grid gap-3 pt-2 sm:grid-cols-2">
-                    <div className="rounded-2xl border border-slate-200/80 bg-slate-50 px-4 py-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">This week</p>
-                      <p className="mt-1 text-sm font-semibold text-slate-900">{tasksDueThisWeek.length} tasks due</p>
+                <div className="grid grid-cols-7 gap-1.5">
+                  {weekGlance.weekDays.map((day) => (
+                    <div
+                      key={day.date.toISOString()}
+                      className={`rounded-2xl border px-2 py-2 text-center ${
+                        day.isToday
+                          ? 'border-blue-200 bg-blue-50 text-blue-800'
+                          : day.taskCount > 0
+                            ? 'border-slate-200 bg-slate-50 text-slate-700'
+                            : 'border-slate-100 bg-white text-slate-400'
+                      }`}
+                    >
+                      <p className="text-[10px] font-semibold uppercase tracking-wide">{day.label}</p>
+                      <p className="mt-1 text-sm font-semibold">{day.dayNumber}</p>
+                      <div className="mt-1 flex h-4 items-center justify-center">
+                        {day.taskCount > 0 ? (
+                          <span className="rounded-full bg-slate-900 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                            {day.taskCount}
+                          </span>
+                        ) : (
+                          <span className="h-1.5 w-1.5 rounded-full bg-slate-200" aria-hidden="true" />
+                        )}
+                      </div>
                     </div>
-                    <div className="rounded-2xl border border-slate-200/80 bg-slate-50 px-4 py-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-sky-600">Holiday signal</p>
-                      <p className="mt-1 text-sm font-semibold text-slate-900">{holidaySummary}</p>
-                    </div>
+                  ))}
+                </div>
+
+                {weekGlance.upcomingTasks.length > 0 ? (
+                  <div className="mt-4 grid gap-2">
+                    {weekGlance.upcomingTasks.slice(0, 3).map((task) => {
+                      const dueDate = parseTaskDueDate(task);
+
+                      return (
+                        <button
+                          key={task.id}
+                          type="button"
+                          onClick={() => onOpenTask(task.id, task.boardId)}
+                          className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white px-3 py-2 text-left transition-colors hover:border-sky-200 hover:bg-sky-50/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                        >
+                          <span className="min-w-0 truncate text-sm font-semibold text-slate-800">{task.title}</span>
+                          <span className="shrink-0 text-xs font-medium text-slate-500">
+                            {dueDate && isSameDay(dueDate, new Date()) ? 'Today' : dueDate ? format(dueDate, 'EEE d') : ''}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
-                </motion.div>
-              </motion.section>
+                ) : (
+                  <p className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
+                    No deadlines this week.
+                  </p>
+                )}
+              </SectionCard>
               )}
             </div>
           </div>

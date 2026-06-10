@@ -6,6 +6,7 @@ import type {
   BoardData,
   BoardDeleteItem,
   ITaskItem,
+  QuickPlanFormData,
   TaskDialogFormData,
 } from '../types/task.type';
 import { createActivity } from '../services/activity.service';
@@ -50,6 +51,7 @@ export interface UseTaskOperationsParams {
 
 export interface UseTaskOperationsResult {
   onSubmitCard: (formData: TaskDialogFormData) => Promise<void>;
+  onSubmitQuickPlan: (formData: QuickPlanFormData) => Promise<void>;
   onSubmitEditTask: (formData: TaskDialogFormData) => Promise<void>;
   handleDeleteConfirm: () => Promise<void>;
   handleUpdateTask: (taskId: string, fields: Partial<ITaskItem>) => Promise<void>;
@@ -148,6 +150,101 @@ export function useTaskOperations({
   closeTaskDialog,
   refreshBoardData,
 }: UseTaskOperationsParams): UseTaskOperationsResult {
+  const onSubmitQuickPlan = async (formData: QuickPlanFormData) => {
+    if (!activeBoardId || !formData.targetListId) return;
+
+    const targetList = boardData.list[formData.targetListId];
+
+    if (!targetList) {
+      toast.error('Choose a valid target list.', { theme: 'colored' });
+      return;
+    }
+
+    const plannedTasks = formData.titles.flatMap((title) => {
+      if (formData.assignmentMode === 'per-assignee') {
+        return formData.assignees.map((assignee) => ({
+          title,
+          assignees: [assignee],
+        }));
+      }
+
+      return [{
+        title,
+        assignees: formData.assignees,
+      }];
+    });
+
+    if (plannedTasks.length === 0) {
+      toast.info('Add at least one task title before creating tasks.', { theme: 'colored' });
+      return;
+    }
+
+    setIsSavingBoard(true);
+
+    const sharedResource = formData.sharedResource?.trim();
+    const description = sharedResource ? `Resource: ${sharedResource}` : '';
+    let successCount = 0;
+    let failureCount = 0;
+    let firstErrorMessage = '';
+
+    try {
+      for (const [index, plannedTask] of plannedTasks.entries()) {
+        try {
+          const createdTask = await createTask({
+            ...buildTaskInsertPayload({
+              boardId: activeBoardId,
+              listId: formData.targetListId,
+              title: plannedTask.title,
+              description,
+              priority: formData.priority,
+              dueDate: formData.dueDate,
+              position: targetList.tasks.length + index,
+              assignees: plannedTask.assignees,
+            }),
+            workspace_id: activeWorkspaceId ?? undefined,
+            created_by: userId,
+          });
+
+          successCount += 1;
+
+          try {
+            await createActivity(createdTask.id, 'create', {
+              description: `Created task "${plannedTask.title}" from Quick Plan`,
+            }, undefined, undefined, {
+              workspaceId: activeWorkspaceId,
+              boardId: activeBoardId,
+              actorId: userId,
+            });
+          } catch (activityError) {
+            console.error('Failed to create Quick Plan activity:', activityError);
+          }
+        } catch (error) {
+          failureCount += 1;
+          if (!firstErrorMessage) {
+            firstErrorMessage = error instanceof Error ? error.message : 'Unable to create one or more tasks.';
+          }
+        }
+      }
+
+      await refreshBoardData();
+
+      if (failureCount > 0) {
+        toast.warning(
+          `Quick Plan created ${successCount} task${successCount === 1 ? '' : 's'}; ${failureCount} failed. ${firstErrorMessage}`,
+          { theme: 'colored' },
+        );
+        return;
+      }
+
+      toast.success(`Quick Plan created ${successCount} task${successCount === 1 ? '' : 's'}.`, { theme: 'colored' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to finish Quick Plan.';
+      toast.error(message, { theme: 'colored' });
+    } finally {
+      setIsSavingBoard(false);
+    }
+  };
+
   const onSubmitCard = async (formData: TaskDialogFormData) => {
     if (!activeListId || !activeBoardId) return;
 
@@ -523,6 +620,7 @@ export function useTaskOperations({
 
   return {
     onSubmitCard,
+    onSubmitQuickPlan,
     onSubmitEditTask,
     handleDeleteConfirm,
     handleUpdateTask,

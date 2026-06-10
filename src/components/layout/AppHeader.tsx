@@ -33,7 +33,7 @@ export default function AppHeader({
   onSignOut,
 }: AppHeaderProps) {
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/88 backdrop-blur-xl">
+    <header className="sticky top-0 z-50 overflow-visible border-b border-slate-200/70 bg-white/88 backdrop-blur-xl">
       <div className="flex min-h-16 items-center gap-3 px-4 sm:px-6">
         <button
           type="button"

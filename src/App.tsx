@@ -10,6 +10,7 @@ import DeleteDialog from './components/organisms/dialog/DeleteDialog';
 import CalendarBoardView from './components/organisms/CalendarBoardView';
 import HomeDashboard from './components/organisms/HomeDashboard';
 import KanbanBoard from './components/organisms/KanbanBoard';
+import QuickPlanDialog from './components/organisms/dialog/QuickPlanDialog';
 import TaskDialog from './components/organisms/dialog/TaskDialog';
 import AuthPage from './components/auth/AuthPage';
 import AcceptInvitePage from './components/invite/AcceptInvitePage';
@@ -131,6 +132,8 @@ function App() {
     closeTaskDialog,
     openGroupDialog,
     closeGroupDialog,
+    openQuickPlanDialog,
+    closeQuickPlanDialog,
     openCreateBoardDialog,
     closeCreateBoardDialog,
     openActivityDialog,
@@ -437,6 +440,18 @@ function App() {
     setActiveViewWithPath('board');
   }, [activeBoardId, boardData.columns, openCreateTaskDialog, setActiveViewWithPath]);
 
+  const handleOpenQuickPlan = useCallback(() => {
+    const firstListId = boardData.columns[0];
+
+    if (!activeBoardId || !firstListId) {
+      toast.info('Create a board and at least one list before using Quick Plan.', { theme: 'colored' });
+      return;
+    }
+
+    openQuickPlanDialog(firstListId);
+    setActiveViewWithPath('board');
+  }, [activeBoardId, boardData.columns, openQuickPlanDialog, setActiveViewWithPath]);
+
   const handleCompleteOnboarding = async (setupValues: OnboardingSetupValues) => {
     if (!user) {
       throw new Error('Please sign in again.');
@@ -537,6 +552,7 @@ function App() {
 
   const {
     onSubmitCard,
+    onSubmitQuickPlan,
     onSubmitEditTask,
     handleDeleteConfirm,
     handleUpdateTask,
@@ -675,6 +691,17 @@ function App() {
         onToggleFocusTask={dialogState.taskDialog.editingTask ? () => handleToggleFocusTask(dialogState.taskDialog.editingTask!) : undefined}
         workspaceMembers={workspaceMembers}
         workspaceId={activeWorkspaceId}
+      />
+
+      <QuickPlanDialog
+        isOpen={dialogState.quickPlanDialog.isOpen}
+        onClose={closeQuickPlanDialog}
+        onSubmit={onSubmitQuickPlan}
+        lists={boardData.list}
+        listOrder={boardData.columns}
+        initialListId={dialogState.quickPlanDialog.activeListId || boardData.columns[0] || null}
+        workspaceMembers={workspaceMembers}
+        isSubmitting={isSavingBoard}
       />
 
       {deleteItem && (
@@ -911,6 +938,8 @@ function App() {
         onTabChange={(tab) => setActiveViewWithPath(tab)}
         onOpenMembers={openMembersDialog}
         onOpenActivity={openActivityDialog}
+        onQuickAddTask={handleQuickAddTask}
+        onOpenQuickPlan={handleOpenQuickPlan}
       />
 
       {(isBoardLoading || isSavingBoard) && (

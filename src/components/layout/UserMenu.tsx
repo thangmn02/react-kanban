@@ -45,7 +45,7 @@ export default function UserMenu({
   }, [isOpen]);
 
   return (
-    <div ref={menuRef} className="relative">
+    <div ref={menuRef} className="relative z-[60]">
       <button
         type="button"
         onClick={() => setIsOpen((currentState) => !currentState)}
@@ -63,7 +63,7 @@ export default function UserMenu({
 
       {isOpen && (
         <div
-          className="absolute right-0 z-40 mt-2 w-72 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.16)]"
+          className="absolute right-0 z-[60] mt-2 w-72 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.16)]"
           role="menu"
         >
           <div className="border-b border-slate-100 px-4 py-3">

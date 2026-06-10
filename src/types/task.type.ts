@@ -74,6 +74,18 @@ export interface TaskDialogFormData {
   image?: string;
 }
 
+export type QuickPlanAssignmentMode = 'per-line' | 'per-assignee';
+
+export interface QuickPlanFormData {
+  targetListId: string;
+  titles: string[];
+  dueDate?: string;
+  priority?: BoardTaskItem['priority'];
+  assignees: BoardTaskItem['assignees'];
+  sharedResource?: string;
+  assignmentMode: QuickPlanAssignmentMode;
+}
+
 export interface BoardDeleteItem {
   type: 'list' | 'card',
   listId: string,

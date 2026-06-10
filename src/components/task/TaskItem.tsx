@@ -7,7 +7,7 @@ import type { TaskAssignee } from '../../types/task.type';
 import { mapWorkspaceMembersToAssignees, mockWorkspaceMembers } from '../../utils/workspaceMembers';
 import type { WorkspaceMember } from '../../types/auth.type';
 import { TASK_PRIORITIES } from '../../constants';
-import { getPriorityBadgeClass, getPriorityDotClass } from '../../utils/taskMetadata';
+import { getDueDateStatus, getPriorityBadgeClass, getPriorityDotClass } from '../../utils/taskMetadata';
 import {
   getChecklistProgress,
   getTaskLabelClass,
@@ -62,10 +62,15 @@ function TaskItem({
   });
 
   const priorityBadgeClass = getPriorityBadgeClass(task.priority);
+  const dueStatus = getDueDateStatus(task.dueDate, task.isDone);
   const descriptionPreview = stripTaskHtml(task.description);
   const checklistProgress = getChecklistProgress(task.checklistItems || []);
   const assigneeOptions: TaskAssignee[] = mapWorkspaceMembersToAssignees(workspaceMembers);
   const hasTeamMembers = assigneeOptions.length > 1;
+  const visibleLabels = task.labels.slice(0, 2);
+  const hiddenLabelCount = Math.max(0, task.labels.length - visibleLabels.length);
+  const shouldShowPriority = task.priority === 'High';
+  const shouldShowDueDate = Boolean(task.dueDate) && dueStatus.status !== 'none';
 
   const style = isOverlay ? {} : {
     transform: CSS.Transform.toString(transform),
@@ -103,11 +108,48 @@ function TaskItem({
               : 'cursor-pointer hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-md active:scale-[0.99] active:cursor-grabbing'
           }`}
         >
-          {/* Top Line: Priority (Dropdown) & Action Buttons */}
-          <div className="flex items-start justify-between mb-2">
-            {/* Priority Badge with Inline Select */}
-            <div className="relative shrink-0">
-              {task.priority ? (
+          <div className="mb-2 flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              {task.labels.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-1.5">
+                  {visibleLabels.map((label) => (
+                    <span
+                      key={label.id}
+                      className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${getTaskLabelClass(label.color)}`}
+                    >
+                      {label.name}
+                    </span>
+                  ))}
+                  {hiddenLabelCount > 0 && (
+                    <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+                      +{hiddenLabelCount}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              <h3>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!isOverlay) {
+                      handleEditTask(task);
+                    }
+                  }}
+                  aria-label={`Open task: ${task.title}`}
+                  className={`block w-full cursor-pointer rounded text-left line-clamp-2 break-words text-[15px] font-semibold leading-snug tracking-[-0.01em] focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 ${
+                    task.isDone ? 'text-slate-400 line-through decoration-slate-300' : 'text-slate-900'
+                  }`}
+                >
+                  {task.title}
+                </button>
+              </h3>
+            </div>
+
+            <div className="flex shrink-0 items-start gap-1.5">
+              {shouldShowPriority && task.priority && (
+                <div className="relative">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -121,10 +163,11 @@ function TaskItem({
                 >
                   {task.priority}
                 </button>
-              ) : null}
+                </div>
+              )}
 
               {/* Inline Priority Floating Dropdown */}
-              {showPriorityMenu && !isOverlay && (
+              {showPriorityMenu && !isOverlay && shouldShowPriority && (
                 <>
                   <div
                     className="fixed inset-0 z-20"
@@ -158,11 +201,8 @@ function TaskItem({
                   </div>
                 </>
               )}
-            </div>
 
-            {/* Task card edit and delete options */}
-            {!isOverlay && (
-              <div className="flex items-center shrink-0">
+              {!isOverlay && !task.isDone && (
                 <button
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => {
@@ -180,12 +220,17 @@ function TaskItem({
                 >
                   {isFocusTask ? 'Focus' : '+ Focus'}
                 </button>
+              )}
+
+              {/* Task card edit and delete options */}
+              {!isOverlay && (
+                <>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     handleEditTask(task);
                   }}
-                  className="pointer-events-none ml-2 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-slate-400 opacity-0 transition hover:bg-slate-50 hover:text-slate-600 hover:opacity-100 focus:pointer-events-auto focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 group-hover:pointer-events-auto group-hover:opacity-100"
+                  className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-slate-400 transition hover:bg-slate-50 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 sm:pointer-events-none sm:opacity-0 sm:focus:pointer-events-auto sm:focus:opacity-100 sm:group-hover:pointer-events-auto sm:group-hover:opacity-100"
                   title="Edit task"
                   aria-label={`Edit task: ${task.title}`}
                 >
@@ -199,7 +244,7 @@ function TaskItem({
                     e.stopPropagation();
                     setDeleteItem({ type: 'card', listId, cardId: task.id });
                   }}
-                  className="pointer-events-none ml-1 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-slate-400 opacity-0 transition hover:bg-rose-50 hover:text-rose-600 hover:opacity-100 focus:pointer-events-auto focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 group-hover:pointer-events-auto group-hover:opacity-100"
+                  className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 sm:pointer-events-none sm:opacity-0 sm:focus:pointer-events-auto sm:focus:opacity-100 sm:group-hover:pointer-events-auto sm:group-hover:opacity-100"
                   title="Delete task"
                   aria-label={`Delete task: ${task.title}`}
                 >
@@ -207,52 +252,21 @@ function TaskItem({
                     <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0 1 16.138 21H7.862a2 2 0 0 1-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3M4 7h16" />
                   </svg>
                 </button>
-              </div>
-            )}
-          </div>
-
-          {/* Task Title */}
-          {task.labels.length > 0 && (
-            <div className="mb-2 flex flex-wrap gap-1.5">
-              {task.labels.slice(0, 3).map((label) => (
-                <span
-                  key={label.id}
-                  className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${getTaskLabelClass(label.color)}`}
-                >
-                  {label.name}
-                </span>
-              ))}
+                </>
+              )}
             </div>
-          )}
-
-          <h3 className="mb-1.5">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!isOverlay) {
-                  handleEditTask(task);
-                }
-              }}
-              aria-label={`Open task: ${task.title}`}
-              className={`block w-full cursor-pointer rounded text-left line-clamp-2 break-words text-[15px] font-semibold leading-snug tracking-[-0.01em] focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 ${
-                task.isDone ? 'text-slate-400 line-through decoration-slate-300' : 'text-slate-900'
-              }`}
-            >
-              {task.title}
-            </button>
-          </h3>
+          </div>
 
           {/* Task Description */}
           {descriptionPreview && (
-            <p className="text-xs text-slate-500 mb-3.5 line-clamp-2 leading-relaxed">
+            <p className="mb-3 line-clamp-1 text-xs leading-relaxed text-slate-500">
               {descriptionPreview}
             </p>
           )}
 
           {/* Task Optional Image */}
           {task.image && (
-            <div className="mb-3 max-h-36 w-full overflow-hidden rounded-xl bg-slate-100 shadow-inner">
+            <div className="mb-3 max-h-24 w-full overflow-hidden rounded-xl bg-slate-100 shadow-inner">
               <img
                 src={task.image}
                 alt={task.title}
@@ -263,32 +277,33 @@ function TaskItem({
           )}
 
           {/* Due Date Status Row */}
-          <div className="mb-3.5">
+          {shouldShowDueDate && (
+          <div className="mb-3">
             <DueDateBadge dueDate={task.dueDate} isDone={task.isDone} />
           </div>
+          )}
 
           {(task.checklistItems.length > 0 || task.attachments.length > 0) && (
-            <div className="mb-3.5 space-y-2">
+            <div className="mb-3 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-slate-500">
               {task.checklistItems.length > 0 && (
-                <div className="flex items-center justify-between rounded-xl border border-emerald-100 bg-emerald-50/70 px-3 py-2 text-[11px] font-semibold text-emerald-700">
-                  <span>Checklist</span>
-                  <span>{checklistProgress.completed}/{checklistProgress.total}</span>
-                </div>
+                <span className="rounded-full border border-emerald-100 bg-emerald-50/70 px-2.5 py-1 text-emerald-700">
+                  Checklist {checklistProgress.completed}/{checklistProgress.total}
+                </span>
               )}
 
               {task.attachments.length > 0 && (
-                <div className="flex items-center gap-2 text-[11px] font-medium text-slate-500">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1">
                   <svg className="h-3.5 w-3.5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 11-5.656-5.656l1.5-1.5m7.328-1.328a4 4 0 010-5.656l3-3a4 4 0 115.656 5.656l-1.5 1.5" />
                   </svg>
                   <span>{task.attachments.length} attachment{task.attachments.length !== 1 ? 's' : ''}</span>
-                </div>
+                </span>
               )}
             </div>
           )}
 
           {/* Divider */}
-          <div className="border-t border-slate-100 my-2.5" />
+          <div className="my-2.5 border-t border-slate-100" />
 
           {/* Task Footer: Assignees & Status */}
           <div className="flex items-center justify-between select-none">

@@ -14,6 +14,8 @@ interface BoardHeaderProps {
   onTabChange: (tab: BoardTabId) => void;
   onOpenMembers: () => void;
   onOpenActivity: () => void;
+  onQuickAddTask: () => void;
+  onOpenQuickPlan: () => void;
 }
 
 export default function BoardHeader({
@@ -26,6 +28,8 @@ export default function BoardHeader({
   onTabChange,
   onOpenMembers,
   onOpenActivity,
+  onQuickAddTask,
+  onOpenQuickPlan,
 }: BoardHeaderProps) {
   const [isOptionsOpen, setIsOptionsOpen] = useState(false);
   const optionsRef = useRef<HTMLDivElement | null>(null);
@@ -81,56 +85,77 @@ export default function BoardHeader({
           </p>
         </div>
 
-        <div ref={optionsRef} className="relative shrink-0 self-start lg:self-auto">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => setIsOptionsOpen((currentValue) => !currentValue)}
-            className="inline-flex cursor-pointer items-center rounded-2xl border border-slate-200 bg-white/90 px-3 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:bg-white hover:shadow-md focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"
-            aria-expanded={isOptionsOpen}
+            onClick={onQuickAddTask}
+            className="inline-flex cursor-pointer items-center rounded-2xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-100"
           >
-            Board options
+            Add task
           </button>
 
-          {isOptionsOpen && (
-          <div className="absolute right-0 top-full z-50 mt-2 w-max min-w-52 max-w-[calc(100vw-2rem)] rounded-2xl border border-slate-200 bg-white p-2 shadow-md">
-            <div className="space-y-2">
-              {hasTeamMembers && (
+          <div ref={optionsRef} className="relative shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsOptionsOpen((currentValue) => !currentValue)}
+              className="inline-flex cursor-pointer items-center rounded-2xl border border-slate-200 bg-white/90 px-3 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:bg-white hover:shadow-md focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"
+              aria-expanded={isOptionsOpen}
+            >
+              Board options
+            </button>
+
+            {isOptionsOpen && (
+            <div className="absolute right-0 top-full z-50 mt-2 w-max min-w-52 max-w-[calc(100vw-2rem)] rounded-2xl border border-slate-200 bg-white p-2 shadow-md">
+              <div className="space-y-2">
                 <button
                   type="button"
                   onClick={() => {
                     setIsOptionsOpen(false);
-                    onOpenMembers();
+                    onOpenQuickPlan();
                   }}
                   className="inline-flex w-full cursor-pointer items-center gap-2 rounded-xl px-2 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
                 >
-                  <span className="flex -space-x-2">
-                    {workspaceMembers.slice(0, 3).map((member) => (
-                      <img
-                        key={member.id}
-                        src={member.avatarUrl}
-                        alt={member.name}
-                        className="h-6 w-6 rounded-full border-2 border-white object-cover"
-                      />
-                    ))}
-                  </span>
-                  Members
+                  Quick Plan
                 </button>
-              )}
 
-              <BoardTabs
-                activeTab={activeTab}
-                onTabChange={(tab) => {
-                  setIsOptionsOpen(false);
-                  onTabChange(tab);
-                }}
-                onOpenActivity={() => {
-                  setIsOptionsOpen(false);
-                  onOpenActivity();
-                }}
-              />
+                {hasTeamMembers && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsOptionsOpen(false);
+                      onOpenMembers();
+                    }}
+                    className="inline-flex w-full cursor-pointer items-center gap-2 rounded-xl px-2 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                  >
+                    <span className="flex -space-x-2">
+                      {workspaceMembers.slice(0, 3).map((member) => (
+                        <img
+                          key={member.id}
+                          src={member.avatarUrl}
+                          alt={member.name}
+                          className="h-6 w-6 rounded-full border-2 border-white object-cover"
+                        />
+                      ))}
+                    </span>
+                    Members
+                  </button>
+                )}
+
+                <BoardTabs
+                  activeTab={activeTab}
+                  onTabChange={(tab) => {
+                    setIsOptionsOpen(false);
+                    onTabChange(tab);
+                  }}
+                  onOpenActivity={() => {
+                    setIsOptionsOpen(false);
+                    onOpenActivity();
+                  }}
+                />
+              </div>
             </div>
+            )}
           </div>
-          )}
         </div>
       </div>
     </section>
