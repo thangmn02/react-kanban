@@ -1,6 +1,7 @@
 import type { TodayTaskSummary } from '../../services/today.service';
 import { getPriorityBadgeClass } from '../../utils/taskMetadata';
 import DueDateBadge from '../atoms/DueDateBadge';
+import { useI18n } from '../../i18n';
 
 interface TodayTaskCardProps {
   task: TodayTaskSummary;
@@ -18,6 +19,7 @@ export default function TodayTaskCard({
   onToggleTodayFocus,
 }: TodayTaskCardProps) {
   const priorityClassName = getPriorityBadgeClass(task.priority || undefined);
+  const { t } = useI18n();
 
   return (
     <article className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-card transition hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-md">
@@ -58,7 +60,7 @@ export default function TodayTaskCard({
           </span>
         ) : (
           <span className="rounded-full border border-dashed border-slate-200 px-2.5 py-0.5 text-[11px] text-slate-400">
-            No priority
+            {t('common.noPriority')}
           </span>
         )}
         <DueDateBadge dueDate={task.dueDate || undefined} />
@@ -69,9 +71,9 @@ export default function TodayTaskCard({
           type="button"
           onClick={() => onStartFocus(task)}
           className="cursor-pointer rounded-2xl bg-slate-950 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:-translate-y-0.5 focus:outline-none focus-visible:ring-4 focus-visible:ring-slate-200 active:scale-[0.98]"
-          aria-label={`Start focus session for ${task.title}`}
+          aria-label={`${t('task.startFocus')}: ${task.title}`}
         >
-          Start focus
+          {t('today.startFocus')}
         </button>
         <button
           type="button"
@@ -82,9 +84,9 @@ export default function TodayTaskCard({
               : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
           }`}
           aria-pressed={isFocusTask}
-          aria-label={`${isFocusTask ? 'Remove from' : 'Add to'} today focus: ${task.title}`}
+          aria-label={`${isFocusTask ? t('today.removeFromToday') : t('today.planToday')}: ${task.title}`}
         >
-          {isFocusTask ? 'Remove from today' : 'Plan today'}
+          {isFocusTask ? t('today.removeFromToday') : t('today.planToday')}
         </button>
       </div>
     </article>

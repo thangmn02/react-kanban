@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { TaskAssignee } from '../../types/task.type';
 import { mapWorkspaceMembersToAssignees, mockWorkspaceMembers } from '../../utils/workspaceMembers';
 import type { WorkspaceMember } from '../../types/auth.type';
+import { useI18n } from '../../i18n';
 
 interface QuickSearchProps {
   searchQuery: string;
@@ -35,6 +36,7 @@ export default function QuickSearch({
   const assigneeOptions: TaskAssignee[] = mapWorkspaceMembersToAssignees(workspaceMembers);
   const showFilterControls = isFilterPanelOpen;
   const showAssigneeFilter = assigneeOptions.length > 1;
+  const { t } = useI18n();
 
   useEffect(() => {
     if (!showFilterControls) {
@@ -76,15 +78,15 @@ export default function QuickSearch({
           type="text"
           value={searchQuery}
           onChange={(e) => onSearchQueryChange(e.target.value)}
-          placeholder="Search tasks..."
+          placeholder={t('board.searchTasks')}
           className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 py-2.5 pl-10 pr-4 text-sm text-slate-800 shadow-inner outline-none transition focus:border-sky-200 focus:bg-white focus:ring-4 focus:ring-sky-100"
         />
         {searchQuery && (
           <button
             onClick={() => onSearchQueryChange('')}
             type="button"
-            aria-label="Clear search"
-            title="Clear search"
+            aria-label={t('board.clearSearch')}
+            title={t('board.clearSearch')}
             className="absolute inset-y-0 right-0 flex cursor-pointer items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 focus:outline-none focus-visible:text-gray-700"
           >
             <svg className="h-4 w-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -105,7 +107,7 @@ export default function QuickSearch({
           }`}
           aria-expanded={showFilterControls}
         >
-          {hasActiveFilters ? 'Filters active' : 'Filter'}
+          {hasActiveFilters ? t('common.filtersActive') : t('common.filter')}
         </button>
 
         {/* Filter Controls */}
@@ -113,26 +115,26 @@ export default function QuickSearch({
         <div className="absolute right-0 top-full z-40 mt-2 w-[min(26rem,calc(100vw-2rem))] rounded-2xl border border-slate-200 bg-white p-3 shadow-md">
           <div className="grid gap-3">
             <div className="flex items-center justify-between gap-3">
-              <span className="text-sm font-semibold text-slate-700">Filter tasks</span>
+              <span className="text-sm font-semibold text-slate-700">{t('board.filterTasks')}</span>
               {hasActiveFilters && (
                 <button
                   onClick={onClearFilters}
                   type="button"
                   className="cursor-pointer rounded-xl border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-xs font-semibold text-sky-700 transition hover:bg-sky-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
                 >
-                  Clear
+                  {t('common.clear')}
                 </button>
               )}
             </div>
 
             <label className="grid gap-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500">
-              Priority
+              {t('common.priority')}
               <select
                 value={filterPriority}
                 onChange={(e) => onFilterPriorityChange(e.target.value)}
                 className="rounded-2xl border border-slate-200 bg-white/90 px-3 py-2 text-sm normal-case tracking-normal text-slate-700 shadow-sm outline-none transition focus:ring-4 focus:ring-sky-100"
               >
-                <option value="">All Priorities</option>
+                <option value="">{t('board.allPriorities')}</option>
                 <option value="High">High</option>
                 <option value="Medium">Medium</option>
                 <option value="Low">Low</option>
@@ -141,22 +143,22 @@ export default function QuickSearch({
             </label>
 
             <label className="grid gap-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500">
-              Due date
+              {t('common.dueDate')}
               <select
                 value={filterDueDate}
                 onChange={(e) => onFilterDueDateChange(e.target.value)}
                 className="rounded-2xl border border-slate-200 bg-white/90 px-3 py-2 text-sm normal-case tracking-normal text-slate-700 shadow-sm outline-none transition focus:ring-4 focus:ring-sky-100"
               >
-                <option value="">All Deadlines</option>
-                <option value="overdue">Overdue</option>
-                <option value="today">Due Today</option>
-                <option value="upcoming">Upcoming</option>
+                <option value="">{t('board.allDeadlines')}</option>
+                <option value="overdue">{t('common.overdue')}</option>
+                <option value="today">{t('common.dueToday')}</option>
+                <option value="upcoming">{t('board.upcoming')}</option>
               </select>
             </label>
 
             {showAssigneeFilter && (
               <div className="grid gap-2">
-                <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Assignee</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">{t('common.assignee')}</p>
                 <div className="flex flex-wrap items-center gap-2">
                   {assigneeOptions.map((member) => {
                     const isSelected = filterAssignee === member.name;
@@ -169,7 +171,7 @@ export default function QuickSearch({
                             ? 'border-sky-300 bg-sky-50 text-sky-700'
                             : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
                         }`}
-                        title={`Filter by ${member.name}`}
+                        title={t('board.filterBy', { name: member.name })}
                       >
                         <img
                           src={member.avatar}

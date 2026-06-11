@@ -6,6 +6,7 @@ import ErrorBoundary from './components/error/ErrorBoundary.tsx'
 import OfflineBanner from './components/error/OfflineBanner.tsx'
 import DesignLab from './design-lab/DesignLab.tsx'
 import { shouldMountDesignLab } from './design-lab/isDesignLabRoute.ts'
+import { I18nProvider } from './i18n'
 
 // Preview-only design lab: rendered in isolation BEFORE the production app so it
 // never touches auth, Supabase, or App's hook order. Gated to dev builds (or an
@@ -22,13 +23,14 @@ createRoot(document.getElementById('root')!).render(
         <DesignLab />
       ) : (
         <>
-          <AuthProvider>
-            <App />
-          </AuthProvider>
-          <OfflineBanner />
+          <I18nProvider>
+            <AuthProvider>
+              <App />
+            </AuthProvider>
+            <OfflineBanner />
+          </I18nProvider>
         </>
       )}
     </ErrorBoundary>
   // </StrictMode>,
 )
-

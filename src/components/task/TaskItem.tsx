@@ -14,6 +14,7 @@ import {
   stripTaskHtml,
 } from '../../utils/taskCollections';
 import DueDateBadge from '../atoms/DueDateBadge';
+import { useI18n } from '../../i18n';
 
 interface TaskItemProps {
   task: ITaskItem;
@@ -40,6 +41,7 @@ function TaskItem({
 }: TaskItemProps) {
   const [showPriorityMenu, setShowPriorityMenu] = useState(false);
   const [showAssigneeMenu, setShowAssigneeMenu] = useState(false);
+  const { t } = useI18n();
 
   const {
     attributes,
@@ -108,8 +110,8 @@ function TaskItem({
               : 'cursor-pointer hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-md active:scale-[0.99] active:cursor-grabbing'
           }`}
         >
-          <div className="mb-2 flex items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
+          <div className="mb-2 space-y-2">
+            <div className="min-w-0">
               {task.labels.length > 0 && (
                 <div className="mb-2 flex flex-wrap gap-1.5">
                   {visibleLabels.map((label) => (
@@ -147,7 +149,7 @@ function TaskItem({
               </h3>
             </div>
 
-            <div className="flex shrink-0 items-start gap-1.5">
+            <div className="flex flex-wrap items-center justify-end gap-1.5">
               {shouldShowPriority && task.priority && (
                 <div className="relative">
                 <button
@@ -158,8 +160,8 @@ function TaskItem({
                   className={`inline-flex shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase transition-all duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 ${priorityBadgeClass} ${
                     isOverlay ? '' : 'hover:ring-1 hover:ring-offset-1 hover:ring-slate-300'
                   }`}
-                  title={isOverlay ? undefined : "Click to change priority"}
-                  aria-label={`Change priority for ${task.title}`}
+                  title={isOverlay ? undefined : t('task.changePriority')}
+                  aria-label={`${t('task.changePriority')}: ${task.title}`}
                 >
                   {task.priority}
                 </button>
@@ -214,11 +216,10 @@ function TaskItem({
                       ? 'bg-sky-50 text-sky-700 ring-1 ring-sky-200'
                       : 'bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-700'
                   }`}
-                  title={isFocusTask ? 'Remove from Focus Dock' : 'Add to Focus Dock'}
-                  aria-pressed={isFocusTask}
-                  aria-label={`${isFocusTask ? 'Remove from' : 'Add to'} Focus Dock: ${task.title}`}
+                  title={t('task.startFocus')}
+                  aria-label={`${t('task.startFocus')}: ${task.title}`}
                 >
-                  {isFocusTask ? 'Focus' : '+ Focus'}
+                  {isFocusTask ? t('task.start') : t('task.addFocus')}
                 </button>
               )}
 
@@ -231,8 +232,8 @@ function TaskItem({
                     handleEditTask(task);
                   }}
                   className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-slate-400 transition hover:bg-slate-50 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 sm:pointer-events-none sm:opacity-0 sm:focus:pointer-events-auto sm:focus:opacity-100 sm:group-hover:pointer-events-auto sm:group-hover:opacity-100"
-                  title="Edit task"
-                  aria-label={`Edit task: ${task.title}`}
+                  title={t('task.edit')}
+                  aria-label={`${t('task.edit')}: ${task.title}`}
                 >
                   <svg className="w-4 h-4" aria-hidden="true" fill="currentColor" viewBox="0 0 20 20">
                     <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
@@ -245,8 +246,8 @@ function TaskItem({
                     setDeleteItem({ type: 'card', listId, cardId: task.id });
                   }}
                   className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 sm:pointer-events-none sm:opacity-0 sm:focus:pointer-events-auto sm:focus:opacity-100 sm:group-hover:pointer-events-auto sm:group-hover:opacity-100"
-                  title="Delete task"
-                  aria-label={`Delete task: ${task.title}`}
+                  title={t('task.delete')}
+                  aria-label={`${t('task.delete')}: ${task.title}`}
                 >
                   <svg className="w-4 h-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0 1 16.138 21H7.862a2 2 0 0 1-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3M4 7h16" />
@@ -287,7 +288,7 @@ function TaskItem({
             <div className="mb-3 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-slate-500">
               {task.checklistItems.length > 0 && (
                 <span className="rounded-full border border-emerald-100 bg-emerald-50/70 px-2.5 py-1 text-emerald-700">
-                  Checklist {checklistProgress.completed}/{checklistProgress.total}
+                  {t('task.checklist', { done: checklistProgress.completed, total: checklistProgress.total })}
                 </span>
               )}
 
@@ -296,7 +297,7 @@ function TaskItem({
                   <svg className="h-3.5 w-3.5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 11-5.656-5.656l1.5-1.5m7.328-1.328a4 4 0 010-5.656l3-3a4 4 0 115.656 5.656l-1.5 1.5" />
                   </svg>
-                  <span>{task.attachments.length} attachment{task.attachments.length !== 1 ? 's' : ''}</span>
+                  <span>{t('task.attachments', { count: task.attachments.length, plural: task.attachments.length !== 1 ? 's' : '' })}</span>
                 </span>
               )}
             </div>
@@ -333,8 +334,8 @@ function TaskItem({
                       setShowAssigneeMenu(!showAssigneeMenu);
                     }}
                   className="pointer-events-none flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-dashed border-slate-300 bg-slate-50 text-slate-500 opacity-0 transition hover:bg-slate-100 hover:text-slate-700 hover:opacity-100 focus:pointer-events-auto focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 group-hover:pointer-events-auto group-hover:opacity-100"
-                    title="Manage assignees"
-                    aria-label="Manage assignees"
+                    title={t('task.manageAssignees')}
+                    aria-label={t('task.manageAssignees')}
                     aria-haspopup="true"
                     aria-expanded={showAssigneeMenu}
                   >
@@ -356,7 +357,7 @@ function TaskItem({
                       />
                       <div className="absolute bottom-9.5 left-0 z-40 w-56 rounded-2xl border border-slate-200 bg-white p-2 text-xs font-medium shadow-md">
                         <div className="font-bold text-slate-500 px-2 pb-1.5 border-b border-slate-100 mb-1">
-                          Assign members
+                          {t('task.assignMembers')}
                         </div>
                         <div className="space-y-0.5 max-h-48 overflow-y-auto">
                           {assigneeOptions.map((member) => {

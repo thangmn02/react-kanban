@@ -18,7 +18,7 @@ export interface UseFocusTaskHandlersParams {
     'toggleFocusTask' | 'pinFocusTask' | 'isFocusTask' | 'setActiveFocusTaskId'
   >;
   pomodoro: {
-    startTimer: (taskId?: string) => void;
+    startFocusTimer: (taskId?: string) => void;
     setActiveTimerTaskId: (taskId: string) => void;
   };
   setIsFocusDockCollapsed: (value: boolean) => void;
@@ -26,7 +26,9 @@ export interface UseFocusTaskHandlersParams {
 
 export interface UseFocusTaskHandlersResult {
   handleToggleFocusTask: (task: ITaskItem) => void;
+  handleStartFocusTask: (task: ITaskItem) => void;
   handleToggleFocusTaskFromHome: (taskSummary: HomeTaskSummary) => void;
+  handleStartFocusTaskFromHome: (taskSummary: HomeTaskSummary) => void;
   handleToggleFocusTaskFromToday: (taskSummary: TodayTaskSummary) => void;
   handleStartFocusTaskFromToday: (taskSummary: TodayTaskSummary) => void;
 }
@@ -40,7 +42,7 @@ export function useFocusTaskHandlers({
   setIsFocusDockCollapsed,
 }: UseFocusTaskHandlersParams): UseFocusTaskHandlersResult {
   const { toggleFocusTask, pinFocusTask, isFocusTask, setActiveFocusTaskId } = focusTasksApi;
-  const { startTimer, setActiveTimerTaskId } = pomodoro;
+  const { startFocusTimer, setActiveTimerTaskId } = pomodoro;
 
   const getTaskListContext = useCallback((taskId: string) => {
     const listId = boardData.columns.find((columnId) => (
@@ -84,6 +86,36 @@ export function useFocusTaskHandlers({
     }
   }, [buildFocusTaskInput, toggleFocusTask]);
 
+  const handleStartFocusTask = useCallback((task: ITaskItem) => {
+    const focusTaskInput = buildFocusTaskInput(task);
+
+    if (!focusTaskInput) {
+      return;
+    }
+
+    if (!isFocusTask(task.id)) {
+      const didPinTask = pinFocusTask(focusTaskInput);
+
+      if (!didPinTask) {
+        toast.info(FOCUS_LIMIT_MESSAGE, { theme: 'colored' });
+        return;
+      }
+    }
+
+    setActiveFocusTaskId(task.id);
+    setActiveTimerTaskId(task.id);
+    setIsFocusDockCollapsed(false);
+    startFocusTimer(task.id);
+  }, [
+    buildFocusTaskInput,
+    isFocusTask,
+    pinFocusTask,
+    setActiveFocusTaskId,
+    setActiveTimerTaskId,
+    setIsFocusDockCollapsed,
+    startFocusTimer,
+  ]);
+
   const handleToggleFocusTaskFromHome = useCallback((taskSummary: HomeTaskSummary) => {
     const liveTask = boardData.task[taskSummary.id];
     const fallbackTask: ITaskItem = liveTask || {
@@ -110,6 +142,51 @@ export function useFocusTaskHandlers({
       toast.info(FOCUS_LIMIT_MESSAGE, { theme: 'colored' });
     }
   }, [boardData.task, getTaskListContext, toggleFocusTask]);
+
+  const handleStartFocusTaskFromHome = useCallback((taskSummary: HomeTaskSummary) => {
+    const liveTask = boardData.task[taskSummary.id];
+    const fallbackTask: ITaskItem = liveTask || {
+      id: taskSummary.id,
+      title: taskSummary.title,
+      description: '',
+      assignees: taskSummary.assigneeAvatar ? [{ name: 'Assignee', avatar: taskSummary.assigneeAvatar }] : [],
+      priority: taskSummary.priority || undefined,
+      dueDate: taskSummary.dueDate || undefined,
+      labels: [],
+      attachments: [],
+      checklistItems: [],
+      isDone: false,
+    };
+    const listContext = liveTask ? getTaskListContext(liveTask.id) : {};
+
+    if (!isFocusTask(taskSummary.id)) {
+      const didPinTask = pinFocusTask({
+        task: fallbackTask,
+        boardId: taskSummary.boardId,
+        boardTitle: taskSummary.boardTitle,
+        ...listContext,
+      });
+
+      if (!didPinTask) {
+        toast.info(FOCUS_LIMIT_MESSAGE, { theme: 'colored' });
+        return;
+      }
+    }
+
+    setActiveFocusTaskId(taskSummary.id);
+    setActiveTimerTaskId(taskSummary.id);
+    setIsFocusDockCollapsed(false);
+    startFocusTimer(taskSummary.id);
+  }, [
+    boardData.task,
+    getTaskListContext,
+    isFocusTask,
+    pinFocusTask,
+    setActiveFocusTaskId,
+    setActiveTimerTaskId,
+    setIsFocusDockCollapsed,
+    startFocusTimer,
+  ]);
 
   const buildFocusTaskInputFromTodayTask = useCallback((taskSummary: TodayTaskSummary): FocusTaskInput => {
     const liveTask = boardData.task[taskSummary.id];
@@ -159,8 +236,7 @@ export function useFocusTaskHandlers({
     setActiveFocusTaskId(taskSummary.id);
     setActiveTimerTaskId(taskSummary.id);
     setIsFocusDockCollapsed(false);
-    startTimer(taskSummary.id);
-    toast.success(`Focus started: ${taskSummary.title}`, { theme: 'colored' });
+    startFocusTimer(taskSummary.id);
   }, [
     buildFocusTaskInputFromTodayTask,
     isFocusTask,
@@ -168,12 +244,14 @@ export function useFocusTaskHandlers({
     setActiveFocusTaskId,
     setActiveTimerTaskId,
     setIsFocusDockCollapsed,
-    startTimer,
+    startFocusTimer,
   ]);
 
   return {
     handleToggleFocusTask,
+    handleStartFocusTask,
     handleToggleFocusTaskFromHome,
+    handleStartFocusTaskFromHome,
     handleToggleFocusTaskFromToday,
     handleStartFocusTaskFromToday,
   };

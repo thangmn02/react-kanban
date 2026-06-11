@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { BoardRow } from '../../types/supabase.type';
 import type { WorkspaceMember } from '../../types/auth.type';
 import BoardTabs, { type BoardTabId } from './BoardTabs';
+import { useI18n } from '../../i18n';
 
 interface BoardHeaderProps {
   activeBoardId: string | null;
@@ -34,6 +35,7 @@ export default function BoardHeader({
   const [isOptionsOpen, setIsOptionsOpen] = useState(false);
   const optionsRef = useRef<HTMLDivElement | null>(null);
   const hasTeamMembers = workspaceMembers.length > 1;
+  const { t } = useI18n();
 
   useEffect(() => {
     if (!isOptionsOpen) {
@@ -70,7 +72,7 @@ export default function BoardHeader({
               value={activeBoardId || ''}
               onChange={(event) => onBoardChange(event.target.value || null)}
               className="max-w-full rounded-2xl border border-slate-200 bg-white/90 px-4 py-2.5 text-base font-semibold tracking-[-0.02em] text-slate-950 shadow-sm outline-none transition focus:border-sky-300 focus:ring-4 focus:ring-sky-100 sm:min-w-64"
-              aria-label="Active board"
+              aria-label={t('board.activeBoard')}
             >
               {boardSummaries.map((boardSummary) => (
                 <option key={boardSummary.id} value={boardSummary.id}>
@@ -81,7 +83,7 @@ export default function BoardHeader({
           </div>
 
           <p className="mt-2 hidden max-w-2xl text-sm leading-6 text-slate-500 md:block">
-            {activeBoardSummary?.description || 'Kanban workspace with realtime tasks, lists, and richer task details.'}
+            {activeBoardSummary?.description || t('board.defaultDescription')}
           </p>
         </div>
 
@@ -91,7 +93,7 @@ export default function BoardHeader({
             onClick={onQuickAddTask}
             className="inline-flex cursor-pointer items-center rounded-2xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-100"
           >
-            Add task
+            {t('board.addTask')}
           </button>
 
           <div ref={optionsRef} className="relative shrink-0">
@@ -101,7 +103,7 @@ export default function BoardHeader({
               className="inline-flex cursor-pointer items-center rounded-2xl border border-slate-200 bg-white/90 px-3 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:bg-white hover:shadow-md focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"
               aria-expanded={isOptionsOpen}
             >
-              Board options
+              {t('board.options')}
             </button>
 
             {isOptionsOpen && (
@@ -115,18 +117,18 @@ export default function BoardHeader({
                   }}
                   className="inline-flex w-full cursor-pointer items-center gap-2 rounded-xl px-2 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
                 >
-                  Quick Plan
+                  {t('board.quickPlan')}
                 </button>
 
-                {hasTeamMembers && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsOptionsOpen(false);
-                      onOpenMembers();
-                    }}
-                    className="inline-flex w-full cursor-pointer items-center gap-2 rounded-xl px-2 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
-                  >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsOptionsOpen(false);
+                    onOpenMembers();
+                  }}
+                  className="inline-flex w-full cursor-pointer items-center gap-2 rounded-xl px-2 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                >
+                  {hasTeamMembers && (
                     <span className="flex -space-x-2">
                       {workspaceMembers.slice(0, 3).map((member) => (
                         <img
@@ -137,9 +139,9 @@ export default function BoardHeader({
                         />
                       ))}
                     </span>
-                    Members
-                  </button>
-                )}
+                  )}
+                  {hasTeamMembers ? t('board.members') : t('board.invitePeople')}
+                </button>
 
                 <BoardTabs
                   activeTab={activeTab}

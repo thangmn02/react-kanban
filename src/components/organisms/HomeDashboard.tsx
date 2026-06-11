@@ -23,15 +23,23 @@ import ErrorState from '../atoms/ErrorState';
 import DueDateBadge from '../atoms/DueDateBadge';
 import MyTasksSummary from '../home/MyTasksSummary';
 import { Skeleton, SkeletonCard } from '../atoms/skeleton';
+import { useI18n } from '../../i18n';
 
 interface HomeDashboardProps {
   onOpenTask: (taskId: string, boardId: string) => void;
   onOpenBoard: (boardId: string) => void;
   onToggleFocusTask: (task: HomeTaskSummary) => void;
+  onStartFocusTask?: (task: HomeTaskSummary) => void;
   isFocusTask: (taskId: string) => boolean;
   currentUser: AppUser;
   activeWorkspace: WorkspaceSummary | null;
   onCreateBoard?: () => void;
+  onCreateTask?: () => void;
+  onOpenQuickPlan?: () => void;
+  onOpenToday?: () => void;
+  focusTaskCount?: number;
+  focusSessionsToday?: number;
+  hasTeamMembers?: boolean;
 }
 
 function parseTaskDueDate(task: HomeTaskSummary) {
@@ -90,15 +98,33 @@ function getWeekGlance(tasks: HomeTaskSummary[]) {
   };
 }
 
+function getTaskDueOffset(task: HomeTaskSummary) {
+  const dueDate = parseTaskDueDate(task);
+
+  if (!dueDate) {
+    return null;
+  }
+
+  return differenceInCalendarDays(startOfDay(dueDate), startOfDay(new Date()));
+}
+
 function HomeDashboard({
   onOpenTask,
   onOpenBoard,
   onToggleFocusTask,
+  onStartFocusTask,
   isFocusTask,
   currentUser,
   activeWorkspace,
   onCreateBoard,
+  onCreateTask,
+  onOpenQuickPlan,
+  onOpenToday,
+  focusTaskCount = 0,
+  focusSessionsToday = 0,
+  hasTeamMembers = false,
 }: HomeDashboardProps) {
+  const { t } = useI18n();
   const [dashboardData, setDashboardData] = useState<HomeDashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRetrying, setIsRetrying] = useState(false);
@@ -163,18 +189,54 @@ function HomeDashboard({
   const recentBoards = dashboardData?.recentBoards || [];
   const heroTask = myTasks[0] ?? null;
   const upNextTasks = heroTask ? myTasks.filter((task) => task.id !== heroTask.id).slice(0, 3) : myTasks.slice(0, 3);
-  const heroPriorityClass = heroTask ? getPriorityBadgeClass(heroTask.priority || undefined) : null;
-  const heroIsFocused = heroTask ? isFocusTask(heroTask.id) : false;
   const weekGlance = getWeekGlance(myTasks);
   const hasWeekPlanningData = myTasks.length > 0;
+  const overdueTask = myTasks.find((task) => {
+    const dueOffset = getTaskDueOffset(task);
+    return dueOffset !== null && dueOffset < 0;
+  }) ?? null;
+  const focusedTask = myTasks.find((task) => isFocusTask(task.id)) ?? null;
+  const recommendedTask = overdueTask || focusedTask || heroTask;
+  const recommendedPriorityClass = recommendedTask ? getPriorityBadgeClass(recommendedTask.priority || undefined) : null;
+  const recommendedIsFocused = recommendedTask ? isFocusTask(recommendedTask.id) : false;
+  const dueTodayCount = myTasks.filter((task) => getTaskDueOffset(task) === 0).length;
+  const dueThisWeekCount = weekGlance.upcomingTasks.length;
+  const firstBoardId = recentBoards[0]?.id;
+  const primaryCta = !recommendedTask
+    ? {
+        label: t('home.quickPlanCta'),
+        helper: t('home.quickPlanHelper'),
+        onClick: onOpenQuickPlan || onCreateTask || onCreateBoard,
+      }
+    : overdueTask
+      ? {
+          label: t('home.startOverdue'),
+          helper: t('home.startOverdueHelper'),
+          onClick: () => onOpenTask(recommendedTask.id, recommendedTask.boardId),
+        }
+      : recommendedIsFocused
+        ? {
+            label: t('home.continueFocus'),
+            helper: t('home.continueFocusHelper'),
+            onClick: onStartFocusTask ? () => onStartFocusTask(recommendedTask) : onOpenToday || (() => onOpenTask(recommendedTask.id, recommendedTask.boardId)),
+          }
+        : {
+            label: t('home.planToday'),
+            helper: t('home.planTodayHelper'),
+            onClick: onOpenToday || (() => onToggleFocusTask(recommendedTask)),
+          };
+  const fallbackBoardAction = firstBoardId ? () => onOpenBoard(firstBoardId) : onCreateBoard;
+  const productSupportCopy = hasTeamMembers
+    ? t('home.description.team')
+    : t('home.description.solo');
 
   return (
     <div className="min-h-screen bg-canvas">
       <main className="mx-auto max-w-7xl px-5 py-6 sm:px-7" aria-busy={isLoading}>
         <PageHeader
-          eyebrow="Home"
-          title="Start your day"
-          description="Pick one task, plan what matters, then move into focus."
+          eyebrow={t('home.eyebrow')}
+          title={t('home.title')}
+          description={productSupportCopy}
           className="mb-6"
           actions={(
             <div className="hidden items-center gap-3 rounded-2xl border border-slate-200/80 bg-white px-3 py-2 shadow-card sm:flex">
@@ -247,10 +309,35 @@ function HomeDashboard({
 
         {!isLoading && !errorMessage && (
           <div className="space-y-6">
-            {/* Focus Now hero — the decisive "what to do now" surface. Uses the
-                top due-sorted assigned task and only existing handlers (open /
-                toggle focus); no timer logic here (Focus Dock is Phase 4). */}
-            {heroTask ? (
+            <section
+              aria-label={t('home.momentum')}
+              className="grid gap-3 rounded-3xl border border-slate-200/80 bg-white p-3 shadow-card sm:grid-cols-2 lg:grid-cols-5"
+            >
+              <div className={`rounded-2xl px-4 py-3 ${weekGlance.overdueTasks.length > 0 ? 'bg-rose-50 text-rose-800' : 'bg-slate-50 text-slate-700'}`}>
+                <p className="text-2xl font-semibold tracking-[-0.04em]">{weekGlance.overdueTasks.length}</p>
+                <p className="mt-1 text-xs font-semibold">
+                  {weekGlance.overdueTasks.length === 1 ? t('home.overdue.one') : t('home.overdue.many')}
+                </p>
+              </div>
+              <div className="rounded-2xl bg-slate-50 px-4 py-3 text-slate-700">
+                <p className="text-2xl font-semibold tracking-[-0.04em]">{dueTodayCount}</p>
+                <p className="mt-1 text-xs font-semibold">{dueTodayCount === 1 ? t('home.dueToday.one') : t('home.dueToday.many')}</p>
+              </div>
+              <div className="rounded-2xl bg-slate-50 px-4 py-3 text-slate-700">
+                <p className="text-2xl font-semibold tracking-[-0.04em]">{dueThisWeekCount}</p>
+                <p className="mt-1 text-xs font-semibold">{dueThisWeekCount === 1 ? t('home.dueWeek.one') : t('home.dueWeek.many')}</p>
+              </div>
+              <div className="rounded-2xl bg-slate-50 px-4 py-3 text-slate-700">
+                <p className="text-2xl font-semibold tracking-[-0.04em]">{focusTaskCount}</p>
+                <p className="mt-1 text-xs font-semibold">{focusTaskCount === 1 ? t('home.focusTask.one') : t('home.focusTask.many')}</p>
+              </div>
+              <div className="rounded-2xl bg-slate-50 px-4 py-3 text-slate-700">
+                <p className="text-2xl font-semibold tracking-[-0.04em]">{focusSessionsToday}</p>
+                <p className="mt-1 text-xs font-semibold">{focusSessionsToday === 1 ? t('home.focusSession.one') : t('home.focusSession.many')}</p>
+              </div>
+            </section>
+
+            {recommendedTask ? (
               <section
                 aria-labelledby="home-focus-now-title"
                 className="rounded-3xl border border-blue-200/70 bg-blue-50/50 p-6 sm:p-7"
@@ -258,84 +345,111 @@ function HomeDashboard({
                 <div className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-blue-600" aria-hidden="true" />
                   <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-blue-700">
-                    Recommended next
+                    {t('home.recommended')}
                   </p>
                 </div>
 
                 <button
                   type="button"
-                  onClick={() => onOpenTask(heroTask.id, heroTask.boardId)}
+                  onClick={() => onOpenTask(recommendedTask.id, recommendedTask.boardId)}
                   className="mt-2 block w-full cursor-pointer rounded-2xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
                 >
                   <h2
                     id="home-focus-now-title"
                     className="truncate text-2xl font-semibold tracking-[-0.03em] text-slate-950 sm:text-3xl"
                   >
-                    {heroTask.title}
+                    {recommendedTask.title}
                   </h2>
                 </button>
 
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                  {heroTask.priority && heroPriorityClass && (
-                    <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase ${heroPriorityClass}`}>
-                      {heroTask.priority}
+                  {recommendedTask.priority && recommendedPriorityClass && (
+                    <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase ${recommendedPriorityClass}`}>
+                      {recommendedTask.priority}
                     </span>
                   )}
-                  <DueDateBadge dueDate={heroTask.dueDate || undefined} />
+                  <DueDateBadge dueDate={recommendedTask.dueDate || undefined} />
                   <span className="rounded-full bg-white px-2.5 py-0.5 text-[11px] font-semibold text-slate-600">
-                    {heroTask.boardTitle}
+                    {recommendedTask.boardTitle}
                   </span>
                 </div>
 
                 <p className="mt-3 max-w-md text-sm leading-6 text-slate-600">
-                  Your highest-priority assigned task. Open it to start, or pin it to your Focus Dock to
-                  work on it next.
+                  {primaryCta.helper}
                 </p>
 
                 <div className="mt-5 flex flex-wrap items-center gap-3">
                   <button
                     type="button"
-                    onClick={() => onOpenTask(heroTask.id, heroTask.boardId)}
+                    onClick={primaryCta.onClick}
                     className="inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-200"
                   >
                     <svg className="h-4 w-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
                     </svg>
-                  Open task
+                    {primaryCta.label}
                   </button>
                   <button
                     type="button"
-                    onClick={() => onToggleFocusTask(heroTask)}
-                    aria-pressed={heroIsFocused}
+                    onClick={() => onToggleFocusTask(recommendedTask)}
+                    aria-pressed={recommendedIsFocused}
                     className={`inline-flex cursor-pointer items-center rounded-2xl border px-4 py-3 text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 ${
-                      heroIsFocused
+                      recommendedIsFocused
                         ? 'border-sky-200 bg-sky-50 text-sky-700'
                         : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                     }`}
                   >
-                    {heroIsFocused ? 'Ready to focus' : 'Plan for focus'}
+                    {recommendedIsFocused ? t('home.readyToFocus') : t('home.addToFocus')}
                   </button>
+                  {onOpenQuickPlan && (
+                    <button
+                      type="button"
+                      onClick={onOpenQuickPlan}
+                      className="inline-flex cursor-pointer items-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-slate-100"
+                    >
+                      {t('home.quickPlan')}
+                    </button>
+                  )}
                 </div>
               </section>
             ) : (
               <section className="rounded-3xl border border-slate-200/80 bg-white p-6 sm:p-7">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-blue-700">Start here</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-blue-700">{t('home.startHere')}</p>
                 <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
-                  Nothing assigned to you yet
+                  {t('home.emptyTitle')}
                 </h2>
                 <p className="mt-2 max-w-md text-sm leading-6 text-slate-600">
-                  When a task is assigned to you it shows up here first. Create a board to start planning
-                  your work.
+                  {t('home.emptyDescription')}
                 </p>
-                {onCreateBoard && (
-                  <button
-                    type="button"
-                    onClick={onCreateBoard}
-                    className="mt-5 inline-flex cursor-pointer items-center rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-200"
-                  >
-                    Create a board
-                  </button>
-                )}
+                <div className="mt-5 flex flex-wrap items-center gap-3">
+                  {primaryCta.onClick && (
+                    <button
+                      type="button"
+                      onClick={primaryCta.onClick}
+                      className="inline-flex cursor-pointer items-center rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-200"
+                    >
+                      {primaryCta.label}
+                    </button>
+                  )}
+                  {onCreateTask && (
+                    <button
+                      type="button"
+                      onClick={onCreateTask}
+                      className="inline-flex cursor-pointer items-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-slate-100"
+                    >
+                    {t('home.createSingleTask')}
+                    </button>
+                  )}
+                  {fallbackBoardAction && !onCreateTask && (
+                    <button
+                      type="button"
+                      onClick={fallbackBoardAction}
+                      className="inline-flex cursor-pointer items-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-slate-100"
+                    >
+                    {t('home.openBoard')}
+                    </button>
+                  )}
+                </div>
               </section>
             )}
 

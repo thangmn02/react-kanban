@@ -47,6 +47,8 @@ import {
 } from './services/focusSession.service';
 import BoardActivityDialog from './components/organisms/dialog/BoardActivityDialog';
 import FocusDock from './components/focus/FocusDock';
+import FocusCompletionPrompt from './components/focus/FocusCompletionPrompt';
+import FocusLaunchpadDialog from './components/focus/FocusLaunchpadDialog';
 import FocusLimitToast from './components/focus/FocusLimitToast';
 import WorkspaceMembersDialog from './components/workspace/WorkspaceMembersDialog';
 import { useFocusTasks } from './hooks/useFocusTasks';
@@ -152,6 +154,16 @@ function App() {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isRetryingWorkspace, setIsRetryingWorkspace] = useState(false);
   const [isRetryingBoard, setIsRetryingBoard] = useState(false);
+  const [focusLaunchTaskId, setFocusLaunchTaskId] = useState<string | null>(null);
+  const [activeFocusIntention, setActiveFocusIntention] = useState<{
+    taskId: string | null;
+    text: string;
+  } | null>(null);
+  const [focusCompletion, setFocusCompletion] = useState<{
+    task: FocusTask;
+    session: PomodoroSessionSnapshot;
+    intention: string;
+  } | null>(null);
   const [dailyFocusStats, setDailyFocusStats] = useState<DailyFocusStats>({
     focusedMinutes: 0,
     completedSessions: 0,
@@ -308,6 +320,10 @@ function App() {
       });
 
     if (task && mode === 'focus') {
+      const intention = activeFocusIntention?.taskId === task.id ? activeFocusIntention.text : '';
+      setFocusCompletion({ task, session, intention });
+      setActiveFocusIntention(null);
+
       void createActivity(task.id, 'update', {
         description: `Completed a ${Math.round(session.durationSeconds / 60)}m focus session`,
         field: 'focusSession',
@@ -319,7 +335,7 @@ function App() {
         console.warn('Unable to log focus session activity:', error);
       });
     }
-  }, [activeWorkspaceId, logPomodoroSession, user?.id]);
+  }, [activeFocusIntention, activeWorkspaceId, logPomodoroSession, user?.id]);
 
   const handlePomodoroInterrupt = useCallback((task: FocusTask | null, mode: PomodoroMode, session: PomodoroSessionSnapshot) => {
     void logPomodoroSession(task, mode, 'interrupted', session)
@@ -345,9 +361,44 @@ function App() {
     onInterrupt: handlePomodoroInterrupt,
   });
 
-  const handleStartFocusTimer = useCallback(() => {
-    startTimer(activeFocusTaskId || focusTasks[0]?.id);
-  }, [activeFocusTaskId, focusTasks, startTimer]);
+  const startFocusSessionNow = useCallback((taskId?: string, intention = '') => {
+    const nextTaskId = taskId || activeFocusTaskId || focusTasks[0]?.id || timerState.activeTaskId || null;
+
+    if (!nextTaskId) {
+      toast.info('Choose a focus task before starting the timer.', { theme: 'colored' });
+      return false;
+    }
+
+    setActiveFocusTaskId(nextTaskId);
+    setActiveTimerTaskId(nextTaskId);
+    setIsFocusDockCollapsed(false);
+
+    if (!timerState.startedAt) {
+      setActiveFocusIntention({
+        taskId: nextTaskId,
+        text: intention,
+      });
+    }
+
+    startTimer(nextTaskId);
+    return true;
+  }, [activeFocusTaskId, focusTasks, setActiveFocusTaskId, setActiveTimerTaskId, startTimer, timerState.activeTaskId, timerState.startedAt]);
+
+  const handleStartFocusTimer = useCallback((taskId?: string) => {
+    const nextTaskId = taskId || activeFocusTaskId || focusTasks[0]?.id || timerState.activeTaskId || null;
+
+    if (!nextTaskId) {
+      toast.info('Choose a focus task before starting the timer.', { theme: 'colored' });
+      return;
+    }
+
+    if (timerState.startedAt || timerState.isRunning) {
+      startFocusSessionNow(nextTaskId);
+      return;
+    }
+
+    setFocusLaunchTaskId(nextTaskId);
+  }, [activeFocusTaskId, focusTasks, startFocusSessionNow, timerState.activeTaskId, timerState.isRunning, timerState.startedAt]);
 
   const {
     isPictureInPictureSupported,
@@ -358,7 +409,7 @@ function App() {
     focusTasks,
     timerState,
     remainingSeconds,
-    onStart: handleStartFocusTimer,
+    onStart: () => startFocusSessionNow(),
     onPause: pauseTimer,
     onReset: resetTimer,
   });
@@ -374,6 +425,28 @@ function App() {
       toast.error(message, { theme: 'colored' });
     });
   }, [isPictureInPictureSupported, openPictureInPicture]);
+
+  const focusLaunchTask = focusLaunchTaskId
+    ? focusTasks.find((focusTask) => focusTask.id === focusLaunchTaskId) || null
+    : null;
+
+  const closeFocusLaunchpad = useCallback(() => {
+    setFocusLaunchTaskId(null);
+  }, []);
+
+  const handleConfirmFocusLaunch = useCallback((intention: string) => {
+    if (!focusLaunchTask) {
+      closeFocusLaunchpad();
+      return;
+    }
+
+    const didStart = startFocusSessionNow(focusLaunchTask.id, intention);
+
+    if (didStart) {
+      setFocusLaunchTaskId(null);
+      toast.success(`Focus started: ${focusLaunchTask.title}`, { theme: 'colored' });
+    }
+  }, [closeFocusLaunchpad, focusLaunchTask, startFocusSessionNow]);
 
   const onSubmitList = async (formData: { title: string }) => {
     if (!activeBoardId) {
@@ -494,7 +567,9 @@ function App() {
 
   const {
     handleToggleFocusTask,
+    handleStartFocusTask,
     handleToggleFocusTaskFromHome,
+    handleStartFocusTaskFromHome,
     handleToggleFocusTaskFromToday,
     handleStartFocusTaskFromToday,
   } = useFocusTaskHandlers({
@@ -508,7 +583,7 @@ function App() {
       setActiveFocusTaskId,
     },
     pomodoro: {
-      startTimer,
+      startFocusTimer: handleStartFocusTimer,
       setActiveTimerTaskId,
     },
     setIsFocusDockCollapsed,
@@ -599,7 +674,7 @@ function App() {
     }
   }, [activeWorkspaceId, removeFocusTask, setActiveViewWithPath, syncBoardCache, user?.id, activeBoardIdRef, setActiveBoardId, setBoardData, setIsBoardLoading, openEditTaskDialog]);
 
-  const handleMarkFocusTaskDone = async (focusTask: FocusTask) => {
+  const handleMarkFocusTaskDone = useCallback(async (focusTask: FocusTask) => {
     try {
       await updateTask(focusTask.id, buildTaskFieldUpdatePayload({ isDone: true }));
       updateFocusedTask(focusTask.id, { isDone: true });
@@ -632,7 +707,29 @@ function App() {
       const message = error instanceof Error ? error.message : 'Unable to mark focus task done.';
       toast.error(message, { theme: 'colored' });
     }
-  };
+  }, [activeWorkspaceId, boardData.task, setBoardData, updateFocusedTask, user?.id]);
+
+  const handleCloseFocusCompletion = useCallback(() => {
+    setFocusCompletion(null);
+  }, []);
+
+  const handleKeepWorkingFromCompletion = useCallback(() => {
+    const taskId = focusCompletion?.task.id;
+    setFocusCompletion(null);
+
+    if (taskId) {
+      setFocusLaunchTaskId(taskId);
+    }
+  }, [focusCompletion?.task.id]);
+
+  const handleMarkDoneFromCompletion = useCallback(() => {
+    const task = focusCompletion?.task;
+    setFocusCompletion(null);
+
+    if (task) {
+      void handleMarkFocusTaskDone(task);
+    }
+  }, [focusCompletion?.task, handleMarkFocusTaskDone]);
 
   const commandPaletteActions = useCommandPaletteActions({
     setActiveViewWithPath,
@@ -680,6 +777,24 @@ function App() {
         isOpen={isCommandPaletteOpen}
         actions={commandPaletteActions}
         onClose={() => setIsCommandPaletteOpen(false)}
+      />
+
+      <FocusLaunchpadDialog
+        isOpen={Boolean(focusLaunchTask)}
+        task={focusLaunchTask}
+        mode={timerState.mode}
+        suggestedSeconds={timerState.remainingSeconds}
+        onClose={closeFocusLaunchpad}
+        onStart={handleConfirmFocusLaunch}
+      />
+
+      <FocusCompletionPrompt
+        task={focusCompletion?.task || null}
+        session={focusCompletion?.session || null}
+        intention={focusCompletion?.intention || ''}
+        onMarkDone={handleMarkDoneFromCompletion}
+        onKeepWorking={handleKeepWorkingFromCompletion}
+        onClose={handleCloseFocusCompletion}
       />
 
       <TaskDialog
@@ -908,10 +1023,17 @@ function App() {
             onOpenTask={handleOpenTaskFromHome}
             onOpenBoard={handleOpenBoardFromHome}
             onToggleFocusTask={handleToggleFocusTaskFromHome}
+            onStartFocusTask={handleStartFocusTaskFromHome}
             isFocusTask={isFocusTask}
             currentUser={user}
             activeWorkspace={activeWorkspace}
             onCreateBoard={openCreateBoardDialog}
+            onCreateTask={handleQuickAddTask}
+            onOpenQuickPlan={handleOpenQuickPlan}
+            onOpenToday={() => setActiveViewWithPath('today')}
+            focusTaskCount={focusTasks.length}
+            focusSessionsToday={dailyFocusStats.completedSessions}
+            hasTeamMembers={workspaceMembers.length > 1}
           />
 
           {sharedDialogs}
@@ -1004,7 +1126,7 @@ function App() {
             onOpenAddGroup: openGroupDialog,
             onBoardPositionChange: handleBoardPositionChange,
             onUpdateTask: handleUpdateTask,
-            onToggleFocusTask: handleToggleFocusTask,
+            onToggleFocusTask: handleStartFocusTask,
           }}
           isFocusTask={isFocusTask}
           workspaceMembers={workspaceMembers}

@@ -1,6 +1,6 @@
 import type { PomodoroMode } from '../../types/focus.type';
-import { POMODORO_MODE_LABELS } from '../../utils/pomodoroTime';
 import { POMODORO_MODES } from '../../constants';
+import { useI18n } from '../../i18n';
 
 interface PomodoroModeSwitchProps {
   mode: PomodoroMode;
@@ -8,6 +8,13 @@ interface PomodoroModeSwitchProps {
 }
 
 function PomodoroModeSwitch({ mode, onModeChange }: PomodoroModeSwitchProps) {
+  const { t } = useI18n();
+  const modeLabels: Record<PomodoroMode, string> = {
+    focus: t('focus.mode.focus'),
+    shortBreak: t('focus.mode.shortBreak'),
+    longBreak: t('focus.mode.longBreak'),
+  };
+
   return (
     <div className="inline-flex rounded-2xl border border-white/10 bg-white/5 p-1">
       {POMODORO_MODES.map((currentMode) => (
@@ -22,7 +29,7 @@ function PomodoroModeSwitch({ mode, onModeChange }: PomodoroModeSwitchProps) {
           }`}
           aria-pressed={mode === currentMode}
         >
-          {POMODORO_MODE_LABELS[currentMode]}
+          {modeLabels[currentMode]}
         </button>
       ))}
     </div>

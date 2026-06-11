@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import type { AppUser, AuthMode, WorkspaceSummary } from '../../types/auth.type';
+import { useI18n, type Language } from '../../i18n';
 
 interface UserMenuProps {
   user: AppUser;
@@ -17,6 +18,7 @@ export default function UserMenu({
 }: UserMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const { language, setLanguage, t } = useI18n();
 
   useEffect(() => {
     if (!isOpen) {
@@ -68,13 +70,28 @@ export default function UserMenu({
         >
           <div className="border-b border-slate-100 px-4 py-3">
             <p className="truncate text-sm font-semibold text-slate-950">{user.name}</p>
-            <p className="truncate text-xs text-slate-500">{user.email || 'Demo user'}</p>
+            <p className="truncate text-xs text-slate-500">{user.email || t('app.demoUser')}</p>
             <p className="mt-1 text-xs text-slate-400">
-              {activeWorkspace?.name || 'No active workspace'}
+              {activeWorkspace?.name || t('app.noActiveWorkspace')}
             </p>
           </div>
 
           <div className="p-2">
+            <div className="mb-2 rounded-xl bg-slate-50 px-3 py-2">
+              <label className="text-xs font-semibold text-slate-500" htmlFor="user-menu-language">
+                {t('app.language.label')}
+              </label>
+              <select
+                id="user-menu-language"
+                value={language}
+                onChange={(event) => setLanguage(event.target.value as Language)}
+                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm font-semibold text-slate-700 outline-none transition focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
+              >
+                <option value="en">{t('app.language.en')}</option>
+                <option value="vi">{t('app.language.vi')}</option>
+              </select>
+            </div>
+
             {authMode === 'supabase' ? (
               <button
                 type="button"
@@ -85,11 +102,11 @@ export default function UserMenu({
                 className="w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-rose-600 transition hover:bg-rose-50 focus:outline-none focus:ring-4 focus:ring-rose-100"
                 role="menuitem"
               >
-                Sign out
+                {t('app.signOut')}
               </button>
             ) : (
               <p className="rounded-xl px-3 py-2 text-sm text-slate-500" role="menuitem">
-                Demo data is safe to edit and stored locally in this browser.
+                {t('app.demoData.description')}
               </p>
             )}
           </div>

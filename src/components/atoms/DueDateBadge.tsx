@@ -1,4 +1,5 @@
 import { getDueDateStatus } from '../../utils/taskMetadata';
+import { useI18n } from '../../i18n';
 
 interface DueDateBadgeProps {
   dueDate?: string;
@@ -8,6 +9,30 @@ interface DueDateBadgeProps {
 
 export default function DueDateBadge({ dueDate, isDone, className = '' }: DueDateBadgeProps) {
   const meta = getDueDateStatus(dueDate, isDone);
+  const { t } = useI18n();
+
+  const getLabel = () => {
+    if (isDone) return t('common.completed');
+    if (!dueDate) return t('common.noDueDate');
+    if (meta.label === 'Invalid date') return t('common.invalidDate');
+    if (meta.status === 'today') return t('common.dueToday');
+    if (meta.label === 'Due tomorrow') return t('common.dueTomorrow');
+
+    const overdueMatch = meta.label.match(/^Overdue (\d+) day/);
+    if (overdueMatch) {
+      const count = Number(overdueMatch[1]);
+      return t('common.overdueDays', { count, plural: count === 1 ? '' : 's' });
+    }
+
+    const daysLeftMatch = meta.label.match(/^(\d+) days left$/);
+    if (daysLeftMatch) {
+      return t('common.daysLeft', { count: Number(daysLeftMatch[1]) });
+    }
+
+    return meta.label;
+  };
+
+  const label = getLabel();
 
   // Render different SVGs depending on iconName
   const renderIcon = () => {
@@ -37,10 +62,10 @@ export default function DueDateBadge({ dueDate, isDone, className = '' }: DueDat
   return (
     <span
       className={`inline-flex items-center gap-1.5 rounded px-2.5 py-0.5 text-xs transition-colors duration-150 ${meta.className} ${className}`}
-      title={dueDate ? `Due date: ${dueDate}` : 'No due date set'}
+      title={dueDate ? `${t('common.dueDate')}: ${dueDate}` : t('common.noDueDate')}
     >
       {renderIcon()}
-      <span>{meta.label}</span>
+      <span>{label}</span>
     </span>
   );
 }

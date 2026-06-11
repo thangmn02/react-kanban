@@ -2,6 +2,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 
 import type { DailyFocusStats, FocusTask, PomodoroMode, PomodoroTimerState } from '../../types/focus.type';
 import { formatPomodoroTime } from '../../utils/pomodoroTime';
+import { useI18n } from '../../i18n';
 import FocusDockHeader from './FocusDockHeader';
 import FocusTaskMiniCard from './FocusTaskMiniCard';
 import PomodoroTimer from './PomodoroTimer';
@@ -48,6 +49,7 @@ function FocusDock({
   isPictureInPictureOpen,
 }: FocusDockProps) {
   const shouldReduceMotion = useReducedMotion();
+  const { t } = useI18n();
 
   if (focusTasks.length === 0) {
     return null;
@@ -66,11 +68,11 @@ function FocusDock({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 16, scale: 0.96 }}
             transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 260, damping: 24 }}
-            aria-label="Expand Focus Dock"
+            aria-label={t('focus.dock.expand')}
           >
             <span className="inline-flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-emerald-400" aria-hidden="true" />
-              {focusTasks.length} focus task{focusTasks.length === 1 ? '' : 's'} · <span className="tabular-nums">{formatPomodoroTime(remainingSeconds)}</span>
+              {t('focus.dock.taskCount', { count: focusTasks.length, plural: focusTasks.length === 1 ? '' : 's' })} · <span className="tabular-nums">{formatPomodoroTime(remainingSeconds)}</span>
             </span>
           </motion.button>
         ) : (
@@ -81,7 +83,7 @@ function FocusDock({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 24, scale: 0.96 }}
             transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 240, damping: 25 }}
-            aria-label="Focus Dock"
+            aria-label={t('focus.dock.title')}
           >
             <FocusDockHeader taskCount={focusTasks.length} onCollapse={() => onCollapseChange(true)} />
 

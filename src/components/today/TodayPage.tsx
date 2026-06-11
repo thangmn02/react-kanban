@@ -11,6 +11,7 @@ import ErrorState from '../atoms/ErrorState';
 import TodayTaskSection from './TodayTaskSection';
 import TodayTaskCard from './TodayTaskCard';
 import { Skeleton, SkeletonTaskCard } from '../atoms/skeleton';
+import { useI18n } from '../../i18n';
 
 interface TodayPageProps {
   currentUser: AppUser;
@@ -49,6 +50,7 @@ export default function TodayPage({
   const [isRetrying, setIsRetrying] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const prefersReducedMotion = useReducedMotion();
+  const { t } = useI18n();
 
   const workspaceId = activeWorkspace?.id;
 
@@ -61,9 +63,9 @@ export default function TodayPage({
       setTodayData(data);
       setErrorMessage(null);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Unable to load Today data.');
+      setErrorMessage(error instanceof Error ? error.message : t('today.loadError'));
     }
-  }, [workspaceId, currentUser]);
+  }, [workspaceId, currentUser, t]);
 
   useEffect(() => {
     let isMounted = true;
@@ -85,7 +87,7 @@ export default function TodayPage({
           return;
         }
 
-        setErrorMessage(error instanceof Error ? error.message : 'Unable to load Today data.');
+        setErrorMessage(error instanceof Error ? error.message : t('today.loadError'));
       })
       .finally(() => {
         if (isMounted) {
@@ -96,7 +98,7 @@ export default function TodayPage({
     return () => {
       isMounted = false;
     };
-  }, [workspaceId, currentUser]);
+  }, [workspaceId, currentUser, t]);
 
   const handleRetry = useCallback(() => {
     setIsRetrying(true);
@@ -112,9 +114,9 @@ export default function TodayPage({
     <main className="min-h-screen bg-canvas px-5 py-7 sm:px-7" aria-busy={isLoading}>
       <section className="mx-auto max-w-7xl">
         <PageHeader
-          eyebrow="Today"
-          title="My Day"
-          description="Choose up to 3 tasks, start focus, and finish the day without living in the board."
+          eyebrow={t('today.eyebrow')}
+          title={t('today.title')}
+          description={t('today.description')}
           className="mb-7"
           actions={(
             <button
@@ -122,7 +124,7 @@ export default function TodayPage({
               onClick={onQuickCreateTask}
               className="cursor-pointer rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-blue-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-100"
             >
-              Quick add task
+              {t('today.quickAddTask')}
             </button>
           )}
         />
@@ -130,10 +132,10 @@ export default function TodayPage({
         <div className="mb-6 rounded-2xl border border-slate-200/80 bg-white px-4 py-3 shadow-card">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm font-semibold text-slate-900">
-              Today: {dailyFocusStats.completedSessions} focus session{dailyFocusStats.completedSessions === 1 ? '' : 's'}
+              {t('today.stats.sessions', { count: dailyFocusStats.completedSessions, plural: dailyFocusStats.completedSessions === 1 ? '' : 's' })}
             </p>
             <p className="text-sm text-slate-500">
-              {dailyFocusStats.focusedMinutes} focused minutes
+              {t('today.stats.minutes', { count: dailyFocusStats.focusedMinutes })}
               {dailyFocusStats.interruptedSessions > 0 ? ` · ${dailyFocusStats.interruptedSessions} interrupted` : ''}
             </p>
           </div>
@@ -174,8 +176,8 @@ export default function TodayPage({
 
         {!isLoading && errorMessage && (
           <ErrorState
-            title="Couldn't load your day"
-            description="Something went wrong while loading today's planning data."
+            title={t('today.errorTitle')}
+            description={t('today.errorDescription')}
             details={errorMessage}
             onRetry={handleRetry}
             isRetrying={isRetrying}
@@ -189,10 +191,10 @@ export default function TodayPage({
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-slate-600">
-                      Today's plan
+                      {t('today.plan')}
                     </h2>
                     <p className="mt-1 text-sm text-slate-500">
-                      Up to 3 tasks, in the order you want to execute.
+                      {t('today.planDescription')}
                     </p>
                   </div>
                   <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
@@ -203,15 +205,15 @@ export default function TodayPage({
                 <div className="mt-4 grid gap-3">
                   {focusTasks.length === 0 ? (
                     <EmptyState
-                      title="No focus tasks yet"
-                      description="Choose one task to focus on and start a session."
+                      title={t('today.noFocusTitle')}
+                      description={t('today.noFocusDescription')}
                       action={(
                         <button
                           type="button"
                           onClick={onQuickCreateTask}
                           className="inline-flex cursor-pointer items-center rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-100"
                         >
-                          Quick add task
+                          {t('today.quickAddTask')}
                         </button>
                       )}
                     />
@@ -222,7 +224,7 @@ export default function TodayPage({
                         boardId: focusTask.boardId,
                         boardTitle: focusTask.boardTitle,
                         listId: focusTask.listId || '',
-                        listTitle: focusTask.listTitle || 'Untitled list',
+                        listTitle: focusTask.listTitle || t('today.untitledList'),
                         title: focusTask.title,
                         description: '',
                         priority: focusTask.priority || null,
@@ -263,9 +265,9 @@ export default function TodayPage({
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ type: 'spring', stiffness: 160, damping: 20 }}
                 >
-                  <h2 className="text-sm font-semibold text-slate-950">No urgent tasks today.</h2>
+                  <h2 className="text-sm font-semibold text-slate-950">{t('today.noUrgentTitle')}</h2>
                   <p className="mt-2 text-sm leading-6 text-slate-600">
-                    Use this as planning space: choose one meaningful task, start focus, and keep the board out of the way.
+                    {t('today.planningSpace')}
                   </p>
                 </motion.div>
               )}
@@ -276,19 +278,19 @@ export default function TodayPage({
                 <SectionCard className="p-5">
                   <div className="mb-4">
                     <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-slate-600">
-                      Needs attention
+                      {t('today.needsAttention')}
                     </h2>
                     <p className="mt-1 text-sm text-slate-500">
-                      Decide whether these belong in today's plan.
+                      {t('today.needsAttentionDescription')}
                     </p>
                   </div>
                   <div className="grid gap-5">
                     {todayData.overdueTasks.length > 0 && (
                       <TodayTaskSection
-                        title="Overdue"
-                        description="Clear these first if they still matter."
+                        title={t('common.overdue')}
+                        description={t('today.overdueDescription')}
                         tasks={todayData.overdueTasks}
-                        emptyMessage="No overdue tasks."
+                        emptyMessage={t('today.noOverdue')}
                         isFocusTask={isFocusTask}
                         onOpenTask={onOpenTask}
                         onStartFocus={onStartFocus}
@@ -299,10 +301,10 @@ export default function TodayPage({
 
                     {todayData.dueTodayTasks.length > 0 && (
                       <TodayTaskSection
-                        title="Due today"
-                        description="Deadline-driven work for this day."
+                        title={t('today.dueTodayTitle')}
+                        description={t('today.dueTodayDescription')}
                         tasks={todayData.dueTodayTasks}
-                        emptyMessage="No urgent tasks. Choose one task to focus on."
+                        emptyMessage={t('today.emptyUrgent')}
                         isFocusTask={isFocusTask}
                         onOpenTask={onOpenTask}
                         onStartFocus={onStartFocus}
@@ -317,15 +319,15 @@ export default function TodayPage({
               {hasSecondaryTasks && (
                 <details className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-card">
                   <summary className="cursor-pointer text-sm font-bold uppercase tracking-[0.2em] text-slate-600">
-                    More tasks
+                    {t('today.moreTasks')}
                   </summary>
                   <div className="mt-5 grid gap-5">
                     {todayData.assignedTasks.length > 0 && (
                       <TodayTaskSection
-                        title="Assigned to me"
-                        description="Your workload, sorted by due date."
+                        title={t('today.assignedTitle')}
+                        description={t('today.assignedDescription')}
                         tasks={todayData.assignedTasks}
-                        emptyMessage="No assigned tasks in this workspace."
+                        emptyMessage={t('today.noAssigned')}
                         isFocusTask={isFocusTask}
                         onOpenTask={onOpenTask}
                         onStartFocus={onStartFocus}
@@ -336,10 +338,10 @@ export default function TodayPage({
 
                     {todayData.recentlyActiveTasks.length > 0 && (
                       <TodayTaskSection
-                        title="Recently active"
-                        description="Tasks updated recently in this workspace."
+                        title={t('today.recentTitle')}
+                        description={t('today.recentDescription')}
                         tasks={todayData.recentlyActiveTasks}
-                        emptyMessage="No recent task activity yet."
+                        emptyMessage={t('today.noRecent')}
                         isFocusTask={isFocusTask}
                         onOpenTask={onOpenTask}
                         onStartFocus={onStartFocus}
