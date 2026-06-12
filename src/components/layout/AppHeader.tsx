@@ -17,6 +17,8 @@ interface AppHeaderProps {
   onCreateBoard: () => void;
   onWorkspaceChange: (workspaceId: string | null) => void;
   onSignOut: () => void;
+  onOpenArcanaBooth: () => void;
+  arcanaAvailableDraws?: number;
 }
 
 export default function AppHeader({
@@ -32,6 +34,8 @@ export default function AppHeader({
   onCreateBoard,
   onWorkspaceChange,
   onSignOut,
+  onOpenArcanaBooth,
+  arcanaAvailableDraws = 0,
 }: AppHeaderProps) {
   const { t } = useI18n();
 
@@ -103,6 +107,8 @@ export default function AppHeader({
             authMode={authMode}
             activeWorkspace={activeWorkspace}
             onSignOut={onSignOut}
+            onOpenArcanaBooth={onOpenArcanaBooth}
+            arcanaAvailableDraws={arcanaAvailableDraws}
           />
         </div>
       </div>

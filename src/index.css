@@ -37,3 +37,431 @@
     scroll-behavior: auto !important;
   }
 }
+
+@keyframes arcana-reveal {
+  0% {
+    opacity: 0;
+    filter: saturate(0.4) brightness(1.8);
+    transform: rotateY(76deg) translateY(14px) scale(0.92);
+  }
+
+  52% {
+    opacity: 1;
+    filter: saturate(1.5) brightness(1.35);
+    transform: rotateY(-8deg) translateY(-4px) scale(1.03);
+  }
+
+  100% {
+    filter: saturate(1) brightness(1);
+    opacity: 1;
+    transform: rotateY(0deg) translateY(0) scale(1);
+  }
+}
+
+.arcana-pixel-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+  background-size: 12px 12px;
+}
+
+.arcana-pixel-card::before,
+.arcana-pixel-card::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  width: 18px;
+  height: 18px;
+  background: var(--arcana-accent);
+  box-shadow: 0 0 22px var(--arcana-accent);
+}
+
+.arcana-pixel-card::before {
+  left: 10px;
+  top: 10px;
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+}
+
+.arcana-pixel-card::after {
+  bottom: 10px;
+  right: 10px;
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
+}
+
+/* ===========================================================================
+ * Arcana — card finish (foil) system, inspired by trading-card CSS techniques.
+ *
+ * Every card (including commons) gets a cursor-driven 3D rotation (set via
+ * inline transform from JS) and a glare/flare layer that follows the pointer.
+ * Higher finishes add distinct holo/galaxy/prism/glitter layers on top.
+ *
+ * Pointer state is exposed as CSS variables on the tilt element:
+ *   --arc-px / --arc-py : pointer position 0..100 (%)
+ *   --arc-fromx/-fromy  : signed offset from center, -50..50
+ *   --arc-hyp           : 0..1 distance from center (glare intensity)
+ * All decorative motion is paused under prefers-reduced-motion.
+ * ======================================================================== */
+
+.arcana-art {
+  image-rendering: pixelated;
+}
+
+/* 3D tilt wrapper — rotation is applied via inline transform from JS. */
+.arcana-tilt {
+  transform-style: preserve-3d;
+  transition: transform 180ms ease-out, box-shadow 180ms ease-out;
+  will-change: transform;
+}
+.arcana-tilt.is-active {
+  transition: transform 60ms ease-out;
+}
+
+/* Universal glare: a soft white flare that tracks the cursor. Present on ALL
+   cards — this is the "basic non-holo" flare-following-mouse behavior. */
+.arcana-glare {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  mix-blend-mode: overlay;
+  opacity: calc(0.35 + var(--arc-hyp, 0) * 0.5);
+  background: radial-gradient(
+    farthest-corner circle at var(--arc-px, 50%) var(--arc-py, 50%),
+    rgba(255, 255, 255, 0.85) 8%,
+    rgba(255, 255, 255, 0.25) 22%,
+    rgba(0, 0, 0, 0.18) 60%,
+    rgba(0, 0, 0, 0.35) 100%
+  );
+}
+
+/* Shared finish overlay base (sits between art and glare). */
+.arcana-finish {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  mix-blend-mode: color-dodge;
+  opacity: 0;
+}
+.arcana-finish::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+/* --- Matte (plain): no holo texture — just the universal glare + a subtle
+   light/shadow polish so it still feels three-dimensional. ---------------- */
+.arcana-finish--plain {
+  opacity: 1;
+  mix-blend-mode: soft-light;
+  background: linear-gradient(
+    calc(120deg + var(--arc-fromx, 0) * 0.6deg),
+    rgba(255, 255, 255, 0.16) 0%,
+    transparent 36%,
+    rgba(0, 0, 0, 0.24) 100%
+  );
+}
+
+/* --- Silver sheen: a metallic reflective band that sweeps with the cursor,
+   plus a soft chrome rim. --------------------------------------------------- */
+.arcana-finish--silver {
+  opacity: 0.85;
+  mix-blend-mode: hard-light;
+  background: linear-gradient(
+    calc(105deg + var(--arc-fromx, 0) * 1deg),
+    transparent calc(28% + var(--arc-fromy, 0) * 0.4%),
+    rgba(245, 248, 255, 0.9) calc(46% + var(--arc-fromx, 0) * 0.4%),
+    rgba(190, 205, 225, 0.4) 52%,
+    transparent 72%
+  );
+  box-shadow: inset 0 0 0 2px rgba(220, 230, 245, 0.35);
+}
+
+/* --- Holo: vertical chromatic beams whose background-position is driven by
+   the cursor, with a pointer-reactive glare hot-spot (classic holofoil). --- */
+.arcana-finish--holo {
+  opacity: 0.6;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 0, 132, 0.5) 0%,
+      rgba(255, 214, 0, 0.4) 12%,
+      rgba(0, 224, 158, 0.45) 24%,
+      rgba(0, 168, 255, 0.45) 36%,
+      rgba(180, 0, 255, 0.5) 48%,
+      rgba(255, 0, 132, 0.5) 60%
+    );
+  background-size: 200% 100%;
+  background-position: calc(var(--arc-px, 50%) * -1) 0;
+}
+.arcana-finish--holo::after {
+  background: radial-gradient(
+    farthest-corner circle at var(--arc-px, 50%) var(--arc-py, 50%),
+    rgba(255, 255, 255, 0.7), transparent 42%
+  );
+  mix-blend-mode: overlay;
+}
+
+/* --- Prism: sharp diagonal light fragments that travel in OPPOSITE
+   directions as the card tilts (V-card style), set to color-dodge. -------- */
+.arcana-finish--prism {
+  opacity: 0.55;
+  background:
+    repeating-linear-gradient(
+      45deg,
+      rgba(255, 80, 210, 0.5) 0px, rgba(0, 220, 255, 0.5) 8px,
+      rgba(150, 255, 130, 0.5) 16px, transparent 24px, transparent 40px
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      rgba(255, 220, 0, 0.4) 0px, rgba(120, 90, 255, 0.4) 10px,
+      transparent 20px, transparent 38px
+    );
+  background-size: 220% 220%, 220% 220%;
+  background-position:
+    calc(var(--arc-px, 50%) * 1.4) calc(var(--arc-py, 50%) * 1.4),
+    calc(var(--arc-px, 50%) * -1.4) calc(var(--arc-py, 50%) * -1.4);
+}
+
+/* --- Galaxy/Cosmos: starfield + a rainbow gradient set to color-dodge that
+   shifts with the cursor (galaxy holofoil). ------------------------------- */
+.arcana-finish--galaxy {
+  opacity: 0.8;
+  mix-blend-mode: color-dodge;
+  background:
+    radial-gradient(1.4px 1.4px at 18% 28%, rgba(255,255,255,0.95), transparent 60%),
+    radial-gradient(1.2px 1.2px at 68% 62%, rgba(210,230,255,0.85), transparent 60%),
+    radial-gradient(1px 1px at 42% 82%, rgba(255,255,255,0.8), transparent 60%),
+    radial-gradient(2px 2px at 84% 22%, rgba(190,220,255,0.95), transparent 60%),
+    radial-gradient(1.3px 1.3px at 55% 12%, rgba(255,235,200,0.85), transparent 60%),
+    linear-gradient(
+      calc(120deg + var(--arc-fromx, 0) * 1.2deg),
+      rgba(255, 0, 160, 0.5), rgba(0, 170, 255, 0.5), rgba(120, 80, 255, 0.5)
+    );
+  background-size: 200% 200%, 200% 200%, 200% 200%, 200% 200%, 200% 200%, 240% 240%;
+  background-position:
+    calc(var(--arc-px,50%) * 0.4) calc(var(--arc-py,50%) * 0.4),
+    calc(var(--arc-px,50%) * -0.3) calc(var(--arc-py,50%) * 0.5),
+    var(--arc-px,50%) var(--arc-py,50%),
+    calc(var(--arc-px,50%) * 0.6) calc(var(--arc-py,50%) * -0.4),
+    calc(var(--arc-px,50%) * -0.5) var(--arc-py,50%),
+    calc(var(--arc-px,50%)) calc(var(--arc-py,50%));
+}
+
+/* --- Eclipse: dark vignette aura with a molten rim-glow that pulses;
+   highest mystical contrast. ---------------------------------------------- */
+.arcana-finish--eclipse {
+  opacity: 0.96;
+  mix-blend-mode: normal;
+  background:
+    radial-gradient(circle at var(--arc-px,50%) var(--arc-py,50%), transparent 46%, rgba(0,0,0,0.82) 80%),
+    radial-gradient(circle at center, rgba(255,150,70,0) 50%, rgba(255,150,70,0.7) 57%, transparent 64%);
+  animation: arcana-pulse 3.6s ease-in-out infinite;
+}
+.arcana-finish--eclipse::after {
+  background: radial-gradient(
+    farthest-corner circle at var(--arc-px,50%) var(--arc-py,50%),
+    rgba(255,190,120,0.5), transparent 38%
+  );
+  mix-blend-mode: screen;
+}
+
+/* --- Spectral (rarest): shiny textured glitter that extends past the frame,
+   two glitter layers sliding opposite, with a lighten filter (amazing-rare
+   style). ----------------------------------------------------------------- */
+.arcana-finish--spectral {
+  opacity: 0.9;
+  mix-blend-mode: color-dodge;
+  background:
+    radial-gradient(1px 1px at 10% 20%, rgba(255,255,255,0.95), transparent 55%),
+    radial-gradient(1.5px 1.5px at 30% 70%, rgba(180,255,240,0.9), transparent 55%),
+    radial-gradient(1px 1px at 60% 40%, rgba(255,255,255,0.9), transparent 55%),
+    radial-gradient(1.8px 1.8px at 80% 75%, rgba(160,200,255,0.9), transparent 55%),
+    radial-gradient(1.2px 1.2px at 90% 30%, rgba(255,255,255,0.85), transparent 55%),
+    linear-gradient(120deg, rgba(120,255,220,0.35), rgba(160,180,255,0.35));
+  background-size: 160% 160%, 160% 160%, 160% 160%, 160% 160%, 160% 160%, 200% 200%;
+  filter: brightness(1.15) saturate(1.2);
+  animation: arcana-glitter 3.2s linear infinite;
+}
+.arcana-finish--spectral::after {
+  background: radial-gradient(
+    farthest-corner circle at var(--arc-px,50%) var(--arc-py,50%),
+    rgba(255,255,255,0.65), transparent 40%
+  );
+  mix-blend-mode: screen;
+}
+
+@keyframes arcana-pulse {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.25); }
+}
+@keyframes arcana-glitter {
+  0% { background-position: 0% 0%, 30% 30%, 60% 10%, 80% 70%, 90% 30%, 0% 0%; }
+  100% { background-position: 60% 60%, -30% 80%, 10% 70%, 30% 10%, 40% 90%, 100% 100%; }
+}
+
+/* Pack opening sequence ---------------------------------------------------- */
+@keyframes arcana-pack-shake {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  20% { transform: translateX(-3px) rotate(-1.5deg); }
+  40% { transform: translateX(3px) rotate(1.5deg); }
+  60% { transform: translateX(-2px) rotate(-1deg); }
+  80% { transform: translateX(2px) rotate(1deg); }
+}
+@keyframes arcana-pack-tear {
+  0% { transform: scale(1); opacity: 1; }
+  60% { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1.35); opacity: 0; }
+}
+@keyframes arcana-flash {
+  0% { opacity: 0; }
+  40% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes arcana-pack-idle {
+  0%, 100% { transform: translateY(0) rotate(-1deg); }
+  50% { transform: translateY(-6px) rotate(1deg); }
+}
+
+.arcana-pack-idle {
+  animation: arcana-pack-idle 3.4s ease-in-out infinite;
+}
+.arcana-pack-shake {
+  animation: arcana-pack-shake 520ms ease-in-out;
+}
+.arcana-pack-tear {
+  animation: arcana-pack-tear 620ms ease-in forwards;
+}
+.arcana-flash {
+  animation: arcana-flash 620ms ease-out forwards;
+}
+
+/* ===========================================================================
+ * Arcana — "Celestial Atelier" booth shell.
+ * A full-bleed mystical scene: ink-indigo void, drifting starfield, nebula
+ * bloom, gold hairline ornaments, engraved serif type. Designed, not vibe.
+ * ======================================================================== */
+
+.arcana-display {
+  font-family: "Liga SFMono Nerd Font", Consolas, "Courier New", monospace;
+  letter-spacing: 0.02em;
+}
+.arcana-serif {
+  font-family: "Liga SFMono Nerd Font", Consolas, "Courier New", monospace;
+}
+
+/* Backdrop: deep void with twin nebula blooms. */
+.arcana-void {
+  background:
+    radial-gradient(60% 50% at 22% 18%, rgba(86, 64, 170, 0.28), transparent 70%),
+    radial-gradient(55% 45% at 82% 88%, rgba(180, 92, 64, 0.18), transparent 70%),
+    radial-gradient(120% 90% at 50% 0%, rgba(14, 12, 34, 0.6), transparent 60%),
+    #05030c;
+}
+
+/* Drifting starfield (two parallax layers). */
+.arcana-stars,
+.arcana-stars::after {
+  position: absolute;
+  inset: -50%;
+  pointer-events: none;
+  background-repeat: repeat;
+}
+.arcana-stars {
+  background-image:
+    radial-gradient(1px 1px at 20% 30%, rgba(255, 255, 255, 0.9), transparent),
+    radial-gradient(1px 1px at 70% 65%, rgba(214, 226, 255, 0.8), transparent),
+    radial-gradient(1.5px 1.5px at 40% 80%, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1px 1px at 85% 18%, rgba(255, 240, 210, 0.85), transparent),
+    radial-gradient(1px 1px at 55% 45%, rgba(255, 255, 255, 0.6), transparent);
+  background-size: 360px 360px;
+  opacity: 0.7;
+  animation: arcana-stardrift 90s linear infinite;
+}
+.arcana-stars::after {
+  content: "";
+  background-image:
+    radial-gradient(1px 1px at 10% 50%, rgba(255, 255, 255, 0.5), transparent),
+    radial-gradient(1.5px 1.5px at 60% 20%, rgba(190, 210, 255, 0.6), transparent),
+    radial-gradient(1px 1px at 90% 75%, rgba(255, 255, 255, 0.5), transparent);
+  background-size: 540px 540px;
+  animation: arcana-stardrift 140s linear infinite reverse;
+}
+@keyframes arcana-stardrift {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(0, -360px, 0); }
+}
+
+/* Gold hairline ornament divider with a center diamond. */
+.arcana-rule {
+  position: relative;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(214, 184, 122, 0.55), transparent);
+}
+.arcana-rule::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  transform: translate(-50%, -50%) rotate(45deg);
+  background: rgba(224, 196, 138, 0.9);
+  box-shadow: 0 0 10px rgba(224, 196, 138, 0.7);
+}
+
+/* The glowing dais the sealed pack rests on. */
+.arcana-dais {
+  background: radial-gradient(60% 100% at 50% 0%, rgba(224, 196, 138, 0.22), transparent 70%);
+}
+.arcana-dais::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 8%;
+  width: 62%;
+  height: 22px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(224, 196, 138, 0.35), transparent 70%);
+  filter: blur(4px);
+}
+
+/* Ceremonial gold button. */
+.arcana-btn-gold {
+  font-family: "Liga SFMono Nerd Font", Consolas, monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #1a1208;
+  background: linear-gradient(180deg, #f6e2ab 0%, #d9b878 55%, #b8924f 100%);
+  box-shadow: 0 10px 30px rgba(184, 146, 79, 0.35), inset 0 1px 0 rgba(255, 248, 224, 0.7);
+}
+.arcana-btn-gold:hover {
+  background: linear-gradient(180deg, #fbeec0 0%, #e6c98a 55%, #c79f5a 100%);
+}
+.arcana-btn-ghost {
+  font-family: "Liga SFMono Nerd Font", Consolas, monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(232, 220, 196, 0.92);
+  border: 1px solid rgba(214, 184, 122, 0.4);
+}
+.arcana-btn-ghost:hover {
+  border-color: rgba(214, 184, 122, 0.7);
+  background: rgba(214, 184, 122, 0.08);
+}
+
+/* Floating ambient motion for the sealed pack. */
+@keyframes arcana-float {
+  0%, 100% { transform: translateY(0) rotate(-1deg); }
+  50% { transform: translateY(-10px) rotate(1deg); }
+}
+.arcana-float { animation: arcana-float 4.2s ease-in-out infinite; }
+
+/* Scene fade/zoom for stage transitions (used as a fallback to framer-motion). */
+@keyframes arcana-scene-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.arcana-scene { animation: arcana-scene-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both; }

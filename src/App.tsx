@@ -51,6 +51,13 @@ import FocusCompletionPrompt from './components/focus/FocusCompletionPrompt';
 import FocusLaunchpadDialog from './components/focus/FocusLaunchpadDialog';
 import FocusLimitToast from './components/focus/FocusLimitToast';
 import WorkspaceMembersDialog from './components/workspace/WorkspaceMembersDialog';
+import ArcanaBoothDialog from './features/arcana/ArcanaBoothDialog';
+import ArcanaRewardToast from './features/arcana/ArcanaRewardToast';
+import {
+  consumeArcanaRewardDraw,
+  readArcanaRewardState,
+  registerArcanaTaskCompletion,
+} from './features/arcana/arcanaReward';
 import { useFocusTasks } from './hooks/useFocusTasks';
 import { usePomodoroTimer } from './hooks/usePomodoroTimer';
 import { useFocusTaskHandlers } from './hooks/useFocusTaskHandlers';
@@ -152,6 +159,9 @@ function App() {
   const [deleteItem, setDeleteItem] = useState<BoardDeleteItem | null>(null);
   const [isFocusDockCollapsed, setIsFocusDockCollapsed] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [isArcanaBoothOpen, setIsArcanaBoothOpen] = useState(false);
+  const [arcanaRewardState, setArcanaRewardState] = useState(readArcanaRewardState);
+  const [isArcanaRewardPromptOpen, setIsArcanaRewardPromptOpen] = useState(false);
   const [isRetryingWorkspace, setIsRetryingWorkspace] = useState(false);
   const [isRetryingBoard, setIsRetryingBoard] = useState(false);
   const [focusLaunchTaskId, setFocusLaunchTaskId] = useState<string | null>(null);
@@ -565,6 +575,26 @@ function App() {
 
   const handleEditTask = openEditTaskDialog;
 
+  const handleArcanaTaskCompleted = useCallback(() => {
+    const rewardResult = registerArcanaTaskCompletion();
+    setArcanaRewardState(rewardResult.state);
+
+    if (rewardResult.shouldPrompt) {
+      setIsArcanaRewardPromptOpen(true);
+    }
+  }, []);
+
+  const handleOpenArcanaBooth = useCallback((consumeRewardDraw = false) => {
+    if (consumeRewardDraw) {
+      setArcanaRewardState(consumeArcanaRewardDraw());
+    } else {
+      setArcanaRewardState(readArcanaRewardState());
+    }
+
+    setIsArcanaRewardPromptOpen(false);
+    setIsArcanaBoothOpen(true);
+  }, []);
+
   const {
     handleToggleFocusTask,
     handleStartFocusTask,
@@ -646,6 +676,7 @@ function App() {
     activeListId: dialogState.taskDialog.activeListId,
     closeTaskDialog,
     refreshBoardData,
+    onTaskCompleted: handleArcanaTaskCompleted,
   });
 
   const handleOpenFocusTask = useCallback(async (focusTask: FocusTask) => {
@@ -702,12 +733,15 @@ function App() {
         boardId: focusTask.boardId,
         actorId: user?.id,
       });
+      if (!focusTask.isDone) {
+        handleArcanaTaskCompleted();
+      }
       toast.success('Focus task marked done.', { theme: 'colored' });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to mark focus task done.';
       toast.error(message, { theme: 'colored' });
     }
-  }, [activeWorkspaceId, boardData.task, setBoardData, updateFocusedTask, user?.id]);
+  }, [activeWorkspaceId, boardData.task, handleArcanaTaskCompleted, setBoardData, updateFocusedTask, user?.id]);
 
   const handleCloseFocusCompletion = useCallback(() => {
     setFocusCompletion(null);
@@ -768,6 +802,8 @@ function App() {
         setIsBoardLoading(true);
       }}
       onSignOut={() => void signOut()}
+      onOpenArcanaBooth={() => handleOpenArcanaBooth()}
+      arcanaAvailableDraws={arcanaRewardState.availableDraws}
     />
   ) : null;
 
@@ -777,6 +813,18 @@ function App() {
         isOpen={isCommandPaletteOpen}
         actions={commandPaletteActions}
         onClose={() => setIsCommandPaletteOpen(false)}
+      />
+
+      <ArcanaBoothDialog
+        isOpen={isArcanaBoothOpen}
+        onClose={() => setIsArcanaBoothOpen(false)}
+      />
+
+      <ArcanaRewardToast
+        isOpen={isArcanaRewardPromptOpen}
+        availableDraws={arcanaRewardState.availableDraws}
+        onDrawNow={() => handleOpenArcanaBooth(true)}
+        onLater={() => setIsArcanaRewardPromptOpen(false)}
       />
 
       <FocusLaunchpadDialog

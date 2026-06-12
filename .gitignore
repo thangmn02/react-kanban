@@ -30,3 +30,14 @@ supabase/
 *.njsproj
 *.sln
 *.sw?
+
+# Third-party Balatro mod sources (GPL-3.0). Only the sliced atlases under
+# public/arcana/atlas are used by the app; the full mod folders (Lua + large
+# PNGs) should not be uploaded.
+public/DX-Tarots-master/
+public/JellyMod-main/
+
+# Raw Hugging Face dataset — regenerate the normalized JSON via
+# scripts/pull_hf_tarot.py (the generated public/arcana/data/*.json is committed
+# because it is a runtime asset).
+public/tarot_readings.parquet

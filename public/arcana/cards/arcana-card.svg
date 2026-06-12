@@ -1,0 +1,8 @@
+<svg width="360" height="600" viewBox="0 0 360 600" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="360" height="600" rx="34" fill="#140F2B"/>
+  <rect x="18" y="18" width="324" height="564" rx="26" stroke="#F8D477" stroke-opacity="0.7" stroke-width="2"/>
+  <circle cx="180" cy="282" r="74" fill="#21113C" stroke="#F8D477" stroke-width="2"/>
+  <path d="M180 142L194 250L302 264L194 278L180 386L166 278L58 264L166 250L180 142Z" fill="#F8D477" fill-opacity="0.88"/>
+  <path d="M114 472C144 444 216 444 246 472" stroke="#D9B8FF" stroke-width="8" stroke-linecap="round"/>
+  <text x="180" y="535" fill="#F8D477" font-family="serif" font-size="28" text-anchor="middle" letter-spacing="8">ARCANA</text>
+</svg>

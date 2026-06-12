@@ -47,6 +47,7 @@ export interface UseTaskOperationsParams {
   activeListId: string | null;
   closeTaskDialog: () => void;
   refreshBoardData: (args?: { boardId?: string | null; showErrorToast?: boolean }) => Promise<void>;
+  onTaskCompleted?: () => void;
 }
 
 export interface UseTaskOperationsResult {
@@ -149,6 +150,7 @@ export function useTaskOperations({
   activeListId,
   closeTaskDialog,
   refreshBoardData,
+  onTaskCompleted,
 }: UseTaskOperationsParams): UseTaskOperationsResult {
   const onSubmitQuickPlan = async (formData: QuickPlanFormData) => {
     if (!activeBoardId || !formData.targetListId) return;
@@ -608,6 +610,10 @@ export function useTaskOperations({
             boardId: activeBoardId,
             actorId: userId,
           });
+
+          if (fields.isDone) {
+            onTaskCompleted?.();
+          }
         }
       }
     } catch (error) {

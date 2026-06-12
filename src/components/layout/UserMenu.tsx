@@ -8,6 +8,8 @@ interface UserMenuProps {
   authMode: AuthMode;
   activeWorkspace: WorkspaceSummary | null;
   onSignOut: () => void;
+  onOpenArcanaBooth: () => void;
+  arcanaAvailableDraws?: number;
 }
 
 export default function UserMenu({
@@ -15,6 +17,8 @@ export default function UserMenu({
   authMode,
   activeWorkspace,
   onSignOut,
+  onOpenArcanaBooth,
+  arcanaAvailableDraws = 0,
 }: UserMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -93,6 +97,23 @@ export default function UserMenu({
             </div>
 
             {authMode === 'supabase' ? (
+              <>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsOpen(false);
+                  onOpenArcanaBooth();
+                }}
+                className="mb-1 flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-sky-100"
+                role="menuitem"
+              >
+                <span>{t('arcana.booth')}</span>
+                {arcanaAvailableDraws > 0 && (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-black text-amber-800">
+                    {t('arcana.reward.menuBadge', { count: arcanaAvailableDraws })}
+                  </span>
+                )}
+              </button>
               <button
                 type="button"
                 onClick={() => {
@@ -104,10 +125,29 @@ export default function UserMenu({
               >
                 {t('app.signOut')}
               </button>
+              </>
             ) : (
-              <p className="rounded-xl px-3 py-2 text-sm text-slate-500" role="menuitem">
-                {t('app.demoData.description')}
-              </p>
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsOpen(false);
+                    onOpenArcanaBooth();
+                  }}
+                  className="mb-1 flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-sky-100"
+                  role="menuitem"
+                >
+                  <span>{t('arcana.booth')}</span>
+                  {arcanaAvailableDraws > 0 && (
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-black text-amber-800">
+                      {t('arcana.reward.menuBadge', { count: arcanaAvailableDraws })}
+                    </span>
+                  )}
+                </button>
+                <p className="rounded-xl px-3 py-2 text-sm text-slate-500" role="menuitem">
+                  {t('app.demoData.description')}
+                </p>
+              </>
             )}
           </div>
         </div>
