@@ -43,10 +43,13 @@ The reading engine can anchor to a local, static tarot corpus derived from the
 `Card 1`, `Card 2`, `Card 3`, `Reading`).
 
 - The corpus is used **only as a local, offline anchor signal**. Its raw English
-  text is never displayed; visible reading text is composed by
-  `arcanaReadingEngine.ts` in the active language.
-- Verify the dataset's license/terms on Hugging Face before redistributing the
-  generated JSON publicly.
+  text is never pasted into the UI; visible reading text is composed by
+  `arcanaReadingEngine.ts` in the active language, with only broad motifs
+  detected from exact/partial corpus matches.
+- Dataset page findings checked on 2026-06-13: Hugging Face lists the dataset as
+  English text, parquet format, default/train split with 5.77k rows. No explicit
+  license field was visible on the dataset page, so verify terms with the
+  publisher before redistributing the generated JSON publicly.
 
 ### Bundled (runtime) data
 - `public/arcana/data/hf_tarot_readings.json` — normalized rows: `{ cards,
@@ -59,10 +62,11 @@ These JSON files are committed as runtime assets (fetched lazily at runtime via
 `hfTarotData.ts`; never fetched from Hugging Face in the browser).
 
 ### Documented preprocessing path (regeneration)
-The generator (`pull_hf_tarot.py`) is kept **local-only** (not uploaded). To
-regenerate the JSON:
+To regenerate the JSON:
 
-1. Obtain `barissglc/tarot` (Hugging Face `datasets`, or its parquet export).
+1. Obtain `barissglc/tarot` with `scripts/pull_hf_tarot.py`, Hugging Face
+   `datasets`, or the source parquet export at `public/tarot_readings.parquet`
+   (raw parquet is ignored by git).
 2. Normalize each card name: trim, lower-case, slugify (`The Sun` → `the-sun`);
    alias `the-wheel-of-fortune` → `wheel-of-fortune` so DX-Tarots card ids match.
 3. For each row emit `{ cards, cardSlugs, comboKey, reading }`, where `comboKey`

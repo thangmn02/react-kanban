@@ -11,7 +11,7 @@ import {
 // The English corpus is used ONLY as an anchor signal for the reading engine
 // (see arcanaReadingEngine.ts) — its raw text is never displayed, so visible
 // reading text always matches the chosen locale. The generic per-spread text
-// composer was removed in S9A in favor of the card-specific engine.
+// composer was replaced by the card-specific S2 engine.
 
 /** Result of locating an interpretation in the HF corpus. */
 export interface ArcanaCorpusMatch {

@@ -43,6 +43,7 @@ function migrateLegacySpread(reading: LegacyReading): ArcanaSpreadCard[] {
       cardId: reading.cardId ?? 'the-fool',
       slug: reading.cardId ?? 'the-fool',
       cardName: reading.cardName ?? '',
+      imagePath: reading.atlas === 'minor' ? '/arcana/atlas/minor.png' : '/arcana/atlas/tarots.png',
       arcana: reading.arcana ?? 'Major Arcana',
       atlas: reading.atlas ?? 'major',
       atlasIndex: typeof reading.atlasIndex === 'number' ? reading.atlasIndex : 0,

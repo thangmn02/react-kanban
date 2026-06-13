@@ -10,7 +10,7 @@ import type {
   ArcanaTopic,
 } from './types';
 
-// S9A — card-specific, question-specific 3-card reading engine.
+// S2 — card-specific, question-specific 3-card reading engine.
 //
 // The reading is driven by the actual drawn cards, each card's position,
 // upright/reversed orientation, the selected topic, and the selected question.
@@ -146,6 +146,59 @@ function buildCardPart(
 // ---------------------------------------------------------------------------
 // Overview / connection / gentle message
 // ---------------------------------------------------------------------------
+
+interface CorpusMotif {
+  pattern: RegExp;
+  label: Record<ArcanaLocale, string>;
+}
+
+const corpusMotifs: CorpusMotif[] = [
+  { pattern: /\b(choice|decision|option|crossroad|path)\b/i, label: { en: 'choice', vi: 'sự lựa chọn' } },
+  { pattern: /\b(change|transform|transition|new beginning|renewal)\b/i, label: { en: 'change', vi: 'sự chuyển hóa' } },
+  { pattern: /\b(balance|harmony|middle ground|moderation)\b/i, label: { en: 'balance', vi: 'sự cân bằng' } },
+  { pattern: /\b(intuition|inner voice|instinct|within)\b/i, label: { en: 'intuition', vi: 'trực giác' } },
+  { pattern: /\b(relationship|connection|love|heart|emotion)\b/i, label: { en: 'connection', vi: 'sự kết nối' } },
+  { pattern: /\b(courage|strength|confidence|power)\b/i, label: { en: 'inner strength', vi: 'sức mạnh nội tâm' } },
+  { pattern: /\b(abundance|security|stability|prosperity)\b/i, label: { en: 'stability', vi: 'sự vững vàng' } },
+  { pattern: /\b(reflect|pause|rest|patience|wait)\b/i, label: { en: 'quiet reflection', vi: 'khoảng lặng để soi lại' } },
+];
+
+function detectCorpusMotifs(reading: string, locale: ArcanaLocale): string[] {
+  return corpusMotifs
+    .filter((motif) => motif.pattern.test(reading))
+    .map((motif) => motif.label[locale])
+    .slice(0, 2);
+}
+
+function buildCorpusAnchor(
+  corpus: ArcanaCorpusMatch | null,
+  source: ArcanaReadingSource,
+  locale: ArcanaLocale,
+): string {
+  if (!corpus) return '';
+  const motifs = detectCorpusMotifs(corpus.reading, locale);
+  const motifText = motifs.length > 0 ? motifs.join(locale === 'vi' ? ' và ' : ' and ') : '';
+
+  if (locale === 'vi') {
+    if (source === 'hf_exact') {
+      return motifText
+        ? `Dấu vết từ kho bài nhấn vào ${motifText}, nên bộ ba này được đọc như một trường cảm xúc chung chứ không phải ba lời rời rạc.`
+        : 'Bộ ba này có một khớp chính xác trong kho trải bài, nên mạch liên kết được giữ sát nhịp của cả ba lá.';
+    }
+    return motifText
+      ? `Kho trải bài chỉ khớp một phần, nhưng vẫn gợi trường ${motifText}; phần còn lại được ghép từ ý nghĩa riêng của từng lá.`
+      : 'Kho trải bài chỉ khớp một phần, nên lời giải ưu tiên ý nghĩa riêng của từng lá và câu hỏi bạn đã chọn.';
+  }
+
+  if (source === 'hf_exact') {
+    return motifText
+      ? `The local archive highlights ${motifText}, so this trio is read as one shared emotional field rather than three separate notes.`
+      : 'This exact trio appears in the local archive, so the connecting thread stays close to the shape of all three cards.';
+  }
+  return motifText
+    ? `The local archive only partially matches, but it still points toward ${motifText}; the rest is composed from the individual card meanings.`
+    : 'The local archive only partially matches, so the reading leans on the individual card meanings and your selected question.';
+}
 
 function buildOverview(
   parts: ArcanaCardReadingPart[],
@@ -292,18 +345,16 @@ export function buildArcanaReading(
     ArcanaCardReadingPart,
   ];
 
+  const source: ArcanaReadingSource = corpus?.overlap === 3 ? 'hf_exact' : corpus ? 'hf_partial' : 'template';
   const overview = buildOverview(cardReadings, question, topic, locale, rng);
   let connection = buildConnection(cardReadings, topic, locale, spread, rng);
   const gentleMessage = buildGentleMessage(cardReadings, topic, locale, rng);
 
-  const source: ArcanaReadingSource = corpus?.overlap === 3 ? 'hf_exact' : corpus ? 'hf_partial' : 'template';
-
-  // HF corpus is used as an anchor SIGNAL only (never pasted; never shown in a
-  // foreign language). When the exact trio is known, deepen the connection note.
-  if (source === 'hf_exact') {
-    connection += locale === 'vi'
-      ? ' Bộ ba này cũng từng xuất hiện trong kho trải bài, nên mạch chuyện của nó càng rõ nét.'
-      : ' This exact trio also appears in the reading archive, so its thread reads especially clearly.';
+  // HF corpus is used as a theme anchor only: detect broad motifs from the
+  // local English row, never paste the row into the localized UI.
+  const corpusAnchor = buildCorpusAnchor(corpus, source, locale);
+  if (corpusAnchor) {
+    connection += ` ${corpusAnchor}`;
   }
 
   return { overview, cardReadings, connection, gentleMessage, source };

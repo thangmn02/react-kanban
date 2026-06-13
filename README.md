@@ -129,9 +129,10 @@ Arcana is a self-contained, offline reward feature:
 - Optional anchoring to a local tarot reading corpus.
 
 The reading corpus JSON under `public/arcana/data/` is generated from a tarot
-dataset and committed as a runtime asset. The generator script is kept local
-(not uploaded); the regeneration steps are documented in
-`src/features/arcana/ATTRIBUTION.md`.
+dataset and committed as a runtime asset. `scripts/pull_hf_tarot.py` documents
+the local preprocessing path: it reads `public/tarot_readings.parquet` when
+present, or pulls `barissglc/tarot` from Hugging Face during regeneration. The
+browser runtime only fetches the static JSON under `public/arcana/data/`.
 
 > **Asset license note:** the Arcana card/pack art under `public/arcana/atlas/`
 > is derived from GPL-3.0 third-party tarot mods (see

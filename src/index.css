@@ -338,29 +338,26 @@
 }
 
 /* ===========================================================================
- * Arcana — "Celestial Atelier" booth shell.
- * A full-bleed mystical scene: ink-indigo void, drifting starfield, nebula
- * bloom, gold hairline ornaments, engraved serif type. Designed, not vibe.
+ * Arcana booth shell: dark reading table, restrained gold details, readable
+ * Vietnamese type. The visual weight stays on the pack and card art.
  * ======================================================================== */
 
 .arcana-display {
-  font-family: "Liga SFMono Nerd Font", Consolas, "Courier New", monospace;
-  letter-spacing: 0.02em;
+  font-family: ui-serif, Georgia, "Times New Roman", serif;
+  letter-spacing: 0;
 }
 .arcana-serif {
-  font-family: "Liga SFMono Nerd Font", Consolas, "Courier New", monospace;
+  font-family: ui-serif, Georgia, "Times New Roman", serif;
 }
 
-/* Backdrop: deep void with twin nebula blooms. */
 .arcana-void {
   background:
-    radial-gradient(60% 50% at 22% 18%, rgba(86, 64, 170, 0.28), transparent 70%),
-    radial-gradient(55% 45% at 82% 88%, rgba(180, 92, 64, 0.18), transparent 70%),
-    radial-gradient(120% 90% at 50% 0%, rgba(14, 12, 34, 0.6), transparent 60%),
-    #05030c;
+    linear-gradient(180deg, rgba(19, 13, 34, 0.96), rgba(5, 4, 12, 0.98)),
+    repeating-linear-gradient(90deg, rgba(214, 184, 122, 0.055) 0 1px, transparent 1px 92px),
+    repeating-linear-gradient(0deg, rgba(214, 184, 122, 0.035) 0 1px, transparent 1px 92px),
+    #05040c;
 }
 
-/* Drifting starfield (two parallax layers). */
 .arcana-stars,
 .arcana-stars::after {
   position: absolute;
@@ -376,7 +373,7 @@
     radial-gradient(1px 1px at 85% 18%, rgba(255, 240, 210, 0.85), transparent),
     radial-gradient(1px 1px at 55% 45%, rgba(255, 255, 255, 0.6), transparent);
   background-size: 360px 360px;
-  opacity: 0.7;
+  opacity: 0.38;
   animation: arcana-stardrift 90s linear infinite;
 }
 .arcana-stars::after {
@@ -430,8 +427,8 @@
 
 /* Ceremonial gold button. */
 .arcana-btn-gold {
-  font-family: "Liga SFMono Nerd Font", Consolas, monospace;
-  letter-spacing: 0.14em;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #1a1208;
   background: linear-gradient(180deg, #f6e2ab 0%, #d9b878 55%, #b8924f 100%);
@@ -441,8 +438,8 @@
   background: linear-gradient(180deg, #fbeec0 0%, #e6c98a 55%, #c79f5a 100%);
 }
 .arcana-btn-ghost {
-  font-family: "Liga SFMono Nerd Font", Consolas, monospace;
-  letter-spacing: 0.14em;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: rgba(232, 220, 196, 0.92);
   border: 1px solid rgba(214, 184, 122, 0.4);
@@ -465,3 +462,1194 @@
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 .arcana-scene { animation: arcana-scene-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* Arcana S3 ritual rebuild ------------------------------------------------- */
+.arcana-portal {
+  font-family: "Be Vietnam Pro", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #f4ead6;
+}
+
+.arcana-portal h2,
+.arcana-portal h3,
+.arcana-portal h4,
+.arcana-portal p,
+.arcana-portal button,
+.arcana-portal span,
+.arcana-portal strong,
+.arcana-portal em,
+.arcana-portal dd,
+.arcana-portal dt {
+  letter-spacing: 0;
+}
+
+.arcana-room-backdrop {
+  background:
+    linear-gradient(115deg, transparent 0 33%, rgba(213, 177, 103, 0.08) 43%, transparent 58%),
+    linear-gradient(68deg, transparent 0 48%, rgba(65, 183, 160, 0.08) 58%, transparent 72%),
+    linear-gradient(180deg, rgba(196, 72, 93, 0.08), transparent 38%),
+    linear-gradient(180deg, #090713 0%, #05040a 100%);
+}
+
+.arcana-room-grid {
+  pointer-events: none;
+  opacity: 0.34;
+  background:
+    linear-gradient(rgba(236, 205, 142, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(236, 205, 142, 0.08) 1px, transparent 1px);
+  background-size: 42px 42px;
+  mask-image: radial-gradient(circle at center, black, transparent 74%);
+}
+
+.arcana-room-light {
+  pointer-events: none;
+  position: fixed;
+  inset: auto 10% 0;
+  height: 42vh;
+  background: linear-gradient(180deg, transparent, rgba(238, 198, 112, 0.16) 38%, transparent);
+  filter: blur(18px);
+  animation: arcana-room-breathe 5.2s ease-in-out infinite;
+}
+.arcana-room-light.is-still { animation: none; }
+
+@keyframes arcana-room-breathe {
+  0%, 100% { opacity: 0.55; transform: scale(0.98); }
+  50% { opacity: 0.9; transform: scale(1.03); }
+}
+
+.arcana-booth {
+  position: relative;
+  z-index: 1;
+  width: min(1120px, calc(100% - 24px));
+  min-height: calc(100vh - 32px);
+  margin: 16px auto;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(226, 190, 118, 0.28);
+  border-radius: 28px;
+  background:
+    linear-gradient(180deg, rgba(18, 14, 31, 0.9), rgba(8, 7, 16, 0.94)),
+    repeating-linear-gradient(135deg, rgba(255,255,255,0.025) 0 1px, transparent 1px 9px);
+  box-shadow: 0 30px 100px rgba(0, 0, 0, 0.62), inset 0 0 0 1px rgba(255,255,255,0.04);
+  overflow: hidden;
+}
+
+.arcana-booth::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% -12%, rgba(239, 205, 139, 0.16), transparent 34%),
+    linear-gradient(90deg, transparent, rgba(236, 205, 142, 0.08), transparent);
+}
+
+.arcana-booth-topbar {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 24px 14px;
+}
+
+.arcana-booth-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.arcana-booth-brand p {
+  margin: 0;
+  color: rgba(230, 195, 123, 0.72);
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.arcana-booth-brand h2 {
+  margin: 2px 0 0;
+  color: #fff2cf;
+  font-size: clamp(1.35rem, 2vw, 2rem);
+  font-weight: 800;
+}
+.arcana-sigil {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1px solid rgba(226, 190, 118, 0.45);
+  border-radius: 14px;
+  background: rgba(226, 190, 118, 0.08);
+  color: #f2d18f;
+  box-shadow: 0 0 30px rgba(226, 190, 118, 0.16);
+}
+
+.arcana-booth-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.arcana-booth-controls button,
+.arcana-history-link {
+  min-height: 40px;
+  border: 1px solid rgba(226, 190, 118, 0.28);
+  border-radius: 999px;
+  padding: 0 14px;
+  color: rgba(245, 234, 212, 0.86);
+  background: rgba(255, 255, 255, 0.035);
+  font-size: 0.82rem;
+  font-weight: 750;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+.arcana-booth-controls button:hover,
+.arcana-history-link:hover {
+  border-color: rgba(226, 190, 118, 0.62);
+  background: rgba(226, 190, 118, 0.08);
+}
+
+.arcana-step-track {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0 24px 18px;
+}
+.arcana-step-track span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  padding-top: 10px;
+  color: rgba(245, 234, 212, 0.42);
+}
+.arcana-step-track i {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  font-size: 0.72rem;
+  font-style: normal;
+}
+.arcana-step-track b {
+  overflow: hidden;
+  font-size: 0.72rem;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.arcana-step-track .is-active {
+  border-color: rgba(226, 190, 118, 0.72);
+  color: #f4d28e;
+}
+.arcana-step-track .is-done {
+  color: rgba(125, 218, 195, 0.72);
+}
+
+.arcana-stage {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  padding: clamp(22px, 4vw, 54px);
+}
+
+.arcana-step-header {
+  max-width: 760px;
+  margin: 0 auto 28px;
+  text-align: center;
+}
+.arcana-step-header--left { margin-inline: 0; text-align: left; }
+.arcana-step-eyebrow {
+  margin: 0 0 10px;
+  color: rgba(226, 190, 118, 0.72);
+  font-size: 0.72rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+.arcana-step-header h3 {
+  margin: 0;
+  color: #fff5da;
+  font-family: "Literata", "Lora", "Noto Serif", Georgia, serif;
+  font-size: clamp(2rem, 5vw, 4.4rem);
+  font-weight: 750;
+  line-height: 1.04;
+}
+.arcana-step-description {
+  max-width: 620px;
+  margin: 14px auto 0;
+  color: rgba(246, 237, 219, 0.76);
+  font-size: clamp(1rem, 1.6vw, 1.14rem);
+  line-height: 1.65;
+}
+
+.arcana-entry-step,
+.arcana-opening-step {
+  display: grid;
+  min-height: 58vh;
+  align-content: center;
+}
+.arcana-entry-pack,
+.arcana-open-pack {
+  position: relative;
+  display: grid;
+  width: min(280px, 58vw);
+  margin: 0 auto 34px;
+  place-items: center;
+}
+.arcana-entry-pack { height: 340px; }
+.arcana-entry-ring,
+.arcana-open-pack-light {
+  position: absolute;
+  inset: 8%;
+  border: 1px solid rgba(226, 190, 118, 0.2);
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(226, 190, 118, 0.16), transparent 62%);
+  box-shadow: 0 0 70px rgba(226, 190, 118, 0.18);
+}
+.arcana-entry-pack-art,
+.arcana-open-pack-art {
+  position: relative;
+  width: 11.5rem;
+  aspect-ratio: 71 / 95;
+  border: 2px solid rgba(226, 190, 118, 0.42);
+  border-radius: 18px;
+  box-shadow: 0 28px 80px rgba(0,0,0,0.7);
+  animation: arcana-pack-hover 4s ease-in-out infinite;
+}
+@keyframes arcana-pack-hover {
+  0%, 100% { transform: translateY(0) rotate(-1deg); }
+  50% { transform: translateY(-10px) rotate(1deg); }
+}
+
+.arcana-token-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.arcana-topic-token,
+.arcana-question-row,
+.arcana-pack-choice {
+  border: 1px solid rgba(226, 190, 118, 0.16);
+  background: rgba(255,255,255,0.035);
+  color: #f4ead6;
+  cursor: pointer;
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+.arcana-topic-token:hover,
+.arcana-question-row:hover,
+.arcana-pack-choice:hover,
+.arcana-topic-token.is-selected,
+.arcana-question-row.is-selected,
+.arcana-pack-choice.is-selected {
+  transform: translateY(-2px);
+  border-color: rgba(226, 190, 118, 0.58);
+  background: rgba(226, 190, 118, 0.08);
+  box-shadow: 0 18px 54px rgba(0,0,0,0.24);
+}
+.arcana-topic-token {
+  min-height: 172px;
+  border-radius: 22px;
+  padding: 22px;
+  text-align: left;
+}
+.arcana-topic-orb {
+  display: block;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 18px;
+  border: 1px solid rgba(125, 218, 195, 0.42);
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, rgba(125, 218, 195, 0.22), rgba(226, 190, 118, 0.12)),
+    #0d1720;
+  box-shadow: 0 0 32px rgba(125, 218, 195, 0.12);
+}
+.arcana-topic-token strong,
+.arcana-pack-copy strong {
+  display: block;
+  color: #fff3d0;
+  font-size: 1.08rem;
+}
+.arcana-topic-token em,
+.arcana-pack-copy em {
+  display: block;
+  margin-top: 9px;
+  color: rgba(246, 237, 219, 0.68);
+  font-size: 0.94rem;
+  font-style: normal;
+  line-height: 1.5;
+}
+
+.arcana-question-list {
+  display: grid;
+  max-width: 780px;
+  margin: 0 auto;
+  gap: 10px;
+}
+.arcana-question-row {
+  display: grid;
+  grid-template-columns: 54px 1fr;
+  align-items: center;
+  min-height: 74px;
+  border-radius: 18px;
+  padding: 14px 18px;
+  text-align: left;
+}
+.arcana-question-row span {
+  color: rgba(226, 190, 118, 0.72);
+  font-size: 0.84rem;
+  font-weight: 850;
+}
+.arcana-question-row strong {
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.arcana-pack-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+.arcana-pack-choice {
+  display: flex;
+  min-height: 292px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: 22px;
+  padding: 16px 13px;
+}
+.arcana-pack-choice-art {
+  width: min(7.4rem, 100%);
+  aspect-ratio: 71 / 95;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.16);
+}
+.arcana-pack-copy {
+  display: block;
+  width: 100%;
+  text-align: left;
+}
+.arcana-pack-copy b {
+  display: inline-flex;
+  margin-top: 12px;
+  border: 1px solid rgba(125, 218, 195, 0.28);
+  border-radius: 999px;
+  padding: 4px 9px;
+  color: rgba(125, 218, 195, 0.88);
+  font-size: 0.72rem;
+}
+
+.arcana-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 30px;
+}
+.arcana-actions--between { justify-content: space-between; }
+.arcana-action {
+  min-height: 46px;
+  border-radius: 999px;
+  padding: 0 22px;
+  font-weight: 850;
+  cursor: pointer;
+  transition: transform 160ms ease, opacity 160ms ease, border-color 160ms ease;
+}
+.arcana-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.arcana-action--primary {
+  border: 1px solid #f2d28d;
+  color: #171006;
+  background: linear-gradient(180deg, #ffe9ad, #d7a953);
+  box-shadow: 0 14px 36px rgba(215, 169, 83, 0.24);
+}
+.arcana-action--secondary {
+  border: 1px solid rgba(125, 218, 195, 0.34);
+  color: #d9fff5;
+  background: rgba(125, 218, 195, 0.08);
+}
+.arcana-action--quiet {
+  border: 1px solid transparent;
+  color: rgba(246, 237, 219, 0.72);
+  background: transparent;
+}
+.arcana-action:hover:not(:disabled) { transform: translateY(-1px); }
+
+.arcana-open-pack {
+  min-height: 360px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.arcana-open-pack.is-opening .arcana-open-pack-art {
+  animation: arcana-pack-open 1.45s ease-in-out both;
+}
+.arcana-open-pack.is-opening .arcana-open-pack-light {
+  animation: arcana-pack-burst 1.45s ease-out both;
+}
+.arcana-open-pack-prompt {
+  position: absolute;
+  bottom: 4px;
+  border: 1px solid rgba(226, 190, 118, 0.28);
+  border-radius: 999px;
+  padding: 8px 14px;
+  color: rgba(246, 237, 219, 0.82);
+  background: rgba(8, 7, 16, 0.72);
+  font-weight: 800;
+}
+@keyframes arcana-pack-open {
+  0% { transform: translateY(0) rotate(-1deg) scale(1); filter: brightness(1); }
+  22% { transform: translateX(-6px) rotate(-4deg) scale(1.02); }
+  44% { transform: translateX(6px) rotate(4deg) scale(1.03); }
+  74% { transform: translateY(-14px) scale(1.1); filter: brightness(1.8); }
+  100% { transform: translateY(-22px) scale(0.92); opacity: 0; }
+}
+@keyframes arcana-pack-burst {
+  0% { opacity: 0.15; transform: scale(0.72); }
+  64% { opacity: 0.75; transform: scale(1.1); }
+  100% { opacity: 0; transform: scale(1.45); }
+}
+
+.arcana-spread-stage {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+  gap: clamp(12px, 3vw, 28px);
+}
+.arcana-reveal-column {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+}
+.arcana-reveal-column:nth-child(2) { transform: translateY(-18px); }
+.arcana-position-label {
+  border: 1px solid rgba(226, 190, 118, 0.28);
+  border-radius: 999px;
+  padding: 7px 12px;
+  color: #f0cd87;
+  background: rgba(226, 190, 118, 0.06);
+  font-size: 0.82rem;
+  font-weight: 850;
+  text-align: center;
+}
+.arcana-card-frame {
+  width: min(13.5rem, 29vw);
+}
+.arcana-card-frame--focus { width: min(15.5rem, 31vw); }
+.arcana-card-plate {
+  position: relative;
+  aspect-ratio: 71 / 95;
+  overflow: hidden;
+  border: 2px solid rgba(226, 190, 118, 0.24);
+  border-radius: 18px;
+  background: #070712;
+  box-shadow: 0 26px 70px rgba(0,0,0,0.55);
+}
+.arcana-card-frame.is-revealed .arcana-card-plate {
+  animation: arcana-card-enter 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.arcana-card-art {
+  position: absolute;
+  inset: 0;
+}
+.arcana-card-back {
+  display: grid;
+  height: 100%;
+  place-items: center;
+  background:
+    radial-gradient(circle at center, rgba(226, 190, 118, 0.24), transparent 28%),
+    linear-gradient(135deg, rgba(125, 218, 195, 0.14), rgba(196, 72, 93, 0.14)),
+    #0b0b18;
+}
+.arcana-card-back span {
+  width: 46%;
+  aspect-ratio: 1;
+  border: 1px solid rgba(226, 190, 118, 0.44);
+  transform: rotate(45deg);
+}
+@keyframes arcana-card-enter {
+  from { opacity: 0; transform: translateY(18px) rotateY(42deg); filter: brightness(1.6); }
+  to { opacity: 1; transform: translateY(0) rotateY(0); filter: brightness(1); }
+}
+.arcana-card-caption {
+  margin-top: 10px;
+  text-align: center;
+}
+.arcana-card-caption strong,
+.arcana-card-caption span {
+  display: block;
+}
+.arcana-card-caption strong {
+  color: #fff2cf;
+  font-size: 1rem;
+}
+.arcana-card-caption span {
+  margin-top: 4px;
+  color: rgba(246, 237, 219, 0.62);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+.arcana-card-meta {
+  display: grid;
+  width: 100%;
+  max-width: 14rem;
+  gap: 6px;
+  margin: 0;
+}
+.arcana-card-meta div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  padding-bottom: 6px;
+}
+.arcana-card-meta dt,
+.arcana-card-meta dd {
+  margin: 0;
+  color: rgba(246, 237, 219, 0.58);
+  font-size: 0.72rem;
+}
+.arcana-card-meta dd {
+  color: rgba(246, 237, 219, 0.86);
+  font-weight: 800;
+  text-align: right;
+}
+
+.arcana-reading-page {
+  max-width: 1040px;
+  margin: 0 auto;
+}
+.arcana-reading-hero {
+  max-width: 760px;
+  margin: 0 auto 32px;
+  text-align: center;
+}
+.arcana-reading-hero p {
+  margin: 0;
+  color: rgba(226, 190, 118, 0.72);
+  font-size: 0.78rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+.arcana-reading-hero h3 {
+  margin: 10px 0 12px;
+  color: #fff5da;
+  font-family: "Literata", "Lora", "Noto Serif", Georgia, serif;
+  font-size: clamp(1.7rem, 4vw, 3.2rem);
+  line-height: 1.14;
+}
+.arcana-reading-hero span {
+  color: rgba(246, 237, 219, 0.58);
+  font-size: 0.9rem;
+}
+.arcana-reading-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.78fr) minmax(0, 1.42fr);
+  gap: clamp(22px, 4vw, 44px);
+  align-items: start;
+}
+.arcana-reading-spread {
+  position: sticky;
+  top: 18px;
+  display: grid;
+  gap: 18px;
+}
+.arcana-reading-spread > div {
+  display: grid;
+  grid-template-columns: 88px 1fr;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid rgba(226, 190, 118, 0.14);
+  border-radius: 20px;
+  padding: 12px;
+  background: rgba(255,255,255,0.03);
+}
+.arcana-reading-spread > div > span {
+  color: rgba(226, 190, 118, 0.86);
+  font-size: 0.8rem;
+  font-weight: 850;
+  line-height: 1.35;
+}
+.arcana-reading-spread .arcana-card-frame {
+  width: 8rem;
+}
+.arcana-reading-spread .arcana-card-caption {
+  display: none;
+}
+.arcana-reading-sections {
+  display: grid;
+  gap: 16px;
+}
+.arcana-reading-section {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 16px;
+  border: 1px solid rgba(226, 190, 118, 0.14);
+  border-radius: 22px;
+  padding: clamp(18px, 3vw, 26px);
+  background: rgba(255,255,255,0.035);
+}
+.arcana-reading-section > span {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid rgba(125, 218, 195, 0.32);
+  border-radius: 12px;
+  color: rgba(125, 218, 195, 0.9);
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+.arcana-reading-section h4 {
+  margin: 0;
+  color: #f5d895;
+  font-size: 1.05rem;
+  font-weight: 850;
+}
+.arcana-reading-section p {
+  max-width: 68ch;
+  margin: 10px 0 0;
+  color: rgba(250, 244, 232, 0.86);
+  font-family: "Be Vietnam Pro", Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 1rem;
+  line-height: 1.78;
+  white-space: pre-line;
+}
+.arcana-saved-note {
+  margin: 24px 0 0;
+  text-align: center;
+  color: rgba(125, 218, 195, 0.92);
+  font-weight: 800;
+}
+.arcana-history-link {
+  display: block;
+  margin: 16px auto 0;
+}
+
+.arcana-history-panel {
+  position: relative;
+  z-index: 1;
+  width: min(680px, 100%);
+  margin: 0 auto;
+  border: 1px solid rgba(226, 190, 118, 0.24);
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(20, 18, 31, 0.96), rgba(8, 8, 16, 0.98)),
+    #0c0c16;
+  box-shadow: 0 30px 100px rgba(0,0,0,0.68);
+  color: #f6ecd8;
+  padding: clamp(18px, 4vw, 28px);
+}
+.arcana-history-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid rgba(226, 190, 118, 0.16);
+  padding-bottom: 18px;
+}
+.arcana-history-head p {
+  margin: 0 0 5px;
+  color: rgba(226, 190, 118, 0.72);
+  font-size: 0.76rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+.arcana-history-head h2 {
+  margin: 0;
+  font-family: "Literata", "Lora", "Noto Serif", Georgia, serif;
+  color: #fff4df;
+  font-size: clamp(1.55rem, 4vw, 2.2rem);
+  font-weight: 780;
+}
+.arcana-history-head button {
+  flex: none;
+  border: 1px solid rgba(246, 236, 216, 0.14);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.04);
+  color: #f6ecd8;
+  cursor: pointer;
+  font-weight: 750;
+  padding: 9px 13px;
+}
+.arcana-history-list {
+  display: grid;
+  gap: 12px;
+  max-height: min(66vh, 620px);
+  overflow-y: auto;
+  padding-top: 18px;
+}
+.arcana-history-empty {
+  margin: 0;
+  padding: 44px 10px;
+  text-align: center;
+  color: rgba(246, 236, 216, 0.66);
+  font-family: "Literata", "Lora", "Noto Serif", Georgia, serif;
+  font-size: 1.1rem;
+  font-style: italic;
+}
+.arcana-history-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 14px;
+  border: 1px solid rgba(246, 236, 216, 0.08);
+  border-radius: 16px;
+  background: rgba(255,255,255,0.025);
+  color: inherit;
+  cursor: pointer;
+  padding: 12px;
+  text-align: left;
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+.arcana-history-item:hover {
+  border-color: rgba(226, 190, 118, 0.36);
+  background: rgba(255,255,255,0.055);
+  transform: translateY(-1px);
+}
+.arcana-history-mini-spread {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+.arcana-history-mini-spread .arcana-art {
+  display: block;
+  width: 2.45rem;
+  aspect-ratio: 71 / 95;
+  border: 1px solid rgba(246, 236, 216, 0.14);
+  border-radius: 6px;
+  background-size: var(--arcana-atlas-size);
+  image-rendering: pixelated;
+}
+.arcana-history-copy {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+}
+.arcana-history-copy > span {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.arcana-history-copy strong,
+.arcana-history-copy em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.arcana-history-copy strong {
+  color: #fff4df;
+  font-family: "Literata", "Lora", "Noto Serif", Georgia, serif;
+  font-size: 1rem;
+  font-style: normal;
+  font-weight: 760;
+}
+.arcana-history-copy time {
+  flex: none;
+  color: rgba(226, 190, 118, 0.72);
+  font-size: 0.72rem;
+  font-weight: 760;
+}
+.arcana-history-copy em {
+  color: rgba(246, 236, 216, 0.72);
+  font-family: "Literata", "Lora", "Noto Serif", Georgia, serif;
+  font-size: 0.96rem;
+}
+.arcana-history-copy b {
+  width: fit-content;
+  border: 1px solid rgba(226, 190, 118, 0.24);
+  border-radius: 999px;
+  color: #f0cd87;
+  font-size: 0.68rem;
+  font-weight: 850;
+  padding: 4px 9px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arcana-entry-pack-art,
+  .arcana-open-pack-art,
+  .arcana-room-light,
+  .arcana-card-frame.is-revealed .arcana-card-plate {
+    animation: none !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .arcana-booth { width: min(100% - 12px, 760px); margin-block: 6px; border-radius: 22px; }
+  .arcana-booth-topbar { align-items: flex-start; padding: 18px; }
+  .arcana-step-track { grid-template-columns: repeat(4, minmax(0, 1fr)); padding-inline: 18px; }
+  .arcana-step-track b { display: none; }
+  .arcana-stage { padding: 24px 16px 32px; }
+  .arcana-token-grid,
+  .arcana-pack-grid,
+  .arcana-spread-stage,
+  .arcana-reading-layout {
+    grid-template-columns: 1fr;
+  }
+  .arcana-pack-choice {
+    min-height: 0;
+    flex-direction: row;
+    gap: 14px;
+    text-align: left;
+  }
+  .arcana-pack-choice-art { width: 5.3rem; flex: none; }
+  .arcana-reveal-column:nth-child(2) { transform: none; }
+  .arcana-card-frame,
+  .arcana-card-frame--focus {
+    width: min(14rem, 72vw);
+  }
+  .arcana-reading-spread {
+    position: static;
+    grid-template-columns: 1fr;
+  }
+  .arcana-reading-spread > div {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+  }
+  .arcana-reading-section {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .arcana-booth-topbar { flex-direction: column; }
+  .arcana-booth-controls { justify-content: flex-start; }
+  .arcana-step-header h3 { font-size: 2rem; }
+  .arcana-question-row { grid-template-columns: 1fr; gap: 6px; }
+  .arcana-actions { align-items: stretch; flex-direction: column; }
+  .arcana-action { width: 100%; }
+}
+
+/* ===========================================================================
+ * Arcana Card — tilt wrapper perspective
+ * ======================================================================== */
+
+.arcana-card-frame .arcana-tilt {
+  perspective: 700px;
+  perspective-origin: 50% 50%;
+  transform-style: preserve-3d;
+  border-radius: 18px;
+}
+
+/* ===========================================================================
+ * Home Appearance Switcher — floating dock
+ * ======================================================================== */
+
+.home-appearance-dock {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 60;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.home-appearance-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(99, 102, 241, 0.28);
+  border-radius: 999px;
+  padding: 10px 18px 10px 14px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.10), 0 1px 0 rgba(255,255,255,0.9) inset;
+  color: #374151;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: box-shadow 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+.home-appearance-trigger:hover {
+  border-color: rgba(99, 102, 241, 0.56);
+  box-shadow: 0 12px 40px rgba(99,102,241,0.14), 0 1px 0 rgba(255,255,255,0.9) inset;
+  transform: translateY(-1px);
+}
+
+.home-appearance-trigger-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.home-appearance-chevron {
+  font-size: 0.68rem;
+  color: #9ca3af;
+  transition: transform 200ms ease;
+}
+.home-appearance-chevron.is-open {
+  transform: rotate(180deg);
+}
+
+.home-appearance-panel {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 10px);
+  display: grid;
+  gap: 4px;
+  width: 240px;
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 20px;
+  padding: 8px;
+  background: rgba(255,255,255,0.97);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06);
+  animation: ha-panel-in 180ms cubic-bezier(0.22,1,0.36,1) both;
+}
+
+@keyframes ha-panel-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.home-appearance-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: transparent;
+  color: #374151;
+  cursor: pointer;
+  text-align: left;
+  transition: background 140ms ease, border-color 140ms ease;
+  width: 100%;
+}
+.home-appearance-option:hover {
+  background: #f3f4f6;
+}
+.home-appearance-option.is-active {
+  border-color: rgba(99, 102, 241, 0.32);
+  background: rgba(99, 102, 241, 0.06);
+  color: #4338ca;
+}
+
+.home-appearance-option-icon {
+  font-size: 1.2rem;
+  flex: none;
+  width: 28px;
+  text-align: center;
+}
+
+.home-appearance-option-copy {
+  flex: 1;
+  min-width: 0;
+}
+.home-appearance-option-copy strong {
+  display: block;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+.home-appearance-option-copy em {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.72rem;
+  font-style: normal;
+  color: #9ca3af;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.home-appearance-option.is-active .home-appearance-option-copy em {
+  color: #818cf8;
+}
+
+.home-appearance-option-check {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #4f46e5;
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 900;
+}
+
+/* ===========================================================================
+ * Home Appearance — DOODLE theme
+ * Body gets data-home-theme="doodle" from useHomeAppearance hook effect.
+ * ======================================================================== */
+
+body[data-home-theme="doodle"] .min-h-screen {
+  background: #fafaf4;
+  background-image:
+    repeating-linear-gradient(
+      0deg, transparent, transparent 27px,
+      rgba(0,0,0,0.035) 28px
+    ),
+    repeating-linear-gradient(
+      90deg, transparent, transparent 27px,
+      rgba(0,0,0,0.018) 28px
+    );
+}
+
+body[data-home-theme="doodle"] h1,
+body[data-home-theme="doodle"] h2,
+body[data-home-theme="doodle"] h3 {
+  font-family: "Caveat", "Comic Sans MS", cursive;
+  letter-spacing: 0.01em;
+}
+
+/* Sketch border on cards — wobbly polygon border-radius */
+body[data-home-theme="doodle"] .rounded-3xl,
+body[data-home-theme="doodle"] .rounded-2xl {
+  border-radius: 8px 18px 12px 22px / 22px 12px 18px 8px !important;
+  box-shadow: 2px 3px 0 rgba(0,0,0,0.12) !important;
+}
+
+/* Slight rotation on alternating section cards */
+body[data-home-theme="doodle"] section:nth-child(odd) > div:first-child {
+  transform: rotate(-0.4deg);
+}
+body[data-home-theme="doodle"] section:nth-child(even) > div:first-child {
+  transform: rotate(0.3deg);
+}
+
+/* Marker-style buttons */
+body[data-home-theme="doodle"] button:not(.home-appearance-trigger):not(.home-appearance-option) {
+  border-radius: 6px 14px 10px 18px / 18px 8px 14px 6px !important;
+}
+
+/* ===========================================================================
+ * Home Appearance — PAPER theme
+ * ======================================================================== */
+
+body[data-home-theme="paper"] .min-h-screen {
+  background-color: #faf5e4;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeBlend in='SourceGraphic' mode='multiply'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+}
+
+body[data-home-theme="paper"] h1,
+body[data-home-theme="paper"] h2,
+body[data-home-theme="paper"] h3 {
+  font-family: "Lora", "Georgia", serif;
+  color: #3b2a1a !important;
+}
+
+body[data-home-theme="paper"] p,
+body[data-home-theme="paper"] span,
+body[data-home-theme="paper"] button {
+  color: #4a3523;
+}
+
+/* Pressed ink card feel */
+body[data-home-theme="paper"] .rounded-3xl,
+body[data-home-theme="paper"] .rounded-2xl {
+  background: #fdf8ee !important;
+  border-color: rgba(120, 80, 40, 0.18) !important;
+  box-shadow: 1px 2px 6px rgba(90,60,20,0.08), inset 0 1px 0 rgba(255,255,255,0.9) !important;
+}
+
+body[data-home-theme="paper"] .bg-white {
+  background-color: #fdf8ee !important;
+}
+
+body[data-home-theme="paper"] .bg-slate-50,
+body[data-home-theme="paper"] .bg-canvas {
+  background-color: #f9f3e1 !important;
+}
+
+body[data-home-theme="paper"] button:not(.home-appearance-trigger):not(.home-appearance-option) {
+  border-color: rgba(120, 80, 40, 0.28) !important;
+}
+
+/* ===========================================================================
+ * Home Appearance — RETROTUNE theme
+ * ======================================================================== */
+
+body[data-home-theme="retrotune"] .min-h-screen {
+  background: #080808;
+  position: relative;
+  color: #c8e6a0;
+}
+
+/* CRT scanlines overlay */
+body[data-home-theme="retrotune"] .min-h-screen::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0,0,0,0.22) 0px,
+    rgba(0,0,0,0.22) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+body[data-home-theme="retrotune"] h1,
+body[data-home-theme="retrotune"] h2,
+body[data-home-theme="retrotune"] h3,
+body[data-home-theme="retrotune"] p,
+body[data-home-theme="retrotune"] span,
+body[data-home-theme="retrotune"] button,
+body[data-home-theme="retrotune"] a {
+  font-family: "Courier New", "Lucida Console", monospace !important;
+  color: #b8e080 !important;
+}
+
+body[data-home-theme="retrotune"] h1 { color: #e8ff80 !important; }
+body[data-home-theme="retrotune"] h2 { color: #d4ef68 !important; }
+
+/* Phosphor glow on headings */
+body[data-home-theme="retrotune"] h1 {
+  text-shadow: 0 0 8px rgba(200, 255, 100, 0.7), 0 0 24px rgba(160, 220, 60, 0.4);
+}
+
+body[data-home-theme="retrotune"] .rounded-3xl,
+body[data-home-theme="retrotune"] .rounded-2xl,
+body[data-home-theme="retrotune"] .bg-white {
+  background: #0a0f06 !important;
+  border-color: rgba(120, 200, 60, 0.32) !important;
+  box-shadow: 0 0 0 1px rgba(100,180,40,0.2), 0 4px 24px rgba(80,160,20,0.10) !important;
+  border-radius: 4px !important;
+}
+
+body[data-home-theme="retrotune"] .bg-slate-50,
+body[data-home-theme="retrotune"] .bg-canvas {
+  background-color: #080c04 !important;
+}
+
+body[data-home-theme="retrotune"] .border-slate-200,
+body[data-home-theme="retrotune"] .border-slate-100 {
+  border-color: rgba(100, 180, 40, 0.22) !important;
+}
+
+body[data-home-theme="retrotune"] button:not(.home-appearance-trigger):not(.home-appearance-option) {
+  background: rgba(80, 160, 20, 0.12) !important;
+  border-color: rgba(100, 200, 40, 0.4) !important;
+  color: #b8e080 !important;
+  border-radius: 2px !important;
+}
+body[data-home-theme="retrotune"] button:hover:not(.home-appearance-trigger):not(.home-appearance-option) {
+  background: rgba(80, 160, 20, 0.24) !important;
+  box-shadow: 0 0 8px rgba(100, 200, 40, 0.32) !important;
+}
+
+/* Screen flicker — honor prefers-reduced-motion */
+@media (prefers-reduced-motion: no-preference) {
+  body[data-home-theme="retrotune"] .min-h-screen {
+    animation: retro-flicker 8s linear infinite;
+  }
+  @keyframes retro-flicker {
+    0%, 97%, 100% { opacity: 1; }
+    97.5% { opacity: 0.88; }
+    98% { opacity: 1; }
+    98.5% { opacity: 0.92; }
+  }
+}
+

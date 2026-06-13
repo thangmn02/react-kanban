@@ -67,6 +67,8 @@ export interface ArcanaSpreadCard {
   cardId: string;
   slug: string;
   cardName: string;
+  /** Static atlas image path used for the DX-Tarots/JellyMod sprite frame. */
+  imagePath: string;
   arcana: string;
   atlas: ArcanaAtlasName;
   atlasIndex: number;

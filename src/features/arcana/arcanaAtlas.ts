@@ -54,6 +54,10 @@ export function getArcanaCardSprite(atlas: ArcanaAtlasName, atlasIndex: number):
   return spriteStyle(src, columns, rows, atlasIndex);
 }
 
+export function getArcanaCardImagePath(atlas: ArcanaAtlasName): string {
+  return cardAtlases[atlas].src;
+}
+
 export function getArcanaPackSprite(packIndex: number): SpriteStyle {
   return spriteStyle(arcanaPackAtlasSrc, arcanaPackAtlas.columns, arcanaPackAtlas.rows, packIndex);
 }

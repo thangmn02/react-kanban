@@ -10,7 +10,7 @@ import DeleteDialog from './components/organisms/dialog/DeleteDialog';
 import CalendarBoardView from './components/organisms/CalendarBoardView';
 import HomeDashboard from './components/organisms/HomeDashboard';
 import KanbanBoard from './components/organisms/KanbanBoard';
-import QuickPlanDialog from './components/organisms/dialog/QuickPlanDialog';
+import TodayQuickPlanDialog from './features/today/components/TodayQuickPlanDialog';
 import TaskDialog from './components/organisms/dialog/TaskDialog';
 import AuthPage from './components/auth/AuthPage';
 import AcceptInvitePage from './components/invite/AcceptInvitePage';
@@ -657,7 +657,6 @@ function App() {
 
   const {
     onSubmitCard,
-    onSubmitQuickPlan,
     onSubmitEditTask,
     handleDeleteConfirm,
     handleUpdateTask,
@@ -856,16 +855,19 @@ function App() {
         workspaceId={activeWorkspaceId}
       />
 
-      <QuickPlanDialog
-        isOpen={dialogState.quickPlanDialog.isOpen}
-        onClose={closeQuickPlanDialog}
-        onSubmit={onSubmitQuickPlan}
-        lists={boardData.list}
-        listOrder={boardData.columns}
-        initialListId={dialogState.quickPlanDialog.activeListId || boardData.columns[0] || null}
-        workspaceMembers={workspaceMembers}
-        isSubmitting={isSavingBoard}
-      />
+      {dialogState.quickPlanDialog.isOpen && user && (
+        <TodayQuickPlanDialog
+          isOpen={dialogState.quickPlanDialog.isOpen}
+          onClose={closeQuickPlanDialog}
+          currentUser={user}
+          activeWorkspace={activeWorkspace}
+          focusTasks={focusTasks}
+          onToggleTodayFocus={handleToggleFocusTaskFromToday}
+          onOpenTask={handleOpenTaskFromToday}
+          onStartFocus={handleStartFocusTaskFromToday}
+          onQuickCreateTask={handleQuickAddTask}
+        />
+      )}
 
       {deleteItem && (
         <DeleteDialog

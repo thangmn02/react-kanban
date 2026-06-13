@@ -24,6 +24,8 @@ import DueDateBadge from '../atoms/DueDateBadge';
 import MyTasksSummary from '../home/MyTasksSummary';
 import { Skeleton, SkeletonCard } from '../atoms/skeleton';
 import { useI18n } from '../../i18n';
+import { useHomeAppearance } from '../../hooks/useHomeAppearance';
+import HomeAppearanceSwitcher from '../home/HomeAppearanceSwitcher';
 
 interface HomeDashboardProps {
   onOpenTask: (taskId: string, boardId: string) => void;
@@ -125,6 +127,7 @@ function HomeDashboard({
   hasTeamMembers = false,
 }: HomeDashboardProps) {
   const { t } = useI18n();
+  const { appearance, setAppearance } = useHomeAppearance();
   const [dashboardData, setDashboardData] = useState<HomeDashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRetrying, setIsRetrying] = useState(false);
@@ -651,6 +654,7 @@ function HomeDashboard({
           </div>
         )}
       </main>
+      <HomeAppearanceSwitcher current={appearance} onChange={setAppearance} />
     </div>
   );
 }
