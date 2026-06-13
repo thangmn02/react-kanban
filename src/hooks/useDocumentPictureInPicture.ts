@@ -11,10 +11,13 @@ interface UseDocumentPictureInPictureParams {
   onStart: () => void;
   onPause: () => void;
   onReset: () => void;
+  onActiveTaskChange?: (taskId: string) => void;
+  onMarkDoneAndNext?: (taskId: string) => void;
 }
 
 interface FloatingTimerSnapshot {
-  activeTaskTitle: string;
+  activeTaskId: string;
+  focusTasks: Array<{ id: string; title: string }>;
   mode: PomodoroMode;
   isRunning: boolean;
   remainingSeconds: number;
@@ -23,7 +26,13 @@ interface FloatingTimerSnapshot {
 
 const floatingTimerStyles = `
   :root {
-    color-scheme: light;
+    --bg-color: #0f172a;
+    --card-bg: rgba(30, 41, 59, 0.7);
+    --border-color: rgba(255, 255, 255, 0.1);
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --accent-color: #38bdf8;
+    color-scheme: dark;
     font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   }
 
@@ -34,37 +43,72 @@ const floatingTimerStyles = `
   body {
     margin: 0;
     min-height: 100vh;
-    background: #0f172a;
-    color: #f8fafc;
+    background: var(--bg-color);
+    background-image: radial-gradient(circle at 50% 0%, #1e293b 0%, #0f172a 70%);
+    color: var(--text-primary);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 16px;
   }
 
   .timer-shell {
+    width: 100%;
+    height: 100%;
     display: flex;
-    min-height: 100vh;
     flex-direction: column;
     justify-content: space-between;
-    padding: 18px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 24px;
+    padding: 20px 24px;
+    box-shadow: 0 20px 40px -10px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    position: relative;
+  }
+
+  .header {
+    display: flex;
+    flex-direction: column;
   }
 
   .eyebrow {
     margin: 0;
-    color: #7dd3fc;
-    font-size: 10px;
+    color: var(--accent-color);
+    font-size: 11px;
     font-weight: 800;
-    letter-spacing: 0.2em;
+    letter-spacing: 0.15em;
     text-transform: uppercase;
   }
 
-  .title {
+  .task-switcher {
     margin: 8px 0 0;
-    max-width: 310px;
-    overflow: hidden;
-    color: #f8fafc;
-    font-size: 15px;
+    width: 100%;
+    appearance: none;
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-size: 16px;
     font-weight: 700;
-    line-height: 1.35;
+    line-height: 1.3;
+    padding: 0;
+    cursor: pointer;
     text-overflow: ellipsis;
     white-space: nowrap;
+    overflow: hidden;
+  }
+
+  .task-switcher:focus {
+    outline: none;
+    text-decoration: underline;
+    text-decoration-color: var(--accent-color);
+    text-underline-offset: 4px;
+  }
+
+  .task-switcher option {
+    background: #1e293b;
+    color: #f8fafc;
   }
 
   .meta-row {
@@ -75,90 +119,142 @@ const floatingTimerStyles = `
   }
 
   .badge {
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    border: 1px solid var(--border-color);
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.08);
-    color: #e0f2fe;
+    background: rgba(255, 255, 255, 0.05);
+    color: #e2e8f0;
     font-size: 11px;
-    font-weight: 700;
-    padding: 5px 9px;
+    font-weight: 600;
+    padding: 4px 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .badge.active {
+    background: rgba(56, 189, 248, 0.1);
+    color: var(--accent-color);
+    border-color: rgba(56, 189, 248, 0.3);
   }
 
   .time {
-    margin-top: 12px;
-    font-size: 50px;
-    font-weight: 750;
-    letter-spacing: -0.08em;
-    line-height: 0.95;
+    margin-top: auto;
+    font-size: 56px;
+    font-weight: 800;
+    letter-spacing: -0.05em;
+    line-height: 1;
     font-variant-numeric: tabular-nums;
+    background: linear-gradient(180deg, #ffffff 0%, #cbd5e1 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+  }
+
+  .controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 16px;
+    margin-bottom: 12px;
   }
 
   .actions {
-    display: grid;
+    display: flex;
     gap: 8px;
-    grid-template-columns: 1fr 1fr auto;
-    margin-top: 16px;
   }
 
   button {
     border: 0;
-    border-radius: 16px;
+    border-radius: 12px;
     cursor: pointer;
     font: inherit;
     font-size: 13px;
-    font-weight: 750;
-    padding: 10px 12px;
+    font-weight: 600;
+    padding: 8px 16px;
+    transition: all 0.2s;
   }
 
-  button:focus-visible {
-    outline: 3px solid rgba(125, 211, 252, 0.5);
+  button:active {
+    transform: scale(0.96);
   }
 
   .primary {
-    background: #2563eb;
-    color: #ffffff;
+    background: var(--text-primary);
+    color: #0f172a;
+  }
+
+  .primary:hover {
+    background: #e2e8f0;
   }
 
   .secondary {
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    background: rgba(255, 255, 255, 0.1);
-    color: #e2e8f0;
+    border: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-primary);
   }
 
-  .close {
-    border: 1px solid rgba(255, 255, 255, 0.15);
+  .secondary:hover {
     background: rgba(255, 255, 255, 0.1);
-    color: #cbd5e1;
-    padding-inline: 12px;
+  }
+
+  .complete-btn {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    margin-left: auto;
+  }
+
+  .complete-btn:hover {
+    background: rgba(16, 185, 129, 0.25);
+  }
+
+  .footer {
+    position: absolute;
+    bottom: 12px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 10px;
+    color: var(--text-secondary);
+    letter-spacing: 0.05em;
+    opacity: 0.5;
   }
 `;
 
 function createFloatingTimerMarkup(snapshot: FloatingTimerSnapshot) {
   const buttonLabel = snapshot.isRunning ? 'Pause' : 'Start';
 
+  const optionsHtml = snapshot.focusTasks.map(task => 
+    `<option value="${task.id}" ${task.id === snapshot.activeTaskId ? 'selected' : ''}>${task.title}</option>`
+  ).join('');
+
   return `
     <main class="timer-shell" aria-label="Floating focus timer">
-      <section>
+      <section class="header">
         <p class="eyebrow">Floating Focus</p>
-        <h1 class="title">${snapshot.activeTaskTitle}</h1>
+        <select class="task-switcher" data-action="switch" aria-label="Switch active focus task">
+          ${optionsHtml}
+        </select>
         <div class="meta-row">
-          <span class="badge">${POMODORO_MODE_LABELS[snapshot.mode]}</span>
+          <span class="badge active">${POMODORO_MODE_LABELS[snapshot.mode]}</span>
           <span class="badge">${snapshot.isRunning ? 'Running' : 'Paused'}</span>
         </div>
         <div class="time" aria-live="polite">${formatPomodoroTime(snapshot.remainingSeconds)}</div>
       </section>
 
-      <section class="actions" aria-label="Timer controls">
-        <button class="primary" type="button" data-action="toggle" aria-label="${buttonLabel} focus timer">
-          ${buttonLabel}
-        </button>
-        <button class="secondary" type="button" data-action="reset" aria-label="Reset focus timer">
-          Reset
-        </button>
-        <button class="close" type="button" data-action="close" aria-label="Close floating focus timer">
-          Close
+      <section class="controls" aria-label="Timer controls">
+        <div class="actions">
+          <button class="primary" type="button" data-action="toggle" aria-label="${buttonLabel} focus timer">
+            ${buttonLabel}
+          </button>
+          <button class="secondary" type="button" data-action="reset" aria-label="Reset focus timer">
+            Reset
+          </button>
+        </div>
+        <button class="complete-btn" type="button" data-action="complete" aria-label="Mark done and next">
+          Complete & Next
         </button>
       </section>
+      <div class="footer">FOCUSED WITH KANBAN</div>
     </main>
   `;
 }
@@ -171,6 +267,8 @@ export function useDocumentPictureInPicture({
   onStart,
   onPause,
   onReset,
+  onActiveTaskChange,
+  onMarkDoneAndNext,
 }: UseDocumentPictureInPictureParams) {
   const pipWindowRef = useRef<Window | null>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -179,12 +277,13 @@ export function useDocumentPictureInPicture({
   const hasRunnableTimer = focusTasks.length > 0 || Boolean(timerState.activeTaskId);
 
   const snapshot = useMemo<FloatingTimerSnapshot>(() => ({
-    activeTaskTitle: activeTask?.title || 'Focus session',
+    activeTaskId: activeTask?.id || '',
+    focusTasks: focusTasks.map(t => ({ id: t.id, title: t.title })),
     mode: timerState.mode,
     isRunning: timerState.isRunning,
     remainingSeconds,
     hasRunnableTimer,
-  }), [activeTask?.title, hasRunnableTimer, remainingSeconds, timerState.isRunning, timerState.mode]);
+  }), [activeTask?.id, focusTasks, hasRunnableTimer, remainingSeconds, timerState.isRunning, timerState.mode]);
 
   const renderPictureInPicture = useCallback(() => {
     const pipWindow = pipWindowRef.current;
@@ -197,7 +296,8 @@ export function useDocumentPictureInPicture({
 
     const toggleButton = pipWindow.document.querySelector<HTMLButtonElement>('[data-action="toggle"]');
     const resetButton = pipWindow.document.querySelector<HTMLButtonElement>('[data-action="reset"]');
-    const closeButton = pipWindow.document.querySelector<HTMLButtonElement>('[data-action="close"]');
+    const completeButton = pipWindow.document.querySelector<HTMLButtonElement>('[data-action="complete"]');
+    const switchSelect = pipWindow.document.querySelector<HTMLSelectElement>('[data-action="switch"]');
 
     toggleButton?.addEventListener('click', () => {
       if (snapshot.isRunning) {
@@ -209,8 +309,20 @@ export function useDocumentPictureInPicture({
     });
 
     resetButton?.addEventListener('click', onReset);
-    closeButton?.addEventListener('click', () => pipWindow.close());
-  }, [onPause, onReset, onStart, snapshot]);
+    
+    completeButton?.addEventListener('click', () => {
+      if (snapshot.activeTaskId && onMarkDoneAndNext) {
+        onMarkDoneAndNext(snapshot.activeTaskId);
+      }
+    });
+
+    switchSelect?.addEventListener('change', (e) => {
+      const target = e.target as HTMLSelectElement;
+      if (target.value && onActiveTaskChange) {
+        onActiveTaskChange(target.value);
+      }
+    });
+  }, [onPause, onReset, onStart, snapshot, onMarkDoneAndNext, onActiveTaskChange]);
 
   useEffect(() => {
     renderPictureInPicture();
@@ -233,8 +345,8 @@ export function useDocumentPictureInPicture({
     }
 
     const nextWindow = await window.documentPictureInPicture.requestWindow({
-      width: 380,
-      height: 240,
+      width: 400,
+      height: 280,
     });
 
     pipWindowRef.current = nextWindow;

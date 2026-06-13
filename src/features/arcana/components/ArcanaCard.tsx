@@ -1,7 +1,7 @@
 import { useCallback, useRef } from 'react';
 
 import { getArcanaCardSprite } from '../arcanaAtlas';
-import { getArcanaCardById } from '../arcanaCards';
+import { getArcanaCardById, getArcanaCardDisplay } from '../arcanaCards';
 import { arcanaFinishLabels, arcanaOrientationLabels, arcanaRarityLabels } from '../arcanaSystems';
 import type { ArcanaSpreadCard } from '../types';
 import { normalizeVietnameseText } from '../utils/normalizeVietnameseText';
@@ -35,9 +35,8 @@ function useTilt() {
         const py = ((e.clientY - rect.top) / rect.height) * 100;
         const fromx = px - 50;
         const fromy = py - 50;
-        const hyp = Math.sqrt(fromx * fromx + fromy * fromy) / 70.71; // normalised 0..1
+        const hyp = Math.sqrt(fromx * fromx + fromy * fromy) / 70.71;
 
-        // Tilt the outer wrapper
         const tilt = el.closest('.arcana-tilt') as HTMLElement | null;
         if (tilt) {
           tilt.style.transform = `rotateY(${fromx * 0.14}deg) rotateX(${fromy * -0.14}deg)`;
@@ -81,16 +80,17 @@ function ArcanaCard({ card, isRevealed, focus = false }: ArcanaCardProps) {
   const { language } = useI18n();
   const data = getArcanaCardById(card.cardId);
   const isReversed = card.orientation === 'reversed';
-  const name = normalizeVietnameseText(card.cardName);
+  const display = data ? getArcanaCardDisplay(data, language, card.orientation) : null;
+  const name = normalizeVietnameseText(display?.name ?? card.cardName);
   const rarity = arcanaRarityLabels[language][card.rarity];
   const finish = arcanaFinishLabels[language][card.finish];
   const orientation = arcanaOrientationLabels[language][card.orientation];
+  const hiddenLabel = language === 'vi' ? 'Đang mở màn' : 'Revealing';
 
   const { elementRef, onPointerMove, onPointerLeave } = useTilt();
 
   return (
     <article className={`arcana-card-frame ${focus ? 'arcana-card-frame--focus' : ''} ${isRevealed ? 'is-revealed' : 'is-hidden'}`}>
-      {/* arcana-tilt is the 3D perspective wrapper; tilt hook sets transform on it */}
       <div className="arcana-tilt">
         <div
           ref={elementRef}
@@ -120,7 +120,7 @@ function ArcanaCard({ card, isRevealed, focus = false }: ArcanaCardProps) {
 
       <div className="arcana-card-caption">
         <strong>{isRevealed ? name : '...'}</strong>
-        <span>{isRevealed ? `${orientation} · ${rarity} · ${finish}` : 'Đang mở màn'}</span>
+        <span>{isRevealed ? `${orientation} - ${rarity} - ${finish}` : hiddenLabel}</span>
       </div>
     </article>
   );

@@ -32,6 +32,39 @@ export type ArcanaRitualStage =
   | 'reading'
   | 'saved';
 
+export function localizeArcanaReading(reading: ArcanaReading, locale: ArcanaLocale): ArcanaReading {
+  const question = getArcanaQuestionById(reading.questionId);
+  const cards: ArcanaSpreadCard[] = reading.cards.map((spreadCard) => {
+    const card = getArcanaCardById(spreadCard.cardId);
+    const display = card ? getArcanaCardDisplay(card, locale, spreadCard.orientation) : null;
+
+    return {
+      ...spreadCard,
+      slug: card?.slug ?? spreadCard.slug,
+      cardName: normalizeVietnameseText(display?.name ?? spreadCard.cardName),
+      imagePath: getArcanaCardImagePath(card?.atlas ?? spreadCard.atlas),
+      arcana: normalizeVietnameseText(display?.arcana ?? spreadCard.arcana),
+      atlas: card?.atlas ?? spreadCard.atlas,
+      atlasIndex: card?.atlasIndex ?? spreadCard.atlasIndex,
+    };
+  });
+
+  if (!question) {
+    return { ...reading, cards, locale };
+  }
+
+  const content = buildArcanaReading(cards, question, question.topic, locale, reading.id, null);
+
+  return {
+    ...reading,
+    questionText: normalizeVietnameseText(question.text[locale]),
+    topic: question.topic,
+    cards,
+    messageSnapshot: normalizeVietnameseText(serializeArcanaReading(content, locale)),
+    locale,
+  };
+}
+
 export function useArcanaRitualFlow(locale: ArcanaLocale) {
   const [stage, setStage] = useState<ArcanaRitualStage>('idle');
   const [selectedTopic, setSelectedTopic] = useState<ArcanaTopic | null>(null);
@@ -43,6 +76,11 @@ export function useArcanaRitualFlow(locale: ArcanaLocale) {
   const topicQuestions = useMemo(
     () => (selectedTopic ? getArcanaQuestionsByTopic(selectedTopic) : []),
     [selectedTopic],
+  );
+
+  const localizedCurrentReading = useMemo(
+    () => (currentReading ? localizeArcanaReading(currentReading, locale) : null),
+    [currentReading, locale],
   );
 
   const beginRitual = useCallback(() => setStage('choosingTopic'), []);
@@ -136,9 +174,9 @@ export function useArcanaRitualFlow(locale: ArcanaLocale) {
 
   const saveCurrentReading = useCallback(() => {
     if (!currentReading) return;
-    setHistory(saveArcanaReading(currentReading));
+    setHistory(saveArcanaReading(localizeArcanaReading(currentReading, locale)));
     setStage('saved');
-  }, [currentReading]);
+  }, [currentReading, locale]);
 
   const refreshHistory = useCallback(() => {
     setHistory(readArcanaHistory());
@@ -172,7 +210,7 @@ export function useArcanaRitualFlow(locale: ArcanaLocale) {
     selectedQuestionId,
     selectedPack,
     topicQuestions,
-    currentReading,
+    currentReading: localizedCurrentReading,
     history,
     beginRitual,
     chooseTopic,

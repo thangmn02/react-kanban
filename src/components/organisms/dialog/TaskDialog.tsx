@@ -310,7 +310,7 @@ function TaskDialog({
   return (
     <AnimatePresence>
       {isOpen && (
-        <motion.div className="fixed inset-0 z-50">
+        <motion.div className="fixed inset-0 z-[60]">
           <motion.div
             className="absolute inset-0 bg-slate-950/30 backdrop-blur-[3px]"
             initial={shouldReduceMotion ? false : { opacity: 0 }}

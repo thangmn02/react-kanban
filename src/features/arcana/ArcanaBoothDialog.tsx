@@ -10,7 +10,7 @@ import QuestionStep from './components/QuestionStep';
 import ReadingStep from './components/ReadingStep';
 import ArcanaRitualShell from './components/ArcanaRitualShell';
 import TopicStep from './components/TopicStep';
-import { useArcanaRitualFlow } from './hooks/useArcanaRitualFlow';
+import { localizeArcanaReading, useArcanaRitualFlow } from './hooks/useArcanaRitualFlow';
 import { useI18n } from '../../i18n';
 
 interface ArcanaBoothDialogProps {
@@ -115,6 +115,7 @@ function ArcanaBoothDialog({ isOpen, onClose }: ArcanaBoothDialogProps) {
 
         {stage === 'openingPack' && currentReading && (
           <PackOpeningStep
+            locale={language}
             packType={currentReading.packType}
             onComplete={completePackOpening}
           />
@@ -148,7 +149,7 @@ function ArcanaBoothDialog({ isOpen, onClose }: ArcanaBoothDialogProps) {
         readings={history}
         onClose={() => setIsHistoryOpen(false)}
         onOpenReading={(reading) => {
-          setCurrentReading(reading);
+          setCurrentReading(localizeArcanaReading(reading, language));
           goToStage('reading');
           setIsHistoryOpen(false);
         }}

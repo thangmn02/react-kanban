@@ -18,6 +18,21 @@ interface PackOption {
   rarityHint: Record<ArcanaLocale, string>;
 }
 
+const packHeader: Record<ArcanaLocale, { eyebrow: string; title: string; description: string; open: string }> = {
+  en: {
+    eyebrow: 'III - Choose a pack',
+    title: 'Choose the vessel for the three cards',
+    description: 'Each pack changes the opening mood, rarity, and finish. The reading still comes from your question and the three cards drawn.',
+    open: 'Place the pack on the table',
+  },
+  vi: {
+    eyebrow: 'III - Chọn gói bài',
+    title: 'Chọn vật chứa cho ba lá',
+    description: 'Mỗi gói chỉ đổi cảm giác mở, độ hiếm và hiệu ứng ánh. Lời giải vẫn đến từ câu hỏi và ba lá rút được.',
+    open: 'Đưa gói lên bàn',
+  },
+};
+
 const packOptions: PackOption[] = [
   {
     type: 'arcana',
@@ -57,12 +72,14 @@ function PackSelectStep({
   onSelect,
   onOpenPack,
 }: PackSelectStepProps) {
+  const header = packHeader[locale];
+
   return (
     <section>
       <ArcanaStepHeader
-        eyebrow="III - Chọn gói bài"
-        title="Chọn vật chứa cho ba lá"
-        description="Mỗi gói chỉ đổi cảm giác mở, độ hiếm và hiệu ứng ánh. Lời giải vẫn đến từ câu hỏi và ba lá rút được."
+        eyebrow={header.eyebrow}
+        title={header.title}
+        description={header.description}
       />
 
       <div className="arcana-pack-grid">
@@ -92,7 +109,7 @@ function PackSelectStep({
       </div>
 
       <ArcanaActions>
-        <ArcanaButton onClick={onOpenPack}>Đưa gói lên bàn</ArcanaButton>
+        <ArcanaButton onClick={onOpenPack}>{header.open}</ArcanaButton>
       </ArcanaActions>
     </section>
   );

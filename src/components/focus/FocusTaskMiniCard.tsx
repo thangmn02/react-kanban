@@ -1,4 +1,5 @@
 import type { FocusTask } from '../../types/focus.type';
+import { useI18n } from '../../i18n';
 import { getPriorityBadgeClass } from '../../utils/taskMetadata';
 import DueDateBadge from '../atoms/DueDateBadge';
 
@@ -19,6 +20,7 @@ function FocusTaskMiniCard({
   onMarkDone,
   onRemove,
 }: FocusTaskMiniCardProps) {
+  const { t } = useI18n();
   const priorityBadgeClass = getPriorityBadgeClass(task.priority);
 
   return (
@@ -34,7 +36,7 @@ function FocusTaskMiniCard({
           className={`mt-1 h-3 w-3 shrink-0 rounded-full transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 ${
             isActive ? 'bg-sky-400' : 'bg-slate-500 hover:bg-sky-300'
           }`}
-          aria-label={`Set ${task.title} as active timer task`}
+          aria-label={t('focus.dock.setActiveTask', { task: task.title })}
           aria-pressed={isActive}
         />
 
@@ -48,7 +50,7 @@ function FocusTaskMiniCard({
               {task.title}
             </p>
             <p className="mt-1 truncate text-xs text-slate-300">
-              {task.boardTitle}{task.listTitle ? ` · ${task.listTitle}` : ''}
+              {task.boardTitle}{task.listTitle ? ` - ${task.listTitle}` : ''}
             </p>
           </button>
 
@@ -77,7 +79,7 @@ function FocusTaskMiniCard({
           onClick={() => onOpenTask(task)}
           className="cursor-pointer rounded-xl border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold text-slate-100 transition hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
         >
-          Open
+          {t('focus.dock.openTask')}
         </button>
         <button
           type="button"
@@ -85,15 +87,15 @@ function FocusTaskMiniCard({
           className="cursor-pointer rounded-xl border border-emerald-400/30 bg-emerald-400/15 px-3 py-1.5 text-xs font-semibold text-emerald-200 transition hover:bg-emerald-400/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
           disabled={task.isDone}
         >
-          {task.isDone ? 'Done' : 'Mark done'}
+          {task.isDone ? t('focus.dock.taskDone') : t('focus.dock.markTaskDone')}
         </button>
         <button
           type="button"
           onClick={() => onRemove(task.id)}
           className="ml-auto cursor-pointer rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-400 transition hover:bg-rose-500/15 hover:text-rose-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
-          aria-label={`Remove ${task.title} from Focus Dock`}
+          aria-label={t('focus.dock.removeTaskLabel', { task: task.title })}
         >
-          Remove
+          {t('focus.dock.removeTask')}
         </button>
       </div>
     </article>

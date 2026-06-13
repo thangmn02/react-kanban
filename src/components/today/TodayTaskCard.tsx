@@ -34,7 +34,7 @@ export default function TodayTaskCard({
               {task.title}
             </h3>
             <p className="mt-1 truncate text-xs text-slate-500">
-              {task.boardTitle} · {task.listTitle}
+              {task.boardTitle} - {task.listTitle}
             </p>
           </div>
           {task.assigneeAvatar && (

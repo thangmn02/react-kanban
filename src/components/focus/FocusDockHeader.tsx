@@ -3,9 +3,10 @@ import { useI18n } from '../../i18n';
 interface FocusDockHeaderProps {
   taskCount: number;
   onCollapse: () => void;
+  onOpenShutdown: () => void;
 }
 
-function FocusDockHeader({ taskCount, onCollapse }: FocusDockHeaderProps) {
+function FocusDockHeader({ taskCount, onCollapse, onOpenShutdown }: FocusDockHeaderProps) {
   const { t } = useI18n();
 
   return (
@@ -20,14 +21,23 @@ function FocusDockHeader({ taskCount, onCollapse }: FocusDockHeaderProps) {
         </h2>
       </div>
 
-      <button
-        type="button"
-        onClick={onCollapse}
-        className="cursor-pointer rounded-2xl border border-white/15 bg-white/10 px-3 py-2 text-xs font-semibold text-slate-100 transition hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
-        aria-label={t('focus.dock.minimizeLabel')}
-      >
-        {t('focus.dock.minimize')}
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onOpenShutdown}
+          className="cursor-pointer rounded-2xl border border-emerald-300/25 bg-emerald-300/10 px-3 py-2 text-xs font-semibold text-emerald-100 transition hover:bg-emerald-300/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+        >
+          {t('focus.dock.shutdown')}
+        </button>
+        <button
+          type="button"
+          onClick={onCollapse}
+          className="cursor-pointer rounded-2xl border border-white/15 bg-white/10 px-3 py-2 text-xs font-semibold text-slate-100 transition hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+          aria-label={t('focus.dock.minimizeLabel')}
+        >
+          {t('focus.dock.minimize')}
+        </button>
+      </div>
     </div>
   );
 }

@@ -1,4 +1,6 @@
 import { getArcanaCardSprite } from './arcanaAtlas';
+import { getArcanaCardById, getArcanaCardDisplay } from './arcanaCards';
+import { getArcanaQuestionById } from './arcanaQuestions';
 import { arcanaPackLabels } from './arcanaSystems';
 import type { ArcanaReading } from './types';
 import { normalizeVietnameseText } from './utils/normalizeVietnameseText';
@@ -38,7 +40,7 @@ function ArcanaHistoryDialog({ isOpen, readings, onClose, onOpenReading }: Arcan
             <h2 id="arcana-history-title">{t('arcana.history')}</h2>
           </div>
           <button type="button" onClick={onClose} aria-label={t('common.close')}>
-            Đóng
+            {t('common.close')}
           </button>
         </div>
 
@@ -46,35 +48,44 @@ function ArcanaHistoryDialog({ isOpen, readings, onClose, onOpenReading }: Arcan
           {readings.length === 0 ? (
             <p className="arcana-history-empty">{t('arcana.noHistory')}</p>
           ) : (
-            readings.map((reading) => (
-              <button
-                key={reading.id}
-                type="button"
-                onClick={() => onOpenReading(reading)}
-                className="arcana-history-item"
-              >
-                <span className="arcana-history-mini-spread">
-                  {reading.cards.map((card) => (
-                    <span
-                      key={card.position}
-                      className={`arcana-art ${card.orientation === 'reversed' ? 'rotate-180' : ''}`}
-                      style={getArcanaCardSprite(card.atlas, card.atlasIndex)}
-                      aria-hidden="true"
-                    />
-                  ))}
-                </span>
-                <span className="arcana-history-copy">
-                  <span>
-                    <strong>{normalizeVietnameseText(reading.cards.map((card) => card.cardName).join(' · '))}</strong>
-                    <time>
-                      {new Intl.DateTimeFormat(dateLocale, { dateStyle: 'medium' }).format(new Date(reading.createdAt))}
-                    </time>
+            readings.map((reading) => {
+              const cardNames = reading.cards.map((card) => {
+                const data = getArcanaCardById(card.cardId);
+                return data ? getArcanaCardDisplay(data, language, card.orientation).name : card.cardName;
+              });
+              const question = getArcanaQuestionById(reading.questionId);
+              const questionText = question?.text[language] ?? reading.questionText;
+
+              return (
+                <button
+                  key={reading.id}
+                  type="button"
+                  onClick={() => onOpenReading(reading)}
+                  className="arcana-history-item"
+                >
+                  <span className="arcana-history-mini-spread">
+                    {reading.cards.map((card) => (
+                      <span
+                        key={card.position}
+                        className={`arcana-art ${card.orientation === 'reversed' ? 'rotate-180' : ''}`}
+                        style={getArcanaCardSprite(card.atlas, card.atlasIndex)}
+                        aria-hidden="true"
+                      />
+                    ))}
                   </span>
-                  <em>{normalizeVietnameseText(reading.questionText)}</em>
-                  <b>{arcanaPackLabels[language][reading.packType]}</b>
-                </span>
-              </button>
-            ))
+                  <span className="arcana-history-copy">
+                    <span>
+                      <strong>{normalizeVietnameseText(cardNames.join(' - '))}</strong>
+                      <time>
+                        {new Intl.DateTimeFormat(dateLocale, { dateStyle: 'medium' }).format(new Date(reading.createdAt))}
+                      </time>
+                    </span>
+                    <em>{normalizeVietnameseText(questionText)}</em>
+                    <b>{arcanaPackLabels[language][reading.packType]}</b>
+                  </span>
+                </button>
+              );
+            })
           )}
         </div>
       </section>

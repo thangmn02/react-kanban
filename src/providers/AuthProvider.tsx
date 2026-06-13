@@ -57,19 +57,36 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     let isMounted = true;
 
+    const handleNextUser = (nextUser: AppUser | null) => {
+      setUser((currentUser) => {
+        if (!currentUser && !nextUser) return null;
+        if (
+          currentUser &&
+          nextUser &&
+          currentUser.id === nextUser.id &&
+          currentUser.email === nextUser.email &&
+          currentUser.name === nextUser.name &&
+          currentUser.avatarUrl === nextUser.avatarUrl
+        ) {
+          return currentUser;
+        }
+        return nextUser;
+      });
+    };
+
     void supabase.auth.getSession().then(({ data }) => {
       if (!isMounted) {
         return;
       }
 
       setSession(data.session);
-      setUser(data.session?.user ? mapSupabaseUserToAppUser(data.session.user) : null);
+      handleNextUser(data.session?.user ? mapSupabaseUserToAppUser(data.session.user) : null);
       setIsAuthLoading(false);
     });
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
-      setUser(nextSession?.user ? mapSupabaseUserToAppUser(nextSession.user) : null);
+      handleNextUser(nextSession?.user ? mapSupabaseUserToAppUser(nextSession.user) : null);
       setIsAuthLoading(false);
     });
 

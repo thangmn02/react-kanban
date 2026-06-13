@@ -21,6 +21,7 @@ interface FocusDockProps {
   onPauseTimer: () => void;
   onResetTimer: () => void;
   onPopOutTimer: () => void;
+  onOpenShutdown: () => void;
   onOpenTask: (task: FocusTask) => void;
   onMarkDone: (task: FocusTask) => void;
   onRemoveTask: (taskId: string) => void;
@@ -42,6 +43,7 @@ function FocusDock({
   onPauseTimer,
   onResetTimer,
   onPopOutTimer,
+  onOpenShutdown,
   onOpenTask,
   onMarkDone,
   onRemoveTask,
@@ -85,7 +87,11 @@ function FocusDock({
             transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 240, damping: 25 }}
             aria-label={t('focus.dock.title')}
           >
-            <FocusDockHeader taskCount={focusTasks.length} onCollapse={() => onCollapseChange(true)} />
+            <FocusDockHeader
+              taskCount={focusTasks.length}
+              onCollapse={() => onCollapseChange(true)}
+              onOpenShutdown={onOpenShutdown}
+            />
 
             <div className="mt-4 space-y-3">
               {focusTasks.map((focusTask) => (

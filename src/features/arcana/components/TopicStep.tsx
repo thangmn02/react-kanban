@@ -9,6 +9,19 @@ interface TopicStepProps {
   onSelect: (topic: ArcanaTopic) => void;
 }
 
+const topicHeader: Record<ArcanaLocale, { eyebrow: string; title: string; description: string }> = {
+  en: {
+    eyebrow: 'I - Choose a topic',
+    title: 'Place your hand on the right symbol',
+    description: 'Each topic opens a different lens for the same three cards.',
+  },
+  vi: {
+    eyebrow: 'I - Chọn chủ đề',
+    title: 'Đặt tay lên biểu tượng phù hợp',
+    description: 'Mỗi chủ đề mở một lăng kính riêng cho cùng ba lá bài.',
+  },
+};
+
 const topicDescriptions: Record<ArcanaLocale, Record<ArcanaTopic, string>> = {
   vi: {
     love: 'Nhịp tim, kết nối và điều chưa gọi thành lời.',
@@ -29,12 +42,14 @@ const topicDescriptions: Record<ArcanaLocale, Record<ArcanaTopic, string>> = {
 };
 
 function TopicStep({ locale, selectedTopic, onSelect }: TopicStepProps) {
+  const header = topicHeader[locale];
+
   return (
     <section>
       <ArcanaStepHeader
-        eyebrow="I - Chọn chủ đề"
-        title="Đặt tay lên biểu tượng phù hợp"
-        description="Mỗi chủ đề mở một lăng kính riêng cho cùng ba lá bài."
+        eyebrow={header.eyebrow}
+        title={header.title}
+        description={header.description}
       />
 
       <div className="arcana-token-grid">

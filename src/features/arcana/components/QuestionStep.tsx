@@ -11,6 +11,17 @@ interface QuestionStepProps {
   onSelect: (questionId: string) => void;
 }
 
+const questionHeader: Record<ArcanaLocale, { title: string; description: string }> = {
+  en: {
+    title: 'Choose the question that keeps the draw in rhythm',
+    description: 'This question is saved with the reading and guides the full interpretation.',
+  },
+  vi: {
+    title: 'Chọn câu hỏi giữ nhịp cho lượt rút',
+    description: 'Câu hỏi này sẽ được giữ lại trong bản ghi và dẫn toàn bộ lời giải.',
+  },
+};
+
 function QuestionStep({
   locale,
   topic,
@@ -18,12 +29,14 @@ function QuestionStep({
   selectedQuestionId,
   onSelect,
 }: QuestionStepProps) {
+  const header = questionHeader[locale];
+
   return (
     <section>
       <ArcanaStepHeader
         eyebrow={`II - ${arcanaTopicLabels[locale][topic]}`}
-        title="Chọn câu hỏi giữ nhịp cho lượt rút"
-        description="Câu hỏi này sẽ được giữ lại trong bản ghi và dẫn toàn bộ lời giải."
+        title={header.title}
+        description={header.description}
       />
 
       <div className="arcana-question-list">

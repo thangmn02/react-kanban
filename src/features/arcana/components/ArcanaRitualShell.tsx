@@ -1,6 +1,7 @@
 import { useReducedMotion } from 'framer-motion';
 
 import type { ArcanaRitualStage } from '../hooks/useArcanaRitualFlow';
+import type { ArcanaLocale } from '../types';
 import { useI18n } from '../../../i18n';
 
 interface ArcanaRitualShellProps {
@@ -24,15 +25,32 @@ const stageOrder: ArcanaRitualStage[] = [
   'saved',
 ];
 
-const stageLabels: Record<ArcanaRitualStage, string> = {
-  idle: 'Ngưỡng cửa',
-  choosingTopic: 'Chủ đề',
-  choosingQuestion: 'Câu hỏi',
-  choosingPack: 'Gói bài',
-  openingPack: 'Mở gói',
-  revealingCards: 'Ba lá',
-  reading: 'Lời giải',
-  saved: 'Đã lưu',
+const stageLabels: Record<ArcanaLocale, Record<ArcanaRitualStage, string>> = {
+  en: {
+    idle: 'Threshold',
+    choosingTopic: 'Topic',
+    choosingQuestion: 'Question',
+    choosingPack: 'Pack',
+    openingPack: 'Opening',
+    revealingCards: 'Three cards',
+    reading: 'Reading',
+    saved: 'Saved',
+  },
+  vi: {
+    idle: 'Ngưỡng cửa',
+    choosingTopic: 'Chủ đề',
+    choosingQuestion: 'Câu hỏi',
+    choosingPack: 'Gói bài',
+    openingPack: 'Mở gói',
+    revealingCards: 'Ba lá',
+    reading: 'Lời giải',
+    saved: 'Đã lưu',
+  },
+};
+
+const shellText: Record<ArcanaLocale, { controls: string; progress: string }> = {
+  en: { controls: 'Arcana controls', progress: 'Ritual progress' },
+  vi: { controls: 'Điều khiển Arcana', progress: 'Tiến trình nghi thức' },
 };
 
 function ArcanaRitualShell({
@@ -44,7 +62,7 @@ function ArcanaRitualShell({
   onOpenHistory,
   children,
 }: ArcanaRitualShellProps) {
-  const { t } = useI18n();
+  const { language, t } = useI18n();
   const shouldReduceMotion = useReducedMotion();
   const stepIndex = Math.max(0, stageOrder.indexOf(stage));
   const visibleSteps = stageOrder.slice(0, 7);
@@ -75,10 +93,10 @@ function ArcanaRitualShell({
             </div>
           </div>
 
-          <nav className="arcana-booth-controls" aria-label="Arcana controls">
+          <nav className="arcana-booth-controls" aria-label={shellText[language].controls}>
             {canGoBack && (
               <button type="button" onClick={onBack} aria-label={t('arcana.back')}>
-                Trở lại
+                {t('arcana.back')}
               </button>
             )}
             {hasHistory && (
@@ -87,19 +105,19 @@ function ArcanaRitualShell({
               </button>
             )}
             <button type="button" onClick={onClose} aria-label={t('common.close')}>
-              Đóng
+              {t('common.close')}
             </button>
           </nav>
         </header>
 
-        <div className="arcana-step-track" aria-label="Tiến trình nghi thức">
+        <div className="arcana-step-track" aria-label={shellText[language].progress}>
           {visibleSteps.map((item, index) => {
             const active = item === stage || (stage === 'saved' && item === 'reading');
             const done = index < stepIndex || stage === 'saved';
             return (
               <span key={item} className={active ? 'is-active' : done ? 'is-done' : ''}>
                 <i>{index + 1}</i>
-                <b>{stageLabels[item]}</b>
+                <b>{stageLabels[language][item]}</b>
               </span>
             );
           })}

@@ -3,6 +3,7 @@ import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 import { ERROR_MESSAGES } from './constants';
+import { useI18n } from './i18n';
 import type { BoardDeleteItem } from './types/task.type';
 import AddGroupDialog from './components/organisms/dialog/AddGroupDialog';
 import CreateBoardDialog from './components/organisms/dialog/CreateBoardDialog';
@@ -11,7 +12,9 @@ import CalendarBoardView from './components/organisms/CalendarBoardView';
 import HomeDashboard from './components/organisms/HomeDashboard';
 import KanbanBoard from './components/organisms/KanbanBoard';
 import TodayQuickPlanDialog from './features/today/components/TodayQuickPlanDialog';
+import ShutdownRitualDialog from './features/today/components/ShutdownRitualDialog';
 import TaskDialog from './components/organisms/dialog/TaskDialog';
+import { parseTaskLines } from './utils/taskParser';
 import AuthPage from './components/auth/AuthPage';
 import AcceptInvitePage from './components/invite/AcceptInvitePage';
 import TodayPage from './components/today/TodayPage';
@@ -37,7 +40,7 @@ import { useDocumentPictureInPicture } from './hooks/useDocumentPictureInPicture
 import { createBoardFromTemplate, fetchBoardSnapshot, fetchBoards } from './services/board.service';
 import { findBoardTemplateById } from './data/boardTemplates';
 import { createList } from './services/list.service';
-import { updateTask } from './services/task.service';
+import { updateTask, createTasks } from './services/task.service';
 import { buildTaskFieldUpdatePayload } from './utils/boardDataMapper';
 import { isLocalDemoMode } from './lib/supabase';
 import { createActivity } from './services/activity.service';
@@ -53,6 +56,11 @@ import FocusLimitToast from './components/focus/FocusLimitToast';
 import WorkspaceMembersDialog from './components/workspace/WorkspaceMembersDialog';
 import ArcanaBoothDialog from './features/arcana/ArcanaBoothDialog';
 import ArcanaRewardToast from './features/arcana/ArcanaRewardToast';
+import {
+  getYesterdayCarryoverSummary,
+  writeDailyRitualSnapshot,
+  type DailyCarryoverSummary,
+} from './features/today/dailyRitual';
 import {
   consumeArcanaRewardDraw,
   readArcanaRewardState,
@@ -85,6 +93,7 @@ function App() {
     isAuthLoading,
     signOut,
   } = useAuth();
+  const { t } = useI18n();
   const {
     workspaces,
     activeWorkspace,
@@ -162,6 +171,8 @@ function App() {
   const [isArcanaBoothOpen, setIsArcanaBoothOpen] = useState(false);
   const [arcanaRewardState, setArcanaRewardState] = useState(readArcanaRewardState);
   const [isArcanaRewardPromptOpen, setIsArcanaRewardPromptOpen] = useState(false);
+  const [carryoverSummary, setCarryoverSummary] = useState<DailyCarryoverSummary | null>(getYesterdayCarryoverSummary);
+  const [isShutdownRitualOpen, setIsShutdownRitualOpen] = useState(false);
   const [isRetryingWorkspace, setIsRetryingWorkspace] = useState(false);
   const [isRetryingBoard, setIsRetryingBoard] = useState(false);
   const [focusLaunchTaskId, setFocusLaunchTaskId] = useState<string | null>(null);
@@ -269,6 +280,7 @@ function App() {
     updateFocusedTask,
     clearLimitMessage,
     pinFocusTask,
+    carryOverFocusTasks,
   } = useFocusTasks(boardData);
 
   const refreshDailyFocusStats = useCallback(async () => {
@@ -316,13 +328,20 @@ function App() {
   }, [activeWorkspaceId, refreshDailyFocusStats, user, activeBoardIdRef]);
 
   const handlePomodoroComplete = useCallback((task: FocusTask | null, mode: PomodoroMode, session: PomodoroSessionSnapshot) => {
-    const modeLabel = mode === 'focus' ? 'Focus session' : mode === 'shortBreak' ? 'Short break' : 'Long break';
-    toast.success(`${modeLabel} completed${task ? ` for "${task.title}"` : ''}.`, { theme: 'colored' });
+    const modeLabel = mode === 'focus'
+      ? t('focus.mode.focus')
+      : mode === 'shortBreak'
+        ? t('focus.mode.shortBreak')
+        : t('focus.mode.longBreak');
+    toast.success(t('toast.focusCompleted', {
+      mode: modeLabel,
+      task: task ? `: ${task.title}` : '',
+    }), { theme: 'colored' });
 
     void logPomodoroSession(task, mode, 'completed', session)
       .then(() => {
         if (mode === 'focus') {
-          toast.success('Focus session logged.', { theme: 'colored' });
+          toast.success(t('toast.focusSessionLogged'), { theme: 'colored' });
         }
       })
       .catch((error) => {
@@ -345,17 +364,17 @@ function App() {
         console.warn('Unable to log focus session activity:', error);
       });
     }
-  }, [activeFocusIntention, activeWorkspaceId, logPomodoroSession, user?.id]);
+  }, [activeFocusIntention, activeWorkspaceId, logPomodoroSession, t, user?.id]);
 
   const handlePomodoroInterrupt = useCallback((task: FocusTask | null, mode: PomodoroMode, session: PomodoroSessionSnapshot) => {
     void logPomodoroSession(task, mode, 'interrupted', session)
       .then(() => {
-        toast.info('Interrupted focus session logged.', { theme: 'colored' });
+        toast.info(t('toast.focusSessionInterrupted'), { theme: 'colored' });
       })
       .catch((error) => {
         console.warn('Unable to log interrupted focus session:', error);
       });
-  }, [logPomodoroSession]);
+  }, [logPomodoroSession, t]);
 
   const {
     timerState,
@@ -375,7 +394,7 @@ function App() {
     const nextTaskId = taskId || activeFocusTaskId || focusTasks[0]?.id || timerState.activeTaskId || null;
 
     if (!nextTaskId) {
-      toast.info('Choose a focus task before starting the timer.', { theme: 'colored' });
+      toast.info(t('toast.chooseFocusTaskBeforeTimer'), { theme: 'colored' });
       return false;
     }
 
@@ -392,13 +411,13 @@ function App() {
 
     startTimer(nextTaskId);
     return true;
-  }, [activeFocusTaskId, focusTasks, setActiveFocusTaskId, setActiveTimerTaskId, startTimer, timerState.activeTaskId, timerState.startedAt]);
+  }, [activeFocusTaskId, focusTasks, setActiveFocusTaskId, setActiveTimerTaskId, startTimer, t, timerState.activeTaskId, timerState.startedAt]);
 
   const handleStartFocusTimer = useCallback((taskId?: string) => {
     const nextTaskId = taskId || activeFocusTaskId || focusTasks[0]?.id || timerState.activeTaskId || null;
 
     if (!nextTaskId) {
-      toast.info('Choose a focus task before starting the timer.', { theme: 'colored' });
+      toast.info(t('toast.chooseFocusTaskBeforeTimer'), { theme: 'colored' });
       return;
     }
 
@@ -408,33 +427,9 @@ function App() {
     }
 
     setFocusLaunchTaskId(nextTaskId);
-  }, [activeFocusTaskId, focusTasks, startFocusSessionNow, timerState.activeTaskId, timerState.isRunning, timerState.startedAt]);
+  }, [activeFocusTaskId, focusTasks, startFocusSessionNow, t, timerState.activeTaskId, timerState.isRunning, timerState.startedAt]);
 
-  const {
-    isPictureInPictureSupported,
-    isPictureInPictureOpen,
-    openPictureInPicture,
-  } = useDocumentPictureInPicture({
-    activeTask: activeFocusTask,
-    focusTasks,
-    timerState,
-    remainingSeconds,
-    onStart: () => startFocusSessionNow(),
-    onPause: pauseTimer,
-    onReset: resetTimer,
-  });
 
-  const handleOpenFloatingFocusTimer = useCallback(() => {
-    if (!isPictureInPictureSupported) {
-      toast.info('Floating timer is not supported in this browser.', { theme: 'colored' });
-      return;
-    }
-
-    void openPictureInPicture().catch((error) => {
-      const message = error instanceof Error ? error.message : 'Unable to open floating focus timer.';
-      toast.error(message, { theme: 'colored' });
-    });
-  }, [isPictureInPictureSupported, openPictureInPicture]);
 
   const focusLaunchTask = focusLaunchTaskId
     ? focusTasks.find((focusTask) => focusTask.id === focusLaunchTaskId) || null
@@ -454,13 +449,13 @@ function App() {
 
     if (didStart) {
       setFocusLaunchTaskId(null);
-      toast.success(`Focus started: ${focusLaunchTask.title}`, { theme: 'colored' });
+      toast.success(t('toast.focusStarted', { task: focusLaunchTask.title }), { theme: 'colored' });
     }
-  }, [closeFocusLaunchpad, focusLaunchTask, startFocusSessionNow]);
+  }, [closeFocusLaunchpad, focusLaunchTask, startFocusSessionNow, t]);
 
   const onSubmitList = async (formData: { title: string }) => {
     if (!activeBoardId) {
-      toast.error('Board is not ready yet.', { theme: 'colored' });
+      toast.error(t('toast.boardNotReady'), { theme: 'colored' });
       return;
     }
 
@@ -476,9 +471,9 @@ function App() {
 
       await refreshBoardData();
       closeGroupDialog();
-      toast.success('List added successfully!', { theme: 'colored' });
+      toast.success(t('toast.listAdded'), { theme: 'colored' });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to add list.';
+      const message = error instanceof Error ? error.message : t('toast.unableAddList');
 
       toast.error(message, { theme: 'colored' });
     } finally {
@@ -502,9 +497,9 @@ function App() {
       await refreshBoardList();
       closeCreateBoardDialog();
       setActiveViewWithPath('board');
-      toast.success('Board created successfully!', { theme: 'colored' });
+      toast.success(t('toast.boardCreated'), { theme: 'colored' });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to create board.';
+      const message = error instanceof Error ? error.message : t('toast.unableCreateBoard');
       toast.error(message, { theme: 'colored' });
     } finally {
       setIsSavingBoard(false);
@@ -515,25 +510,80 @@ function App() {
     const firstListId = boardData.columns[0];
 
     if (!activeBoardId || !firstListId) {
-      toast.info('Create a board and at least one list before adding a task.', { theme: 'colored' });
+      toast.info(t('toast.createBoardBeforeTask'), { theme: 'colored' });
       return;
     }
 
     openCreateTaskDialog(firstListId);
-    setActiveViewWithPath('board');
-  }, [activeBoardId, boardData.columns, openCreateTaskDialog, setActiveViewWithPath]);
+  }, [activeBoardId, boardData.columns, openCreateTaskDialog, t]);
 
   const handleOpenQuickPlan = useCallback(() => {
     const firstListId = boardData.columns[0];
 
     if (!activeBoardId || !firstListId) {
-      toast.info('Create a board and at least one list before using Quick Plan.', { theme: 'colored' });
+      toast.info(t('toast.createBoardBeforeQuickPlan'), { theme: 'colored' });
       return;
     }
 
     openQuickPlanDialog(firstListId);
-    setActiveViewWithPath('board');
-  }, [activeBoardId, boardData.columns, openQuickPlanDialog, setActiveViewWithPath]);
+    setCarryoverSummary(getYesterdayCarryoverSummary());
+  }, [activeBoardId, boardData.columns, openQuickPlanDialog, t]);
+
+  const handlePasteTasks = useCallback(async (text: string) => {
+    if (activeView !== 'board' && activeView !== 'home' && activeView !== 'today') return;
+    
+    const firstListId = boardData.columns[0];
+    if (!activeBoardId || !activeWorkspaceId || !firstListId || !user) {
+      return;
+    }
+
+    const taskTitles = parseTaskLines(text);
+    if (!taskTitles.length) return;
+
+    setIsSavingBoard(true);
+    try {
+      const listTasks = boardData.list[firstListId]?.tasks || [];
+      const positionOffset = listTasks.length * 65536;
+
+      const tasksToCreate = taskTitles.map((title, index) => ({
+        title,
+        board_id: activeBoardId,
+        list_id: firstListId,
+        workspace_id: activeWorkspaceId,
+        created_by: user.id,
+        assignees: [user.id],
+        position: positionOffset + ((index + 1) * 65536),
+      }));
+
+      await createTasks(tasksToCreate);
+      await refreshBoardData({ boardId: activeBoardId });
+      toast.success(t('toast.createdTasksFromPaste', { count: tasksToCreate.length }), { theme: 'colored' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t('toast.failedCreatePastedTasks');
+      toast.error(message, { theme: 'colored' });
+    } finally {
+      setIsSavingBoard(false);
+    }
+  }, [activeView, boardData, activeBoardId, activeWorkspaceId, user, refreshBoardData, setIsSavingBoard, t]);
+
+  useEffect(() => {
+    const handleGlobalPaste = (e: ClipboardEvent) => {
+      const activeElement = document.activeElement;
+      if (activeElement) {
+        const tagName = activeElement.tagName.toUpperCase();
+        if (tagName === 'INPUT' || tagName === 'TEXTAREA') return;
+        if (activeElement.getAttribute('contenteditable') === 'true') return;
+      }
+
+      const text = e.clipboardData?.getData('text');
+      if (!text) return;
+
+      void handlePasteTasks(text);
+    };
+
+    window.addEventListener('paste', handleGlobalPaste);
+    return () => window.removeEventListener('paste', handleGlobalPaste);
+  }, [handlePasteTasks]);
 
   const handleCompleteOnboarding = async (setupValues: OnboardingSetupValues) => {
     if (!user) {
@@ -570,7 +620,7 @@ function App() {
     setBoardSummaries(boardRows);
     syncBoardCache(boardSnapshot.boardId, boardSnapshot.boardData);
     setActiveViewWithPath('board');
-    toast.success('Workspace and first board created.', { theme: 'colored' });
+    toast.success(t('toast.workspaceCreated'), { theme: 'colored' });
   };
 
   const handleEditTask = openEditTaskDialog;
@@ -640,12 +690,12 @@ function App() {
         openEditTaskDialog(task);
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to open task.';
+      const message = error instanceof Error ? error.message : t('toast.unableOpenTask');
       toast.error(message, { theme: 'colored' });
     } finally {
       setIsBoardLoading(false);
     }
-  }, [activeWorkspaceId, syncBoardCache, user?.id, activeBoardIdRef, setActiveBoardId, setBoardData, setIsBoardLoading, openEditTaskDialog]);
+  }, [activeWorkspaceId, syncBoardCache, user?.id, activeBoardIdRef, setActiveBoardId, setBoardData, setIsBoardLoading, openEditTaskDialog, t]);
 
   const handleOpenTaskFromToday = useCallback((taskSummary: TodayTaskSummary) => {
     void handleOpenTaskFromHome(taskSummary.id, taskSummary.boardId);
@@ -694,15 +744,15 @@ function App() {
         openEditTaskDialog(task);
       } else {
         removeFocusTask(focusTask.id);
-        toast.info('This focus task is no longer available.', { theme: 'colored' });
+        toast.info(t('toast.focusTaskUnavailable'), { theme: 'colored' });
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to open focus task.';
+      const message = error instanceof Error ? error.message : t('toast.unableOpenFocusTask');
       toast.error(message, { theme: 'colored' });
     } finally {
       setIsBoardLoading(false);
     }
-  }, [activeWorkspaceId, removeFocusTask, setActiveViewWithPath, syncBoardCache, user?.id, activeBoardIdRef, setActiveBoardId, setBoardData, setIsBoardLoading, openEditTaskDialog]);
+  }, [activeWorkspaceId, removeFocusTask, setActiveViewWithPath, syncBoardCache, user?.id, activeBoardIdRef, setActiveBoardId, setBoardData, setIsBoardLoading, openEditTaskDialog, t]);
 
   const handleMarkFocusTaskDone = useCallback(async (focusTask: FocusTask) => {
     try {
@@ -735,12 +785,12 @@ function App() {
       if (!focusTask.isDone) {
         handleArcanaTaskCompleted();
       }
-      toast.success('Focus task marked done.', { theme: 'colored' });
+      toast.success(t('toast.focusTaskMarkedDone'), { theme: 'colored' });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to mark focus task done.';
+      const message = error instanceof Error ? error.message : t('toast.unableMarkFocusTaskDone');
       toast.error(message, { theme: 'colored' });
     }
-  }, [activeWorkspaceId, boardData.task, handleArcanaTaskCompleted, setBoardData, updateFocusedTask, user?.id]);
+  }, [activeWorkspaceId, boardData.task, handleArcanaTaskCompleted, setBoardData, t, updateFocusedTask, user?.id]);
 
   const handleCloseFocusCompletion = useCallback(() => {
     setFocusCompletion(null);
@@ -763,6 +813,117 @@ function App() {
       void handleMarkFocusTaskDone(task);
     }
   }, [focusCompletion?.task, handleMarkFocusTaskDone]);
+
+  const handleActiveTaskChange = useCallback((taskId: string) => {
+    setActiveFocusTaskId(taskId);
+    setActiveTimerTaskId(taskId);
+  }, [setActiveFocusTaskId, setActiveTimerTaskId]);
+
+  const handleMarkDoneAndNext = useCallback((taskId: string) => {
+    const task = focusTasks.find((t) => t.id === taskId);
+    if (task) {
+      void handleMarkFocusTaskDone(task);
+    }
+
+    const currentIndex = focusTasks.findIndex((t) => t.id === taskId);
+    const nextTask = focusTasks.find((t, idx) => idx > currentIndex && !t.isDone) 
+      || focusTasks.find((t, idx) => idx < currentIndex && !t.isDone);
+    
+    if (nextTask) {
+      setActiveFocusTaskId(nextTask.id);
+      setActiveTimerTaskId(nextTask.id);
+    } else {
+      pauseTimer();
+    }
+  }, [focusTasks, handleMarkFocusTaskDone, setActiveFocusTaskId, setActiveTimerTaskId, pauseTimer]);
+
+  const {
+    isPictureInPictureSupported,
+    isPictureInPictureOpen,
+    openPictureInPicture,
+  } = useDocumentPictureInPicture({
+    activeTask: activeFocusTask,
+    focusTasks,
+    timerState,
+    remainingSeconds,
+    onStart: () => startFocusSessionNow(),
+    onPause: pauseTimer,
+    onReset: resetTimer,
+    onActiveTaskChange: handleActiveTaskChange,
+    onMarkDoneAndNext: handleMarkDoneAndNext,
+  });
+
+  const handleOpenFloatingFocusTimer = useCallback(() => {
+    if (!isPictureInPictureSupported) {
+      toast.info(t('toast.floatingTimerUnsupported'), { theme: 'colored' });
+      return;
+    }
+
+    void openPictureInPicture().catch((error) => {
+      const message = error instanceof Error ? error.message : t('toast.unableOpenFloatingTimer');
+      toast.error(message, { theme: 'colored' });
+    });
+  }, [isPictureInPictureSupported, openPictureInPicture, t]);
+
+  const handleCarryYesterday = useCallback((taskIds: string[]) => {
+    const carriedCount = carryOverFocusTasks(taskIds);
+    setCarryoverSummary(null);
+
+    if (carriedCount > 0) {
+      toast.success(t('dailyRitual.carriedToast', {
+        count: carriedCount,
+        plural: carriedCount === 1 ? '' : 's',
+      }), { theme: 'colored' });
+    } else {
+      toast.info(t('dailyRitual.carryUnavailableToast'), { theme: 'colored' });
+    }
+  }, [carryOverFocusTasks, t]);
+
+  const handleFinishDailyRitual = useCallback(() => {
+    const firstRunnableTask = focusTasks.find((task) => !task.isDone) || null;
+
+    writeDailyRitualSnapshot(
+      focusTasks,
+      dailyFocusStats.completedSessions,
+      dailyFocusStats.focusedMinutes,
+    );
+    setCarryoverSummary(null);
+    closeQuickPlanDialog();
+
+    if (!firstRunnableTask) {
+      toast.info(t('dailyRitual.chooseBeforeStartToast'), { theme: 'colored' });
+      return;
+    }
+
+    const didStart = startFocusSessionNow(firstRunnableTask.id, t('dailyRitual.title'));
+    if (!didStart) return;
+
+    toast.success(t('dailyRitual.startedToast', { task: firstRunnableTask.title }), { theme: 'colored' });
+
+    if (isPictureInPictureSupported) {
+      handleOpenFloatingFocusTimer();
+    }
+  }, [
+    closeQuickPlanDialog,
+    dailyFocusStats.completedSessions,
+    dailyFocusStats.focusedMinutes,
+    focusTasks,
+    handleOpenFloatingFocusTimer,
+    isPictureInPictureSupported,
+    startFocusSessionNow,
+    t,
+  ]);
+
+  const handleCompleteShutdownRitual = useCallback(() => {
+    writeDailyRitualSnapshot(
+      focusTasks,
+      dailyFocusStats.completedSessions,
+      dailyFocusStats.focusedMinutes,
+    );
+    setCarryoverSummary(null);
+    setIsShutdownRitualOpen(false);
+    toast.success(t('shutdown.completeToast'), { theme: 'colored' });
+  }, [dailyFocusStats.completedSessions, dailyFocusStats.focusedMinutes, focusTasks, t]);
 
   const commandPaletteActions = useCommandPaletteActions({
     setActiveViewWithPath,
@@ -862,10 +1023,14 @@ function App() {
           currentUser={user}
           activeWorkspace={activeWorkspace}
           focusTasks={focusTasks}
+          carryoverSummary={carryoverSummary}
+          onCarryYesterday={handleCarryYesterday}
+          onDismissCarryover={() => setCarryoverSummary(null)}
           onToggleTodayFocus={handleToggleFocusTaskFromToday}
           onOpenTask={handleOpenTaskFromToday}
           onStartFocus={handleStartFocusTaskFromToday}
           onQuickCreateTask={handleQuickAddTask}
+          onFinishRitual={handleFinishDailyRitual}
         />
       )}
 
@@ -933,6 +1098,7 @@ function App() {
         onPauseTimer={pauseTimer}
         onResetTimer={resetTimer}
         onPopOutTimer={handleOpenFloatingFocusTimer}
+        onOpenShutdown={() => setIsShutdownRitualOpen(true)}
         onOpenTask={handleOpenFocusTask}
         onMarkDone={handleMarkFocusTaskDone}
         onRemoveTask={removeFocusTask}
@@ -941,6 +1107,14 @@ function App() {
       />
 
       <FocusLimitToast message={focusLimitMessage} onDismiss={clearLimitMessage} />
+
+      <ShutdownRitualDialog
+        isOpen={isShutdownRitualOpen}
+        focusTasks={focusTasks}
+        dailyFocusStats={dailyFocusStats}
+        onClose={() => setIsShutdownRitualOpen(false)}
+        onComplete={handleCompleteShutdownRitual}
+      />
 
       <ToastContainer />
     </>

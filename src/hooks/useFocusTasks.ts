@@ -96,6 +96,17 @@ export function useFocusTasks(boardData: BoardData) {
     setFocusTasks((currentFocusTasks) => currentFocusTasks.filter((focusTask) => focusTask.id !== taskId));
   }, []);
 
+  const carryOverFocusTasks = useCallback((taskIds: string[]) => {
+    const taskIdSet = new Set(taskIds);
+    const nextFocusTasks = focusTasks.filter((focusTask) => taskIdSet.has(focusTask.id) && !focusTask.isDone);
+
+    setFocusTasks(nextFocusTasks);
+    setActiveFocusTaskId(nextFocusTasks[0]?.id || null);
+    setLimitMessage(null);
+
+    return nextFocusTasks.length;
+  }, [focusTasks]);
+
   const pinFocusTask = useCallback((input: FocusTaskInput) => {
     const nextFocusTask = mapTaskToFocusTask(input);
     let didHitLimit = false;
@@ -152,6 +163,7 @@ export function useFocusTasks(boardData: BoardData) {
     maxFocusTasks: MAX_FOCUS_TASKS,
     isFocusTask: (taskId: string) => focusTaskIds.has(taskId),
     pinFocusTask,
+    carryOverFocusTasks,
     removeFocusTask,
     setActiveFocusTaskId,
     toggleFocusTask,

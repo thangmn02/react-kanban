@@ -159,6 +159,49 @@ export async function createTask(taskData: TaskInsert): Promise<TaskRow> {
   return data;
 }
 
+export async function createTasks(tasksData: TaskInsert[]): Promise<TaskRow[]> {
+  if (!tasksData.length) return [];
+
+  if (!supabase) {
+    return tasksData.map((taskData, index) => ({
+      id: `task-${Date.now()}-${index}`,
+      workspace_id: taskData.workspace_id ?? null,
+      board_id: taskData.board_id,
+      list_id: taskData.list_id,
+      title: taskData.title,
+      description: taskData.description || '',
+      position: taskData.position ?? 0,
+      priority: taskData.priority || 'Low',
+      start_date: taskData.start_date || null,
+      due_date: taskData.due_date || null,
+      category1: taskData.category1 || null,
+      category2: taskData.category2 || null,
+      assignees: taskData.assignees || null,
+      image: taskData.image || null,
+      is_done: taskData.is_done || false,
+      created_at: new Date().toISOString(),
+      created_by: taskData.created_by ?? null,
+      updated_at: null,
+      completed_at: taskData.completed_at ?? null,
+      deleted_at: null,
+      archived_at: null,
+    }));
+  }
+
+  const client = requireSupabaseClient();
+  const { data, error } = await client
+    .from('tasks')
+    .insert(tasksData.map(normalizeTaskData))
+    .select();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+
 export async function updateTask(taskId: string, taskData: TaskUpdate): Promise<TaskRow> {
   if (!supabase) {
     return {

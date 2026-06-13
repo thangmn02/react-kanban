@@ -20,22 +20,64 @@ interface ReadingBlock {
   body: string;
 }
 
-const viSectionLabels = [
-  'Tổng quan trải bài',
-  'Lá 1 - Nền năng lượng',
-  'Lá 2 - Điều cần thấy rõ',
-  'Lá 3 - Điều đang mở ra',
-  'Mối liên kết',
-  'Lời nhắn nhẹ',
-];
+const readingText: Record<ArcanaLocale, {
+  eyebrow: string;
+  spreadLabel: string;
+  saved: string;
+  savedButton: string;
+  saveButton: string;
+  drawAgain: string;
+  close: string;
+  history: string;
+  sectionLabels: string[];
+}> = {
+  en: {
+    eyebrow: 'Reading for your question',
+    spreadLabel: 'Three drawn cards',
+    saved: 'This reading has been saved to history.',
+    savedButton: 'Saved',
+    saveButton: 'Save reading',
+    drawAgain: 'Draw again',
+    close: 'Close',
+    history: 'View reading history',
+    sectionLabels: [
+      'Spread overview',
+      'Card 1 - Foundation',
+      'Card 2 - What to see clearly',
+      'Card 3 - What is opening',
+      'The thread between them',
+      'A gentle note',
+    ],
+  },
+  vi: {
+    eyebrow: 'Lời giải cho câu hỏi',
+    spreadLabel: 'Ba lá đã rút',
+    saved: 'Đã lưu lượt rút này vào lịch sử.',
+    savedButton: 'Đã lưu',
+    saveButton: 'Lưu lượt rút',
+    drawAgain: 'Rút lại',
+    close: 'Đóng',
+    history: 'Xem lịch sử rút bài',
+    sectionLabels: [
+      'Tổng quan trải bài',
+      'Lá 1 - Nền năng lượng',
+      'Lá 2 - Điều cần thấy rõ',
+      'Lá 3 - Điều đang mở ra',
+      'Mối liên kết',
+      'Lời nhắn nhẹ',
+    ],
+  },
+};
 
-function parseReadingSnapshot(snapshot: string): ReadingBlock[] {
+function parseReadingSnapshot(snapshot: string, locale: ArcanaLocale): ReadingBlock[] {
+  const labels = readingText[locale].sectionLabels;
+
   return normalizeVietnameseText(snapshot)
     .split('\n\n')
     .map((section, index) => {
       const [heading, ...body] = section.split('\n');
       return {
-        heading: viSectionLabels[index] ?? normalizeVietnameseText(heading),
+        heading: labels[index] ?? normalizeVietnameseText(heading),
         body: normalizeVietnameseText(body.join('\n').trim()),
       };
     })
@@ -52,13 +94,14 @@ function ReadingStep({
   onClose,
   onOpenHistory,
 }: ReadingStepProps) {
-  const blocks = parseReadingSnapshot(reading.messageSnapshot);
+  const copy = readingText[locale];
+  const blocks = parseReadingSnapshot(reading.messageSnapshot, locale);
   const dateLocale = locale === 'vi' ? 'vi-VN' : 'en-US';
 
   return (
     <section className="arcana-reading-page">
       <header className="arcana-reading-hero">
-        <p>Lời giải cho câu hỏi</p>
+        <p>{copy.eyebrow}</p>
         <h3>{normalizeVietnameseText(reading.questionText)}</h3>
         <span>
           {arcanaPackLabels[locale][reading.packType]} - {new Intl.DateTimeFormat(dateLocale, {
@@ -69,7 +112,7 @@ function ReadingStep({
       </header>
 
       <div className="arcana-reading-layout">
-        <aside className="arcana-reading-spread" aria-label="Ba lá đã rút">
+        <aside className="arcana-reading-spread" aria-label={copy.spreadLabel}>
           {reading.cards.map((card) => (
             <div key={card.position}>
               <span>{arcanaSpreadLabels[locale][card.position]}</span>
@@ -93,25 +136,25 @@ function ReadingStep({
 
       {isSaved && (
         <p className="arcana-saved-note" role="status">
-          Đã lưu lượt rút này vào lịch sử.
+          {copy.saved}
         </p>
       )}
 
       <ArcanaActions>
         <ArcanaButton onClick={onSave} disabled={isSaved}>
-          {isSaved ? 'Đã lưu' : 'Lưu lượt rút'}
+          {isSaved ? copy.savedButton : copy.saveButton}
         </ArcanaButton>
         <ArcanaButton onClick={onDrawAgain} variant="secondary">
-          Rút lại
+          {copy.drawAgain}
         </ArcanaButton>
         <ArcanaButton onClick={onClose} variant="quiet">
-          Đóng
+          {copy.close}
         </ArcanaButton>
       </ArcanaActions>
 
       {hasHistory && (
         <button type="button" onClick={onOpenHistory} className="arcana-history-link">
-          Xem lịch sử rút bài
+          {copy.history}
         </button>
       )}
     </section>

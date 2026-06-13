@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
+
+import { Skeleton } from '../../../components/atoms/skeleton';
+import ContentDialog from '../../../components/molecules/dialog/ContentDialog';
+import { useI18n } from '../../../i18n';
 import { fetchTodayPageData, type TodayPageData, type TodayTaskSummary } from '../../../services/today.service';
 import type { AppUser, WorkspaceSummary } from '../../../types/auth.type';
 import type { FocusTask } from '../../../types/focus.type';
+import type { DailyCarryoverSummary } from '../dailyRitual';
 import TodayTaskSelector from './TodayTaskSelector';
-import { Skeleton } from '../../../components/atoms/skeleton';
-import { useI18n } from '../../../i18n';
-import ContentDialog from '../../../components/molecules/dialog/ContentDialog';
 
 interface TodayQuickPlanDialogProps {
   isOpen: boolean;
@@ -13,10 +15,14 @@ interface TodayQuickPlanDialogProps {
   currentUser: AppUser;
   activeWorkspace: WorkspaceSummary | null;
   focusTasks: FocusTask[];
+  carryoverSummary: DailyCarryoverSummary | null;
+  onCarryYesterday: (taskIds: string[]) => void;
+  onDismissCarryover: () => void;
   onToggleTodayFocus: (task: TodayTaskSummary) => void;
   onOpenTask: (task: TodayTaskSummary) => void;
   onStartFocus: (task: TodayTaskSummary) => void;
   onQuickCreateTask: () => void;
+  onFinishRitual: () => void;
 }
 
 export default function TodayQuickPlanDialog({
@@ -25,10 +31,14 @@ export default function TodayQuickPlanDialog({
   currentUser,
   activeWorkspace,
   focusTasks,
+  carryoverSummary,
+  onCarryYesterday,
+  onDismissCarryover,
   onToggleTodayFocus,
   onOpenTask,
   onStartFocus,
   onQuickCreateTask,
+  onFinishRitual,
 }: TodayQuickPlanDialogProps) {
   const { t } = useI18n();
   const [todayData, setTodayData] = useState<TodayPageData | null>(null);
@@ -39,10 +49,10 @@ export default function TodayQuickPlanDialog({
     if (!isOpen) return;
 
     let isMounted = true;
-    
+
+    // Fetching a fresh Today payload is the dialog's external synchronization.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsLoading(true);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setError(null);
 
     fetchTodayPageData({
@@ -55,7 +65,7 @@ export default function TodayQuickPlanDialog({
       })
       .catch((err) => {
         if (!isMounted) return;
-        setError(err instanceof Error ? err.message : t('today.loadError'));
+        setError(err instanceof Error ? err.message : t('dailyRitual.loadingError'));
       })
       .finally(() => {
         if (isMounted) setIsLoading(false);
@@ -71,54 +81,54 @@ export default function TodayQuickPlanDialog({
   return (
     <ContentDialog
       title={
-        <div className="mb-2 flex items-center justify-between">
-          <h3 className="text-xl font-bold text-slate-900">Lập kế hoạch nhanh</h3>
-        </div>
-      }
-      onClose={onClose}
-      onSubmit={onClose}
-      textButtonClose=""
-      textButtonSubmit="Hoàn tất"
-      className="max-w-5xl w-full p-6 sm:p-10"
-      modalFooter={
-        <div className="mt-8 flex justify-end">
+        <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-[0.22em] text-sky-600">
+              {t('dailyRitual.frontDoor')}
+            </p>
+            <h3 className="mt-1 text-2xl font-semibold tracking-[-0.04em] text-slate-950">
+              {t('dailyRitual.title')}
+            </h3>
+          </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full bg-slate-900 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
+            className="w-fit rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"
           >
-            Hoàn tất
+            {t('common.close')}
           </button>
-        </div>
+        </header>
       }
+      onClose={onClose}
+      onSubmit={onFinishRitual}
+      textButtonClose=""
+      textButtonSubmit=""
+      className="w-full max-w-6xl rounded-[2rem] p-4 sm:p-6"
+      modalFooter={null}
     >
-      <div className="flex-1 overflow-y-auto">
-        {isLoading || !todayData ? (
-          <div className="grid gap-8 lg:grid-cols-2">
-            <div className="flex flex-col gap-4">
-              <Skeleton className="h-6 w-48" />
-              <Skeleton className="h-32 w-full rounded-2xl" />
-              <Skeleton className="h-32 w-full rounded-2xl" />
-            </div>
-            <div className="flex flex-col gap-4">
-              <Skeleton className="h-6 w-48" />
-              <Skeleton className="h-16 w-full rounded-2xl" />
-              <Skeleton className="h-16 w-full rounded-2xl" />
-            </div>
-          </div>
-        ) : error ? (
-          <div className="py-12 text-center text-red-500">{error}</div>
-        ) : (
-          <TodayTaskSelector
-            todayData={todayData}
-            focusTasks={focusTasks}
-            onToggleTodayFocus={onToggleTodayFocus}
-            onOpenTask={onOpenTask}
-            onStartFocus={onStartFocus}
-            onQuickCreateTask={onQuickCreateTask}
-          />
-        )}
-      </div>
+      {isLoading || !todayData ? (
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1.05fr)_minmax(330px,0.95fr)]">
+          <Skeleton className="h-[520px] w-full rounded-[2rem]" />
+          <Skeleton className="h-[520px] w-full rounded-[2rem]" />
+        </div>
+      ) : error ? (
+        <div className="rounded-3xl border border-rose-200 bg-rose-50 px-5 py-12 text-center text-sm font-semibold text-rose-700">
+          {error}
+        </div>
+      ) : (
+        <TodayTaskSelector
+          todayData={todayData}
+          focusTasks={focusTasks}
+          carryoverSummary={carryoverSummary}
+          onCarryYesterday={onCarryYesterday}
+          onDismissCarryover={onDismissCarryover}
+          onToggleTodayFocus={onToggleTodayFocus}
+          onOpenTask={onOpenTask}
+          onStartFocus={onStartFocus}
+          onQuickCreateTask={onQuickCreateTask}
+          onFinishRitual={onFinishRitual}
+        />
+      )}
     </ContentDialog>
   );
 }

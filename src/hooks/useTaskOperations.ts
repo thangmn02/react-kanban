@@ -2,6 +2,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import { toast } from 'react-toastify';
 
 import { LIST_POSITION_STEP } from '../constants';
+import { useI18n } from '../i18n';
 import type {
   BoardData,
   BoardDeleteItem,
@@ -152,13 +153,15 @@ export function useTaskOperations({
   refreshBoardData,
   onTaskCompleted,
 }: UseTaskOperationsParams): UseTaskOperationsResult {
+  const { t } = useI18n();
+
   const onSubmitQuickPlan = async (formData: QuickPlanFormData) => {
     if (!activeBoardId || !formData.targetListId) return;
 
     const targetList = boardData.list[formData.targetListId];
 
     if (!targetList) {
-      toast.error('Choose a valid target list.', { theme: 'colored' });
+      toast.error(t('toast.chooseValidTargetList'), { theme: 'colored' });
       return;
     }
 
@@ -177,7 +180,7 @@ export function useTaskOperations({
     });
 
     if (plannedTasks.length === 0) {
-      toast.info('Add at least one task title before creating tasks.', { theme: 'colored' });
+      toast.info(t('toast.addTaskTitleBeforeCreate'), { theme: 'colored' });
       return;
     }
 
@@ -223,7 +226,7 @@ export function useTaskOperations({
         } catch (error) {
           failureCount += 1;
           if (!firstErrorMessage) {
-            firstErrorMessage = error instanceof Error ? error.message : 'Unable to create one or more tasks.';
+            firstErrorMessage = error instanceof Error ? error.message : t('toast.unableCreateTasks');
           }
         }
       }
@@ -232,15 +235,23 @@ export function useTaskOperations({
 
       if (failureCount > 0) {
         toast.warning(
-          `Quick Plan created ${successCount} task${successCount === 1 ? '' : 's'}; ${failureCount} failed. ${firstErrorMessage}`,
+          t('toast.quickPlanPartial', {
+            success: successCount,
+            successPlural: successCount === 1 ? '' : 's',
+            failure: failureCount,
+            message: firstErrorMessage,
+          }),
           { theme: 'colored' },
         );
         return;
       }
 
-      toast.success(`Quick Plan created ${successCount} task${successCount === 1 ? '' : 's'}.`, { theme: 'colored' });
+      toast.success(t('toast.quickPlanCreated', {
+        count: successCount,
+        plural: successCount === 1 ? '' : 's',
+      }), { theme: 'colored' });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to finish Quick Plan.';
+      const message = error instanceof Error ? error.message : t('toast.unableFinishQuickPlan');
       toast.error(message, { theme: 'colored' });
     } finally {
       setIsSavingBoard(false);
@@ -286,9 +297,9 @@ export function useTaskOperations({
 
       await refreshBoardData();
       closeTaskDialog();
-      toast.success('Card added successfully!', { theme: 'colored' });
+      toast.success(t('toast.cardAdded'), { theme: 'colored' });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to add task.';
+      const message = error instanceof Error ? error.message : t('toast.unableAddTask');
 
       toast.error(message, { theme: 'colored' });
     } finally {
@@ -366,9 +377,9 @@ export function useTaskOperations({
 
       await refreshBoardData();
       closeTaskDialog();
-      toast.success('Task updated successfully!', { theme: 'colored' });
+      toast.success(t('toast.taskUpdated'), { theme: 'colored' });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to update task.';
+      const message = error instanceof Error ? error.message : t('toast.unableUpdateTask');
 
       toast.error(message, { theme: 'colored' });
     } finally {
@@ -380,9 +391,9 @@ export function useTaskOperations({
     try {
       await restoreTask(taskId);
       await refreshBoardData();
-      toast.success('Task restored.', { theme: 'colored' });
+      toast.success(t('toast.taskRestored'), { theme: 'colored' });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to restore task.';
+      const message = error instanceof Error ? error.message : t('toast.unableRestoreTask');
       toast.error(message, { theme: 'colored' });
     }
   };
@@ -479,10 +490,10 @@ export function useTaskOperations({
       await refreshBoardData();
 
       if (itemToDelete.type === 'list') {
-        toast.success('List deleted successfully!', { theme: 'colored' });
+        toast.success(t('toast.listDeleted'), { theme: 'colored' });
       } else if (itemToDelete.cardId) {
         const deletedCardId = itemToDelete.cardId;
-        showUndoToast('Task deleted', () => {
+        showUndoToast(t('toast.taskDeleted'), () => {
           void handleRestoreTask(deletedCardId);
         });
       }
@@ -491,7 +502,7 @@ export function useTaskOperations({
       setBoardData(previousBoardData);
       syncBoardCache(activeBoardId, previousBoardData);
 
-      const message = error instanceof Error ? error.message : `Unable to delete ${itemToDelete.type}.`;
+      const message = error instanceof Error ? error.message : t('toast.unableDeleteItem', { type: itemToDelete.type });
       toast.error(message, { theme: 'colored' });
     } finally {
       setIsSavingBoard(false);
@@ -540,7 +551,7 @@ export function useTaskOperations({
       setBoardData(previousBoardData);
       syncBoardCache(activeBoardId, previousBoardData);
 
-      const message = error instanceof Error ? error.message : 'Unable to save drag and drop changes.';
+      const message = error instanceof Error ? error.message : t('toast.unableSaveDragDrop');
       toast.error(message, { theme: 'colored' });
     }
   };
@@ -619,7 +630,7 @@ export function useTaskOperations({
     } catch (error) {
       setBoardData(previousBoardData);
       syncBoardCache(activeBoardId, previousBoardData);
-      const message = error instanceof Error ? error.message : 'Unable to update task.';
+      const message = error instanceof Error ? error.message : t('toast.unableUpdateTask');
       toast.error(message, { theme: 'colored' });
     }
   };
