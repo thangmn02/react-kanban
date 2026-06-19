@@ -48,9 +48,11 @@ export default function AppHeader({
           className="flex cursor-pointer items-center gap-2 rounded-2xl px-2 py-1.5 text-left transition hover:bg-slate-100/80 focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"
           aria-label={t('app.goDashboard')}
         >
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-950 text-sm font-bold text-white shadow-sm">
-            K
-          </span>
+          <img
+            src="/logo.png"
+            alt=""
+            className="h-9 w-9 rounded-xl object-cover shadow-sm"
+          />
           <span className="hidden leading-tight sm:block">
             <span className="block text-sm font-bold tracking-[-0.01em] text-slate-950">
               {t('app.name')}

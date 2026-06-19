@@ -925,11 +925,43 @@ function App() {
     toast.success(t('shutdown.completeToast'), { theme: 'colored' });
   }, [dailyFocusStats.completedSessions, dailyFocusStats.focusedMinutes, focusTasks, t]);
 
+  const clearBoardFilters = useCallback(() => {
+    setSearchQuery('');
+    setFilterPriority('');
+    setFilterAssignee('');
+    setFilterDueDate('');
+  }, []);
+
+  const focusBoardSearch = useCallback(() => {
+    window.setTimeout(() => {
+      document.getElementById('board-search-input')?.focus();
+    }, 0);
+  }, []);
+
+  const filterHighPriority = useCallback(() => {
+    setSearchQuery('');
+    setFilterPriority('High');
+    setFilterAssignee('');
+    setFilterDueDate('');
+  }, []);
+
+  const filterDueToday = useCallback(() => {
+    setSearchQuery('');
+    setFilterPriority('');
+    setFilterAssignee('');
+    setFilterDueDate('today');
+  }, []);
+
   const commandPaletteActions = useCommandPaletteActions({
     setActiveViewWithPath,
     handleQuickAddTask,
     openGroupDialog,
     openCreateBoardDialog,
+    focusBoardSearch,
+    clearBoardFilters,
+    filterHighPriority,
+    filterDueToday,
+    openActivityDialog,
     handleStartFocusTimer,
     pauseTimer,
     resetTimer,
@@ -943,6 +975,7 @@ function App() {
     enabled: Boolean(user) && activeView !== 'auth' && activeView !== 'onboarding',
     onOpenCommandPalette: () => setIsCommandPaletteOpen(true),
     onQuickAddTask: handleQuickAddTask,
+    onFocusSearch: focusBoardSearch,
   });
 
   const appHeader = user ? (
@@ -1316,12 +1349,7 @@ function App() {
         onFilterAssigneeChange={setFilterAssignee}
         filterDueDate={filterDueDate}
         onFilterDueDateChange={setFilterDueDate}
-        onClearFilters={() => {
-          setSearchQuery('');
-          setFilterPriority('');
-          setFilterAssignee('');
-          setFilterDueDate('');
-        }}
+        onClearFilters={clearBoardFilters}
         workspaceMembers={workspaceMembers}
       />
 

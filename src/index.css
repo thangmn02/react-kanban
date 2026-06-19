@@ -465,8 +465,23 @@
 
 /* Arcana S3 ritual rebuild ------------------------------------------------- */
 .arcana-portal {
-  font-family: "Be Vietnam Pro", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #f4ead6;
+  --arcana-ink: #06050b;
+  --arcana-void: #0b0712;
+  --arcana-panel: #151020;
+  --arcana-panel-2: #21182a;
+  --arcana-gold: #f2cb7f;
+  --arcana-gold-soft: rgba(242, 203, 127, 0.68);
+  --arcana-blood: #b94c62;
+  --arcana-mint: #7ddac3;
+  --arcana-text: #fff2d9;
+  --arcana-muted: rgba(255, 242, 217, 0.68);
+  --arcana-border: rgba(242, 203, 127, 0.28);
+  --arcana-pixel-shadow: 0 0 0 1px rgba(255, 242, 217, 0.06), 0 28px 0 rgba(0, 0, 0, 0.18), 0 44px 110px rgba(0, 0, 0, 0.68);
+  font-family: "Be Vietnam Pro", "Noto Sans", "Segoe UI", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  color: var(--arcana-text);
+  font-synthesis-weight: none;
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
 }
 
 .arcana-portal h2,
@@ -484,20 +499,22 @@
 
 .arcana-room-backdrop {
   background:
-    linear-gradient(115deg, transparent 0 33%, rgba(213, 177, 103, 0.08) 43%, transparent 58%),
-    linear-gradient(68deg, transparent 0 48%, rgba(65, 183, 160, 0.08) 58%, transparent 72%),
-    linear-gradient(180deg, rgba(196, 72, 93, 0.08), transparent 38%),
-    linear-gradient(180deg, #090713 0%, #05040a 100%);
+    radial-gradient(circle at 18% 14%, rgba(185, 76, 98, 0.22), transparent 28%),
+    radial-gradient(circle at 82% 22%, rgba(125, 218, 195, 0.12), transparent 32%),
+    linear-gradient(115deg, transparent 0 36%, rgba(242, 203, 127, 0.12) 44%, transparent 58%),
+    repeating-linear-gradient(0deg, rgba(255, 242, 217, 0.035) 0 1px, transparent 1px 6px),
+    linear-gradient(180deg, #110817 0%, #06050b 62%, #040307 100%);
 }
 
 .arcana-room-grid {
   pointer-events: none;
-  opacity: 0.34;
+  opacity: 0.42;
   background:
-    linear-gradient(rgba(236, 205, 142, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(236, 205, 142, 0.08) 1px, transparent 1px);
-  background-size: 42px 42px;
-  mask-image: radial-gradient(circle at center, black, transparent 74%);
+    linear-gradient(rgba(242, 203, 127, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(242, 203, 127, 0.08) 1px, transparent 1px),
+    repeating-linear-gradient(45deg, transparent 0 16px, rgba(185, 76, 98, 0.055) 16px 17px);
+  background-size: 38px 38px, 38px 38px, 96px 96px;
+  mask-image: radial-gradient(circle at center, black, transparent 78%);
 }
 
 .arcana-room-light {
@@ -505,8 +522,10 @@
   position: fixed;
   inset: auto 10% 0;
   height: 42vh;
-  background: linear-gradient(180deg, transparent, rgba(238, 198, 112, 0.16) 38%, transparent);
-  filter: blur(18px);
+  background:
+    radial-gradient(ellipse at center, rgba(242, 203, 127, 0.22), transparent 62%),
+    linear-gradient(180deg, transparent, rgba(185, 76, 98, 0.14) 42%, transparent);
+  filter: blur(20px);
   animation: arcana-room-breathe 5.2s ease-in-out infinite;
 }
 .arcana-room-light.is-still { animation: none; }
@@ -519,17 +538,18 @@
 .arcana-booth {
   position: relative;
   z-index: 1;
-  width: min(1120px, calc(100% - 24px));
-  min-height: calc(100vh - 32px);
+  width: min(1180px, calc(100% - 24px));
+  min-height: calc(100dvh - 32px);
   margin: 16px auto;
   display: flex;
   flex-direction: column;
-  border: 1px solid rgba(226, 190, 118, 0.28);
-  border-radius: 28px;
+  border: 1px solid var(--arcana-border);
+  border-radius: 10px;
   background:
-    linear-gradient(180deg, rgba(18, 14, 31, 0.9), rgba(8, 7, 16, 0.94)),
-    repeating-linear-gradient(135deg, rgba(255,255,255,0.025) 0 1px, transparent 1px 9px);
-  box-shadow: 0 30px 100px rgba(0, 0, 0, 0.62), inset 0 0 0 1px rgba(255,255,255,0.04);
+    linear-gradient(180deg, rgba(24, 17, 34, 0.95), rgba(9, 7, 15, 0.97)),
+    repeating-linear-gradient(135deg, rgba(255, 242, 217, 0.04) 0 1px, transparent 1px 8px);
+  box-shadow: var(--arcana-pixel-shadow);
+  clip-path: polygon(0 16px, 16px 16px, 16px 0, calc(100% - 16px) 0, calc(100% - 16px) 16px, 100% 16px, 100% calc(100% - 16px), calc(100% - 16px) calc(100% - 16px), calc(100% - 16px) 100%, 16px 100%, 16px calc(100% - 16px), 0 calc(100% - 16px));
   overflow: hidden;
 }
 
@@ -539,8 +559,18 @@
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(circle at 50% -12%, rgba(239, 205, 139, 0.16), transparent 34%),
-    linear-gradient(90deg, transparent, rgba(236, 205, 142, 0.08), transparent);
+    radial-gradient(circle at 50% -12%, rgba(242, 203, 127, 0.2), transparent 34%),
+    radial-gradient(circle at 100% 46%, rgba(185, 76, 98, 0.12), transparent 36%),
+    linear-gradient(90deg, transparent, rgba(242, 203, 127, 0.08), transparent);
+}
+
+.arcana-booth::after {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  pointer-events: none;
+  border: 1px solid rgba(242, 203, 127, 0.16);
+  clip-path: polygon(0 12px, 12px 12px, 12px 0, calc(100% - 12px) 0, calc(100% - 12px) 12px, 100% 12px, 100% calc(100% - 12px), calc(100% - 12px) calc(100% - 12px), calc(100% - 12px) 100%, 12px 100%, 12px calc(100% - 12px), 0 calc(100% - 12px));
 }
 
 .arcana-booth-topbar {
@@ -550,62 +580,79 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 22px 24px 14px;
+  border-bottom: 1px solid rgba(242, 203, 127, 0.14);
+  padding: 22px 28px 18px;
+  background: linear-gradient(180deg, rgba(255, 242, 217, 0.045), rgba(255, 242, 217, 0));
 }
 
 .arcana-booth-brand {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
 }
 .arcana-booth-brand p {
   margin: 0;
-  color: rgba(230, 195, 123, 0.72);
-  font-size: 0.7rem;
+  color: var(--arcana-gold-soft);
+  font-size: 0.72rem;
   font-weight: 800;
-  text-transform: uppercase;
+  text-transform: none;
 }
 .arcana-booth-brand h2 {
   margin: 2px 0 0;
-  color: #fff2cf;
-  font-size: clamp(1.35rem, 2vw, 2rem);
-  font-weight: 800;
+  color: var(--arcana-text);
+  font-size: clamp(1.5rem, 2.4vw, 2.35rem);
+  font-weight: 900;
+  line-height: 1.05;
+  text-wrap: balance;
 }
 .arcana-sigil {
   display: grid;
-  width: 44px;
-  height: 44px;
+  width: 52px;
+  height: 52px;
   place-items: center;
-  border: 1px solid rgba(226, 190, 118, 0.45);
-  border-radius: 14px;
-  background: rgba(226, 190, 118, 0.08);
-  color: #f2d18f;
-  box-shadow: 0 0 30px rgba(226, 190, 118, 0.16);
+  border: 1px solid rgba(242, 203, 127, 0.5);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(242, 203, 127, 0.16), rgba(185, 76, 98, 0.12)),
+    rgba(6, 5, 11, 0.68);
+  color: var(--arcana-gold);
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: 1.3rem;
+  font-weight: 900;
+  box-shadow: 0 0 0 4px rgba(242, 203, 127, 0.05), 0 0 34px rgba(242, 203, 127, 0.18);
 }
 
 .arcana-booth-controls {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 10px;
 }
 .arcana-booth-controls button,
 .arcana-history-link {
-  min-height: 40px;
-  border: 1px solid rgba(226, 190, 118, 0.28);
-  border-radius: 999px;
-  padding: 0 14px;
-  color: rgba(245, 234, 212, 0.86);
-  background: rgba(255, 255, 255, 0.035);
+  min-height: 42px;
+  border: 1px solid rgba(242, 203, 127, 0.26);
+  border-radius: 8px;
+  padding: 0 15px;
+  color: rgba(255, 242, 217, 0.88);
+  background:
+    linear-gradient(180deg, rgba(255, 242, 217, 0.055), rgba(255, 242, 217, 0.018)),
+    rgba(6, 5, 11, 0.38);
   font-size: 0.82rem;
   font-weight: 750;
   cursor: pointer;
-  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease, color 160ms ease;
 }
 .arcana-booth-controls button:hover,
 .arcana-history-link:hover {
-  border-color: rgba(226, 190, 118, 0.62);
-  background: rgba(226, 190, 118, 0.08);
+  border-color: rgba(242, 203, 127, 0.7);
+  color: #fff8e8;
+  background: rgba(242, 203, 127, 0.1);
+  transform: translateY(-1px);
+}
+.arcana-booth-controls button:active,
+.arcana-history-link:active {
+  transform: translateY(1px);
 }
 
 .arcana-step-track {
@@ -613,17 +660,20 @@
   z-index: 1;
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 8px;
-  padding: 0 24px 18px;
+  gap: 6px;
+  padding: 18px 28px 0;
 }
 .arcana-step-track span {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
-  border-top: 1px solid rgba(255,255,255,0.1);
-  padding-top: 10px;
-  color: rgba(245, 234, 212, 0.42);
+  min-height: 42px;
+  border: 1px solid rgba(255, 242, 217, 0.08);
+  border-radius: 7px;
+  padding: 7px 9px;
+  color: rgba(255, 242, 217, 0.38);
+  background: rgba(6, 5, 11, 0.24);
 }
 .arcana-step-track i {
   display: grid;
@@ -631,10 +681,12 @@
   height: 24px;
   flex: none;
   place-items: center;
-  border-radius: 999px;
+  border-radius: 5px;
   border: 1px solid currentColor;
   font-size: 0.72rem;
   font-style: normal;
+  font-family: "Courier New", ui-monospace, monospace;
+  font-weight: 900;
 }
 .arcana-step-track b {
   overflow: hidden;
@@ -644,8 +696,9 @@
   white-space: nowrap;
 }
 .arcana-step-track .is-active {
-  border-color: rgba(226, 190, 118, 0.72);
-  color: #f4d28e;
+  border-color: rgba(242, 203, 127, 0.72);
+  color: var(--arcana-gold);
+  background: rgba(242, 203, 127, 0.09);
 }
 .arcana-step-track .is-done {
   color: rgba(125, 218, 195, 0.72);
@@ -655,70 +708,76 @@
   position: relative;
   z-index: 1;
   flex: 1;
-  padding: clamp(22px, 4vw, 54px);
+  padding: clamp(28px, 5vw, 68px);
 }
 
 .arcana-step-header {
-  max-width: 760px;
-  margin: 0 auto 28px;
+  max-width: 820px;
+  margin: 0 auto 34px;
   text-align: center;
 }
 .arcana-step-header--left { margin-inline: 0; text-align: left; }
 .arcana-step-eyebrow {
-  margin: 0 0 10px;
-  color: rgba(226, 190, 118, 0.72);
-  font-size: 0.72rem;
+  margin: 0 0 12px;
+  color: var(--arcana-gold-soft);
+  font-size: 0.78rem;
   font-weight: 850;
-  text-transform: uppercase;
+  text-transform: none;
 }
 .arcana-step-header h3 {
   margin: 0;
-  color: #fff5da;
-  font-family: "Literata", "Lora", "Noto Serif", Georgia, serif;
-  font-size: clamp(2rem, 5vw, 4.4rem);
-  font-weight: 750;
-  line-height: 1.04;
+  color: var(--arcana-text);
+  font-family: "Be Vietnam Pro", "Noto Sans", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(2.1rem, 4.8vw, 4.6rem);
+  font-weight: 900;
+  line-height: 1.08;
+  text-wrap: balance;
 }
 .arcana-step-description {
-  max-width: 620px;
-  margin: 14px auto 0;
-  color: rgba(246, 237, 219, 0.76);
+  max-width: 660px;
+  margin: 16px auto 0;
+  color: var(--arcana-muted);
   font-size: clamp(1rem, 1.6vw, 1.14rem);
-  line-height: 1.65;
+  line-height: 1.76;
+  text-wrap: pretty;
 }
 
 .arcana-entry-step,
 .arcana-opening-step {
   display: grid;
-  min-height: 58vh;
+  min-height: 60dvh;
   align-content: center;
 }
 .arcana-entry-pack,
 .arcana-open-pack {
   position: relative;
   display: grid;
-  width: min(280px, 58vw);
-  margin: 0 auto 34px;
+  width: min(300px, 58vw);
+  margin: 0 auto 38px;
   place-items: center;
 }
-.arcana-entry-pack { height: 340px; }
+.arcana-entry-pack { height: 360px; }
 .arcana-entry-ring,
 .arcana-open-pack-light {
   position: absolute;
   inset: 8%;
-  border: 1px solid rgba(226, 190, 118, 0.2);
-  border-radius: 999px;
-  background: radial-gradient(circle, rgba(226, 190, 118, 0.16), transparent 62%);
-  box-shadow: 0 0 70px rgba(226, 190, 118, 0.18);
+  border: 1px solid rgba(242, 203, 127, 0.22);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle, rgba(242, 203, 127, 0.18), transparent 58%),
+    repeating-linear-gradient(90deg, transparent 0 12px, rgba(125, 218, 195, 0.08) 12px 13px);
+  box-shadow: 0 0 80px rgba(242, 203, 127, 0.18);
+  transform: rotate(45deg);
 }
 .arcana-entry-pack-art,
 .arcana-open-pack-art {
   position: relative;
   width: 11.5rem;
   aspect-ratio: 71 / 95;
-  border: 2px solid rgba(226, 190, 118, 0.42);
-  border-radius: 18px;
-  box-shadow: 0 28px 80px rgba(0,0,0,0.7);
+  border: 2px solid rgba(242, 203, 127, 0.48);
+  border-radius: 8px;
+  image-rendering: pixelated;
+  box-shadow: 0 28px 0 rgba(0, 0, 0, 0.18), 0 36px 90px rgba(0,0,0,0.72);
   animation: arcana-pack-hover 4s ease-in-out infinite;
 }
 @keyframes arcana-pack-hover {
@@ -728,15 +787,18 @@
 
 .arcana-token-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
 }
 .arcana-topic-token,
 .arcana-question-row,
 .arcana-pack-choice {
-  border: 1px solid rgba(226, 190, 118, 0.16);
-  background: rgba(255,255,255,0.035);
-  color: #f4ead6;
+  border: 1px solid rgba(242, 203, 127, 0.16);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 242, 217, 0.045), rgba(255, 242, 217, 0.015)),
+    rgba(6, 5, 11, 0.28);
+  color: var(--arcana-text);
   cursor: pointer;
   transition: transform 160ms ease, border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
 }
@@ -747,23 +809,29 @@
 .arcana-question-row.is-selected,
 .arcana-pack-choice.is-selected {
   transform: translateY(-2px);
-  border-color: rgba(226, 190, 118, 0.58);
-  background: rgba(226, 190, 118, 0.08);
-  box-shadow: 0 18px 54px rgba(0,0,0,0.24);
+  border-color: rgba(242, 203, 127, 0.66);
+  background:
+    linear-gradient(180deg, rgba(242, 203, 127, 0.12), rgba(185, 76, 98, 0.055)),
+    rgba(6, 5, 11, 0.38);
+  box-shadow: 0 10px 0 rgba(0, 0, 0, 0.18), 0 22px 58px rgba(0,0,0,0.26);
 }
 .arcana-topic-token {
-  min-height: 172px;
-  border-radius: 22px;
+  grid-column: span 2;
+  min-height: 184px;
   padding: 22px;
   text-align: left;
 }
+.arcana-topic-token:nth-child(1),
+.arcana-topic-token:nth-child(4) {
+  grid-column: span 3;
+}
 .arcana-topic-orb {
   display: block;
-  width: 44px;
-  height: 44px;
+  width: 46px;
+  height: 46px;
   margin-bottom: 18px;
   border: 1px solid rgba(125, 218, 195, 0.42);
-  border-radius: 14px;
+  border-radius: 8px;
   background:
     linear-gradient(135deg, rgba(125, 218, 195, 0.22), rgba(226, 190, 118, 0.12)),
     #0d1720;
@@ -772,64 +840,74 @@
 .arcana-topic-token strong,
 .arcana-pack-copy strong {
   display: block;
-  color: #fff3d0;
+  color: var(--arcana-text);
   font-size: 1.08rem;
+  font-weight: 850;
+  line-height: 1.25;
 }
 .arcana-topic-token em,
 .arcana-pack-copy em {
   display: block;
-  margin-top: 9px;
-  color: rgba(246, 237, 219, 0.68);
+  margin-top: 10px;
+  color: var(--arcana-muted);
   font-size: 0.94rem;
   font-style: normal;
-  line-height: 1.5;
+  line-height: 1.58;
+  text-wrap: pretty;
 }
 
 .arcana-question-list {
   display: grid;
-  max-width: 780px;
+  max-width: 860px;
   margin: 0 auto;
-  gap: 10px;
+  gap: 12px;
 }
 .arcana-question-row {
   display: grid;
-  grid-template-columns: 54px 1fr;
+  grid-template-columns: 58px 1fr;
   align-items: center;
-  min-height: 74px;
-  border-radius: 18px;
-  padding: 14px 18px;
+  min-height: 78px;
+  padding: 16px 20px;
   text-align: left;
 }
 .arcana-question-row span {
-  color: rgba(226, 190, 118, 0.72);
+  color: var(--arcana-gold-soft);
+  font-family: "Courier New", ui-monospace, monospace;
   font-size: 0.84rem;
-  font-weight: 850;
+  font-weight: 900;
 }
 .arcana-question-row strong {
-  font-size: 1.05rem;
+  font-size: 1.08rem;
   font-weight: 700;
-  line-height: 1.45;
+  line-height: 1.62;
+  text-wrap: pretty;
 }
 
 .arcana-pack-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(10, minmax(0, 1fr));
   gap: 12px;
 }
 .arcana-pack-choice {
   display: flex;
-  min-height: 292px;
+  grid-column: span 2;
+  min-height: 306px;
   flex-direction: column;
   align-items: center;
   justify-content: space-between;
-  border-radius: 22px;
-  padding: 16px 13px;
+  padding: 16px 13px 15px;
+}
+.arcana-pack-choice:nth-child(1),
+.arcana-pack-choice:nth-child(5) {
+  grid-column: span 3;
 }
 .arcana-pack-choice-art {
-  width: min(7.4rem, 100%);
+  width: min(7.6rem, 100%);
   aspect-ratio: 71 / 95;
-  border-radius: 14px;
-  border: 1px solid rgba(255,255,255,0.16);
+  border-radius: 7px;
+  border: 1px solid rgba(255, 242, 217, 0.16);
+  image-rendering: pixelated;
+  box-shadow: 0 12px 0 rgba(0, 0, 0, 0.18), 0 22px 46px rgba(0, 0, 0, 0.34);
 }
 .arcana-pack-copy {
   display: block;
@@ -839,53 +917,55 @@
 .arcana-pack-copy b {
   display: inline-flex;
   margin-top: 12px;
-  border: 1px solid rgba(125, 218, 195, 0.28);
-  border-radius: 999px;
+  border: 1px solid rgba(125, 218, 195, 0.32);
+  border-radius: 6px;
   padding: 4px 9px;
   color: rgba(125, 218, 195, 0.88);
   font-size: 0.72rem;
+  font-weight: 850;
 }
 
 .arcana-actions {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 12px;
-  margin-top: 30px;
+  gap: 10px;
+  margin-top: 34px;
 }
 .arcana-actions--between { justify-content: space-between; }
 .arcana-action {
-  min-height: 46px;
-  border-radius: 999px;
+  min-height: 48px;
+  border-radius: 8px;
   padding: 0 22px;
   font-weight: 850;
   cursor: pointer;
-  transition: transform 160ms ease, opacity 160ms ease, border-color 160ms ease;
+  transition: transform 160ms ease, opacity 160ms ease, border-color 160ms ease, background 160ms ease;
 }
 .arcana-action:disabled {
   cursor: not-allowed;
   opacity: 0.5;
 }
 .arcana-action--primary {
-  border: 1px solid #f2d28d;
+  border: 1px solid #ffe4a6;
   color: #171006;
-  background: linear-gradient(180deg, #ffe9ad, #d7a953);
-  box-shadow: 0 14px 36px rgba(215, 169, 83, 0.24);
+  background: linear-gradient(180deg, #ffe9ad, #d6a24d);
+  box-shadow: 0 6px 0 #6b4720, 0 18px 38px rgba(215, 169, 83, 0.24);
 }
 .arcana-action--secondary {
-  border: 1px solid rgba(125, 218, 195, 0.34);
+  border: 1px solid rgba(125, 218, 195, 0.38);
   color: #d9fff5;
-  background: rgba(125, 218, 195, 0.08);
+  background: rgba(125, 218, 195, 0.09);
 }
 .arcana-action--quiet {
   border: 1px solid transparent;
-  color: rgba(246, 237, 219, 0.72);
+  color: rgba(255, 242, 217, 0.72);
   background: transparent;
 }
 .arcana-action:hover:not(:disabled) { transform: translateY(-1px); }
+.arcana-action:active:not(:disabled) { transform: translateY(1px); }
 
 .arcana-open-pack {
-  min-height: 360px;
+  min-height: 372px;
   border: 0;
   background: transparent;
   cursor: pointer;
@@ -899,11 +979,12 @@
 .arcana-open-pack-prompt {
   position: absolute;
   bottom: 4px;
-  border: 1px solid rgba(226, 190, 118, 0.28);
-  border-radius: 999px;
+  border: 1px solid rgba(242, 203, 127, 0.34);
+  border-radius: 7px;
   padding: 8px 14px;
-  color: rgba(246, 237, 219, 0.82);
-  background: rgba(8, 7, 16, 0.72);
+  color: rgba(255, 242, 217, 0.86);
+  background: rgba(8, 7, 16, 0.78);
+  font-family: "Courier New", ui-monospace, monospace;
   font-weight: 800;
 }
 @keyframes arcana-pack-open {
@@ -923,36 +1004,39 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: end;
-  gap: clamp(12px, 3vw, 28px);
+  gap: clamp(18px, 4vw, 38px);
+  max-width: 980px;
+  margin: 0 auto;
 }
 .arcana-reveal-column {
   display: grid;
   justify-items: center;
-  gap: 12px;
+  gap: 14px;
 }
 .arcana-reveal-column:nth-child(2) { transform: translateY(-18px); }
 .arcana-position-label {
-  border: 1px solid rgba(226, 190, 118, 0.28);
-  border-radius: 999px;
+  border: 1px solid rgba(242, 203, 127, 0.32);
+  border-radius: 7px;
   padding: 7px 12px;
-  color: #f0cd87;
-  background: rgba(226, 190, 118, 0.06);
+  color: var(--arcana-gold);
+  background: rgba(242, 203, 127, 0.07);
   font-size: 0.82rem;
   font-weight: 850;
   text-align: center;
 }
 .arcana-card-frame {
-  width: min(13.5rem, 29vw);
+  width: min(14rem, 29vw);
 }
-.arcana-card-frame--focus { width: min(15.5rem, 31vw); }
+.arcana-card-frame--focus { width: min(16rem, 31vw); }
 .arcana-card-plate {
   position: relative;
   aspect-ratio: 71 / 95;
   overflow: hidden;
-  border: 2px solid rgba(226, 190, 118, 0.24);
-  border-radius: 18px;
+  border: 2px solid rgba(242, 203, 127, 0.28);
+  border-radius: 8px;
   background: #070712;
-  box-shadow: 0 26px 70px rgba(0,0,0,0.55);
+  image-rendering: pixelated;
+  box-shadow: 0 14px 0 rgba(0, 0, 0, 0.2), 0 30px 76px rgba(0,0,0,0.58);
 }
 .arcana-card-frame.is-revealed .arcana-card-plate {
   animation: arcana-card-enter 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -966,14 +1050,15 @@
   height: 100%;
   place-items: center;
   background:
-    radial-gradient(circle at center, rgba(226, 190, 118, 0.24), transparent 28%),
+    radial-gradient(circle at center, rgba(242, 203, 127, 0.24), transparent 28%),
     linear-gradient(135deg, rgba(125, 218, 195, 0.14), rgba(196, 72, 93, 0.14)),
+    repeating-linear-gradient(45deg, rgba(255,255,255,0.035) 0 2px, transparent 2px 8px),
     #0b0b18;
 }
 .arcana-card-back span {
   width: 46%;
   aspect-ratio: 1;
-  border: 1px solid rgba(226, 190, 118, 0.44);
+  border: 1px solid rgba(242, 203, 127, 0.44);
   transform: rotate(45deg);
 }
 @keyframes arcana-card-enter {
@@ -989,12 +1074,14 @@
   display: block;
 }
 .arcana-card-caption strong {
-  color: #fff2cf;
+  color: var(--arcana-text);
   font-size: 1rem;
+  font-weight: 850;
+  line-height: 1.32;
 }
 .arcana-card-caption span {
   margin-top: 4px;
-  color: rgba(246, 237, 219, 0.62);
+  color: rgba(255, 242, 217, 0.62);
   font-size: 0.78rem;
   line-height: 1.35;
 }
@@ -1009,7 +1096,7 @@
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
+  border-bottom: 1px solid rgba(255, 242, 217, 0.08);
   padding-bottom: 6px;
 }
 .arcana-card-meta dt,
@@ -1019,120 +1106,135 @@
   font-size: 0.72rem;
 }
 .arcana-card-meta dd {
-  color: rgba(246, 237, 219, 0.86);
+  color: rgba(255, 242, 217, 0.86);
   font-weight: 800;
   text-align: right;
 }
 
 .arcana-reading-page {
-  max-width: 1040px;
+  max-width: 1100px;
   margin: 0 auto;
 }
 .arcana-reading-hero {
-  max-width: 760px;
-  margin: 0 auto 32px;
-  text-align: center;
+  max-width: 900px;
+  margin: 0 0 38px;
+  text-align: left;
 }
 .arcana-reading-hero p {
   margin: 0;
-  color: rgba(226, 190, 118, 0.72);
-  font-size: 0.78rem;
+  color: var(--arcana-gold-soft);
+  font-size: 0.84rem;
   font-weight: 850;
-  text-transform: uppercase;
+  text-transform: none;
 }
 .arcana-reading-hero h3 {
-  margin: 10px 0 12px;
-  color: #fff5da;
-  font-family: "Literata", "Lora", "Noto Serif", Georgia, serif;
-  font-size: clamp(1.7rem, 4vw, 3.2rem);
-  line-height: 1.14;
+  max-width: 16ch;
+  margin: 10px 0 14px;
+  color: var(--arcana-text);
+  font-family: "Be Vietnam Pro", "Noto Sans", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(2rem, 4.5vw, 4.1rem);
+  font-weight: 900;
+  line-height: 1.12;
+  text-wrap: balance;
 }
 .arcana-reading-hero span {
-  color: rgba(246, 237, 219, 0.58);
+  color: rgba(255, 242, 217, 0.58);
   font-size: 0.9rem;
 }
 .arcana-reading-layout {
   display: grid;
-  grid-template-columns: minmax(220px, 0.78fr) minmax(0, 1.42fr);
-  gap: clamp(22px, 4vw, 44px);
+  grid-template-columns: minmax(260px, 0.72fr) minmax(0, 1.48fr);
+  gap: clamp(28px, 5vw, 58px);
   align-items: start;
 }
 .arcana-reading-spread {
   position: sticky;
   top: 18px;
   display: grid;
-  gap: 18px;
+  gap: 14px;
+  border-left: 1px solid rgba(242, 203, 127, 0.16);
+  padding-left: 16px;
 }
 .arcana-reading-spread > div {
   display: grid;
-  grid-template-columns: 88px 1fr;
-  gap: 12px;
+  grid-template-columns: 76px 1fr;
+  gap: 14px;
   align-items: center;
-  border: 1px solid rgba(226, 190, 118, 0.14);
-  border-radius: 20px;
-  padding: 12px;
-  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(242, 203, 127, 0.13);
+  border-radius: 8px;
+  padding: 10px;
+  background: rgba(6, 5, 11, 0.26);
 }
 .arcana-reading-spread > div > span {
-  color: rgba(226, 190, 118, 0.86);
+  color: rgba(242, 203, 127, 0.86);
   font-size: 0.8rem;
   font-weight: 850;
   line-height: 1.35;
 }
 .arcana-reading-spread .arcana-card-frame {
-  width: 8rem;
+  width: 8.4rem;
 }
 .arcana-reading-spread .arcana-card-caption {
   display: none;
 }
 .arcana-reading-sections {
   display: grid;
-  gap: 16px;
+  gap: 18px;
 }
 .arcana-reading-section {
   display: grid;
-  grid-template-columns: 44px 1fr;
-  gap: 16px;
-  border: 1px solid rgba(226, 190, 118, 0.14);
-  border-radius: 22px;
-  padding: clamp(18px, 3vw, 26px);
-  background: rgba(255,255,255,0.035);
+  grid-template-columns: 52px 1fr;
+  gap: 18px;
+  border: 1px solid rgba(242, 203, 127, 0.14);
+  border-radius: 8px;
+  padding: clamp(20px, 3.4vw, 30px);
+  background:
+    linear-gradient(180deg, rgba(255, 242, 217, 0.04), rgba(255, 242, 217, 0.015)),
+    rgba(6, 5, 11, 0.26);
+  box-shadow: 0 10px 0 rgba(0, 0, 0, 0.14);
+}
+.arcana-reading-section:nth-child(even) {
+  transform: translateX(12px);
+  border-color: rgba(125, 218, 195, 0.14);
 }
 .arcana-reading-section > span {
   display: grid;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   place-items: center;
   border: 1px solid rgba(125, 218, 195, 0.32);
-  border-radius: 12px;
+  border-radius: 7px;
   color: rgba(125, 218, 195, 0.9);
+  font-family: "Courier New", ui-monospace, monospace;
   font-size: 0.76rem;
   font-weight: 900;
 }
 .arcana-reading-section h4 {
   margin: 0;
-  color: #f5d895;
-  font-size: 1.05rem;
+  color: var(--arcana-gold);
+  font-size: 1.08rem;
   font-weight: 850;
+  line-height: 1.34;
 }
 .arcana-reading-section p {
-  max-width: 68ch;
-  margin: 10px 0 0;
-  color: rgba(250, 244, 232, 0.86);
+  max-width: 62ch;
+  margin: 12px 0 0;
+  color: rgba(255, 248, 236, 0.86);
   font-family: "Be Vietnam Pro", Inter, ui-sans-serif, system-ui, sans-serif;
-  font-size: 1rem;
-  line-height: 1.78;
+  font-size: 1.02rem;
+  line-height: 1.9;
   white-space: pre-line;
+  text-wrap: pretty;
 }
 .arcana-saved-note {
-  margin: 24px 0 0;
+  margin: 28px 0 0;
   text-align: center;
   color: rgba(125, 218, 195, 0.92);
   font-weight: 800;
 }
 .arcana-history-link {
   display: block;
-  margin: 16px auto 0;
+  margin: 18px auto 0;
 }
 
 .arcana-history-panel {
@@ -1140,43 +1242,44 @@
   z-index: 1;
   width: min(680px, 100%);
   margin: 0 auto;
-  border: 1px solid rgba(226, 190, 118, 0.24);
-  border-radius: 22px;
+  border: 1px solid rgba(242, 203, 127, 0.24);
+  border-radius: 10px;
   background:
     linear-gradient(180deg, rgba(20, 18, 31, 0.96), rgba(8, 8, 16, 0.98)),
     #0c0c16;
   box-shadow: 0 30px 100px rgba(0,0,0,0.68);
-  color: #f6ecd8;
+  color: var(--arcana-text);
   padding: clamp(18px, 4vw, 28px);
+  clip-path: polygon(0 14px, 14px 14px, 14px 0, calc(100% - 14px) 0, calc(100% - 14px) 14px, 100% 14px, 100% calc(100% - 14px), calc(100% - 14px) calc(100% - 14px), calc(100% - 14px) 100%, 14px 100%, 14px calc(100% - 14px), 0 calc(100% - 14px));
 }
 .arcana-history-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  border-bottom: 1px solid rgba(226, 190, 118, 0.16);
+  border-bottom: 1px solid rgba(242, 203, 127, 0.16);
   padding-bottom: 18px;
 }
 .arcana-history-head p {
   margin: 0 0 5px;
-  color: rgba(226, 190, 118, 0.72);
+  color: var(--arcana-gold-soft);
   font-size: 0.76rem;
   font-weight: 850;
-  text-transform: uppercase;
+  text-transform: none;
 }
 .arcana-history-head h2 {
   margin: 0;
-  font-family: "Literata", "Lora", "Noto Serif", Georgia, serif;
-  color: #fff4df;
+  font-family: "Be Vietnam Pro", "Noto Sans", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  color: var(--arcana-text);
   font-size: clamp(1.55rem, 4vw, 2.2rem);
-  font-weight: 780;
+  font-weight: 900;
 }
 .arcana-history-head button {
   flex: none;
   border: 1px solid rgba(246, 236, 216, 0.14);
-  border-radius: 999px;
+  border-radius: 8px;
   background: rgba(255,255,255,0.04);
-  color: #f6ecd8;
+  color: var(--arcana-text);
   cursor: pointer;
   font-weight: 750;
   padding: 9px 13px;
@@ -1193,16 +1296,15 @@
   padding: 44px 10px;
   text-align: center;
   color: rgba(246, 236, 216, 0.66);
-  font-family: "Literata", "Lora", "Noto Serif", Georgia, serif;
+  font-family: "Be Vietnam Pro", "Noto Sans", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
   font-size: 1.1rem;
-  font-style: italic;
 }
 .arcana-history-item {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: 14px;
   border: 1px solid rgba(246, 236, 216, 0.08);
-  border-radius: 16px;
+  border-radius: 8px;
   background: rgba(255,255,255,0.025);
   color: inherit;
   cursor: pointer;
@@ -1211,7 +1313,7 @@
   transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
 }
 .arcana-history-item:hover {
-  border-color: rgba(226, 190, 118, 0.36);
+  border-color: rgba(242, 203, 127, 0.36);
   background: rgba(255,255,255,0.055);
   transform: translateY(-1px);
 }
@@ -1225,7 +1327,7 @@
   width: 2.45rem;
   aspect-ratio: 71 / 95;
   border: 1px solid rgba(246, 236, 216, 0.14);
-  border-radius: 6px;
+  border-radius: 4px;
   background-size: var(--arcana-atlas-size);
   image-rendering: pixelated;
 }
@@ -1247,28 +1349,28 @@
   white-space: nowrap;
 }
 .arcana-history-copy strong {
-  color: #fff4df;
-  font-family: "Literata", "Lora", "Noto Serif", Georgia, serif;
+  color: var(--arcana-text);
+  font-family: "Be Vietnam Pro", "Noto Sans", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
   font-size: 1rem;
   font-style: normal;
   font-weight: 760;
 }
 .arcana-history-copy time {
   flex: none;
-  color: rgba(226, 190, 118, 0.72);
+  color: var(--arcana-gold-soft);
   font-size: 0.72rem;
   font-weight: 760;
 }
 .arcana-history-copy em {
   color: rgba(246, 236, 216, 0.72);
-  font-family: "Literata", "Lora", "Noto Serif", Georgia, serif;
+  font-family: "Be Vietnam Pro", "Noto Sans", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
   font-size: 0.96rem;
 }
 .arcana-history-copy b {
   width: fit-content;
-  border: 1px solid rgba(226, 190, 118, 0.24);
-  border-radius: 999px;
-  color: #f0cd87;
+  border: 1px solid rgba(242, 203, 127, 0.24);
+  border-radius: 6px;
+  color: var(--arcana-gold);
   font-size: 0.68rem;
   font-weight: 850;
   padding: 4px 9px;
@@ -1284,7 +1386,7 @@
 }
 
 @media (max-width: 900px) {
-  .arcana-booth { width: min(100% - 12px, 760px); margin-block: 6px; border-radius: 22px; }
+  .arcana-booth { width: min(100% - 12px, 760px); margin-block: 6px; border-radius: 10px; }
   .arcana-booth-topbar { align-items: flex-start; padding: 18px; }
   .arcana-step-track { grid-template-columns: repeat(4, minmax(0, 1fr)); padding-inline: 18px; }
   .arcana-step-track b { display: none; }
@@ -1294,6 +1396,14 @@
   .arcana-spread-stage,
   .arcana-reading-layout {
     grid-template-columns: 1fr;
+  }
+  .arcana-topic-token,
+  .arcana-topic-token:nth-child(1),
+  .arcana-topic-token:nth-child(4),
+  .arcana-pack-choice,
+  .arcana-pack-choice:nth-child(1),
+  .arcana-pack-choice:nth-child(5) {
+    grid-column: auto;
   }
   .arcana-pack-choice {
     min-height: 0;
@@ -1310,6 +1420,8 @@
   .arcana-reading-spread {
     position: static;
     grid-template-columns: 1fr;
+    border-left: 0;
+    padding-left: 0;
   }
   .arcana-reading-spread > div {
     grid-template-columns: 1fr;
@@ -1318,27 +1430,32 @@
   }
   .arcana-reading-section {
     grid-template-columns: 1fr;
+    transform: none;
+  }
+  .arcana-reading-section:nth-child(even) {
+    transform: none;
   }
 }
 
 @media (max-width: 560px) {
   .arcana-booth-topbar { flex-direction: column; }
   .arcana-booth-controls { justify-content: flex-start; }
-  .arcana-step-header h3 { font-size: 2rem; }
+  .arcana-step-header h3 { font-size: 2.05rem; line-height: 1.14; }
+  .arcana-reading-hero h3 { max-width: none; font-size: 2.15rem; }
   .arcana-question-row { grid-template-columns: 1fr; gap: 6px; }
   .arcana-actions { align-items: stretch; flex-direction: column; }
   .arcana-action { width: 100%; }
 }
 
 /* ===========================================================================
- * Arcana Card — tilt wrapper perspective
+ * Arcana Card - tilt wrapper perspective
  * ======================================================================== */
 
 .arcana-card-frame .arcana-tilt {
   perspective: 700px;
   perspective-origin: 50% 50%;
   transform-style: preserve-3d;
-  border-radius: 18px;
+  border-radius: 8px;
 }
 
 /* ===========================================================================
@@ -1347,7 +1464,7 @@
 
 .home-appearance-dock {
   position: fixed;
-  right: 20px;
+  left: 20px;
   bottom: 20px;
   z-index: 60;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -1391,7 +1508,7 @@
 
 .home-appearance-panel {
   position: absolute;
-  right: 0;
+  left: 0;
   bottom: calc(100% + 10px);
   display: grid;
   gap: 4px;
@@ -1652,4 +1769,3 @@ body[data-home-theme="retrotune"] button:hover:not(.home-appearance-trigger):not
     98.5% { opacity: 0.92; }
   }
 }
-

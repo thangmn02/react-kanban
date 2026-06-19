@@ -16,12 +16,14 @@ interface UseGlobalKeyboardShortcutsParams {
   enabled: boolean;
   onOpenCommandPalette: () => void;
   onQuickAddTask: () => void;
+  onFocusSearch: () => void;
 }
 
 export function useGlobalKeyboardShortcuts({
   enabled,
   onOpenCommandPalette,
   onQuickAddTask,
+  onFocusSearch,
 }: UseGlobalKeyboardShortcutsParams) {
   useEffect(() => {
     if (!enabled) {
@@ -44,10 +46,16 @@ export function useGlobalKeyboardShortcuts({
       if (event.key.toLowerCase() === 'n') {
         event.preventDefault();
         onQuickAddTask();
+        return;
+      }
+
+      if (event.key === '/') {
+        event.preventDefault();
+        onFocusSearch();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [enabled, onOpenCommandPalette, onQuickAddTask]);
+  }, [enabled, onFocusSearch, onOpenCommandPalette, onQuickAddTask]);
 }

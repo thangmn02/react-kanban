@@ -1,6 +1,7 @@
 import { getArcanaPackSprite } from '../arcanaAtlas';
 import { arcanaPackAtlasIndex } from '../arcanaSystems';
 import type { ArcanaLocale, ArcanaPackType } from '../types';
+import { normalizeVietnameseText } from '../utils/normalizeVietnameseText';
 import { ArcanaActions, ArcanaButton } from './ArcanaActions';
 import ArcanaStepHeader from './ArcanaStepHeader';
 
@@ -99,9 +100,9 @@ function PackSelectStep({
                 aria-hidden="true"
               />
               <span className="arcana-pack-copy">
-                <strong>{pack.name[locale]}</strong>
-                <em>{pack.mood[locale]}</em>
-                <b>{pack.rarityHint[locale]}</b>
+                <strong>{normalizeVietnameseText(pack.name[locale])}</strong>
+                <em>{normalizeVietnameseText(pack.mood[locale])}</em>
+                <b>{normalizeVietnameseText(pack.rarityHint[locale])}</b>
               </span>
             </button>
           );

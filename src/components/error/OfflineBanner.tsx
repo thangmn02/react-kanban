@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
+import { readBoardCache } from '../../utils/boardCache';
+
 const BACK_ONLINE_VISIBLE_MS = 3000;
 
 /**
@@ -17,11 +19,13 @@ export default function OfflineBanner() {
   const [isOnline, setIsOnline] = useState<boolean>(() => (
     typeof navigator === 'undefined' ? true : navigator.onLine
   ));
+  const [cachedAt, setCachedAt] = useState<string | null>(() => readBoardCache()?.updatedAt ?? null);
   const [showBackOnline, setShowBackOnline] = useState(false);
   const backOnlineTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     const handleOffline = () => {
+      setCachedAt(readBoardCache()?.updatedAt ?? null);
       setIsOnline(false);
       setShowBackOnline(false);
       if (backOnlineTimeoutRef.current !== null) {
@@ -31,6 +35,7 @@ export default function OfflineBanner() {
     };
 
     const handleOnline = () => {
+      setCachedAt(readBoardCache()?.updatedAt ?? null);
       setIsOnline(true);
       setShowBackOnline(true);
       if (backOnlineTimeoutRef.current !== null) {
@@ -55,6 +60,9 @@ export default function OfflineBanner() {
   }, []);
 
   const isVisible = !isOnline || showBackOnline;
+  const cachedTimeLabel = cachedAt
+    ? new Date(cachedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : null;
 
   return (
     <div
@@ -70,7 +78,9 @@ export default function OfflineBanner() {
               : 'border-amber-200 bg-amber-50 text-amber-800'
           }`}
         >
-          {isOnline ? 'Back online.' : 'You are offline. Changes may not sync.'}
+          {isOnline
+            ? 'Back online.'
+            : `You are offline. ${cachedTimeLabel ? `Cached board from ${cachedTimeLabel} is available.` : 'Changes may not sync.'}`}
         </div>
       )}
     </div>

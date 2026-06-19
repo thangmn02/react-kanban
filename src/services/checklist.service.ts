@@ -32,7 +32,7 @@ export async function fetchChecklistItemsByTaskIds(taskIds: string[]): Promise<T
     throw error;
   }
 
-  return data;
+  return data ?? [];
 }
 
 export async function replaceTaskChecklistItems(

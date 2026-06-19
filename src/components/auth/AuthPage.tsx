@@ -92,9 +92,11 @@ export default function AuthPage({ onAuthenticated }: AuthPageProps) {
       <section className="grid w-full max-w-5xl overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-card lg:grid-cols-[0.95fr_1.05fr]">
         <aside className="hidden bg-slate-950 p-8 lg:flex lg:flex-col lg:justify-between">
           <div>
-            <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600 text-lg font-semibold text-white shadow-[0_14px_36px_rgba(37,99,235,0.28)]">
-              K
-            </div>
+            <img
+              src="/logo.png"
+              alt=""
+              className="h-12 w-12 rounded-2xl object-cover shadow-[0_14px_36px_rgba(37,99,235,0.28)]"
+            />
             <h1 className="mt-8 text-4xl font-semibold tracking-[-0.04em] text-white">
               Kanban Workspace
             </h1>

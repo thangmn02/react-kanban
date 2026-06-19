@@ -6,16 +6,24 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 export const authMode = (import.meta.env.VITE_AUTH_MODE === 'supabase' ? 'supabase' : 'mock') as 'mock' | 'supabase';
 
-// Check if credentials are valid and present
-export const isLocalDemoMode = authMode === 'mock'
-  || !supabaseUrl
-  || !supabaseAnonKey
-  || supabaseUrl.includes('placeholder')
-  || supabaseAnonKey.includes('placeholder');
+const hasValidSupabaseCredentials = Boolean(
+  supabaseUrl
+  && supabaseAnonKey
+  && !supabaseUrl.includes('placeholder')
+  && !supabaseAnonKey.includes('placeholder')
+);
+
+export const isLocalDemoMode = authMode === 'mock';
 
 let supabase: SupabaseClient<Database> | null = null;
 
-if (!isLocalDemoMode) {
+if (authMode === 'supabase' && !hasValidSupabaseCredentials) {
+  throw new Error(
+    'VITE_AUTH_MODE=supabase requires valid VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY values.'
+  );
+}
+
+if (authMode === 'supabase') {
   try {
     supabase = createClient<Database>(supabaseUrl!, supabaseAnonKey!, {
       realtime: {
@@ -28,7 +36,7 @@ if (!isLocalDemoMode) {
     console.error('Failed to initialize Supabase client:', error);
   }
 } else {
-  console.warn('Supabase credentials missing or invalid. App is running in Local Demo Mode with full drag & drop support.');
+  console.warn('App is running in Local Demo Mode with full drag & drop support.');
 }
 
 export function requireSupabaseClient(): SupabaseClient<Database> {

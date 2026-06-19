@@ -195,10 +195,10 @@ export async function fetchTodayPageData({
     throw tasksResult.error;
   }
 
-  const boardTitleById = new Map((boardsResult.data as TodayBoardRow[]).map((board) => [board.id, board.title]));
-  const listById = new Map((listsResult.data as TodayListRow[]).map((list) => [list.id, list]));
+  const boardTitleById = new Map(((boardsResult.data ?? []) as TodayBoardRow[]).map((board) => [board.id, board.title]));
+  const listById = new Map(((listsResult.data ?? []) as TodayListRow[]).map((list) => [list.id, list]));
 
-  const assignedTasks = (tasksResult.data as TodayTaskRow[])
+  const assignedTasks = ((tasksResult.data ?? []) as TodayTaskRow[])
     .filter((task) => isAssignedToUser(normalizeTaskAssignees(task.assignees), currentUser))
     .map<TodayTaskSummary>((task) => {
       const assignees = normalizeTaskAssignees(task.assignees);

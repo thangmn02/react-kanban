@@ -129,6 +129,10 @@ export async function createActivity(
     throw error;
   }
 
+  if (!data) {
+    throw new Error('Activity was not created.');
+  }
+
   return mapActivityRowToActivity(data, taskTitle);
 }
 
@@ -151,7 +155,7 @@ export async function fetchActivitiesForTask(taskId: string): Promise<ITaskActiv
     throw error;
   }
 
-  return data.map((activityRow) => mapActivityRowToActivity(activityRow));
+  return (data ?? []).map((activityRow) => mapActivityRowToActivity(activityRow));
 }
 
 export async function fetchBoardActivities(boardId: string): Promise<ITaskActivity[]> {
@@ -163,13 +167,13 @@ export async function fetchBoardActivities(boardId: string): Promise<ITaskActivi
   const client = requireSupabaseClient();
   const { data, error } = await client
     .from('task_activities')
-    .select('*, tasks!inner(board_id)')
-    .eq('tasks.board_id', boardId)
+    .select('*')
+    .eq('board_id', boardId)
     .order('created_at', { ascending: false });
 
   if (error) {
     throw error;
   }
 
-  return (data as TaskActivityRow[]).map((activityRow) => mapActivityRowToActivity(activityRow));
+  return ((data ?? []) as TaskActivityRow[]).map((activityRow) => mapActivityRowToActivity(activityRow));
 }

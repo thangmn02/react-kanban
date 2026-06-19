@@ -63,7 +63,7 @@ export async function fetchLabelLinksByTaskIds(taskIds: string[]): Promise<TaskL
     throw error;
   }
 
-  return data;
+  return data ?? [];
 }
 
 export async function fetchLabelsByIds(labelIds: string[]): Promise<TaskLabelRow[]> {
@@ -87,7 +87,7 @@ export async function fetchLabelsByIds(labelIds: string[]): Promise<TaskLabelRow
     throw error;
   }
 
-  return data;
+  return data ?? [];
 }
 
 export async function replaceTaskLabels(
@@ -161,7 +161,7 @@ export async function replaceTaskLabels(
     throw persistedLabelsError;
   }
 
-  const labelLinks: TaskLabelLinkInsert[] = persistedLabels.map((label: TaskLabelRow) => ({
+  const labelLinks: TaskLabelLinkInsert[] = (persistedLabels ?? []).map((label: TaskLabelRow) => ({
     workspace_id: workspaceId ?? label.workspace_id,
     task_id: taskId,
     label_id: label.id,

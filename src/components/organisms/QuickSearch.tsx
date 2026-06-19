@@ -5,6 +5,17 @@ import { mapWorkspaceMembersToAssignees, mockWorkspaceMembers } from '../../util
 import type { WorkspaceMember } from '../../types/auth.type';
 import { useI18n } from '../../i18n';
 
+const savedFiltersStorageKey = 'kanban_saved_filters';
+
+interface SavedTaskFilter {
+  id: string;
+  name: string;
+  searchQuery: string;
+  priority: string;
+  assignee: string;
+  dueDate: string;
+}
+
 interface QuickSearchProps {
   searchQuery: string;
   onSearchQueryChange: (query: string) => void;
@@ -16,6 +27,27 @@ interface QuickSearchProps {
   onFilterDueDateChange: (dueDateStatus: string) => void;
   onClearFilters: () => void;
   workspaceMembers?: WorkspaceMember[];
+}
+
+function readSavedFilters(): SavedTaskFilter[] {
+  if (typeof window === 'undefined') {
+    return [];
+  }
+
+  try {
+    const storedValue = window.localStorage.getItem(savedFiltersStorageKey);
+    return storedValue ? JSON.parse(storedValue) as SavedTaskFilter[] : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeSavedFilters(savedFilters: SavedTaskFilter[]) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.localStorage.setItem(savedFiltersStorageKey, JSON.stringify(savedFilters));
 }
 
 export default function QuickSearch({
@@ -31,12 +63,18 @@ export default function QuickSearch({
   workspaceMembers = mockWorkspaceMembers,
 }: QuickSearchProps) {
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
+  const [savedFilters, setSavedFilters] = useState<SavedTaskFilter[]>(readSavedFilters);
+  const [savedFilterName, setSavedFilterName] = useState('');
   const filterPanelRef = useRef<HTMLDivElement | null>(null);
   const hasActiveFilters = searchQuery !== '' || filterPriority !== '' || filterAssignee !== '' || filterDueDate !== '';
   const assigneeOptions: TaskAssignee[] = mapWorkspaceMembersToAssignees(workspaceMembers);
   const showFilterControls = isFilterPanelOpen;
   const showAssigneeFilter = assigneeOptions.length > 1;
   const { t } = useI18n();
+
+  useEffect(() => {
+    writeSavedFilters(savedFilters);
+  }, [savedFilters]);
 
   useEffect(() => {
     if (!showFilterControls) {
@@ -64,6 +102,46 @@ export default function QuickSearch({
     };
   }, [showFilterControls]);
 
+  const applySavedFilter = (savedFilterId: string) => {
+    const savedFilter = savedFilters.find((filter) => filter.id === savedFilterId);
+
+    if (!savedFilter) {
+      return;
+    }
+
+    onSearchQueryChange(savedFilter.searchQuery);
+    onFilterPriorityChange(savedFilter.priority);
+    onFilterAssigneeChange(savedFilter.assignee);
+    onFilterDueDateChange(savedFilter.dueDate);
+  };
+
+  const saveCurrentFilter = () => {
+    const normalizedName = savedFilterName.trim();
+
+    if (!normalizedName || !hasActiveFilters) {
+      return;
+    }
+
+    const nextSavedFilter: SavedTaskFilter = {
+      id: `filter-${Date.now()}`,
+      name: normalizedName,
+      searchQuery,
+      priority: filterPriority,
+      assignee: filterAssignee,
+      dueDate: filterDueDate,
+    };
+
+    setSavedFilters((currentFilters) => [
+      nextSavedFilter,
+      ...currentFilters.filter((filter) => filter.name.toLowerCase() !== normalizedName.toLowerCase()),
+    ].slice(0, 12));
+    setSavedFilterName('');
+  };
+
+  const deleteSavedFilter = (savedFilterId: string) => {
+    setSavedFilters((currentFilters) => currentFilters.filter((filter) => filter.id !== savedFilterId));
+  };
+
   return (
     <div className="relative z-20 overflow-visible border-b border-slate-200/70 bg-white/72 px-6 py-3 shadow-card backdrop-blur-xl">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -75,6 +153,7 @@ export default function QuickSearch({
           </svg>
         </span>
         <input
+          id="board-search-input"
           type="text"
           value={searchQuery}
           onChange={(e) => onSearchQueryChange(e.target.value)}
@@ -124,6 +203,70 @@ export default function QuickSearch({
                 >
                   {t('common.clear')}
                 </button>
+              )}
+            </div>
+
+            <div className="grid gap-2 rounded-2xl border border-slate-100 bg-slate-50/70 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Saved filters</span>
+                {savedFilters.length > 0 && (
+                  <select
+                    value=""
+                    onChange={(event) => applySavedFilter(event.target.value)}
+                    className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none transition focus:ring-2 focus:ring-sky-100"
+                    aria-label="Apply saved filter"
+                  >
+                    <option value="">Apply...</option>
+                    {savedFilters.map((filter) => (
+                      <option key={filter.id} value={filter.id}>{filter.name}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={savedFilterName}
+                  onChange={(event) => setSavedFilterName(event.target.value)}
+                  placeholder="Filter name"
+                  className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none transition focus:ring-2 focus:ring-sky-100"
+                />
+                <button
+                  type="button"
+                  onClick={saveCurrentFilter}
+                  disabled={!hasActiveFilters || !savedFilterName.trim()}
+                  className="cursor-pointer rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Save
+                </button>
+              </div>
+
+              {savedFilters.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {savedFilters.slice(0, 4).map((filter) => (
+                    <span
+                      key={filter.id}
+                      className="inline-flex max-w-full items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-600"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => applySavedFilter(filter.id)}
+                        className="max-w-32 cursor-pointer truncate hover:text-sky-700 focus:outline-none focus-visible:text-sky-700"
+                      >
+                        {filter.name}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteSavedFilter(filter.id)}
+                        aria-label={`Delete saved filter: ${filter.name}`}
+                        className="cursor-pointer text-slate-400 hover:text-rose-600 focus:outline-none focus-visible:text-rose-600"
+                      >
+                        x
+                      </button>
+                    </span>
+                  ))}
+                </div>
               )}
             </div>
 

@@ -33,12 +33,11 @@ export default function DesignLabLayout({ current, children }: DesignLabLayoutPr
       <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/95">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-3 sm:px-7">
           <div className="flex items-center gap-3">
-            <span
-              aria-hidden="true"
-              className="flex h-9 w-9 items-center justify-center rounded-2xl bg-blue-600 text-sm font-bold text-white"
-            >
-              QV
-            </span>
+            <img
+              src="/logo.png"
+              alt=""
+              className="h-9 w-9 rounded-2xl object-cover shadow-sm"
+            />
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-blue-600">
                 Quiet Velocity

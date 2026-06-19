@@ -33,6 +33,10 @@ async function createBoard(boardData: BoardInsert): Promise<BoardRow> {
     throw error;
   }
 
+  if (!data) {
+    throw new Error('Board was not created.');
+  }
+
   return data;
 }
 
@@ -67,7 +71,7 @@ export async function fetchBoards(workspaceId?: string | null): Promise<BoardRow
     throw error;
   }
 
-  return data;
+  return data ?? [];
 }
 
 async function fetchLists(boardId: string, workspaceId?: string | null): Promise<ListRow[]> {
@@ -90,7 +94,7 @@ async function fetchLists(boardId: string, workspaceId?: string | null): Promise
     throw error;
   }
 
-  return data;
+  return data ?? [];
 }
 
 async function fetchTasksForBoard(boardId: string, workspaceId?: string | null): Promise<TaskRow[]> {
@@ -211,7 +215,7 @@ async function seedBoardTasks(
     throw error;
   }
 
-  return { insertedTasks, seededTaskDetails };
+  return { insertedTasks: insertedTasks ?? [], seededTaskDetails };
 }
 
 async function seedTaskDetails(

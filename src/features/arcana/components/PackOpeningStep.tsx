@@ -36,7 +36,7 @@ const openingText: Record<ArcanaLocale, {
   vi: {
     eyebrow: 'IV - Mở gói',
     title: 'Chạm để mở phong ấn',
-    description: 'Không có lời giải ở bước này. Chỉ có tiếng gói bài mở ra và ba lá chuẩn bị hiện mặt.',
+    description: 'Chưa có lời giải ở bước này. Chỉ có tiếng gói bài mở ra và ba lá chuẩn bị hiện mặt.',
     aria: 'Mở gói bài Arcana',
     idlePrompt: 'Chạm để mở',
     openingPrompt: 'Đang mở...',

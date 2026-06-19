@@ -10,6 +10,11 @@ export interface UseCommandPaletteActionsParams {
   handleQuickAddTask: () => void;
   openGroupDialog: () => void;
   openCreateBoardDialog: () => void;
+  focusBoardSearch: () => void;
+  clearBoardFilters: () => void;
+  filterHighPriority: () => void;
+  filterDueToday: () => void;
+  openActivityDialog: () => void;
   handleStartFocusTimer: () => void;
   pauseTimer: () => void;
   resetTimer: () => void;
@@ -38,6 +43,11 @@ export function useCommandPaletteActions({
   handleQuickAddTask,
   openGroupDialog,
   openCreateBoardDialog,
+  focusBoardSearch,
+  clearBoardFilters,
+  filterHighPriority,
+  filterDueToday,
+  openActivityDialog,
   handleStartFocusTimer,
   pauseTimer,
   resetTimer,
@@ -58,6 +68,20 @@ export function useCommandPaletteActions({
       openGroupDialog();
     }),
     withRun(COMMAND_PALETTE_ACTION_CONFIG.NEW_BOARD, () => openCreateBoardDialog()),
+    withRun(COMMAND_PALETTE_ACTION_CONFIG.FOCUS_BOARD_SEARCH, () => {
+      setActiveViewWithPath('board');
+      focusBoardSearch();
+    }),
+    withRun(COMMAND_PALETTE_ACTION_CONFIG.CLEAR_BOARD_FILTERS, clearBoardFilters),
+    withRun(COMMAND_PALETTE_ACTION_CONFIG.FILTER_HIGH_PRIORITY, () => {
+      setActiveViewWithPath('board');
+      filterHighPriority();
+    }),
+    withRun(COMMAND_PALETTE_ACTION_CONFIG.FILTER_DUE_TODAY, () => {
+      setActiveViewWithPath('board');
+      filterDueToday();
+    }),
+    withRun(COMMAND_PALETTE_ACTION_CONFIG.OPEN_BOARD_ACTIVITY, openActivityDialog),
     withRun(COMMAND_PALETTE_ACTION_CONFIG.START_FOCUS_TIMER, handleStartFocusTimer),
     withRun(COMMAND_PALETTE_ACTION_CONFIG.VIEW_TODAY_FOCUS_STATS, () => setActiveViewWithPath('today')),
     withRun(COMMAND_PALETTE_ACTION_CONFIG.OPEN_FOCUS_HISTORY, () => {
@@ -75,6 +99,10 @@ export function useCommandPaletteActions({
       : []),
   ], [
     activeFocusTask,
+    clearBoardFilters,
+    filterDueToday,
+    filterHighPriority,
+    focusBoardSearch,
     handleOpenFloatingFocusTimer,
     handleOpenFocusTask,
     handleQuickAddTask,
@@ -82,6 +110,7 @@ export function useCommandPaletteActions({
     isPictureInPictureSupported,
     openCreateBoardDialog,
     openGroupDialog,
+    openActivityDialog,
     pauseTimer,
     resetTimer,
     setActiveViewWithPath,

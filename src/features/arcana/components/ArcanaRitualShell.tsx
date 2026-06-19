@@ -48,9 +48,9 @@ const stageLabels: Record<ArcanaLocale, Record<ArcanaRitualStage, string>> = {
   },
 };
 
-const shellText: Record<ArcanaLocale, { controls: string; progress: string }> = {
-  en: { controls: 'Arcana controls', progress: 'Ritual progress' },
-  vi: { controls: 'Điều khiển Arcana', progress: 'Tiến trình nghi thức' },
+const shellText: Record<ArcanaLocale, { brand: string; controls: string; progress: string }> = {
+  en: { brand: 'Occult card ritual', controls: 'Arcana controls', progress: 'Ritual progress' },
+  vi: { brand: 'Nghi thức bài ẩn ngữ', controls: 'Điều khiển Arcana', progress: 'Tiến trình nghi thức' },
 };
 
 function ArcanaRitualShell({
@@ -86,9 +86,9 @@ function ArcanaRitualShell({
       >
         <header className="arcana-booth-topbar">
           <div className="arcana-booth-brand">
-            <span className="arcana-sigil" aria-hidden="true">◇</span>
+            <span className="arcana-sigil" aria-hidden="true">A</span>
             <div>
-              <p>Arcana Booth</p>
+              <p>{shellText[language].brand}</p>
               <h2 id="arcana-booth-title">{t('arcana.booth')}</h2>
             </div>
           </div>

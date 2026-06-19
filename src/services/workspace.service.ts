@@ -112,7 +112,7 @@ export async function fetchUserWorkspaces(user: AppUser | null): Promise<Workspa
     throw error;
   }
 
-  return (data as unknown as WorkspaceMembershipRow[])
+  return ((data ?? []) as unknown as WorkspaceMembershipRow[])
     .flatMap((membership) => {
       if (!membership.workspaces) {
         return [];
@@ -180,7 +180,7 @@ export async function fetchWorkspaceMembers(workspaceId: string | null): Promise
     throw membersError;
   }
 
-  const memberRows = (members || []) as WorkspaceMemberRow[];
+  const memberRows = (members ?? []) as WorkspaceMemberRow[];
   const userIds = memberRows.map((member) => member.user_id);
 
   if (userIds.length === 0) {
@@ -196,7 +196,7 @@ export async function fetchWorkspaceMembers(workspaceId: string | null): Promise
     throw profilesError;
   }
 
-  return mapWorkspaceMemberRows(memberRows, (profiles || []) as ProfileRow[]);
+  return mapWorkspaceMemberRows(memberRows, (profiles ?? []) as ProfileRow[]);
 }
 
 export async function addWorkspaceMemberByEmail(

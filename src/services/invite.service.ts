@@ -1,21 +1,12 @@
 import supabase, { requireSupabaseClient } from '../lib/supabase';
+import type { Database } from '../types/supabase.type';
 import type {
   WorkspaceInvite,
   WorkspaceInviteActionResult,
   WorkspaceInviteRole,
 } from '../types/auth.type';
 
-interface WorkspaceInviteRow {
-  id: string;
-  workspace_id: string;
-  email: string;
-  role: WorkspaceInviteRole;
-  token: string;
-  invited_by: string | null;
-  accepted_at: string | null;
-  expires_at: string;
-  created_at: string;
-}
+type WorkspaceInviteRow = Database['public']['Tables']['workspace_invites']['Row'];
 
 interface WorkspaceInviteRpcPayload {
   status: WorkspaceInviteActionResult['status'];
@@ -27,48 +18,7 @@ interface AcceptInviteRpcPayload {
   workspace_id: string;
 }
 
-interface SupabaseErrorLike {
-  message: string;
-}
-
-interface WorkspaceInviteSelectQuery {
-  eq(column: string, value: string): WorkspaceInviteSelectQuery;
-  is(column: string, value: null): WorkspaceInviteSelectQuery;
-  order(
-    column: string,
-    options: { ascending: boolean },
-  ): Promise<{ data: WorkspaceInviteRow[] | null; error: SupabaseErrorLike | null }>;
-  maybeSingle(): Promise<{ data: WorkspaceInviteRow | null; error: SupabaseErrorLike | null }>;
-}
-
-interface WorkspaceInviteDeleteQuery {
-  eq(column: string, value: string): Promise<{ error: SupabaseErrorLike | null }>;
-}
-
-interface WorkspaceInviteTableClient {
-  select(columns: string): WorkspaceInviteSelectQuery;
-  delete(): WorkspaceInviteDeleteQuery;
-}
-
-interface WorkspaceInviteClient {
-  from(table: 'workspace_invites'): WorkspaceInviteTableClient;
-}
-
-type WorkspaceInviteRpcCaller = (
-  functionName: string,
-  args: Record<string, unknown>,
-) => Promise<{ data: unknown; error: SupabaseErrorLike | null }>;
-
 const inviteSelectColumns = 'id,workspace_id,email,role,token,invited_by,accepted_at,expires_at,created_at';
-
-function getInviteTableClient(): WorkspaceInviteClient {
-  return requireSupabaseClient() as unknown as WorkspaceInviteClient;
-}
-
-function createBoundInviteRpcCaller(): WorkspaceInviteRpcCaller {
-  const client = requireSupabaseClient();
-  return client.rpc.bind(client) as unknown as WorkspaceInviteRpcCaller;
-}
 
 function mapWorkspaceInvite(row: WorkspaceInviteRow): WorkspaceInvite {
   return {
@@ -115,7 +65,7 @@ export async function fetchWorkspaceInvites(workspaceId: string | null): Promise
     return [];
   }
 
-  const client = getInviteTableClient();
+  const client = requireSupabaseClient();
   const { data, error } = await client
     .from('workspace_invites')
     .select(inviteSelectColumns)
@@ -127,7 +77,7 @@ export async function fetchWorkspaceInvites(workspaceId: string | null): Promise
     throw new Error(error.message);
   }
 
-  return (data || []).map(mapWorkspaceInvite);
+  return (data ?? []).map(mapWorkspaceInvite);
 }
 
 export async function inviteWorkspaceMemberByEmail(
@@ -148,8 +98,8 @@ export async function inviteWorkspaceMemberByEmail(
     throw new Error('Member email is required.');
   }
 
-  const rpc = createBoundInviteRpcCaller();
-  const { data, error } = await rpc('invite_workspace_member_by_email', {
+  const client = requireSupabaseClient();
+  const { data, error } = await client.rpc('invite_workspace_member_by_email', {
     target_workspace_id: workspaceId,
     member_email: trimmedEmail,
     member_role: role,
@@ -167,7 +117,7 @@ export async function cancelWorkspaceInvite(inviteId: string): Promise<void> {
     return;
   }
 
-  const client = getInviteTableClient();
+  const client = requireSupabaseClient();
   const { error } = await client
     .from('workspace_invites')
     .delete()
@@ -183,7 +133,7 @@ export async function fetchWorkspaceInviteByToken(token: string): Promise<Worksp
     return null;
   }
 
-  const client = getInviteTableClient();
+  const client = requireSupabaseClient();
   const { data, error } = await client
     .from('workspace_invites')
     .select(inviteSelectColumns)
@@ -202,8 +152,8 @@ export async function acceptWorkspaceInvite(token: string): Promise<AcceptInvite
     throw new Error('Invite links require Supabase auth mode.');
   }
 
-  const rpc = createBoundInviteRpcCaller();
-  const { data, error } = await rpc('accept_workspace_invite', {
+  const client = requireSupabaseClient();
+  const { data, error } = await client.rpc('accept_workspace_invite', {
     invite_token: token,
   });
 

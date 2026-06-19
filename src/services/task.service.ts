@@ -2,7 +2,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 
 import supabase, { requireSupabaseClient } from '../lib/supabase';
 import { DEFAULT_TASK_PRIORITY } from '../constants';
-import type { TaskInsert, TaskRow, TaskUpdate } from '../types/supabase.type';
+import type { Json, TaskInsert, TaskRow, TaskUpdate } from '../types/supabase.type';
 
 interface FetchTasksParams {
   boardId?: string;
@@ -27,6 +27,8 @@ const STABLE_TASK_FIELD_NORMALIZERS = {
   priority: (value: TaskInsert['priority']) => value ?? DEFAULT_TASK_PRIORITY,
   start_date: (value: TaskInsert['start_date']) => value ?? null,
   due_date: (value: TaskInsert['due_date']) => value ?? null,
+  category1: (value: TaskInsert['category1']) => value ?? null,
+  category2: (value: TaskInsert['category2']) => value ?? null,
   assignees: (value: TaskInsert['assignees']) => value ?? [],
   image: (value: TaskInsert['image']) => value ?? null,
   is_done: (value: TaskInsert['is_done']) => value ?? false,
@@ -47,6 +49,8 @@ function normalizeTaskData(taskData: TaskInsert): TaskInsert {
     priority: STABLE_TASK_FIELD_NORMALIZERS.priority(taskData.priority),
     start_date: STABLE_TASK_FIELD_NORMALIZERS.start_date(taskData.start_date),
     due_date: STABLE_TASK_FIELD_NORMALIZERS.due_date(taskData.due_date),
+    category1: STABLE_TASK_FIELD_NORMALIZERS.category1(taskData.category1),
+    category2: STABLE_TASK_FIELD_NORMALIZERS.category2(taskData.category2),
     assignees: STABLE_TASK_FIELD_NORMALIZERS.assignees(taskData.assignees),
     image: STABLE_TASK_FIELD_NORMALIZERS.image(taskData.image),
     is_done: STABLE_TASK_FIELD_NORMALIZERS.is_done(taskData.is_done),
@@ -69,6 +73,8 @@ function normalizeTaskDataPartial(taskData: TaskUpdate): TaskUpdate {
   if ('priority' in taskData) stablePayload.priority = STABLE_TASK_FIELD_NORMALIZERS.priority(taskData.priority);
   if ('start_date' in taskData) stablePayload.start_date = STABLE_TASK_FIELD_NORMALIZERS.start_date(taskData.start_date);
   if ('due_date' in taskData) stablePayload.due_date = STABLE_TASK_FIELD_NORMALIZERS.due_date(taskData.due_date);
+  if ('category1' in taskData) stablePayload.category1 = STABLE_TASK_FIELD_NORMALIZERS.category1(taskData.category1);
+  if ('category2' in taskData) stablePayload.category2 = STABLE_TASK_FIELD_NORMALIZERS.category2(taskData.category2);
   if ('assignees' in taskData) stablePayload.assignees = STABLE_TASK_FIELD_NORMALIZERS.assignees(taskData.assignees);
   if ('image' in taskData) stablePayload.image = STABLE_TASK_FIELD_NORMALIZERS.image(taskData.image);
   if ('is_done' in taskData) stablePayload.is_done = STABLE_TASK_FIELD_NORMALIZERS.is_done(taskData.is_done);
@@ -115,7 +121,7 @@ export async function fetchTasks({ boardId, listId, workspaceId }: FetchTasksPar
     throw error;
   }
 
-  return data;
+  return data ?? [];
 }
 
 export async function createTask(taskData: TaskInsert): Promise<TaskRow> {
@@ -154,6 +160,10 @@ export async function createTask(taskData: TaskInsert): Promise<TaskRow> {
 
   if (error) {
     throw error;
+  }
+
+  if (!data) {
+    throw new Error('Task was not created.');
   }
 
   return data;
@@ -198,7 +208,7 @@ export async function createTasks(tasksData: TaskInsert[]): Promise<TaskRow[]> {
     throw error;
   }
 
-  return data;
+  return data ?? [];
 }
 
 
@@ -220,6 +230,10 @@ export async function updateTask(taskId: string, taskData: TaskUpdate): Promise<
 
   if (error) {
     throw error;
+  }
+
+  if (!data) {
+    throw new Error('Task was not updated.');
   }
 
   return data;
@@ -275,24 +289,22 @@ export async function deleteTasksByListId(listId: string): Promise<void> {
 }
 
 export async function updateTaskPositions(taskPositions: UpdateTaskPositionPayload[]): Promise<void> {
-  if (!supabase) {
+  if (!supabase || taskPositions.length === 0) {
     return;
   }
 
   const client = requireSupabaseClient();
-  await Promise.all(taskPositions.map(async ({ id, list_id, position }) => {
-    const { error } = await client
-      .from('tasks')
-      .update({
-        list_id,
-        position,
-      })
-      .eq('id', id);
+  const { error } = await client.rpc('update_task_positions', {
+    task_positions: taskPositions.map(({ id, list_id, position }) => ({
+      id,
+      list_id,
+      position,
+    })) as Json,
+  });
 
-    if (error) {
-      throw error;
-    }
-  }));
+  if (error) {
+    throw error;
+  }
 }
 
 export function subscribeToTasksRealtime(boardId: string, onChange: () => void): RealtimeChannel {

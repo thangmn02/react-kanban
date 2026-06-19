@@ -155,8 +155,8 @@ export async function fetchHomeDashboardData({
     throw tasksResult.error;
   }
 
-  const boards = boardsResult.data as DashboardBoardRow[];
-  const tasks = tasksResult.data as DashboardTaskRow[];
+  const boards = (boardsResult.data ?? []) as DashboardBoardRow[];
+  const tasks = (tasksResult.data ?? []) as DashboardTaskRow[];
   const boardTitleById = new Map(boards.map((board) => [board.id, board.title]));
   let holidays = fallbackVietnamHolidays.filter((holiday) => (
     holiday.date >= visibleMonthStart && holiday.date <= visibleMonthEnd

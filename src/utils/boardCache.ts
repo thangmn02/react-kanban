@@ -5,6 +5,7 @@ const boardCacheKey = 'kanban_board_cache';
 export interface BoardCachePayload {
   boardId: string | null;
   boardData: BoardData;
+  updatedAt?: string;
 }
 
 export function readBoardCache(): BoardCachePayload | null {
@@ -30,5 +31,8 @@ export function writeBoardCache(cachePayload: BoardCachePayload) {
     return;
   }
 
-  window.localStorage.setItem(boardCacheKey, JSON.stringify(cachePayload));
+  window.localStorage.setItem(boardCacheKey, JSON.stringify({
+    ...cachePayload,
+    updatedAt: new Date().toISOString(),
+  }));
 }
