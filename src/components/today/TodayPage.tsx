@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 
 import { fetchTodayPageData, type TodayPageData, type TodayTaskSummary } from '../../services/today.service';
+import { getTodayFocusSuggestions, type FocusReason } from '../../features/today/utils/todayFocusSuggestions';
 import type { AppUser, WorkspaceSummary } from '../../types/auth.type';
 import type { DailyFocusStats, FocusTask } from '../../types/focus.type';
 import PageHeader from '../atoms/PageHeader';
@@ -109,6 +110,35 @@ export default function TodayPage({
 
   const hasUrgentTasks = todayData.overdueTasks.length > 0 || todayData.dueTodayTasks.length > 0;
   const hasSecondaryTasks = todayData.assignedTasks.length > 0 || todayData.recentlyActiveTasks.length > 0;
+
+  const focusSuggestions = useMemo(() => {
+    const focusTaskIds = new Set(focusTasks.map((task) => task.id));
+    return getTodayFocusSuggestions(todayData, 5)
+      .filter((suggestion) => !focusTaskIds.has(suggestion.task.id))
+      .slice(0, 3);
+  }, [todayData, focusTasks]);
+
+  const focusReasonLabels: Record<FocusReason, string> = {
+    overdue: t('today.focus.reason.overdue'),
+    dueToday: t('today.focus.reason.dueToday'),
+    highPriority: t('today.focus.reason.highPriority'),
+    recentlyActive: t('today.focus.reason.recentlyActive'),
+  };
+
+  const focusReasonBadgeClass = (reason: FocusReason): string => {
+    switch (reason) {
+      case 'overdue':
+        return 'inline-flex rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-700';
+      case 'dueToday':
+        return 'inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700';
+      case 'highPriority':
+        return 'inline-flex rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-700';
+      case 'recentlyActive':
+        return 'inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600';
+      default:
+        return 'inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600';
+    }
+  };
 
   return (
     <main className="min-h-screen bg-canvas px-5 py-7 sm:px-7" aria-busy={isLoading}>
@@ -257,6 +287,52 @@ export default function TodayPage({
                   )}
                 </div>
               </SectionCard>
+
+              {focusSuggestions.length > 0 && (
+                <SectionCard className="p-5">
+                  <div className="mb-4">
+                    <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-slate-600">
+                      {t('today.focusTitle')}
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-500">{t('today.focusDescription')}</p>
+                  </div>
+                  <div className="grid gap-3">
+                    {focusSuggestions.map(({ task, reasons }) => (
+                      <div
+                        key={task.id}
+                        className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <button
+                            type="button"
+                            onClick={() => onOpenTask(task)}
+                            className="min-w-0 text-left text-sm font-semibold text-slate-800 transition hover:text-blue-600"
+                          >
+                            {task.title}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onStartFocus(task)}
+                            className="shrink-0 rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                          >
+                            {t('today.startFocus')}
+                          </button>
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {reasons.map((reason) => (
+                            <span key={reason} className={focusReasonBadgeClass(reason)}>
+                              {focusReasonLabels[reason]}
+                            </span>
+                          ))}
+                        </div>
+                        <p className="mt-2 truncate text-xs text-slate-400">
+                          {task.boardTitle} · {task.listTitle}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </SectionCard>
+              )}
 
               {!hasUrgentTasks && (
                 <motion.div

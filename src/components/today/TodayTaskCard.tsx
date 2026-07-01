@@ -54,27 +54,43 @@ export default function TodayTaskCard({
       </button>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        {task.priority && priorityClassName ? (
-          <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase ${priorityClassName}`}>
-            {task.priority}
+        {task.isDone ? (
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold uppercase text-emerald-700"
+            aria-label={t('today.taskCompleted')}
+          >
+            <svg className="h-3.5 w-3.5 shrink-0" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+            {t('today.taskCompleted')}
           </span>
         ) : (
-          <span className="rounded-full border border-dashed border-slate-200 px-2.5 py-0.5 text-[11px] text-slate-400">
-            {t('common.noPriority')}
-          </span>
+          <>
+            {task.priority && priorityClassName ? (
+              <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase ${priorityClassName}`}>
+                {task.priority}
+              </span>
+            ) : (
+              <span className="rounded-full border border-dashed border-slate-200 px-2.5 py-0.5 text-[11px] text-slate-400">
+                {t('common.noPriority')}
+              </span>
+            )}
+            <DueDateBadge dueDate={task.dueDate || undefined} />
+          </>
         )}
-        <DueDateBadge dueDate={task.dueDate || undefined} />
       </div>
 
-      <div className="mt-4 grid gap-2 sm:grid-cols-2">
-        <button
-          type="button"
-          onClick={() => onStartFocus(task)}
-          className="cursor-pointer rounded-2xl bg-slate-950 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:-translate-y-0.5 focus:outline-none focus-visible:ring-4 focus-visible:ring-slate-200 active:scale-[0.98]"
-          aria-label={`${t('task.startFocus')}: ${task.title}`}
-        >
-          {t('today.startFocus')}
-        </button>
+      <div className="mt-4 flex items-center gap-2">
+        {!task.isDone && (
+          <button
+            type="button"
+            onClick={() => onStartFocus(task)}
+            className="cursor-pointer rounded-2xl bg-slate-950 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:-translate-y-0.5 focus:outline-none focus-visible:ring-4 focus-visible:ring-slate-200 active:scale-[0.98]"
+            aria-label={`${t('task.startFocus')}: ${task.title}`}
+          >
+            {t('today.startFocus')}
+          </button>
+        )}
         <button
           type="button"
           onClick={() => onToggleTodayFocus(task)}

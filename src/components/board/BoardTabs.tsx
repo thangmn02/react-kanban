@@ -1,6 +1,6 @@
 import { useI18n } from '../../i18n';
 
-export type BoardTabId = 'board' | 'calendar';
+export type BoardTabId = 'board' | 'table' | 'calendar';
 
 interface BoardTabsProps {
   activeTab: BoardTabId;
@@ -32,6 +32,14 @@ export default function BoardTabs({
           aria-current={activeTab === 'board' ? 'page' : undefined}
         >
           {t('board.views.board')}
+        </button>
+        <button
+          type="button"
+          onClick={() => onTabChange('table')}
+          className={tabClassName('table')}
+          aria-current={activeTab === 'table' ? 'page' : undefined}
+        >
+          {t('board.views.table')}
         </button>
         <button
           type="button"

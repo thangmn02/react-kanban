@@ -7,6 +7,8 @@ interface ContentDialogProps extends React.PropsWithChildren {
   textButtonSubmit?: string;
   modalFooter?: React.ReactNode;
   className?: string;
+  /** Classes for the fixed backdrop/scrim. Defaults to the legacy flat gray. */
+  scrimClassName?: string;
   onSubmit: () => void;
   onClose?: () => void;
 }
@@ -20,11 +22,12 @@ function ContentDialog({
   onClose,
   modalFooter,
   className = "max-w-md w-full p-6",
+  scrimClassName = 'bg-gray-900 opacity-50',
 }: ContentDialogProps) {
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div
-        className="fixed inset-0 bg-gray-900 opacity-50 transition-opacity"
+        className={`fixed inset-0 transition-opacity ${scrimClassName}`}
         onClick={onClose}
         aria-hidden="true"
       />

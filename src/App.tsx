@@ -9,6 +9,7 @@ import AddGroupDialog from './components/organisms/dialog/AddGroupDialog';
 import CreateBoardDialog from './components/organisms/dialog/CreateBoardDialog';
 import DeleteDialog from './components/organisms/dialog/DeleteDialog';
 import CalendarBoardView from './components/organisms/CalendarBoardView';
+import TableView from './components/organisms/TableView';
 import HomeDashboard from './components/organisms/HomeDashboard';
 import KanbanBoard from './components/organisms/KanbanBoard';
 import TodayQuickPlanDialog from './features/today/components/TodayQuickPlanDialog';
@@ -41,7 +42,8 @@ import { createBoardFromTemplate, fetchBoardSnapshot, fetchBoards } from './serv
 import { findBoardTemplateById } from './data/boardTemplates';
 import { createList } from './services/list.service';
 import { updateTask, createTasks } from './services/task.service';
-import { buildTaskFieldUpdatePayload } from './utils/boardDataMapper';
+import { buildTaskFieldUpdatePayload, buildTaskInsertPayload } from './utils/boardDataMapper';
+import { tasksToCsv, downloadTextFile, parseTasksCsv, normalizeCsvPriority, normalizeCsvDueDate } from './utils/csvTasks';
 import { isLocalDemoMode } from './lib/supabase';
 import { createActivity } from './services/activity.service';
 import {
@@ -49,6 +51,7 @@ import {
   logFocusSession,
 } from './services/focusSession.service';
 import BoardActivityDialog from './components/organisms/dialog/BoardActivityDialog';
+import ProgressReportDialog from './components/organisms/dialog/ProgressReportDialog';
 import FocusDock from './components/focus/FocusDock';
 import FocusCompletionPrompt from './components/focus/FocusCompletionPrompt';
 import FocusLaunchpadDialog from './components/focus/FocusLaunchpadDialog';
@@ -119,7 +122,6 @@ function App() {
   const {
     activeView,
     activeInviteToken,
-    activeBoardTab,
     setActiveViewWithPath,
   } = useViewRouting();
 
@@ -169,6 +171,8 @@ function App() {
   const [isFocusDockCollapsed, setIsFocusDockCollapsed] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isArcanaBoothOpen, setIsArcanaBoothOpen] = useState(false);
+  const [isProgressReportOpen, setIsProgressReportOpen] = useState(false);
+  const [boardSubView, setBoardSubView] = useState<'kanban' | 'table'>('kanban');
   const [arcanaRewardState, setArcanaRewardState] = useState(readArcanaRewardState);
   const [isArcanaRewardPromptOpen, setIsArcanaRewardPromptOpen] = useState(false);
   const [carryoverSummary, setCarryoverSummary] = useState<DailyCarryoverSummary | null>(getYesterdayCarryoverSummary);
@@ -565,6 +569,88 @@ function App() {
       setIsSavingBoard(false);
     }
   }, [activeView, boardData, activeBoardId, activeWorkspaceId, user, refreshBoardData, setIsSavingBoard, t]);
+
+  const handleExportCsv = useCallback(() => {
+    try {
+      const csv = tasksToCsv(boardData);
+      const boardTitle = activeBoardSummary?.title || t('common.untitledBoard');
+      const slug = boardTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'board';
+      downloadTextFile(`${slug}-tasks.csv`, csv);
+      const taskCount = Object.values(boardData.task).filter(Boolean).length;
+      toast.success(t('toast.exportedCsv', { count: taskCount }), { theme: 'colored' });
+    } catch {
+      toast.error(t('toast.csvExportFailed'), { theme: 'colored' });
+    }
+  }, [boardData, activeBoardSummary, t]);
+
+  const handleImportCsv = useCallback(async (file: File) => {
+    if (activeView !== 'board' && activeView !== 'home') {
+      return;
+    }
+
+    const firstListId = boardData.columns[0];
+    if (!activeBoardId || !activeWorkspaceId || !firstListId || !user) {
+      return;
+    }
+
+    let fileText: string;
+    try {
+      fileText = await file.text();
+    } catch {
+      toast.error(t('toast.csvImportFailed'), { theme: 'colored' });
+      return;
+    }
+
+    const parsedTasks = parseTasksCsv(fileText);
+    if (parsedTasks.length === 0) {
+      toast.info(t('toast.csvImportEmpty'), { theme: 'colored' });
+      return;
+    }
+
+    const listIdByTitle = new Map<string, string>();
+    boardData.columns.forEach((listId) => {
+      const list = boardData.list[listId];
+      if (list) {
+        listIdByTitle.set(list.title.trim().toLowerCase(), listId);
+      }
+    });
+
+    const assigneeByName = new Map<string, { name: string; avatar: string }>();
+    workspaceMembers.forEach((member) => {
+      assigneeByName.set(member.name.trim().toLowerCase(), { name: member.name, avatar: member.avatarUrl });
+    });
+
+    setIsSavingBoard(true);
+    try {
+      const positionOffset = (boardData.list[firstListId]?.tasks.length || 0) * 65536;
+      const tasksToCreate = parsedTasks.map((row, index) => {
+        const matchedAssignee = assigneeByName.get(row.assignee.trim().toLowerCase());
+        return {
+          ...buildTaskInsertPayload({
+            boardId: activeBoardId,
+            listId: listIdByTitle.get(row.status.trim().toLowerCase()) || firstListId,
+            title: row.title,
+            description: '',
+            priority: normalizeCsvPriority(row.priority),
+            dueDate: normalizeCsvDueDate(row.dueDate),
+            position: positionOffset + (index + 1) * 65536,
+            assignees: matchedAssignee ? [matchedAssignee] : [],
+          }),
+          workspace_id: activeWorkspaceId,
+          created_by: user.id,
+        };
+      });
+
+      await createTasks(tasksToCreate);
+      await refreshBoardData({ boardId: activeBoardId });
+      toast.success(t('toast.importedCsv', { count: tasksToCreate.length }), { theme: 'colored' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t('toast.csvImportFailed');
+      toast.error(message, { theme: 'colored' });
+    } finally {
+      setIsSavingBoard(false);
+    }
+  }, [activeView, boardData, activeBoardId, activeWorkspaceId, user, workspaceMembers, refreshBoardData, setIsSavingBoard, t]);
 
   useEffect(() => {
     const handleGlobalPaste = (e: ClipboardEvent) => {
@@ -1307,18 +1393,30 @@ function App() {
         activeBoardId={activeBoardId}
         activeBoardSummary={activeBoardSummary}
         boardSummaries={boardSummaries}
-        activeTab={activeBoardTab}
+        activeTab={activeView === 'calendar' ? 'calendar' : boardSubView === 'table' ? 'table' : 'board'}
         workspaceMembers={workspaceMembers}
         onBoardChange={(boardId) => {
           setIsBoardLoading(true);
           setActiveViewWithPath('board');
           void refreshBoardData({ boardId, showErrorToast: true });
         }}
-        onTabChange={(tab) => setActiveViewWithPath(tab)}
+        onTabChange={(tab) => {
+          if (tab === 'calendar') {
+            setActiveViewWithPath('calendar');
+            return;
+          }
+          setBoardSubView(tab === 'table' ? 'table' : 'kanban');
+          if (activeView !== 'board') {
+            setActiveViewWithPath('board');
+          }
+        }}
         onOpenMembers={openMembersDialog}
         onOpenActivity={openActivityDialog}
         onQuickAddTask={handleQuickAddTask}
         onOpenQuickPlan={handleOpenQuickPlan}
+        onOpenProgressReport={() => setIsProgressReportOpen(true)}
+        onExportCsv={handleExportCsv}
+        onImportCsv={handleImportCsv}
       />
 
       {(isBoardLoading || isSavingBoard) && (
@@ -1366,6 +1464,15 @@ function App() {
             ))}
           </div>
         </div>
+      ) : activeView === 'board' && boardSubView === 'table' ? (
+        <TableView
+          boardData={boardData}
+          searchQuery={searchQuery}
+          filterPriority={filterPriority}
+          filterAssignee={filterAssignee}
+          filterDueDate={filterDueDate}
+          onOpenTask={handleEditTask}
+        />
       ) : activeView === 'board' ? (
         <KanbanBoard
           boardData={boardData}
@@ -1395,6 +1502,13 @@ function App() {
       )}
 
       {sharedDialogs}
+
+      <ProgressReportDialog
+        isOpen={isProgressReportOpen}
+        onClose={() => setIsProgressReportOpen(false)}
+        boardTitle={activeBoardSummary?.title || t('common.untitledBoard')}
+        boardData={boardData}
+      />
     </div>
     </ProtectedRoute>
   );

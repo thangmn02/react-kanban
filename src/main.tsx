@@ -2,6 +2,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { AuthProvider } from './providers/AuthProvider.tsx'
+import AstryxThemeProvider from './providers/AstryxThemeProvider'
 import ErrorBoundary from './components/error/ErrorBoundary.tsx'
 import OfflineBanner from './components/error/OfflineBanner.tsx'
 import DesignLab from './design-lab/DesignLab.tsx'
@@ -24,9 +25,11 @@ createRoot(document.getElementById('root')!).render(
       ) : (
         <>
           <I18nProvider>
-            <AuthProvider>
-              <App />
-            </AuthProvider>
+            <AstryxThemeProvider>
+              <AuthProvider>
+                <App />
+              </AuthProvider>
+            </AstryxThemeProvider>
             <OfflineBanner />
           </I18nProvider>
         </>

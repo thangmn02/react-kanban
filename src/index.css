@@ -1,6 +1,20 @@
 @import "tailwindcss";
 
 /*
+ * Astryx token CSS — tokens-only. Loaded BEFORE astryx-bridge.css so the
+ * --app-* variables resolve to the real Astryx neutral-theme tokens. Tokens-only:
+ * we intentionally do NOT import @astryxdesign/core reset.css / astryx.css —
+ * those would globally reset the app's typography via :where(h1…) rules scoped
+ * to [data-astryx-theme]. The Theme provider (src/providers/AstryxThemeProvider)
+ * keeps data-astryx-theme="neutral" on <html> in sync so these scoped tokens
+ * reach the whole app (incl. portals).
+ */
+@import "@astryxdesign/theme-neutral/theme.css";
+
+/* App-level Astryx → app token bridge (graceful fallbacks; active now). */
+@import "./styles/astryx-bridge.css";
+
+/*
  * Design foundation tokens (Phase 0).
  * Tailwind v4 theme extension. These are ADDITIVE semantic aliases on top of the
  * default scale — they do not override Tailwind's built-in radius/shadow values,

@@ -45,3 +45,4 @@ public/tarot_readings.parquet
 # Project docs and local data/build scripts — kept locally, not uploaded.
 docs/
 scripts/
+SECURITY_RLS.md

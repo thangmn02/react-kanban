@@ -1,0 +1,79 @@
+/*
+ * Astryx → App token bridge.
+ *
+ * Maps Astryx design tokens (the system CSS custom properties emitted by
+ * @astryxdesign/theme-neutral) to app-level semantic variables consumed by UI
+ * surfaces. ProgressReportDialog is the first consumer; other surfaces can opt
+ * in later by referencing these --app-* variables.
+ *
+ * Design goals
+ *  - Single source of truth: components reference --app-* only, never raw
+ *    Astryx token names. Swapping/restyling later means editing this one file.
+ *  - Graceful degradation: every mapping uses `var(--astryx-token, <fallback>)`
+ *    where <fallback> matches the app's current "Quiet Velocity" light values.
+ *    The app therefore builds AND looks correct EVEN BEFORE @astryxdesign/* is
+ *    installed. Once theme-neutral's theme.css is loaded (see
+ *    docs/astryx-integration.md) the real Astryx tokens take over automatically
+ *    — surfaces, text, borders, radius and motion upgrade with no further code
+ *    changes.
+ *  - No global resets: this file ONLY defines variables plus a light
+ *    color-scheme guard for the neutral theme scope. It does NOT import Astryx
+ *    reset.css / astryx.css, so existing Tailwind utilities and app styles are
+ *    completely untouched.
+ *
+ * Load order (post-install, in src/index.css):
+ *   @import "tailwindcss";
+ *   @import "@astryxdesign/theme-neutral/theme.css";  // Astryx tokens
+ *   @import "./styles/astryx-bridge.css";             // this file
+ */
+
+/*
+ * Keep the neutral theme in light mode so Astryx `light-dark()` tokens resolve
+ * to their light values — matches the app's existing light canvas (#f8f9fa).
+ * Inert until data-astryx-theme="neutral" is present on <html> (set in
+ * index.html and kept in sync by <AstryxThemeProvider>).
+ */
+:root[data-astryx-theme="neutral"] {
+  color-scheme: light;
+}
+
+:root {
+  /* ---- Surfaces ---- */
+  --app-bg: var(--color-background-body, #f8f9fa);         /* page canvas */
+  --app-surface: var(--color-background-surface, #ffffff); /* dialog / page surface */
+  --app-card: var(--color-background-card, #ffffff);       /* cards, tiles, table shell */
+  --app-popover: var(--color-background-popover, #ffffff); /* popovers, dropdowns */
+
+  /* ---- Text ---- */
+  --app-text: var(--color-text-primary, #0f172a);          /* slate-900 */
+  --app-text-muted: var(--color-text-secondary, #64748b);  /* slate-500 */
+
+  /* ---- Borders ---- */
+  --app-border: var(--color-border, #e2e8f0);              /* slate-200 hairline */
+
+  /* ---- Radius ---- */
+  --app-radius-sm: var(--radius-inner, 0.375rem);          /* 6px — rows, small controls */
+  --app-radius-md: var(--radius-element, 0.5rem);          /* 8px — buttons, medium controls */
+  --app-radius-lg: var(--radius-container, 0.75rem);       /* 12px — cards, tiles, dialog */
+
+  /* ---- Motion (durations) ---- */
+  --app-motion-fast: var(--duration-fast, 125ms);
+  --app-motion-medium: var(--duration-medium, 300ms);
+
+  /*
+   * ---- Optional extras (beyond the required core set) ----
+   * Consumed by ProgressReportDialog today; available for future surfaces.
+   */
+  --app-muted: var(--color-background-muted, #f1f1f1);     /* table header / footer bg */
+  --app-shadow-card: var(
+    --shadow-low,
+    0 2px 4px rgba(15, 23, 42, 0.05),
+    0 4px 8px rgba(15, 23, 42, 0.10)
+  );
+  --app-shadow-overlay: var(
+    --shadow-high,
+    0 4px 6px rgba(15, 23, 42, 0.10),
+    0 12px 24px rgba(15, 23, 42, 0.15)
+  );
+  --app-accent: var(--color-accent, #2563eb);              /* action accent (blue-600 fallback) */
+}

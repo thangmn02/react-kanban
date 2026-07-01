@@ -17,6 +17,9 @@ interface BoardHeaderProps {
   onOpenActivity: () => void;
   onQuickAddTask: () => void;
   onOpenQuickPlan: () => void;
+  onOpenProgressReport: () => void;
+  onExportCsv: () => void;
+  onImportCsv: (file: File) => void;
 }
 
 export default function BoardHeader({
@@ -31,9 +34,13 @@ export default function BoardHeader({
   onOpenActivity,
   onQuickAddTask,
   onOpenQuickPlan,
+  onOpenProgressReport,
+  onExportCsv,
+  onImportCsv,
 }: BoardHeaderProps) {
   const [isOptionsOpen, setIsOptionsOpen] = useState(false);
   const optionsRef = useRef<HTMLDivElement | null>(null);
+  const csvInputRef = useRef<HTMLInputElement | null>(null);
   const hasTeamMembers = workspaceMembers.length > 1;
   const { t } = useI18n();
 
@@ -119,6 +126,51 @@ export default function BoardHeader({
                 >
                   {t('board.quickPlan')}
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsOptionsOpen(false);
+                    onOpenProgressReport();
+                  }}
+                  className="inline-flex w-full cursor-pointer items-center gap-2 rounded-xl px-2 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                >
+                  {t('report.title')}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsOptionsOpen(false);
+                    onExportCsv();
+                  }}
+                  className="inline-flex w-full cursor-pointer items-center gap-2 rounded-xl px-2 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                >
+                  {t('csv.export')}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => csvInputRef.current?.click()}
+                  className="inline-flex w-full cursor-pointer items-center gap-2 rounded-xl px-2 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                >
+                  {t('csv.import')}
+                </button>
+
+                <input
+                  ref={csvInputRef}
+                  type="file"
+                  accept=".csv,text/csv"
+                  className="hidden"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    setIsOptionsOpen(false);
+                    if (file) {
+                      onImportCsv(file);
+                    }
+                    event.target.value = '';
+                  }}
+                />
 
                 <button
                   type="button"

@@ -59,6 +59,7 @@ export function mapTaskRowToTaskItem(taskRow: TaskRow): BoardTaskItem {
     category2: taskRow.category2 || undefined,
     image: taskRow.image || undefined,
     isDone: taskRow.is_done,
+    updatedAt: taskRow.updated_at || undefined,
     attachments: normalizeTaskAttachments(taskRow.attachments ?? null),
     labels: [],
     checklistItems: [],

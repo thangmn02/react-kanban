@@ -16,6 +16,29 @@ interface UpdateTaskPositionPayload {
   position: number;
 }
 
+const taskPositionRpcName = 'update_task_positions';
+const taskPositionRpcPayloadKey = 'task_positions';
+
+function summarizeTaskPositionPayload(taskPositions: UpdateTaskPositionPayload[]) {
+  return {
+    count: taskPositions.length,
+    first: taskPositions[0]
+      ? {
+          id: taskPositions[0].id,
+          list_id: taskPositions[0].list_id,
+          position: taskPositions[0].position,
+        }
+      : null,
+    last: taskPositions.at(-1)
+      ? {
+          id: taskPositions.at(-1)!.id,
+          list_id: taskPositions.at(-1)!.list_id,
+          position: taskPositions.at(-1)!.position,
+        }
+      : null,
+  };
+}
+
 /**
  * Single source of truth for the default-coalescing applied to the task fields that the
  * insert and update paths normalize identically. Each normalizer reproduces the exact
@@ -294,8 +317,8 @@ export async function updateTaskPositions(taskPositions: UpdateTaskPositionPaylo
   }
 
   const client = requireSupabaseClient();
-  const { error } = await client.rpc('update_task_positions', {
-    task_positions: taskPositions.map(({ id, list_id, position }) => ({
+  const { error } = await client.rpc(taskPositionRpcName, {
+    [taskPositionRpcPayloadKey]: taskPositions.map(({ id, list_id, position }) => ({
       id,
       list_id,
       position,
@@ -303,6 +326,15 @@ export async function updateTaskPositions(taskPositions: UpdateTaskPositionPaylo
   });
 
   if (error) {
+    console.error('[tasks] Unable to persist drag and drop task positions.', {
+      rpc: taskPositionRpcName,
+      payloadKey: taskPositionRpcPayloadKey,
+      payloadSummary: summarizeTaskPositionPayload(taskPositions),
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+    });
     throw error;
   }
 }

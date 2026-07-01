@@ -56,6 +56,7 @@ export interface BoardTaskItem {
   category2?: string,
   image?: string,
   isDone?: boolean,
+  updatedAt?: string,
   labels: TaskLabel[],
   attachments: TaskAttachment[],
   checklistItems: TaskChecklistItem[]
