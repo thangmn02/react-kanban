@@ -30,6 +30,9 @@ import { createLocalId } from '../../../utils/idGenerator';
 import { formatFocusSessionDuration } from '../../../utils/timeFormatting';
 import { mapWorkspaceMembersToAssignees, mockWorkspaceMembers } from '../../../utils/workspaceMembers';
 import { Skeleton } from '../../atoms/skeleton';
+import TaskCoverPicker from '../../task/TaskCoverPicker';
+import { useI18n } from '../../../i18n';
+
 
 interface TaskDialogProps {
   isOpen: boolean;
@@ -102,6 +105,7 @@ function TaskDialog({
 }: TaskDialogProps) {
   const isEditMode = Boolean(taskData);
   const shouldReduceMotion = useReducedMotion();
+  const { t } = useI18n();
   const [showAssigneeSelect, setShowAssigneeSelect] = useState(false);
   const [labels, setLabels] = useState<TaskLabel[]>([]);
   const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
@@ -160,6 +164,27 @@ function TaskDialog({
     editorProps: {
       attributes: {
         class: 'min-h-[180px] px-4 py-3 text-sm text-gray-900 focus:outline-none',
+      },
+      handleDOMEvents: {
+        click: (_view, event) => {
+          if (!event.ctrlKey && !event.metaKey) {
+            return false;
+          }
+
+          if (!(event.target instanceof Element)) {
+            return false;
+          }
+
+          const link = event.target.closest('a[href]');
+
+          if (!(link instanceof HTMLAnchorElement) || !link.href) {
+            return false;
+          }
+
+          event.preventDefault();
+          window.open(link.href, '_blank', 'noopener,noreferrer');
+          return true;
+        },
       },
     },
     onUpdate: ({ editor: currentEditor }) => {
@@ -431,31 +456,26 @@ function TaskDialog({
                     </div>
 
                     <div className="overflow-hidden rounded-b-xl border border-gray-300 bg-white focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500">
-                      <EditorContent editor={editor} className="w-full" />
+                      <EditorContent
+                        editor={editor}
+                        className="w-full [&_.ProseMirror_a]:cursor-pointer [&_.ProseMirror_a]:text-blue-700 [&_.ProseMirror_a]:underline [&_.ProseMirror_a]:decoration-blue-400 [&_.ProseMirror_a]:underline-offset-4 [&_.ProseMirror_a]:transition-colors [&_.ProseMirror_a:hover]:bg-blue-50 [&_.ProseMirror_a:hover]:text-blue-900 [&_.ProseMirror_a:active]:text-blue-950"
+                      />
                     </div>
                   </div>
 
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold text-gray-700">
-                      Cover image URL
-                    </label>
-                    <input
-                      type="url"
-                      {...register('image')}
-                      placeholder="https://example.com/cover.jpg"
-                      className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-
-                    {imagePreview && (
-                      <div className="mt-3 overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
-                        <img
-                          src={imagePreview}
-                          alt="Task cover preview"
-                          className="h-44 w-full object-cover"
-                        />
-                      </div>
-                    )}
-                  </div>
+                  {isEditMode && taskData?.id && (
+                    <div>
+                      <label className="mb-2 block text-sm font-semibold text-gray-700">
+                        {t('cover.title')}
+                      </label>
+                      <TaskCoverPicker
+                        taskId={taskData.id}
+                        imageUrl={imagePreview || ''}
+                        workspaceId={workspaceId}
+                        onImageUrlChange={(url) => setValue('image', url, { shouldDirty: true })}
+                      />
+                    </div>
+                  )}
                 </section>
 
                 <section className="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">

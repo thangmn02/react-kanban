@@ -16,9 +16,9 @@ interface ThemeOption {
 }
 
 const THEMES: ThemeOption[] = [
-  {
+    {
     id: 'default',
-    label: { en: 'Default', vi: 'Mặc định' },
+    label: { en: 'Clean', vi: 'Cơ bản' },
     icon: '◈',
     description: { en: 'Original interface - bright and compact.', vi: 'Giao diện gốc - sáng, gọn.' },
   },
@@ -42,18 +42,20 @@ const THEMES: ThemeOption[] = [
   },
 ];
 
-const switcherText: Record<Language, { region: string; trigger: string; choose: string; fallback: string }> = {
+const switcherText: Record<Language, { region: string; trigger: string; choose: string; prefix: string; fallback: string }> = {
   en: {
     region: 'Home appearance',
     trigger: 'Change home appearance',
     choose: 'Choose appearance',
-    fallback: 'Default',
+    prefix: 'Appearance',
+    fallback: 'Clean',
   },
   vi: {
     region: 'Giao diện trang chủ',
     trigger: 'Đổi giao diện trang chủ',
     choose: 'Chọn giao diện',
-    fallback: 'Mặc định',
+    prefix: 'Giao diện',
+    fallback: 'Cơ bản',
   },
 };
 
@@ -77,7 +79,7 @@ export default function HomeAppearanceSwitcher({ current, onChange }: HomeAppear
         <span className="home-appearance-trigger-icon" aria-hidden="true">
           {selectedTheme?.icon ?? '◈'}
         </span>
-        <span>{selectedTheme?.label[language] ?? copy.fallback}</span>
+                        <span>{copy.prefix}: {selectedTheme?.label[language] ?? copy.fallback}</span>
         <span
           className={`home-appearance-chevron ${open ? 'is-open' : ''}`}
           aria-hidden="true"

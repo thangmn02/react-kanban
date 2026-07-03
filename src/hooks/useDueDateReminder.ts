@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { isPast, isToday, parseISO, startOfDay } from 'date-fns';
-import { toast } from 'react-toastify';
+import { notify } from '../components/organisms/toast/notify';
 
 import type { BoardData } from '../types/task.type';
 
@@ -35,9 +35,8 @@ export function useDueDateReminder(boardData: BoardData) {
     }
 
     window.localStorage.setItem(reminderStorageKey, todayKey);
-    toast.info(
-      `${todayTasks.length} due today · ${overdueTasks.length} overdue`,
-      { theme: 'colored' }
+    notify.info(
+      `${todayTasks.length} due today · ${overdueTasks.length} overdue`
     );
   }, [boardData.task]);
 }

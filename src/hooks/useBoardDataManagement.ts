@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
-import { toast } from 'react-toastify';
+import { notify } from '../components/organisms/toast/notify';
 
 import { data } from '../data';
 import type { AuthMode } from '../types/auth.type';
@@ -99,7 +99,7 @@ export function useBoardDataManagement({
       setBoardErrorMessage(message);
 
       if (showErrorToast) {
-        toast.error(message, { theme: 'colored' });
+        notify.error(message);
       }
     } finally {
       setIsBoardLoading(false);

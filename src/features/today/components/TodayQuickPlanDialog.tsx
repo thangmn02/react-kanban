@@ -21,7 +21,8 @@ interface TodayQuickPlanDialogProps {
   onToggleTodayFocus: (task: TodayTaskSummary) => void;
   onOpenTask: (task: TodayTaskSummary) => void;
   onStartFocus: (task: TodayTaskSummary) => void;
-  onQuickCreateTask: () => void;
+  /** Footer fallback action when no unfinished task is selected. */
+  onGoToBoard: () => void;
   onFinishRitual: () => void;
 }
 
@@ -37,7 +38,7 @@ export default function TodayQuickPlanDialog({
   onToggleTodayFocus,
   onOpenTask,
   onStartFocus,
-  onQuickCreateTask,
+  onGoToBoard,
   onFinishRitual,
 }: TodayQuickPlanDialogProps) {
   const { t } = useI18n();
@@ -78,41 +79,56 @@ export default function TodayQuickPlanDialog({
 
   if (!isOpen) return null;
 
+  const hasUnfinishedTask = focusTasks.some((task) => !task.isDone);
+
+  const modalFooter = (
+    <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <button
+        type="button"
+        onClick={onClose}
+        className="cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"
+      >
+        {t('dailyRitual.skipForNow')}
+      </button>
+      <button
+        type="button"
+        onClick={hasUnfinishedTask ? onFinishRitual : onGoToBoard}
+        className="cursor-pointer rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-sky-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-200 active:scale-[0.98]"
+      >
+        {hasUnfinishedTask ? t('today.startFocus') : t('dailyRitual.goToBoard')}
+      </button>
+    </div>
+  );
+
   return (
     <ContentDialog
       title={
-        <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.22em] text-sky-600">
-              {t('dailyRitual.frontDoor')}
-            </p>
-            <h3 className="mt-1 text-2xl font-semibold tracking-[-0.04em] text-slate-950">
-              {t('dailyRitual.title')}
-            </h3>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-fit rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"
-          >
-            {t('common.close')}
-          </button>
+        <header className="mb-5 flex flex-col gap-1">
+          <p className="text-[11px] font-black uppercase tracking-[0.22em] text-sky-600">
+            {t('dailyRitual.eyebrow')}
+          </p>
+          <h3 className="mt-1 text-2xl font-semibold tracking-[-0.04em] text-slate-950">
+            {t('dailyRitual.title')}
+          </h3>
+          <p className="mt-1 text-sm text-slate-500">
+            {t('dailyRitual.subtitle')}
+          </p>
         </header>
       }
       onClose={onClose}
       onSubmit={onFinishRitual}
       textButtonClose=""
       textButtonSubmit=""
-      className="w-full max-w-6xl rounded-[2rem] p-4 sm:p-6"
-      modalFooter={null}
+      className="w-full max-w-6xl rounded-[1.5rem] p-4 sm:p-6"
+      modalFooter={modalFooter}
     >
       {isLoading || !todayData ? (
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1.05fr)_minmax(330px,0.95fr)]">
-          <Skeleton className="h-[520px] w-full rounded-[2rem]" />
-          <Skeleton className="h-[520px] w-full rounded-[2rem]" />
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)]">
+          <Skeleton className="h-[520px] w-full rounded-2xl" />
+          <Skeleton className="h-[520px] w-full rounded-2xl" />
         </div>
       ) : error ? (
-        <div className="rounded-3xl border border-rose-200 bg-rose-50 px-5 py-12 text-center text-sm font-semibold text-rose-700">
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-12 text-center text-sm font-semibold text-rose-700">
           {error}
         </div>
       ) : (
@@ -125,8 +141,6 @@ export default function TodayQuickPlanDialog({
           onToggleTodayFocus={onToggleTodayFocus}
           onOpenTask={onOpenTask}
           onStartFocus={onStartFocus}
-          onQuickCreateTask={onQuickCreateTask}
-          onFinishRitual={onFinishRitual}
         />
       )}
     </ContentDialog>

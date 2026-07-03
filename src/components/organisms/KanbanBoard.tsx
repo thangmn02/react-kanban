@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
+import { memo, useCallback, useEffect, useMemo, useReducer, useState, type Dispatch, type SetStateAction } from 'react';
 import {
   closestCorners,
   type CollisionDetection,
@@ -23,6 +23,13 @@ import EmptyState from '../atoms/EmptyState';
 import type { BoardData, BoardDeleteItem, ITaskItem } from '../../types/task.type';
 import type { WorkspaceMember } from '../../types/auth.type';
 import { doesTaskMatchFilters } from '../../utils/taskFilters';
+import {
+  BOARD_BACKGROUND_UPDATED_EVENT,
+  getBoardBackground,
+  getBoardBackgroundStyle,
+  type BoardBackground,
+  type BoardBackgroundUpdateEventDetail,
+} from '../../utils/coverBackground';
 
 
 interface KanbanBoardFilters {
@@ -58,6 +65,7 @@ interface KanbanBoardProps {
   handlers: KanbanBoardHandlers;
   isFocusTask: (taskId: string) => boolean;
   workspaceMembers?: WorkspaceMember[];
+  activeBoardId?: string | null;
 }
 
 interface DragItemData {
@@ -98,6 +106,7 @@ function KanbanBoard({
   handlers,
   isFocusTask,
   workspaceMembers,
+  activeBoardId = null,
 }: KanbanBoardProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeType, setActiveType] = useState<'list' | 'task' | null>(null);
@@ -110,6 +119,34 @@ function KanbanBoard({
     })
   );
 
+  // Board background (local persistence — see utils/coverBackground.ts)
+  const [, refreshBackground] = useReducer((currentVersion: number) => currentVersion + 1, 0);
+
+  useEffect(() => {
+    if (!activeBoardId) {
+      return;
+    }
+
+    const handleBackgroundUpdate = (event: Event) => {
+      const { boardId } = (event as CustomEvent<BoardBackgroundUpdateEventDetail>).detail;
+
+      if (boardId === activeBoardId) {
+        refreshBackground();
+      }
+    };
+
+    window.addEventListener(BOARD_BACKGROUND_UPDATED_EVENT, handleBackgroundUpdate);
+
+    return () => {
+      window.removeEventListener(BOARD_BACKGROUND_UPDATED_EVENT, handleBackgroundUpdate);
+    };
+  }, [activeBoardId]);
+
+  const boardBackground: BoardBackground = activeBoardId
+    ? getBoardBackground(activeBoardId)
+    : { type: 'default', value: null };
+  const boardBackgroundValue = getBoardBackgroundStyle(boardBackground);
+  const boardBgStyle = boardBackgroundValue ? { background: boardBackgroundValue } : undefined;
   const collisionDetectionStrategy = useCallback<CollisionDetection>((collisionArgs) => {
     if (activeType === 'list') {
       const listDroppableContainers = collisionArgs.droppableContainers.filter((droppableContainer) => (
@@ -294,7 +331,7 @@ function KanbanBoard({
       onDragCancel={handleDragCancel}
       onDragEnd={handleDragEnd}
     >
-      <div className="bg-canvas p-6">
+      <div className="bg-canvas p-6" style={boardBgStyle}>
         {showNoResults && (
           <div className="mb-4">
             <EmptyState

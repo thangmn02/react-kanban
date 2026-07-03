@@ -4,6 +4,7 @@ import type { BoardRow } from '../../types/supabase.type';
 import type { WorkspaceMember } from '../../types/auth.type';
 import BoardTabs, { type BoardTabId } from './BoardTabs';
 import { useI18n } from '../../i18n';
+import BoardBackgroundPicker from './BoardBackgroundPicker';
 
 interface BoardHeaderProps {
   activeBoardId: string | null;
@@ -194,6 +195,15 @@ export default function BoardHeader({
                   )}
                   {hasTeamMembers ? t('board.members') : t('board.invitePeople')}
                 </button>
+
+                <div className="border-t border-slate-100 pt-2">
+                  <p className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                    {t('board.bg.title')}
+                  </p>
+                  {activeBoardId && (
+                    <BoardBackgroundPicker boardId={activeBoardId} />
+                  )}
+                </div>
 
                 <BoardTabs
                   activeTab={activeTab}

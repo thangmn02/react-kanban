@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { toast } from 'react-toastify';
+import { notify } from '../organisms/toast/notify';
 
 import { DEFAULT_BOARD_TEMPLATE_ID } from '../../data/boardTemplates';
 import type { OnboardingSetupValues } from '../../types/onboarding.type';
@@ -37,9 +37,7 @@ export default function OnboardingPage({
         templateId,
       });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Unable to finish onboarding.', {
-        theme: 'colored',
-      });
+      notify.error(error instanceof Error ? error.message : 'Unable to finish onboarding.');
     } finally {
       setIsSubmitting(false);
     }

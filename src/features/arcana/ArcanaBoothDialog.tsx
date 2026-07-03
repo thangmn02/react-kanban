@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { toast } from 'react-toastify';
+import { notify } from '../../components/organisms/toast/notify';
 
 import ArcanaHistoryDialog from './ArcanaHistoryDialog';
 import CardRevealStep from './components/CardRevealStep';
@@ -64,7 +64,7 @@ function ArcanaBoothDialog({ isOpen, onClose }: ArcanaBoothDialogProps) {
 
   const handleSave = () => {
     saveCurrentReading();
-    toast.success(t('arcana.saved'), { theme: 'colored' });
+    notify.success(t('arcana.saved'));
   };
 
   const handleCloseAndReset = () => {

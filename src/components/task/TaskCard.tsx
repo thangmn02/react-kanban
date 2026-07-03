@@ -1,4 +1,4 @@
-import type { Dispatch, SetStateAction } from 'react';
+import { useEffect, useReducer, type Dispatch, type SetStateAction } from 'react';
 
 import type { BoardDeleteItem, ITaskItem } from '../../types/task.type';
 import { getPriorityBadgeClass } from '../../utils/taskMetadata';
@@ -8,6 +8,11 @@ import {
   stripTaskHtml,
 } from '../../utils/taskCollections';
 import DueDateBadge from '../atoms/DueDateBadge';
+import {
+  TASK_COVER_UPDATED_EVENT,
+  resolveTaskCover,
+  type TaskCoverUpdateEventDetail,
+} from '../../utils/coverBackground';
 
 interface TaskCardProps {
   task: ITaskItem;
@@ -29,8 +34,27 @@ function TaskCard({
   className = '',
 }: TaskCardProps) {
   const priorityBadgeClass = getPriorityBadgeClass(task.priority);
+  const [, refreshCover] = useReducer((currentVersion: number) => currentVersion + 1, 0);
   const descriptionPreview = stripTaskHtml(task.description);
   const checklistProgress = getChecklistProgress(task.checklistItems || []);
+
+  useEffect(() => {
+    const handleCoverUpdate = (event: Event) => {
+      const { taskId } = (event as CustomEvent<TaskCoverUpdateEventDetail>).detail;
+
+      if (taskId === task.id) {
+        refreshCover();
+      }
+    };
+
+    window.addEventListener(TASK_COVER_UPDATED_EVENT, handleCoverUpdate);
+
+    return () => {
+      window.removeEventListener(TASK_COVER_UPDATED_EVENT, handleCoverUpdate);
+    };
+  }, [task.id]);
+
+  const taskCover = resolveTaskCover(task.id, task.image);
 
   return (
     <div
@@ -42,6 +66,23 @@ function TaskCard({
             : 'cursor-grab hover:shadow-md'
       } ${className}`}
     >
+          {taskCover.type !== 'none' && taskCover.imageUrl === null && (
+            <div
+              className={`-mx-4 -mt-4 mb-3 rounded-t-2xl ${taskCover.size === 'full' ? 'h-16' : 'h-8'}`}
+              style={{ backgroundColor: taskCover.color || undefined }}
+              aria-hidden="true"
+            />
+          )}
+          {taskCover.type === 'image' && taskCover.imageUrl && (
+            <div className={`-mx-4 -mt-4 mb-3 overflow-hidden rounded-t-2xl ${taskCover.size === 'full' ? 'h-36' : 'h-20'}`}>
+              <img
+                src={taskCover.imageUrl}
+                alt=""
+                className="h-full w-full object-cover"
+                draggable={false}
+              />
+            </div>
+          )}
       <div className="mb-2 flex items-start justify-between group">
         <div className="min-w-0 flex-1">
           {task.labels.length > 0 && (
@@ -95,13 +136,6 @@ function TaskCard({
         )}
       </div>
 
-      {task.image && (
-        <img
-          src={task.image}
-          alt={task.title}
-          className="mb-3 h-32 w-full rounded-lg object-cover"
-        />
-      )}
 
       <p className="mb-4 line-clamp-2 text-sm text-gray-600">
         {descriptionPreview}

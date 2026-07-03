@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { toast } from 'react-toastify';
+import { notify } from '../components/organisms/toast/notify';
 
 import { useI18n } from '../i18n';
 import type { BoardData, ITaskItem } from '../types/task.type';
@@ -59,7 +59,7 @@ export function useFocusTaskHandlers({
 
   const buildFocusTaskInput = useCallback((task: ITaskItem): FocusTaskInput | null => {
     if (!activeBoardId) {
-      toast.error(t('toast.boardNotReady'), { theme: 'colored' });
+      notify.error(t('toast.boardNotReady'));
       return null;
     }
 
@@ -83,7 +83,7 @@ export function useFocusTaskHandlers({
     const didToggle = toggleFocusTask(focusTaskInput);
 
     if (!didToggle) {
-      toast.info(t('focus.limit.message'), { theme: 'colored' });
+      notify.info(t('focus.limit.message'));
     }
   }, [buildFocusTaskInput, t, toggleFocusTask]);
 
@@ -98,7 +98,7 @@ export function useFocusTaskHandlers({
       const didPinTask = pinFocusTask(focusTaskInput);
 
       if (!didPinTask) {
-        toast.info(t('focus.limit.message'), { theme: 'colored' });
+        notify.info(t('focus.limit.message'));
         return;
       }
     }
@@ -141,7 +141,7 @@ export function useFocusTaskHandlers({
     });
 
     if (!didToggle) {
-      toast.info(t('focus.limit.message'), { theme: 'colored' });
+      notify.info(t('focus.limit.message'));
     }
   }, [boardData.task, getTaskListContext, t, toggleFocusTask]);
 
@@ -170,7 +170,7 @@ export function useFocusTaskHandlers({
       });
 
       if (!didPinTask) {
-        toast.info(t('focus.limit.message'), { theme: 'colored' });
+        notify.info(t('focus.limit.message'));
         return;
       }
     }
@@ -222,7 +222,7 @@ export function useFocusTaskHandlers({
     const didToggle = toggleFocusTask(buildFocusTaskInputFromTodayTask(taskSummary));
 
     if (!didToggle) {
-      toast.info(t('focus.limit.message'), { theme: 'colored' });
+      notify.info(t('focus.limit.message'));
     }
   }, [buildFocusTaskInputFromTodayTask, t, toggleFocusTask]);
 
@@ -231,7 +231,7 @@ export function useFocusTaskHandlers({
       const didPinTask = pinFocusTask(buildFocusTaskInputFromTodayTask(taskSummary));
 
       if (!didPinTask) {
-        toast.info(t('focus.limit.message'), { theme: 'colored' });
+        notify.info(t('focus.limit.message'));
         return;
       }
     }

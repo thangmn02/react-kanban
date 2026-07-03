@@ -21,7 +21,6 @@ import SectionCard from '../atoms/SectionCard';
 import EmptyState from '../atoms/EmptyState';
 import ErrorState from '../atoms/ErrorState';
 import DueDateBadge from '../atoms/DueDateBadge';
-import MyTasksSummary from '../home/MyTasksSummary';
 import { Skeleton, SkeletonCard } from '../atoms/skeleton';
 import { useI18n } from '../../i18n';
 import { useHomeAppearance } from '../../hooks/useHomeAppearance';
@@ -190,48 +189,42 @@ function HomeDashboard({
 
   const myTasks = dashboardData?.myTasks || [];
   const recentBoards = dashboardData?.recentBoards || [];
-  const heroTask = myTasks[0] ?? null;
-  const upNextTasks = heroTask ? myTasks.filter((task) => task.id !== heroTask.id).slice(0, 3) : myTasks.slice(0, 3);
   const weekGlance = getWeekGlance(myTasks);
   const hasWeekPlanningData = myTasks.length > 0;
-  const overdueTask = myTasks.find((task) => {
-    const dueOffset = getTaskDueOffset(task);
-    return dueOffset !== null && dueOffset < 0;
-  }) ?? null;
-  const focusedTask = myTasks.find((task) => isFocusTask(task.id)) ?? null;
-  const recommendedTask = overdueTask || focusedTask || heroTask;
-  const recommendedPriorityClass = recommendedTask ? getPriorityBadgeClass(recommendedTask.priority || undefined) : null;
-  const recommendedIsFocused = recommendedTask ? isFocusTask(recommendedTask.id) : false;
   const dueTodayCount = myTasks.filter((task) => getTaskDueOffset(task) === 0).length;
   const dueThisWeekCount = weekGlance.upcomingTasks.length;
   const firstBoardId = recentBoards[0]?.id;
-  const primaryCta = !recommendedTask
-    ? {
-        label: t('home.quickPlanCta'),
-        helper: t('home.quickPlanHelper'),
-        onClick: onOpenQuickPlan || onCreateTask || onCreateBoard,
-      }
-    : overdueTask
-      ? {
-          label: t('home.startOverdue'),
-          helper: t('home.startOverdueHelper'),
-          onClick: () => onOpenTask(recommendedTask.id, recommendedTask.boardId),
-        }
-      : recommendedIsFocused
-        ? {
-            label: t('home.continueFocus'),
-            helper: t('home.continueFocusHelper'),
-            onClick: onStartFocusTask ? () => onStartFocusTask(recommendedTask) : onOpenToday || (() => onOpenTask(recommendedTask.id, recommendedTask.boardId)),
-          }
-        : {
-            label: t('home.planToday'),
-            helper: t('home.planTodayHelper'),
-            onClick: onOpenToday || (() => onToggleFocusTask(recommendedTask)),
-          };
-  const fallbackBoardAction = firstBoardId ? () => onOpenBoard(firstBoardId) : onCreateBoard;
+  const openFirstBoard = firstBoardId ? () => onOpenBoard(firstBoardId) : onCreateBoard;
   const productSupportCopy = hasTeamMembers
     ? t('home.description.team')
     : t('home.description.solo');
+
+  // --- Hero state machine: Plan -> Today -> Focus -> Done ---
+  // The hero surfaces the single next step in the flow. Focus tasks are derived
+  // from this page's own data (assigned-to-me tasks also pinned to the Focus
+  // Dock) so the "Today's Focus" section never shows "0 / no tasks" while the
+  // momentum stats report focus tasks are selected.
+  const hasTasks = myTasks.length > 0;
+  const hasFocus = focusTaskCount > 0;
+  const focusTasksInMyList = myTasks.filter((task) => isFocusTask(task.id));
+  const heroFocusTask = focusTasksInMyList[0] ?? null;
+  const focusTasksElsewhere = hasFocus && focusTasksInMyList.length === 0;
+  const heroFocusPriorityClass = heroFocusTask
+    ? getPriorityBadgeClass(heroFocusTask.priority || undefined)
+    : null;
+
+  // Candidate tasks for the "choose focus" guiding empty state — top assigned
+  // tasks not yet pinned to focus (myTasks is already due-date sorted by the
+  // service).
+  const focusCandidates = myTasks
+    .filter((task) => !isFocusTask(task.id))
+    .slice(0, 5);
+
+  const heroMode: 'empty' | 'choose' | 'focus' = !hasTasks && !hasFocus
+    ? 'empty'
+    : !hasFocus
+      ? 'choose'
+      : 'focus';
 
   return (
     <div className="min-h-screen bg-canvas">
@@ -340,70 +333,76 @@ function HomeDashboard({
               </div>
             </section>
 
-            {recommendedTask ? (
-              <section
-                aria-labelledby="home-focus-now-title"
-                className="rounded-3xl border border-blue-200/70 bg-blue-50/50 p-6 sm:p-7"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-blue-600" aria-hidden="true" />
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-blue-700">
-                    {t('home.recommended')}
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => onOpenTask(recommendedTask.id, recommendedTask.boardId)}
-                  className="mt-2 block w-full cursor-pointer rounded-2xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
-                >
-                  <h2
-                    id="home-focus-now-title"
-                    className="truncate text-2xl font-semibold tracking-[-0.03em] text-slate-950 sm:text-3xl"
-                  >
-                    {recommendedTask.title}
-                  </h2>
-                </button>
-
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  {recommendedTask.priority && recommendedPriorityClass && (
-                    <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase ${recommendedPriorityClass}`}>
-                      {recommendedTask.priority}
-                    </span>
-                  )}
-                  <DueDateBadge dueDate={recommendedTask.dueDate || undefined} />
-                  <span className="rounded-full bg-white px-2.5 py-0.5 text-[11px] font-semibold text-slate-600">
-                    {recommendedTask.boardTitle}
-                  </span>
-                </div>
-
-                <p className="mt-3 max-w-md text-sm leading-6 text-slate-600">
-                  {primaryCta.helper}
+            {heroMode === 'empty' && (
+              <section className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-card sm:p-7">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-blue-700">
+                  {t('home.startHere')}
                 </p>
-
+                <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+                  {t('home.emptyTitle')}
+                </h2>
+                <p className="mt-2 max-w-md text-sm leading-6 text-slate-600">
+                  {t('home.emptyDescription')}
+                </p>
                 <div className="mt-5 flex flex-wrap items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={primaryCta.onClick}
-                    className="inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-200"
-                  >
-                    <svg className="h-4 w-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-                    </svg>
-                    {primaryCta.label}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onToggleFocusTask(recommendedTask)}
-                    aria-pressed={recommendedIsFocused}
-                    className={`inline-flex cursor-pointer items-center rounded-2xl border px-4 py-3 text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 ${
-                      recommendedIsFocused
-                        ? 'border-sky-200 bg-sky-50 text-sky-700'
-                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    {recommendedIsFocused ? t('home.readyToFocus') : t('home.addToFocus')}
-                  </button>
+                  {onOpenQuickPlan && (
+                    <button
+                      type="button"
+                      onClick={onOpenQuickPlan}
+                      className="inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-200"
+                    >
+                      <svg className="h-4 w-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                      </svg>
+                      {t('home.quickPlanCta')}
+                    </button>
+                  )}
+                  {onCreateTask && (
+                    <button
+                      type="button"
+                      onClick={onCreateTask}
+                      className="inline-flex cursor-pointer items-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-slate-100"
+                    >
+                      {t('home.createSingleTask')}
+                    </button>
+                  )}
+                  {openFirstBoard && (
+                    <button
+                      type="button"
+                      onClick={openFirstBoard}
+                      className="inline-flex cursor-pointer items-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-slate-100"
+                    >
+                      {t('home.openBoard')}
+                    </button>
+                  )}
+                </div>
+              </section>
+            )}
+
+            {heroMode === 'choose' && (
+              <section className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-card sm:p-7">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-blue-700">
+                  {t('home.chooseFocus')}
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+                  {t('home.chooseFocusTitle')}
+                </h2>
+                <p className="mt-2 max-w-md text-sm leading-6 text-slate-600">
+                  {t('home.chooseFocusHelper', { count: myTasks.length })}
+                </p>
+                <div className="mt-5 flex flex-wrap items-center gap-3">
+                  {onOpenToday && (
+                    <button
+                      type="button"
+                      onClick={onOpenToday}
+                      className="inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-200"
+                    >
+                      <svg className="h-4 w-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                      </svg>
+                      {t('home.openToday')}
+                    </button>
+                  )}
                   {onOpenQuickPlan && (
                     <button
                       type="button"
@@ -413,46 +412,111 @@ function HomeDashboard({
                       {t('home.quickPlan')}
                     </button>
                   )}
-                </div>
-              </section>
-            ) : (
-              <section className="rounded-3xl border border-slate-200/80 bg-white p-6 sm:p-7">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-blue-700">{t('home.startHere')}</p>
-                <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
-                  {t('home.emptyTitle')}
-                </h2>
-                <p className="mt-2 max-w-md text-sm leading-6 text-slate-600">
-                  {t('home.emptyDescription')}
-                </p>
-                <div className="mt-5 flex flex-wrap items-center gap-3">
-                  {primaryCta.onClick && (
+                  {openFirstBoard && (
                     <button
                       type="button"
-                      onClick={primaryCta.onClick}
-                      className="inline-flex cursor-pointer items-center rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-200"
-                    >
-                      {primaryCta.label}
-                    </button>
-                  )}
-                  {onCreateTask && (
-                    <button
-                      type="button"
-                      onClick={onCreateTask}
+                      onClick={openFirstBoard}
                       className="inline-flex cursor-pointer items-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-slate-100"
                     >
-                    {t('home.createSingleTask')}
-                    </button>
-                  )}
-                  {fallbackBoardAction && !onCreateTask && (
-                    <button
-                      type="button"
-                      onClick={fallbackBoardAction}
-                      className="inline-flex cursor-pointer items-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-slate-100"
-                    >
-                    {t('home.openBoard')}
+                      {t('home.openBoard')}
                     </button>
                   )}
                 </div>
+              </section>
+            )}
+            {heroMode === 'focus' && (
+              <section
+                aria-labelledby="home-focus-now-title"
+                className="rounded-3xl border border-blue-200/70 bg-blue-50/50 p-6 sm:p-7"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-blue-600" aria-hidden="true" />
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-blue-700">
+                    {t('home.focusNow')}
+                  </p>
+                </div>
+
+                {heroFocusTask ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => onOpenTask(heroFocusTask.id, heroFocusTask.boardId)}
+                      className="mt-2 block w-full cursor-pointer rounded-2xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                    >
+                      <h2
+                        id="home-focus-now-title"
+                        className="truncate text-2xl font-semibold tracking-[-0.03em] text-slate-950 sm:text-3xl"
+                      >
+                        {heroFocusTask.title}
+                      </h2>
+                    </button>
+
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      {heroFocusTask.priority && heroFocusPriorityClass && (
+                        <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase ${heroFocusPriorityClass}`}>
+                          {heroFocusTask.priority}
+                        </span>
+                      )}
+                      <DueDateBadge dueDate={heroFocusTask.dueDate || undefined} />
+                      <span className="rounded-full bg-white px-2.5 py-0.5 text-[11px] font-semibold text-slate-600">
+                        {heroFocusTask.boardTitle}
+                      </span>
+                    </div>
+
+                    <p className="mt-3 max-w-md text-sm leading-6 text-slate-600">
+                      {t('home.focusNowHelper')}
+                    </p>
+
+                    <div className="mt-5 flex flex-wrap items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={onStartFocusTask ? () => onStartFocusTask(heroFocusTask) : onOpenToday || (() => onOpenTask(heroFocusTask.id, heroFocusTask.boardId))}
+                        className="inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-200"
+                      >
+                        <svg className="h-4 w-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        {t('home.startFocus')}
+                      </button>
+                      {onOpenToday && (
+                        <button
+                          type="button"
+                          onClick={onOpenToday}
+                          className="inline-flex cursor-pointer items-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-slate-100"
+                        >
+                          {t('home.openToday')}
+                        </button>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <h2
+                      id="home-focus-now-title"
+                      className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950"
+                    >
+                      {t('home.focusElsewhereTitle')}
+                    </h2>
+                    <p className="mt-2 max-w-md text-sm leading-6 text-slate-600">
+                      {t('home.focusElsewhereDescription', { count: focusTaskCount })}
+                    </p>
+                    <div className="mt-5 flex flex-wrap items-center gap-3">
+                      {onOpenToday && (
+                        <button
+                          type="button"
+                          onClick={onOpenToday}
+                          className="inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-200"
+                        >
+                          <svg className="h-4 w-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                          </svg>
+                          {t('home.openToday')}
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
               </section>
             )}
 
@@ -460,32 +524,20 @@ function HomeDashboard({
             <SectionCard>
               <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
                 <div>
-                  <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-slate-600">Up next</h2>
-                  <p className="mt-1 text-sm text-slate-500">Only the next few tasks, sorted by due date.</p>
+                  <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-slate-600">
+                    {t('home.focusSectionTitle')}
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-500">{t('home.focusSectionHelper')}</p>
                 </div>
                 <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-                  {myTasks.length} total
+                  {t('home.focusSelectedCount', { count: focusTaskCount, max: 3 })}
                 </span>
               </div>
 
-              <div className="border-b border-slate-100 px-5 py-3">
-                <MyTasksSummary tasks={myTasks} />
-              </div>
-
               <div className="divide-y divide-slate-100">
-                {myTasks.length === 0 ? (
-                  <div className="p-5">
-                    <EmptyState
-                      title="No assigned tasks"
-                      description="Tasks assigned to you across this workspace will show up here."
-                      compact
-                    />
-                  </div>
-                ) : (
-                  upNextTasks.map((task) => {
+                {focusTasksInMyList.length > 0 ? (
+                  focusTasksInMyList.map((task) => {
                     const priorityClassName = getPriorityBadgeClass(task.priority || undefined);
-
-                    const isFocused = isFocusTask(task.id);
 
                     return (
                       <div
@@ -499,7 +551,7 @@ function HomeDashboard({
                             onOpenTask(task.id, task.boardId);
                           }
                         }}
-                        className="grid w-full gap-3 px-5 py-4 text-left transition-[background,transform] duration-200 hover:bg-slate-50/90 active:scale-[0.995] md:grid-cols-[minmax(0,1fr)_auto_auto_auto] focus:outline-none focus:ring-2 focus:ring-sky-300"
+                        className="grid w-full gap-3 px-5 py-4 text-left transition-[background,transform] duration-200 hover:bg-slate-50/90 active:scale-[0.995] md:grid-cols-[minmax(0,1fr)_auto_auto] focus:outline-none focus:ring-2 focus:ring-sky-300"
                       >
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-slate-900">{task.title}</p>
@@ -513,73 +565,199 @@ function HomeDashboard({
                             </span>
                           ) : (
                             <span className="rounded-full border border-dashed border-slate-200 px-2.5 py-0.5 text-[11px] text-slate-400">
-                              No priority
+                              {t('home.noPriority')}
                             </span>
                           )}
                         </div>
 
-                        <div className="flex items-center justify-start md:justify-end">
+                        <div className="flex items-center justify-start gap-2 md:justify-end">
                           <DueDateBadge dueDate={task.dueDate || undefined} />
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onToggleFocusTask(task);
+                            }}
+                            className="cursor-pointer rounded-2xl border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700 transition hover:bg-sky-100 focus:outline-none focus:ring-2 focus:ring-sky-300"
+                            aria-pressed={true}
+                            aria-label={`${t('home.removeFromFocus')}: ${task.title}`}
+                          >
+                            {FOCUS_BUTTON_LABELS.ACTIVE}
+                          </button>
                         </div>
-
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            onToggleFocusTask(task);
-                          }}
-                          className={`cursor-pointer rounded-2xl border px-3 py-1.5 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-sky-300 ${
-                            isFocused
-                              ? 'border-sky-200 bg-sky-50 text-sky-700'
-                              : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
-                          }`}
-                          aria-pressed={isFocused}
-                          aria-label={`${isFocused ? 'Remove from' : 'Add to'} Focus Dock: ${task.title}`}
-                        >
-                          {isFocused ? FOCUS_BUTTON_LABELS.ACTIVE : FOCUS_BUTTON_LABELS.INACTIVE}
-                        </button>
                       </div>
                     );
                   })
+                ) : focusTasksElsewhere ? (
+                  <div className="p-5">
+                    <EmptyState
+                      title={t('home.focusElsewhereTitle')}
+                      description={t('home.focusElsewhereDescription', { count: focusTaskCount })}
+                      compact
+                      action={onOpenToday ? (
+                        <button
+                          type="button"
+                          onClick={onOpenToday}
+                          className="inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-200"
+                        >
+                          {t('home.openToday')}
+                        </button>
+                      ) : undefined}
+                    />
+                  </div>
+                ) : hasTasks ? (                  <>
+                    <div className="p-5">
+                      <EmptyState
+                        title={t('home.focusEmptyTitle')}
+                        description={t('home.focusEmptyDescription')}
+                        compact
+                      />
+                    </div>
+                    {focusCandidates.length > 0 && (
+                      <div className="border-t border-slate-100 px-5 py-4">
+                        <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+                          {t('home.focusCandidatesLabel')}
+                        </p>
+                        <div className="divide-y divide-slate-100">
+                          {focusCandidates.map((task) => {
+                            const priorityClassName = getPriorityBadgeClass(task.priority || undefined);
+
+                            return (
+                              <div
+                                key={task.id}
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => onOpenTask(task.id, task.boardId)}
+                                onKeyDown={(event) => {
+                                  if (event.key === 'Enter' || event.key === ' ') {
+                                    event.preventDefault();
+                                    onOpenTask(task.id, task.boardId);
+                                  }
+                                }}
+                                className="grid w-full gap-3 py-3 text-left transition-colors hover:bg-slate-50/90 md:grid-cols-[minmax(0,1fr)_auto_auto] focus:outline-none focus:ring-2 focus:ring-sky-300"
+                              >
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm font-semibold text-slate-800">{task.title}</p>
+                                  <p className="mt-0.5 truncate text-xs text-slate-500">{task.boardTitle}</p>
+                                </div>
+                                <div className="flex items-center">
+                                  {task.priority && priorityClassName ? (
+                                    <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase ${priorityClassName}`}>
+                                      {task.priority}
+                                    </span>
+                                  ) : (
+                                    <span className="rounded-full border border-dashed border-slate-200 px-2.5 py-0.5 text-[11px] text-slate-400">
+                                      {t('home.noPriority')}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center justify-end">
+                                  <button
+                                    type="button"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      onToggleFocusTask(task);
+                                    }}
+                                    className="cursor-pointer rounded-2xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-300"
+                                    aria-pressed={false}
+                                    aria-label={`${t('home.addToFocus')}: ${task.title}`}
+                                  >
+                                    {FOCUS_BUTTON_LABELS.INACTIVE}
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="p-5">
+                    <EmptyState
+                      title={t('home.noTasksTitle')}
+                      description={t('home.noTasksDescription')}
+                      compact
+                      action={onOpenQuickPlan ? (
+                        <button
+                          type="button"
+                          onClick={onOpenQuickPlan}
+                          className="inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-200"
+                        >
+                          {t('home.quickPlanCta')}
+                        </button>
+                      ) : undefined}
+                    />
+                  </div>
                 )}
               </div>
             </SectionCard>
 
             <div className="space-y-6">
-              {recentBoards.length > 0 && (
               <SectionCard>
                 <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
                   <div>
-                    <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-slate-600">Continue planning</h2>
-                    <p className="mt-1 text-sm text-slate-500">Recent boards, kept secondary to today's work.</p>
+                    <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-slate-600">
+                      {t('home.continuePlanning')}
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-500">{t('home.continuePlanningHelper')}</p>
                   </div>
                 </div>
 
-                <div className="grid gap-2 p-4">
-                  {recentBoards.slice(0, 4).map((board) => (
-                    <button
-                      key={board.id}
-                      type="button"
-                      onClick={() => onOpenBoard(board.id)}
-                      className="cursor-pointer rounded-2xl border border-slate-200/80 bg-white px-4 py-3 text-left transition-colors hover:border-sky-200 hover:bg-sky-50/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
-                      aria-label={`Open board: ${board.title}`}
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-slate-900">{board.title}</p>
-                          <p className="mt-1 truncate text-xs text-slate-500">
-                            {board.updatedAt ? `Updated ${format(parseISO(board.updatedAt), 'MMM d')}` : 'No recent activity'}
-                          </p>
+                {recentBoards.length > 0 ? (
+                  <div className="grid gap-2 p-4">
+                    {recentBoards.slice(0, 4).map((board) => (
+                      <button
+                        key={board.id}
+                        type="button"
+                        onClick={() => onOpenBoard(board.id)}
+                        className="group cursor-pointer rounded-2xl border border-slate-200/80 bg-white px-4 py-3 text-left transition-colors hover:border-sky-200 hover:bg-sky-50/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                        aria-label={`Open board: ${board.title}`}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-slate-900">{board.title}</p>
+                            <p className="mt-1 truncate text-xs text-slate-500">
+                              {board.updatedAt ? t('home.updatedOn', { date: format(parseISO(board.updatedAt), 'MMM d') }) : t('home.noRecentActivity')}
+                            </p>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-2">
+                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                              {t('home.taskCount', { count: board.taskCount })}
+                            </span>
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-400 transition-colors group-hover:text-sky-600">
+                              {t('home.openBoard')}
+                              <svg className="h-3.5 w-3.5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                              </svg>
+                            </span>
+                          </div>
                         </div>
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
-                          {board.taskCount} tasks
-                        </span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-5">
+                    <EmptyState
+                      title={t('home.noBoardsTitle')}
+                      description={t('home.noBoardsDescription')}
+                      compact
+                      action={onCreateBoard ? (
+                        <button
+                          type="button"
+                          onClick={onCreateBoard}
+                          className="inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-slate-100"
+                        >
+                          <svg className="h-4 w-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                          </svg>
+                          {t('home.createBoard')}
+                        </button>
+                      ) : undefined}
+                    />
+                  </div>
+                )}
               </SectionCard>
-              )}
 
               {hasWeekPlanningData && (
               <SectionCard className="p-4">
@@ -652,9 +830,11 @@ function HomeDashboard({
             </div>
           </div>
           </div>
-        )}
+                )}
       </main>
-      <HomeAppearanceSwitcher current={appearance} onChange={setAppearance} />
+      {import.meta.env.DEV && (
+        <HomeAppearanceSwitcher current={appearance} onChange={setAppearance} />
+      )}
     </div>
   );
 }

@@ -23,8 +23,14 @@ const TASK_LABEL_CLASS_MAP: Record<TaskLabelColor, string> = {
   violet: 'bg-violet-100 text-violet-700 border border-violet-200',
 };
 
+export function normalizeTaskLabelColor(color: unknown): TaskLabelColor {
+  return TASK_LABEL_COLOR_OPTIONS.includes(color as TaskLabelColor)
+    ? color as TaskLabelColor
+    : 'sky';
+}
+
 export function getTaskLabelClass(color: TaskLabelColor) {
-  return TASK_LABEL_CLASS_MAP[color] || TASK_LABEL_CLASS_MAP.slate;
+  return TASK_LABEL_CLASS_MAP[normalizeTaskLabelColor(color)] || TASK_LABEL_CLASS_MAP.sky;
 }
 
 export function stripTaskHtml(html: string) {

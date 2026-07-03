@@ -10,7 +10,7 @@ import type {
   TaskRow,
   TaskUpdate,
 } from '../types/supabase.type';
-import { normalizeTaskAssignees, normalizeTaskAttachments } from './taskCollections';
+import { normalizeTaskAssignees, normalizeTaskAttachments, normalizeTaskLabelColor } from './taskCollections';
 import { DEFAULT_TASK_CATEGORIES, DEFAULT_TASK_PRIORITY, TASK_PRIORITIES } from '../constants';
 
 interface BuildTaskInsertParams {
@@ -143,7 +143,7 @@ function buildLabelsMap(taskLabelRows: TaskLabelRow[]): Map<string, BoardTaskIte
     labelsById.set(taskLabelRow.id, {
       id: taskLabelRow.id,
       name: taskLabelRow.name,
-      color: taskLabelRow.color as BoardTaskItem['labels'][number]['color'],
+      color: normalizeTaskLabelColor(taskLabelRow.color),
     });
   });
 

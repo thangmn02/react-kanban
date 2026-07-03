@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
-import { toast } from 'react-toastify';
+import { notify } from '../components/organisms/toast/notify';
 
 import { LIST_POSITION_STEP } from '../constants';
 import { useI18n } from '../i18n';
@@ -161,7 +161,7 @@ export function useTaskOperations({
     const targetList = boardData.list[formData.targetListId];
 
     if (!targetList) {
-      toast.error(t('toast.chooseValidTargetList'), { theme: 'colored' });
+      notify.error(t('toast.chooseValidTargetList'));
       return;
     }
 
@@ -180,7 +180,7 @@ export function useTaskOperations({
     });
 
     if (plannedTasks.length === 0) {
-      toast.info(t('toast.addTaskTitleBeforeCreate'), { theme: 'colored' });
+      notify.info(t('toast.addTaskTitleBeforeCreate'));
       return;
     }
 
@@ -234,25 +234,24 @@ export function useTaskOperations({
       await refreshBoardData();
 
       if (failureCount > 0) {
-        toast.warning(
+        notify.warning(
           t('toast.quickPlanPartial', {
             success: successCount,
             successPlural: successCount === 1 ? '' : 's',
             failure: failureCount,
             message: firstErrorMessage,
           }),
-          { theme: 'colored' },
         );
         return;
       }
 
-      toast.success(t('toast.quickPlanCreated', {
+      notify.success(t('toast.quickPlanCreated', {
         count: successCount,
         plural: successCount === 1 ? '' : 's',
-      }), { theme: 'colored' });
+      }));
     } catch (error) {
       const message = error instanceof Error ? error.message : t('toast.unableFinishQuickPlan');
-      toast.error(message, { theme: 'colored' });
+      notify.error(message);
     } finally {
       setIsSavingBoard(false);
     }
@@ -297,11 +296,11 @@ export function useTaskOperations({
 
       await refreshBoardData();
       closeTaskDialog();
-      toast.success(t('toast.cardAdded'), { theme: 'colored' });
+      notify.success(t('toast.cardAdded'));
     } catch (error) {
       const message = error instanceof Error ? error.message : t('toast.unableAddTask');
 
-      toast.error(message, { theme: 'colored' });
+      notify.error(message);
     } finally {
       setIsSavingBoard(false);
     }
@@ -377,11 +376,11 @@ export function useTaskOperations({
 
       await refreshBoardData();
       closeTaskDialog();
-      toast.success(t('toast.taskUpdated'), { theme: 'colored' });
+      notify.success(t('toast.taskUpdated'));
     } catch (error) {
       const message = error instanceof Error ? error.message : t('toast.unableUpdateTask');
 
-      toast.error(message, { theme: 'colored' });
+      notify.error(message);
     } finally {
       setIsSavingBoard(false);
     }
@@ -391,10 +390,10 @@ export function useTaskOperations({
     try {
       await restoreTask(taskId);
       await refreshBoardData();
-      toast.success(t('toast.taskRestored'), { theme: 'colored' });
+      notify.success(t('toast.taskRestored'));
     } catch (error) {
       const message = error instanceof Error ? error.message : t('toast.unableRestoreTask');
-      toast.error(message, { theme: 'colored' });
+      notify.error(message);
     }
   };
 
@@ -490,7 +489,7 @@ export function useTaskOperations({
       await refreshBoardData();
 
       if (itemToDelete.type === 'list') {
-        toast.success(t('toast.listDeleted'), { theme: 'colored' });
+        notify.success(t('toast.listDeleted'));
       } else if (itemToDelete.cardId) {
         const deletedCardId = itemToDelete.cardId;
         showUndoToast(t('toast.taskDeleted'), () => {
@@ -503,7 +502,7 @@ export function useTaskOperations({
       syncBoardCache(activeBoardId, previousBoardData);
 
       const message = error instanceof Error ? error.message : t('toast.unableDeleteItem', { type: itemToDelete.type });
-      toast.error(message, { theme: 'colored' });
+      notify.error(message);
     } finally {
       setIsSavingBoard(false);
     }
@@ -552,7 +551,7 @@ export function useTaskOperations({
       syncBoardCache(activeBoardId, previousBoardData);
 
       const message = error instanceof Error ? error.message : t('toast.unableSaveDragDrop');
-      toast.error(message, { theme: 'colored' });
+      notify.error(message);
     }
   };
 
@@ -631,7 +630,7 @@ export function useTaskOperations({
       setBoardData(previousBoardData);
       syncBoardCache(activeBoardId, previousBoardData);
       const message = error instanceof Error ? error.message : t('toast.unableUpdateTask');
-      toast.error(message, { theme: 'colored' });
+      notify.error(message);
     }
   };
 

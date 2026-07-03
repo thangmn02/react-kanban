@@ -6,6 +6,7 @@ import type {
   TaskLabelLinkRow,
   TaskLabelRow,
 } from '../types/supabase.type';
+import { normalizeTaskLabelColor } from '../utils/taskCollections';
 
 function isMissingLabelTableError(error: unknown) {
   return typeof error === 'object'
@@ -37,6 +38,7 @@ function normalizeLabels(labels: BoardTaskItem['labels']): BoardTaskItem['labels
     collectedLabels.push({
       ...label,
       name: normalizedName,
+      color: normalizeTaskLabelColor(label.color),
     });
 
     return collectedLabels;
@@ -125,6 +127,29 @@ export async function replaceTaskLabels(
       }
 
       throw upsertError;
+    }
+
+    const labelColorUpdates = uniqueLabels.map((label) => (
+      client
+        .from('task_labels')
+        .update({
+          color: label.color,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('board_id', boardId)
+        .eq('name', label.name)
+    ));
+
+    const labelColorUpdateResults = await Promise.all(labelColorUpdates);
+    const labelColorUpdateError = labelColorUpdateResults.find((result) => Boolean(result.error))?.error;
+
+    if (labelColorUpdateError) {
+      if (isMissingLabelTableError(labelColorUpdateError)) {
+        console.warn('[LabelService] Label tables are missing. Label color changes were skipped.');
+        return;
+      }
+
+      throw labelColorUpdateError;
     }
   }
 

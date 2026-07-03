@@ -1,57 +1,77 @@
 import { useMemo } from 'react';
 import type { TodayPageData, TodayTaskSummary } from '../../../services/today.service';
 
-
+/**
+ * Smart suggestions for the Plan Today modal.
+ *
+ * Rules (Plan Today spec):
+ *  - Only existing, UNFINISHED tasks are suggested (completed tasks excluded).
+ *  - Tasks already selected for today are excluded.
+ *  - Ranking priority (highest first):
+ *      a. overdue
+ *      b. due today
+ *      c. high priority (High > Medium > Low > Lowest)
+ *      d. recently updated
+ *  - Ties break by title for a stable, deterministic order.
+ */
 export function useTodaySuggestions(
   todayData: TodayPageData,
   selectedTaskIds: Set<string>,
-  maxSuggestions = 5
+  maxSuggestions = 5,
 ) {
   return useMemo(() => {
     const allTasks = new Map<string, TodayTaskSummary>();
-    
+
     const addTasks = (tasks: TodayTaskSummary[]) => {
       tasks.forEach((task) => {
         if (!allTasks.has(task.id)) {
-          // Store the task along with an initial score based on its source array order and weight offset
           allTasks.set(task.id, task);
         }
       });
     };
 
-    // Rank 1: Overdue
+    // Build the candidate pool from every source the Today page already loads.
     addTasks(todayData.overdueTasks);
-    // Rank 2: Due Today
     addTasks(todayData.dueTodayTasks);
-    // Rank 3: High priority (will be checked below)
-    // Rank 4: Assigned tasks
     addTasks(todayData.assignedTasks);
-    // Rank 5: Recently active
     addTasks(todayData.recentlyActiveTasks);
+
+    // Pre-comcompute membership sets once (avoids O(n^2) `.some()` scans).
+    const overdueIds = new Set(todayData.overdueTasks.map((task) => task.id));
+    const dueTodayIds = new Set(todayData.dueTodayTasks.map((task) => task.id));
+    const recentlyActiveIds = new Set(todayData.recentlyActiveTasks.map((task) => task.id));
+
+    const priorityWeight = (priority: TodayTaskSummary['priority']): number => {
+      switch (priority) {
+        case 'High':
+          return 500;
+        case 'Medium':
+          return 300;
+        case 'Low':
+          return 150;
+        case 'Lowest':
+          return 80;
+        default:
+          return 0;
+      }
+    };
 
     const scoredTasks = Array.from(allTasks.values())
       .filter((task) => !task.isDone && !selectedTaskIds.has(task.id))
       .map((task) => {
         let score = 0;
-        
-        // 1. Overdue
-        if (todayData.overdueTasks.some(t => t.id === task.id)) score += 1000;
-        // 2. Due today
-        if (todayData.dueTodayTasks.some(t => t.id === task.id)) score += 800;
-        // 3. High priority
-        if (task.priority === 'High') score += 500;
-        if (task.priority === 'Medium') score += 300;
-        // 4. Assigned to me
-        if (todayData.assignedTasks.some(t => t.id === task.id)) score += 200;
-        // 5. Recently active
-        if (todayData.recentlyActiveTasks.some(t => t.id === task.id)) score += 100;
+        if (overdueIds.has(task.id)) score += 1000;
+        if (dueTodayIds.has(task.id)) score += 800;
+        score += priorityWeight(task.priority);
+        if (recentlyActiveIds.has(task.id)) score += 100;
 
         return { task, score };
       });
 
-    // Sort by score descending
-    scoredTasks.sort((a, b) => b.score - a.score);
+    scoredTasks.sort(
+      (current, next) => next.score - current.score || current.task.title.localeCompare(next.task.title),
+    );
 
-    return scoredTasks.slice(0, maxSuggestions).map(item => item.task);
+    return scoredTasks.slice(0, maxSuggestions).map((item) => item.task);
   }, [todayData, selectedTaskIds, maxSuggestions]);
 }

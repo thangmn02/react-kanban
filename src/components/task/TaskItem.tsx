@@ -1,4 +1,4 @@
-import { memo, useState, type Dispatch, type SetStateAction } from 'react';
+import { memo, useEffect, useReducer, useState, type Dispatch, type SetStateAction } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
@@ -15,6 +15,11 @@ import {
 } from '../../utils/taskCollections';
 import DueDateBadge from '../atoms/DueDateBadge';
 import { useI18n } from '../../i18n';
+import {
+  TASK_COVER_UPDATED_EVENT,
+  resolveTaskCover,
+  type TaskCoverUpdateEventDetail,
+} from '../../utils/coverBackground';
 
 interface TaskItemProps {
   task: ITaskItem;
@@ -41,7 +46,26 @@ function TaskItem({
 }: TaskItemProps) {
   const [showPriorityMenu, setShowPriorityMenu] = useState(false);
   const [showAssigneeMenu, setShowAssigneeMenu] = useState(false);
+  const [, refreshCover] = useReducer((currentVersion: number) => currentVersion + 1, 0);
   const { t } = useI18n();
+
+  useEffect(() => {
+    const handleCoverUpdate = (event: Event) => {
+      const { taskId } = (event as CustomEvent<TaskCoverUpdateEventDetail>).detail;
+
+      if (taskId === task.id) {
+        refreshCover();
+      }
+    };
+
+    window.addEventListener(TASK_COVER_UPDATED_EVENT, handleCoverUpdate);
+
+    return () => {
+      window.removeEventListener(TASK_COVER_UPDATED_EVENT, handleCoverUpdate);
+    };
+  }, [task.id]);
+
+  const taskCover = resolveTaskCover(task.id, task.image);
 
   const {
     attributes,
@@ -110,6 +134,23 @@ function TaskItem({
               : 'cursor-pointer hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-md active:scale-[0.99] active:cursor-grabbing'
           }`}
         >
+          {taskCover.type !== 'none' && taskCover.imageUrl === null && (
+            <div
+              className={`-mx-4 -mt-4 mb-3 rounded-t-2xl ${taskCover.size === 'full' ? 'h-16' : 'h-8'}`}
+              style={{ backgroundColor: taskCover.color || undefined }}
+              aria-hidden="true"
+            />
+          )}
+          {taskCover.type === 'image' && taskCover.imageUrl && (
+            <div className={`-mx-4 -mt-4 mb-3 overflow-hidden rounded-t-2xl ${taskCover.size === 'full' ? 'h-36' : 'h-20'}`}>
+              <img
+                src={taskCover.imageUrl}
+                alt=""
+                className="h-full w-full object-cover"
+                draggable={false}
+              />
+            </div>
+          )}
           <div className="mb-2 space-y-2">
             <div className="min-w-0">
               {task.labels.length > 0 && (
@@ -265,17 +306,6 @@ function TaskItem({
             </p>
           )}
 
-          {/* Task Optional Image */}
-          {task.image && (
-            <div className="mb-3 max-h-24 w-full overflow-hidden rounded-xl bg-slate-100 shadow-inner">
-              <img
-                src={task.image}
-                alt={task.title}
-                className="w-full object-cover"
-                draggable={false}
-              />
-            </div>
-          )}
 
           {/* Due Date Status Row */}
           {shouldShowDueDate && (
