@@ -23,20 +23,18 @@ enabled = true
 enabled = true
 port = 54323
 
-[inbucket]
+[local_smtp]
 enabled = true
 port = 54324
 
 [storage]
 enabled = true
-port = 54325
 
 [auth]
 enabled = true
 site_url = "http://localhost:5173"
 additional_redirect_urls = ["http://localhost:5173"]
 jwt_expiry = 3600
-refresh_token_rotation_enabled = true
 enable_signup = true
 
 [auth.email]
@@ -45,4 +43,9 @@ double_confirm_changes = true
 enable_confirmations = false
 
 [analytics]
+enabled = false
+
+# This repository has no Edge Functions. Keeping the runtime disabled avoids a
+# network-only JSR dependency during database reproducibility checks.
+[edge_runtime]
 enabled = false

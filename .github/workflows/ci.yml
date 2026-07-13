@@ -42,7 +42,7 @@ jobs:
         run: npm run bundle-size
 
   database:
-    name: Supabase migrations + DB lint
+    name: Supabase reset, lint, and RLS isolation
     runs-on: ubuntu-latest
 
     # Requires Docker (the Supabase CLI runs the local stack in containers).
@@ -62,7 +62,7 @@ jobs:
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.109.1
 
       - name: Start local Supabase stack
         run: supabase start
@@ -71,7 +71,10 @@ jobs:
         run: supabase db reset
 
       - name: Lint database
-        run: supabase db lint
+        run: supabase db lint --level warning --fail-on error
+
+      - name: Test workspace RLS isolation
+        run: supabase test db supabase/tests/database --local
 
   e2e:
     name: Playwright E2E (local mock mode)

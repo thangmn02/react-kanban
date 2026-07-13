@@ -1,11 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * Playwright config (remediation plan §9.2 / Phase 5 — E2E).
- *
- * The smoke suite runs against the app in **local mock mode** (no Supabase
- * required): `npm run dev` is started as the `webServer`, and tests load
- * URL-addressable routes. CI installs browsers via `npx playwright install`.
+ * The E2E suite owns a mock-mode development server. It exercises persisted
+ * local state and URL behavior without depending on a hosted Supabase project.
  */
 export default defineConfig({
   testDir: './e2e',
@@ -16,6 +13,7 @@ export default defineConfig({
   reporter: 'list',
   use: {
     baseURL: 'http://localhost:5173',
+    screenshot: 'only-on-failure',
     trace: 'on-first-retry',
   },
   projects: [
@@ -25,12 +23,11 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run dev',
+    command: 'node ./node_modules/vite/bin/vite.js --host 127.0.0.1 --port 5173',
     url: 'http://localhost:5173',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
     env: {
-      // Force local mock mode so E2E never depends on a running Supabase stack.
       VITE_AUTH_MODE: 'mock',
     },
   },

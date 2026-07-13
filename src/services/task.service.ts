@@ -156,29 +156,8 @@ export async function fetchTasks({ boardId, listId, workspaceId }: FetchTasksPar
 
 export async function createTask(taskData: TaskInsert): Promise<TaskRow> {
   if (!supabase) {
-    return {
-      id: `task-${Date.now()}`,
-      workspace_id: taskData.workspace_id ?? null,
-      board_id: taskData.board_id,
-      list_id: taskData.list_id,
-      title: taskData.title,
-      description: taskData.description || '',
-      position: taskData.position ?? 0,
-      priority: taskData.priority || 'Low',
-      start_date: taskData.start_date || null,
-      due_date: taskData.due_date || null,
-      category1: taskData.category1 || null,
-      category2: taskData.category2 || null,
-      assignees: taskData.assignees || null,
-      image: taskData.image || null,
-      is_done: taskData.is_done || false,
-      created_at: new Date().toISOString(),
-      created_by: taskData.created_by ?? null,
-      updated_at: null,
-      completed_at: taskData.completed_at ?? null,
-      deleted_at: null,
-      archived_at: null,
-    };
+    const [createdTask] = localCreateTasks([taskData]);
+    return createdTask;
   }
 
   const client = requireSupabaseClient();
