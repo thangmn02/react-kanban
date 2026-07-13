@@ -7,8 +7,10 @@ import type {
   PomodoroTimerState,
 } from '../types/focus.type';
 import { formatPomodoroTime, POMODORO_MODE_SECONDS } from '../utils/pomodoroTime';
+import { buildStorageKey, readScopedJSON, writeScopedJSON, type StorageScope } from '../shared/storage/storageAdapter';
 
-const pomodoroStorageKey = 'kanban_pomodoro_timer';
+const pomodoroStorageFeature = 'pomodoro_timer';
+const legacyPomodoroStorageKey = 'kanban_pomodoro_timer';
 
 function createInitialPomodoroState(): PomodoroTimerState {
   return {
@@ -22,22 +24,30 @@ function createInitialPomodoroState(): PomodoroTimerState {
   };
 }
 
-function readStoredPomodoroState(): PomodoroTimerState {
-  if (typeof window === 'undefined') {
-    return createInitialPomodoroState();
+function readStoredPomodoroState(scope: StorageScope): PomodoroTimerState {
+  const scopedState = readScopedJSON<Partial<PomodoroTimerState> | null>(scope, pomodoroStorageFeature, null);
+  if (scopedState) {
+    return { ...createInitialPomodoroState(), ...scopedState };
   }
 
-  try {
-    const storedValue = window.localStorage.getItem(pomodoroStorageKey);
-    return storedValue
-      ? {
-        ...createInitialPomodoroState(),
-        ...JSON.parse(storedValue) as Partial<PomodoroTimerState>,
+  if (typeof window !== 'undefined') {
+    try {
+      const legacyValue = window.localStorage.getItem(legacyPomodoroStorageKey);
+      if (legacyValue) {
+        const migratedState = {
+          ...createInitialPomodoroState(),
+          ...JSON.parse(legacyValue) as Partial<PomodoroTimerState>,
+        };
+        writeScopedJSON(scope, pomodoroStorageFeature, migratedState);
+        window.localStorage.removeItem(legacyPomodoroStorageKey);
+        return migratedState;
       }
-      : createInitialPomodoroState();
-  } catch {
-    return createInitialPomodoroState();
+    } catch {
+      window.localStorage.removeItem(legacyPomodoroStorageKey);
+    }
   }
+
+  return createInitialPomodoroState();
 }
 
 function getRemainingSeconds(state: PomodoroTimerState) {
@@ -49,6 +59,7 @@ function getRemainingSeconds(state: PomodoroTimerState) {
 }
 
 interface UsePomodoroTimerParams {
+  scope: StorageScope;
   activeFocusTask: FocusTask | null;
   onComplete?: (task: FocusTask | null, mode: PomodoroMode, session: PomodoroSessionSnapshot) => void;
   onInterrupt?: (task: FocusTask | null, mode: PomodoroMode, session: PomodoroSessionSnapshot) => void;
@@ -67,23 +78,36 @@ function buildSessionSnapshot(state: PomodoroTimerState, endedAt: number): Pomod
   };
 }
 
-export function usePomodoroTimer({ activeFocusTask, onComplete, onInterrupt }: UsePomodoroTimerParams) {
-  const [timerState, setTimerState] = useState<PomodoroTimerState>(readStoredPomodoroState);
-  const [visibleRemainingSeconds, setVisibleRemainingSeconds] = useState(() => (
-    getRemainingSeconds(readStoredPomodoroState())
-  ));
+export function usePomodoroTimer({ scope, activeFocusTask, onComplete, onInterrupt }: UsePomodoroTimerParams) {
+  const scopeKey = buildStorageKey(scope, pomodoroStorageFeature);
+  const [scopedTimer, setScopedTimer] = useState(() => ({ scopeKey, scope, state: readStoredPomodoroState(scope) }));
+  const timerState = scopedTimer.scopeKey === scopeKey ? scopedTimer.state : readStoredPomodoroState(scope);
+  const [visibleRemainingSeconds, setVisibleRemainingSeconds] = useState(() => getRemainingSeconds(timerState));
   const [isPageHidden, setIsPageHidden] = useState(() => (
     typeof document !== 'undefined' ? document.hidden : false
   ));
   const completionKeyRef = useRef<string | null>(null);
   const originalDocumentTitleRef = useRef<string | null>(null);
 
-  useEffect(() => {
-    window.localStorage.setItem(pomodoroStorageKey, JSON.stringify({
-      ...timerState,
-      remainingSeconds: getRemainingSeconds(timerState),
+  if (scopedTimer.scopeKey !== scopeKey) {
+    const nextState = readStoredPomodoroState(scope);
+    setScopedTimer({ scopeKey, scope, state: nextState });
+    setVisibleRemainingSeconds(getRemainingSeconds(nextState));
+  }
+
+  const setTimerState = useCallback((updater: React.SetStateAction<PomodoroTimerState>) => {
+    setScopedTimer((current) => ({
+      ...current,
+      state: typeof updater === 'function' ? updater(current.state) : updater,
     }));
-  }, [timerState]);
+  }, []);
+
+  useEffect(() => {
+    writeScopedJSON(scopedTimer.scope, pomodoroStorageFeature, {
+      ...scopedTimer.state,
+      remainingSeconds: getRemainingSeconds(scopedTimer.state),
+    });
+  }, [scopedTimer.scope, scopedTimer.state]);
 
   useEffect(() => {
     const updateRemainingTime = () => {
@@ -118,7 +142,7 @@ export function usePomodoroTimer({ activeFocusTask, onComplete, onInterrupt }: U
     const intervalId = window.setInterval(updateRemainingTime, 1000);
 
     return () => window.clearInterval(intervalId);
-  }, [activeFocusTask, onComplete, timerState]);
+  }, [activeFocusTask, onComplete, setTimerState, timerState]);
 
   useEffect(() => {
     if (typeof document === 'undefined') {
@@ -170,7 +194,7 @@ export function usePomodoroTimer({ activeFocusTask, onComplete, onInterrupt }: U
         plannedSeconds: currentState.plannedSeconds || remainingSeconds,
       };
     });
-  }, [activeFocusTask?.id]);
+  }, [activeFocusTask?.id, setTimerState]);
 
   const pauseTimer = useCallback(() => {
     setTimerState((currentState) => ({
@@ -179,7 +203,7 @@ export function usePomodoroTimer({ activeFocusTask, onComplete, onInterrupt }: U
       remainingSeconds: getRemainingSeconds(currentState),
       endsAt: null,
     }));
-  }, []);
+  }, [setTimerState]);
 
   const resetTimer = useCallback(() => {
     setTimerState((currentState) => {
@@ -198,7 +222,7 @@ export function usePomodoroTimer({ activeFocusTask, onComplete, onInterrupt }: U
         plannedSeconds: null,
       };
     });
-  }, [activeFocusTask, onInterrupt]);
+  }, [activeFocusTask, onInterrupt, setTimerState]);
 
   const setMode = useCallback((mode: PomodoroMode) => {
     setTimerState((currentState) => ({
@@ -210,14 +234,14 @@ export function usePomodoroTimer({ activeFocusTask, onComplete, onInterrupt }: U
       startedAt: null,
       plannedSeconds: null,
     }));
-  }, []);
+  }, [setTimerState]);
 
   const setActiveTimerTaskId = useCallback((taskId: string) => {
     setTimerState((currentState) => ({
       ...currentState,
       activeTaskId: taskId,
     }));
-  }, []);
+  }, [setTimerState]);
 
   return {
     timerState,

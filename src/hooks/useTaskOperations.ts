@@ -1,7 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { notify } from '../components/organisms/toast/notify';
 
-import { LIST_POSITION_STEP } from '../constants';
 import { useI18n } from '../i18n';
 import type {
   BoardData,
@@ -28,6 +27,10 @@ import {
   buildTaskUpdatePayload,
 } from '../utils/boardDataMapper';
 import { showUndoToast } from '../components/organisms/toast/showUndoToast';
+import {
+  buildChangedListPositionPayload,
+  buildChangedTaskPositionPayload,
+} from '../features/task/model/taskPositions';
 
 interface BoardChangeActivity {
   taskId: string;
@@ -63,79 +66,6 @@ export interface UseTaskOperationsResult {
     activity?: BoardChangeActivity,
   ) => Promise<void>;
 }
-
-/**
- * Shared diff core for position payloads. Builds a map of the previous location
- * for each entry id, derives the next entries, then keeps only the entries that
- * changed relative to their previous location.
- */
-function buildChangedPositions<PreviousLocation, Entry extends { id: string }>(
-  previousBoardData: BoardData,
-  nextBoardData: BoardData,
-  buildPreviousLocations: (board: BoardData) => Map<string, PreviousLocation>,
-  buildNextEntries: (board: BoardData) => Entry[],
-  hasChanged: (previousLocation: PreviousLocation | undefined, entry: Entry) => boolean,
-): Entry[] {
-  const previousLocations = buildPreviousLocations(previousBoardData);
-
-  return buildNextEntries(nextBoardData).filter((entry) => (
-    hasChanged(previousLocations.get(entry.id), entry)
-  ));
-}
-
-const buildChangedTaskPositionPayload = (previousBoardData: BoardData, nextBoardData: BoardData) => (
-  buildChangedPositions<{ listId: string; position: number }, { id: string; list_id: string; position: number }>(
-    previousBoardData,
-    nextBoardData,
-    (board) => {
-      const previousTaskLocations = new Map<string, { listId: string; position: number }>();
-
-      board.columns.forEach((listId) => {
-        board.list[listId]?.tasks.forEach((taskId, position) => {
-          previousTaskLocations.set(taskId, {
-            listId,
-            position,
-          });
-        });
-      });
-
-      return previousTaskLocations;
-    },
-    (board) => board.columns.flatMap((listId) => (
-      board.list[listId].tasks.map((taskId, position) => ({
-        id: taskId,
-        list_id: listId,
-        position,
-      }))
-    )),
-    (previousLocation, { list_id, position }) => (
-      !previousLocation
-      || previousLocation.listId !== list_id
-      || previousLocation.position !== position
-    ),
-  )
-);
-
-const buildChangedListPositionPayload = (previousBoardData: BoardData, nextBoardData: BoardData) => (
-  buildChangedPositions<number, { id: string; position: number }>(
-    previousBoardData,
-    nextBoardData,
-    (board) => {
-      const previousListPositions = new Map<string, number>();
-
-      board.columns.forEach((listId, position) => {
-        previousListPositions.set(listId, position * LIST_POSITION_STEP);
-      });
-
-      return previousListPositions;
-    },
-    (board) => board.columns.map((listId, position) => ({
-      id: listId,
-      position: position * LIST_POSITION_STEP,
-    })),
-    (previousPosition, { position }) => previousPosition !== position,
-  )
-);
 
 export function useTaskOperations({
   boardData,

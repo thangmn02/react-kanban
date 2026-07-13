@@ -47,6 +47,24 @@ you can unlock by completing tasks, for a moment of reflection between work.
 
 | Feature | Local mode (`mock`) | Supabase mode (`supabase`) |
 | --- | :---: | :---: |
+| Kanban board (drag-and-drop columns/cards, priorities, due dates, Tiptap rich-text) | ✅ | ✅ |
+| Today daily planning + focus task suggestions | ✅ | ✅ |
+| Home overview dashboard | ✅ | ✅ |
+| Focus dock + Pomodoro timer | ✅ | ✅ |
+| Command palette (keyboard navigation) | ✅ | ✅ |
+| Arcana tarot mini-game | ✅ | ✅ |
+| Bilingual UI (English / Vietnamese) | ✅ | ✅ |
+| **Persistent storage** | `localStorage` | PostgreSQL |
+| Real user authentication | ❌ (mock user) | ✅ (Supabase Auth) |
+| Multi-workspace organization | ❌ (single local workspace) | ✅ |
+| Member invites & workspace membership | ❌ | ✅ |
+| Realtime sync across devices/sessions | ❌ | ✅ (Supabase Realtime) |
+| Task cover image uploads | ❌ | ✅ (Supabase Storage bucket) |
+| Row-Level Security / tenant isolation | n/a | ✅ |
+| Works fully offline | ✅ | ❌ (needs Supabase) |
+
+Local mode is the easiest way to try the product end-to-end; Supabase mode is the
+collaborative, multi-user configuration.
 
 ---
 
@@ -86,6 +104,15 @@ refreshes because they're written to `localStorage`.
 For collaborative mode with auth, workspaces, invites, realtime sync, and RLS,
 run the full Supabase stack. Migrations are tracked in `supabase/migrations/`
 and applied by `supabase db reset`.
+
+> **Caveat — not yet verified from an empty clone.** The tracked migration set
+> does **not** yet include a baseline `create table` for `boards`, `lists`, or
+> `tasks` (the earliest tracked migrations `alter` those tables assuming they
+> already exist). `focus_sessions` was only recently promoted from
+> `docs/sql/` into a tracked migration. As a result `supabase db reset` against
+> a pristine database is expected to fail until a reproducible baseline schema
+> migration is added (see [Known limitations](#known-limitations-and-project-status)).
+> Do not treat reset-from-empty as working until it has been verified locally.
 
 **Prerequisites:** the [Supabase CLI](https://supabase.com/docs/guides/cli)
 (`supabase` on your PATH) and Docker (the CLI runs a local stack in containers).
@@ -138,24 +165,7 @@ To target a **remote** Supabase project instead, set `VITE_SUPABASE_URL` /
 `VITE_SUPABASE_ANON_KEY` to your hosted project values and apply the migrations
 there (`supabase db push` or the Supabase dashboard).
 
-| Kanban board (drag-and-drop columns/cards, priorities, due dates, Tiptap rich-text) | ✅ | ✅ |
-| Today daily planning + focus task suggestions | ✅ | ✅ |
-| Home overview dashboard | ✅ | ✅ |
-| Focus dock + Pomodoro timer | ✅ | ✅ |
-| Command palette (keyboard navigation) | ✅ | ✅ |
-| Arcana tarot mini-game | ✅ | ✅ |
-| Bilingual UI (English / Vietnamese) | ✅ | ✅ |
-| **Persistent storage** | `localStorage` | PostgreSQL |
-| Real user authentication | ❌ (mock user) | ✅ (Supabase Auth) |
-| Multi-workspace organization | ❌ (single local workspace) | ✅ |
-| Member invites & workspace membership | ❌ | ✅ |
-| Realtime sync across devices/sessions | ❌ | ✅ (Supabase Realtime) |
-| Task cover image uploads | ❌ | ✅ (Supabase Storage bucket) |
-| Row-Level Security / tenant isolation | n/a | ✅ |
-| Works fully offline | ✅ | ❌ (needs Supabase) |
-
-Local mode is the easiest way to try the product end-to-end; Supabase mode is the
-collaborative, multi-user configuration.
+---
 
 ---
 
@@ -211,7 +221,7 @@ src/
 public/
   arcana/             card/pack art atlases + generated reading data (runtime)
 docs/
-  sql/                reference SQL + RLS verification notes
+  sql/                reference SQL + RLS verification notes (NOT tracked — local only)
   *.md                design/integration/handoff notes
 supabase/
   migrations/         tracked DB migrations (RLS, RPCs, storage bucket…)
@@ -241,8 +251,7 @@ persistent, `localStorage`-backed repository.
 ### Data model (Supabase)
 
 The normalized core is `boards → lists → tasks`, plus supporting tables. Key
-tables and their workspace-scoped RLS boundaries (see
-[SECURITY_RLS.md](SECURITY_RLS.md) and `docs/sql/`):
+tables and their workspace-scoped RLS boundaries (see `supabase/migrations/`):
 
 - `boards`, `lists`, `tasks` — read: workspace members; write: workspace editors
 - `workspace_invites` — read: workspace managers or the invited JWT email;
@@ -267,6 +276,28 @@ The production bundle is code-split: heavy views (`CalendarBoardView`,
 
 ---
 
+## Routes
+
+Navigation is URL-addressable. The browser URL is the single source of truth
+(`useViewRouting` is `react-router`-backed), so back/forward and deep links work.
+
+| Route | Surface |
+| --- | --- |
+| `/home` | Home overview dashboard |
+| `/today` | Daily planning + focus task suggestions |
+| `/board` | Kanban board (default sub-view) |
+| `/calendar` | Calendar view of the current board |
+| `/auth` | Sign-in / sign-up |
+| `/onboarding` | First-run workspace + board setup |
+| `/invite/:token` | Accept a workspace invite |
+| anything else | Not-found page |
+
+> `/` renders the Home dashboard (same surface as `/home`). The focus dock,
+> command palette, task dialog, and Arcana dialogs are app-level chrome shared
+> across authenticated routes.
+
+---
+
 ## Testing and quality commands
 
 | Command | What it does |
@@ -277,6 +308,11 @@ The production bundle is code-split: heavy views (`CalendarBoardView`,
 | `npm run test:coverage` | Run tests with V8 coverage (`vitest run --coverage`) |
 | `npm run lint` | Lint with ESLint 9 (`eslint .`) |
 | `npm run build` | Type-check (`tsc -b`) then build (`vite build`) |
+| `npm run typecheck` | Type-check only (`tsc -b`, project references) |
+| `npm run test:ci` | Run tests with coverage (CI gate) |
+| `npm run bundle-size` | Enforce the 1 MB main-entry bundle budget |
+| `npm run e2e` | Playwright E2E (local mock mode) |
+| `npm run quality` | lint + typecheck + test:ci + build + bundle-size |
 | `npm run preview` | Preview the production build locally |
 
 Tests run in jsdom via Vitest. Coverage is collected through
@@ -388,10 +424,13 @@ browser runtime only fetches the static JSON under `public/arcana/data/`.
 
 `src/design-lab/` is a development-only preview sandbox for UI exploration. It
 is gated behind dev builds (or an explicit `VITE_ENABLE_DESIGN_LAB="true"`
-opt-in) and is unreachable in a normal production build — a disabled
-`/design-lab/*` visit falls through to the app (which shows NotFound). In
-production the entire design-lab chunk is dead code and stripped from the
-bundle.
+opt-in) and is unreachable at runtime in a normal production build — a disabled
+`/design-lab/*` visit falls through to the app (which shows NotFound).
+
+> Note: the lab is `React.lazy`-imported and gated, but the build may still emit
+> a small `DesignLab` chunk. It is not executed unless the opt-in/env enables
+> the lab; do **not** assume the chunk is fully stripped from the bundle
+> without verifying the production build output for your configuration.
 
 ```dotenv
 # opt in for a production build (rarely needed):
@@ -419,6 +458,11 @@ VITE_ENABLE_DESIGN_LAB=true
   stack (or point at a hosted project) and apply all migrations; without the
   database, RLS policies, and storage bucket, collaborative features won't
   function.
+- **Database reset is not yet reproducible from an empty clone.** The tracked
+  migrations `alter` `boards`/`lists`/`tasks` without a baseline `create table`,
+  so `supabase db reset` on a pristine database is expected to fail until a
+  squashed baseline schema migration is added. `focus_sessions` is now tracked,
+  but RLS isolation has not yet been proven with multi-JWT tests.
 - Arcana card/pack art is derived from GPL-3.0 third-party assets — review
   those obligations before any public/commercial release (see [License](#license)
   and `src/features/arcana/ATTRIBUTION.md`).

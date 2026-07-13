@@ -8,7 +8,7 @@ on:
 
 jobs:
   quality:
-    name: Lint, Type-check, Test, Build
+    name: Lint, Type-check, Test, Build, Bundle budget
     runs-on: ubuntu-latest
 
     steps:
@@ -27,11 +27,71 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # Uses `tsc -b` (project references) — the previous `npx tsc --noEmit`
+      # no-op'd because the root tsconfig only references projects (§11).
       - name: Type-check
-        run: npx tsc --noEmit
+        run: npm run typecheck
 
-      - name: Unit tests
-        run: npm test
+      - name: Unit tests (coverage)
+        run: npm run test:ci
 
       - name: Build
         run: npm run build
+
+      - name: Bundle-size budget
+        run: npm run bundle-size
+
+  database:
+    name: Supabase migrations + DB lint
+    runs-on: ubuntu-latest
+
+    # Requires Docker (the Supabase CLI runs the local stack in containers).
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start local Supabase stack
+        run: supabase start
+
+      - name: Reset database from clean state
+        run: supabase db reset
+
+      - name: Lint database
+        run: supabase db lint
+
+  e2e:
+    name: Playwright E2E (local mock mode)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E
+        run: npm run e2e

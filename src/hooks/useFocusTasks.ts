@@ -8,6 +8,7 @@ import {
   readScopedJSON,
   writeScopedJSON,
   removeScopedKey,
+  buildStorageKey,
   type StorageScope,
 } from '../shared/storage/storageAdapter';
 
@@ -20,21 +21,54 @@ function readStoredActiveFocusTaskId(scope: StorageScope): string | null {
 }
 
 export function useFocusTasks(boardData: BoardData, scope: StorageScope) {
-  const [focusTasks, setFocusTasks] = useState<FocusTask[]>(() => readStoredFocusTasks(scope));
-  const [activeFocusTaskId, setActiveFocusTaskId] = useState<string | null>(() => readStoredActiveFocusTaskId(scope));
+  const scopeKey = buildStorageKey(scope, 'focus_tasks');
+  const [scopedState, setScopedState] = useState(() => ({
+    scopeKey,
+    scope,
+    focusTasks: readStoredFocusTasks(scope),
+    activeFocusTaskId: readStoredActiveFocusTaskId(scope),
+  }));
   const [limitMessage, setLimitMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    writeScopedJSON(scope, 'focus_tasks', focusTasks);
-  }, [focusTasks, scope]);
+  if (scopedState.scopeKey !== scopeKey) {
+    setScopedState({
+      scopeKey,
+      scope,
+      focusTasks: readStoredFocusTasks(scope),
+      activeFocusTaskId: readStoredActiveFocusTaskId(scope),
+    });
+  }
+
+  const focusTasks = scopedState.scopeKey === scopeKey ? scopedState.focusTasks : readStoredFocusTasks(scope);
+  const activeFocusTaskId = scopedState.scopeKey === scopeKey
+    ? scopedState.activeFocusTaskId
+    : readStoredActiveFocusTaskId(scope);
+
+  const setFocusTasks = useCallback((updater: React.SetStateAction<FocusTask[]>) => {
+    setScopedState((current) => ({
+      ...current,
+      focusTasks: typeof updater === 'function' ? updater(current.focusTasks) : updater,
+    }));
+  }, []);
+
+  const setActiveFocusTaskId = useCallback((updater: React.SetStateAction<string | null>) => {
+    setScopedState((current) => ({
+      ...current,
+      activeFocusTaskId: typeof updater === 'function' ? updater(current.activeFocusTaskId) : updater,
+    }));
+  }, []);
 
   useEffect(() => {
-    if (activeFocusTaskId) {
-      writeScopedJSON(scope, 'active_focus_task', activeFocusTaskId);
+    writeScopedJSON(scopedState.scope, 'focus_tasks', scopedState.focusTasks);
+  }, [scopedState.focusTasks, scopedState.scope]);
+
+  useEffect(() => {
+    if (scopedState.activeFocusTaskId) {
+      writeScopedJSON(scopedState.scope, 'active_focus_task', scopedState.activeFocusTaskId);
     } else {
-      removeScopedKey(scope, 'active_focus_task');
+      removeScopedKey(scopedState.scope, 'active_focus_task');
     }
-  }, [activeFocusTaskId, scope]);
+  }, [scopedState.activeFocusTaskId, scopedState.scope]);
 
 
   const focusTasksWithCurrentBoardState = useMemo(() => (
@@ -79,7 +113,7 @@ export function useFocusTasks(boardData: BoardData, scope: StorageScope) {
 
   const removeFocusTask = useCallback((taskId: string) => {
     setFocusTasks((currentFocusTasks) => currentFocusTasks.filter((focusTask) => focusTask.id !== taskId));
-  }, []);
+  }, [setFocusTasks]);
 
   const carryOverFocusTasks = useCallback((taskIds: string[]) => {
     const taskIdSet = new Set(taskIds);
@@ -90,7 +124,7 @@ export function useFocusTasks(boardData: BoardData, scope: StorageScope) {
     setLimitMessage(null);
 
     return nextFocusTasks.length;
-  }, [focusTasks]);
+  }, [focusTasks, setActiveFocusTaskId, setFocusTasks]);
 
   const pinFocusTask = useCallback((input: FocusTaskInput) => {
     const nextFocusTask = mapTaskToFocusTask(input);
@@ -119,7 +153,7 @@ export function useFocusTasks(boardData: BoardData, scope: StorageScope) {
     setActiveFocusTaskId(nextFocusTask.id);
     setLimitMessage(null);
     return true;
-  }, []);
+  }, [setActiveFocusTaskId, setFocusTasks]);
 
   const toggleFocusTask = useCallback((input: FocusTaskInput) => {
     if (focusTaskIds.has(input.task.id)) {
@@ -134,7 +168,7 @@ export function useFocusTasks(boardData: BoardData, scope: StorageScope) {
     setFocusTasks((currentFocusTasks) => currentFocusTasks.map((focusTask) => (
       focusTask.id === taskId ? { ...focusTask, ...updates } : focusTask
     )));
-  }, []);
+  }, [setFocusTasks]);
 
   const clearLimitMessage = useCallback(() => {
     setLimitMessage(null);
