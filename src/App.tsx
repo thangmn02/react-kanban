@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import AppToastContainer from './components/organisms/toast/AppToastContainer';
 import { notify } from './components/organisms/toast/notify';
 
@@ -8,9 +8,9 @@ import type { BoardDeleteItem } from './types/task.type';
 import AddGroupDialog from './components/organisms/dialog/AddGroupDialog';
 import CreateBoardDialog from './components/organisms/dialog/CreateBoardDialog';
 import DeleteDialog from './components/organisms/dialog/DeleteDialog';
-import CalendarBoardView from './components/organisms/CalendarBoardView';
-import TableView from './components/organisms/TableView';
-import HomeDashboard from './components/organisms/HomeDashboard';
+const CalendarBoardView = lazy(() => import('./components/organisms/CalendarBoardView'));
+const TableView = lazy(() => import('./components/organisms/TableView'));
+const HomeDashboard = lazy(() => import('./components/organisms/HomeDashboard'));
 import KanbanBoard from './components/organisms/KanbanBoard';
 import TodayQuickPlanDialog from './features/today/components/TodayQuickPlanDialog';
 import ShutdownRitualDialog from './features/today/components/ShutdownRitualDialog';
@@ -18,7 +18,7 @@ import TaskDialog from './components/organisms/dialog/TaskDialog';
 import { parseTaskLines } from './utils/taskParser';
 import AuthPage from './components/auth/AuthPage';
 import AcceptInvitePage from './components/invite/AcceptInvitePage';
-import TodayPage from './components/today/TodayPage';
+const TodayPage = lazy(() => import('./components/today/TodayPage'));
 import BoardEmptyState from './components/board/BoardEmptyState';
 import BoardHeader from './components/board/BoardHeader';
 import BoardToolbar from './components/board/BoardToolbar';
@@ -45,6 +45,7 @@ import { updateTask, createTasks } from './services/task.service';
 import { buildTaskFieldUpdatePayload, buildTaskInsertPayload } from './utils/boardDataMapper';
 import { tasksToCsv, downloadTextFile, parseTasksCsv, normalizeCsvPriority, normalizeCsvDueDate } from './utils/csvTasks';
 import { isLocalDemoMode } from './lib/supabase';
+import type { StorageScope } from './shared/storage/storageAdapter';
 import { createActivity } from './services/activity.service';
 import {
   fetchDailyFocusStats,
@@ -57,8 +58,8 @@ import FocusCompletionPrompt from './components/focus/FocusCompletionPrompt';
 import FocusLaunchpadDialog from './components/focus/FocusLaunchpadDialog';
 import FocusLimitToast from './components/focus/FocusLimitToast';
 import WorkspaceMembersDialog from './components/workspace/WorkspaceMembersDialog';
-import ArcanaBoothDialog from './features/arcana/ArcanaBoothDialog';
-import ArcanaRewardToast from './features/arcana/ArcanaRewardToast';
+const ArcanaBoothDialog = lazy(() => import('./features/arcana/ArcanaBoothDialog'));
+const ArcanaRewardToast = lazy(() => import('./features/arcana/ArcanaRewardToast'));
 import {
   getYesterdayCarryoverSummary,
   writeDailyRitualSnapshot,
@@ -88,6 +89,13 @@ interface CreateBoardDialogFormData {
   description: string;
   templateId: string;
 }
+
+/** Full-screen fallback shown while a lazy-loaded view chunk is fetching. */
+const pageSuspenseFallback = (
+  <div className="flex min-h-screen items-center justify-center bg-canvas text-sm font-medium text-slate-500">
+    Loading workspace...
+  </div>
+);
 
 function App() {
   const {
@@ -272,6 +280,7 @@ function App() {
     user,
   ]);
 
+  const focusTaskScope: StorageScope = { userId: user?.id ?? 'mock-user', workspaceId: activeWorkspaceId };
   const {
     focusTasks,
     activeFocusTask,
@@ -285,7 +294,8 @@ function App() {
     clearLimitMessage,
     pinFocusTask,
     carryOverFocusTasks,
-  } = useFocusTasks(boardData);
+  } = useFocusTasks(boardData, focusTaskScope);
+
 
   const refreshDailyFocusStats = useCallback(async () => {
     if (!user) {
@@ -1109,17 +1119,21 @@ function App() {
         onClose={() => setIsCommandPaletteOpen(false)}
       />
 
-      <ArcanaBoothDialog
-        isOpen={isArcanaBoothOpen}
-        onClose={() => setIsArcanaBoothOpen(false)}
-      />
+      <Suspense fallback={null}>
+        <ArcanaBoothDialog
+          isOpen={isArcanaBoothOpen}
+          onClose={() => setIsArcanaBoothOpen(false)}
+        />
+      </Suspense>
 
-      <ArcanaRewardToast
-        isOpen={isArcanaRewardPromptOpen}
-        availableDraws={arcanaRewardState.availableDraws}
-        onDrawNow={() => handleOpenArcanaBooth(true)}
-        onLater={() => setIsArcanaRewardPromptOpen(false)}
-      />
+      <Suspense fallback={null}>
+        <ArcanaRewardToast
+          isOpen={isArcanaRewardPromptOpen}
+          availableDraws={arcanaRewardState.availableDraws}
+          onDrawNow={() => handleOpenArcanaBooth(true)}
+          onLater={() => setIsArcanaRewardPromptOpen(false)}
+        />
+      </Suspense>
 
       <FocusLaunchpadDialog
         isOpen={Boolean(focusLaunchTask)}
@@ -1334,17 +1348,19 @@ function App() {
         <div className="min-h-screen bg-canvas">
           {appHeader}
 
-          <TodayPage
-            currentUser={user}
-            activeWorkspace={activeWorkspace}
-            focusTasks={focusTasks}
-            dailyFocusStats={dailyFocusStats}
-            isFocusTask={isFocusTask}
-            onOpenTask={handleOpenTaskFromToday}
-            onStartFocus={handleStartFocusTaskFromToday}
-            onToggleTodayFocus={handleToggleFocusTaskFromToday}
-            onQuickCreateTask={handleQuickAddTask}
-          />
+          <Suspense fallback={pageSuspenseFallback}>
+            <TodayPage
+              currentUser={user}
+              activeWorkspace={activeWorkspace}
+              focusTasks={focusTasks}
+              dailyFocusStats={dailyFocusStats}
+              isFocusTask={isFocusTask}
+              onOpenTask={handleOpenTaskFromToday}
+              onStartFocus={handleStartFocusTaskFromToday}
+              onToggleTodayFocus={handleToggleFocusTaskFromToday}
+              onQuickCreateTask={handleQuickAddTask}
+            />
+          </Suspense>
 
           {sharedDialogs}
         </div>
@@ -1377,22 +1393,24 @@ function App() {
             </div>
           )}
 
-          <HomeDashboard
-            onOpenTask={handleOpenTaskFromHome}
-            onOpenBoard={handleOpenBoardFromHome}
-            onToggleFocusTask={handleToggleFocusTaskFromHome}
-            onStartFocusTask={handleStartFocusTaskFromHome}
-            isFocusTask={isFocusTask}
-            currentUser={user}
-            activeWorkspace={activeWorkspace}
-            onCreateBoard={openCreateBoardDialog}
-            onCreateTask={handleQuickAddTask}
-            onOpenQuickPlan={handleOpenQuickPlan}
-            onOpenToday={() => setActiveViewWithPath('today')}
-            focusTaskCount={focusTasks.length}
-            focusSessionsToday={dailyFocusStats.completedSessions}
-            hasTeamMembers={workspaceMembers.length > 1}
-          />
+          <Suspense fallback={pageSuspenseFallback}>
+            <HomeDashboard
+              onOpenTask={handleOpenTaskFromHome}
+              onOpenBoard={handleOpenBoardFromHome}
+              onToggleFocusTask={handleToggleFocusTaskFromHome}
+              onStartFocusTask={handleStartFocusTaskFromHome}
+              isFocusTask={isFocusTask}
+              currentUser={user}
+              activeWorkspace={activeWorkspace}
+              onCreateBoard={openCreateBoardDialog}
+              onCreateTask={handleQuickAddTask}
+              onOpenQuickPlan={handleOpenQuickPlan}
+              onOpenToday={() => setActiveViewWithPath('today')}
+              focusTaskCount={focusTasks.length}
+              focusSessionsToday={dailyFocusStats.completedSessions}
+              hasTeamMembers={workspaceMembers.length > 1}
+            />
+          </Suspense>
 
           {sharedDialogs}
         </div>
@@ -1480,14 +1498,16 @@ function App() {
           </div>
         </div>
       ) : activeView === 'board' && boardSubView === 'table' ? (
-        <TableView
-          boardData={boardData}
-          searchQuery={searchQuery}
-          filterPriority={filterPriority}
-          filterAssignee={filterAssignee}
-          filterDueDate={filterDueDate}
-          onOpenTask={handleEditTask}
-        />
+        <Suspense fallback={pageSuspenseFallback}>
+          <TableView
+            boardData={boardData}
+            searchQuery={searchQuery}
+            filterPriority={filterPriority}
+            filterAssignee={filterAssignee}
+            filterDueDate={filterDueDate}
+            onOpenTask={handleEditTask}
+          />
+        </Suspense>
       ) : activeView === 'board' ? (
         <KanbanBoard
           boardData={boardData}
@@ -1507,14 +1527,16 @@ function App() {
           activeBoardId={activeBoardId}
         />
       ) : (
-        <CalendarBoardView
-          boardData={boardData}
-          searchQuery={searchQuery}
-          filterPriority={filterPriority}
-          filterAssignee={filterAssignee}
-          filterDueDate={filterDueDate}
-          onOpenTask={handleEditTask}
-        />
+        <Suspense fallback={pageSuspenseFallback}>
+          <CalendarBoardView
+            boardData={boardData}
+            searchQuery={searchQuery}
+            filterPriority={filterPriority}
+            filterAssignee={filterAssignee}
+            filterDueDate={filterDueDate}
+            onOpenTask={handleEditTask}
+          />
+        </Suspense>
       )}
 
       {sharedDialogs}

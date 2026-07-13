@@ -70,6 +70,8 @@ function serializeTaskAssignees(assignees: BoardTaskItem['assignees'] | undefine
   return (assignees || []).map((assignee) => ({
     name: assignee.name,
     avatar: assignee.avatar,
+    ...(assignee.userId ? { userId: assignee.userId } : {}),
+    ...(assignee.workspaceMemberId ? { workspaceMemberId: assignee.workspaceMemberId } : {}),
   }));
 }
 

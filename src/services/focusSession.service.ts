@@ -1,6 +1,7 @@
 import { endOfDay, startOfDay } from 'date-fns';
 
 import supabase, { requireSupabaseClient } from '../lib/supabase';
+import { readScopedJSON, writeScopedJSON, type StorageScope } from '../shared/storage/storageAdapter';
 import type {
   DailyFocusStats,
   FocusSessionLogInput,
@@ -51,7 +52,7 @@ interface FocusSessionsClient {
   from(table: 'focus_sessions'): FocusSessionsTableClient;
 }
 
-const focusSessionStorageKey = 'kanban_focus_sessions_cache';
+const MOCK_FOCUS_SCOPE: StorageScope = { userId: 'mock-user', workspaceId: 'local-mock-workspace' };
 const focusSessionSelectColumns = 'id,workspace_id,board_id,task_id,user_id,mode,status,started_at,ended_at,duration_seconds,planned_seconds,created_at';
 
 function getFocusSessionsClient(): FocusSessionsClient {
@@ -59,24 +60,11 @@ function getFocusSessionsClient(): FocusSessionsClient {
 }
 
 function readLocalFocusSessions(): FocusSessionSummary[] {
-  if (typeof window === 'undefined') {
-    return [];
-  }
-
-  try {
-    const storedValue = window.localStorage.getItem(focusSessionStorageKey);
-    return storedValue ? JSON.parse(storedValue) as FocusSessionSummary[] : [];
-  } catch {
-    return [];
-  }
+  return readScopedJSON<FocusSessionSummary[]>(MOCK_FOCUS_SCOPE, 'focus_sessions', []);
 }
 
 function writeLocalFocusSessions(sessions: FocusSessionSummary[]) {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  window.localStorage.setItem(focusSessionStorageKey, JSON.stringify(sessions));
+  writeScopedJSON(MOCK_FOCUS_SCOPE, 'focus_sessions', sessions);
 }
 
 function mapFocusSessionRow(row: FocusSessionRow): FocusSessionSummary {

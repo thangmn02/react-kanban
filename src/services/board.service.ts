@@ -5,6 +5,11 @@ import supabase, { requireSupabaseClient } from '../lib/supabase';
 import type { BoardData, ITaskItem } from '../types/task.type';
 import type { BoardInsert, BoardRow, ListRow, TaskInsert, TaskRow } from '../types/supabase.type';
 import { buildBoardDataFromRows } from '../utils/boardDataMapper';
+import {
+  localFetchBoards,
+  localFetchBoardSnapshot,
+  localCreateBoardFromTemplate,
+} from '../infrastructure/local/localBoardStore';
 import { fetchChecklistItemsByTaskIds, replaceTaskChecklistItems } from './checklist.service';
 import { fetchLabelLinksByTaskIds, fetchLabelsByIds, replaceTaskLabels } from './label.service';
 
@@ -42,16 +47,7 @@ async function createBoard(boardData: BoardInsert): Promise<BoardRow> {
 
 export async function fetchBoards(workspaceId?: string | null): Promise<BoardRow[]> {
   if (!supabase) {
-    return [{
-      id: 'local-mock-board',
-      workspace_id: workspaceId ?? null,
-      title: DEFAULT_BOARD_TITLE,
-      description: 'Local demo board',
-      created_by: null,
-      created_at: new Date().toISOString(),
-      updated_at: null,
-      archived_at: null,
-    }];
+    return localFetchBoards(workspaceId);
   }
 
   const client = requireSupabaseClient();
@@ -259,16 +255,7 @@ export async function createBoardFromTemplate({
   createdBy,
 }: CreateBoardFromTemplateParams): Promise<BoardRow> {
   if (!supabase) {
-    return {
-      id: `board-${Date.now()}`,
-      workspace_id: workspaceId ?? null,
-      title,
-      description,
-      created_by: createdBy ?? null,
-      created_at: new Date().toISOString(),
-      updated_at: null,
-      archived_at: null,
-    };
+    return localCreateBoardFromTemplate({ title, description, templateId, workspaceId, createdBy });
   }
 
   const client = requireSupabaseClient();
@@ -312,9 +299,16 @@ export async function fetchBoardSnapshot(
   options: { seedIfMissing?: boolean } = {},
 ): Promise<BoardSnapshot> {
   if (!supabase) {
+    const snapshot = localFetchBoardSnapshot(requestedBoardId, workspaceId);
     return {
-      boardId: 'local-mock-board',
-      boardData: seedBoardData,
+      boardId: snapshot.boardId,
+      boardData: buildBoardDataFromRows(
+        snapshot.listRows,
+        snapshot.taskRows,
+        snapshot.checklistItemRows,
+        snapshot.labelRows,
+        snapshot.labelLinkRows,
+      ),
     };
   }
 

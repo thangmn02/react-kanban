@@ -1,0 +1,61 @@
+# Third-Party Notices
+
+This file identifies third-party assets and datasets bundled with React Kanban
+that carry licensing obligations separate from the project's MIT license.
+
+## Project License
+
+The project's own source code is licensed under the **MIT License** — see
+`LICENSE` for the full text.
+
+## Arcana Card Art (GPL-3.0)
+
+The tarot card and pack art under `public/arcana/atlas/` is derived from
+third-party Balatro mods licensed under **GPL-3.0**:
+
+- Source: DX-Tarots and JellyMod community mods
+- License: GNU General Public License v3.0
+- Attribution: See `src/features/arcana/ATTRIBUTION.md`
+
+### Redistribution obligations
+
+If you redistribute this project with the Arcana art included, you must:
+
+1. Include the GPL-3.0 license text.
+2. Provide access to the corresponding source of the GPL-licensed components.
+3. Disclose that the combined work includes GPL-3.0 material.
+
+If GPL compatibility is a concern for your use case, replace the atlases
+under `public/arcana/atlas/` with original or permissively-licensed art before
+distribution.
+
+## Tarot Reading Dataset
+
+The generated reading corpus under `public/arcana/data/*.json` is derived from
+the `barissglc/tarot` dataset on Hugging Face. The dataset's license was not
+explicitly identified at the time of generation.
+
+- Regeneration script: `scripts/pull_hf_tarot.py` (reads
+  `public/tarot_readings.parquet` when present)
+- Runtime usage: The browser only fetches the static committed JSON files
+- Before public distribution: confirm the dataset license or replace the
+  generated content with original reflections
+
+## Third-Party Libraries
+
+All npm dependencies retain their original licenses (see each package's
+`LICENSE` file in `node_modules`). Key runtime dependencies:
+
+| Library | License |
+|---|---|
+| React | MIT |
+| Vite | MIT |
+| Supabase JS | MIT |
+| dnd-kit | MIT |
+| Tiptap | MIT |
+| Framer Motion | MIT |
+| date-fns | MIT |
+| React Hook Form | MIT |
+| Yup | MIT |
+| React Toastify | MIT |
+| Tailwind CSS | MIT |

@@ -20,7 +20,11 @@ export interface BoardTaskMap {
 
 export interface TaskAssignee {
   name: string,
-  avatar: string
+  avatar: string,
+  /** Stable user identity (Supabase auth uid). Absent for legacy/seed data. */
+  userId?: string,
+  /** Workspace membership id for normalized assignment tracking. */
+  workspaceMemberId?: string
 }
 
 export type TaskLabelColor = 'slate' | 'sky' | 'emerald' | 'amber' | 'rose' | 'violet';

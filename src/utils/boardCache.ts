@@ -1,6 +1,10 @@
 import type { BoardData } from '../types/task.type';
-
-const boardCacheKey = 'kanban_board_cache';
+import {
+  readScopedJSON,
+  writeScopedJSON,
+  writeGlobalJSON,
+  type StorageScope,
+} from '../shared/storage/storageAdapter';
 
 export interface BoardCachePayload {
   boardId: string | null;
@@ -8,31 +12,24 @@ export interface BoardCachePayload {
   updatedAt?: string;
 }
 
-export function readBoardCache(): BoardCachePayload | null {
-  if (typeof window === 'undefined') {
-    return null;
-  }
+const BOARD_CACHE_FEATURE = 'board_cache';
 
-  const cachedValue = window.localStorage.getItem(boardCacheKey);
-
-  if (!cachedValue) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(cachedValue) as BoardCachePayload;
-  } catch {
-    return null;
-  }
+/**
+ * Reads the cached board snapshot from namespaced localStorage.
+ * The key is scoped per user + workspace so switching accounts or
+ * workspaces never leaks another context's cached board data.
+ */
+export function readBoardCache(scope: StorageScope): BoardCachePayload | null {
+  return readScopedJSON<BoardCachePayload | null>(scope, BOARD_CACHE_FEATURE, null);
 }
 
-export function writeBoardCache(cachePayload: BoardCachePayload) {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  window.localStorage.setItem(boardCacheKey, JSON.stringify({
+/**
+ * Writes the board snapshot to namespaced localStorage.
+ */
+export function writeBoardCache(scope: StorageScope, cachePayload: BoardCachePayload): void {
+  writeScopedJSON(scope, BOARD_CACHE_FEATURE, {
     ...cachePayload,
     updatedAt: new Date().toISOString(),
-  }));
+  });
+  writeGlobalJSON('last_board_cache_at', cachePayload.updatedAt ?? new Date().toISOString());
 }

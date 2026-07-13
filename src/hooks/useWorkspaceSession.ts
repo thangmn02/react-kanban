@@ -6,17 +6,17 @@ import {
   fetchUserWorkspaces,
 } from '../services/workspace.service';
 import type { AppUser, WorkspaceSummary } from '../types/auth.type';
+import { readScopedJSON, writeScopedJSON, type StorageScope } from '../shared/storage/storageAdapter';
 
-const activeWorkspaceStorageKey = 'kanban_active_workspace_id';
+function buildUserScope(user: AppUser | null): StorageScope {
+  return { userId: user?.id ?? 'mock-user', workspaceId: null };
+}
 
 export function useWorkspaceSession(user: AppUser | null) {
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([]);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(() => {
-    if (typeof window === 'undefined') {
-      return null;
-    }
-
-    return window.localStorage.getItem(activeWorkspaceStorageKey);
+    if (typeof window === 'undefined') return null;
+    return readScopedJSON<string | null>(buildUserScope(user), 'active_workspace', null);
   });
   const [isWorkspaceLoading, setIsWorkspaceLoading] = useState(true);
   const [workspaceErrorMessage, setWorkspaceErrorMessage] = useState<string | null>(null);
@@ -38,9 +38,7 @@ export function useWorkspaceSession(user: AppUser | null) {
     try {
       await ensureUserProfile(user);
       const nextWorkspaces = await fetchUserWorkspaces(user);
-      const storedWorkspaceId = typeof window === 'undefined'
-        ? null
-        : window.localStorage.getItem(activeWorkspaceStorageKey);
+      const storedWorkspaceId = readScopedJSON<string | null>(buildUserScope(user), 'active_workspace', null);
       const nextActiveWorkspace = nextWorkspaces.find((workspace) => workspace.id === storedWorkspaceId)
         || nextWorkspaces[0]
         || null;
@@ -60,16 +58,13 @@ export function useWorkspaceSession(user: AppUser | null) {
   }, [loadWorkspaces]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
+    const scope = buildUserScope(user);
     if (activeWorkspace?.id) {
-      window.localStorage.setItem(activeWorkspaceStorageKey, activeWorkspace.id);
+      writeScopedJSON(scope, 'active_workspace', activeWorkspace.id);
     } else {
-      window.localStorage.removeItem(activeWorkspaceStorageKey);
+      writeScopedJSON(scope, 'active_workspace', null);
     }
-  }, [activeWorkspace?.id]);
+  }, [activeWorkspace?.id, user]);
 
   const createWorkspace = useCallback(async (workspaceName: string) => {
     const createdWorkspace = await createWorkspaceForCurrentUser(workspaceName);

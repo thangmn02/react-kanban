@@ -1,8 +1,12 @@
 import supabase, { requireSupabaseClient } from '../lib/supabase';
+import {
+  localCreateActivity,
+  localFetchActivitiesForTask,
+  localFetchBoardActivities,
+} from '../infrastructure/local/localBoardStore';
 import type { ITaskActivity } from '../types/task.type';
 import type { Json, TaskActivityInsert, TaskActivityRow } from '../types/supabase.type';
 
-const cacheKey = 'kanban_activities_cache';
 
 const DEFAULT_ACTOR = {
   name: 'You',
@@ -19,22 +23,7 @@ const TASK_ACTIVITY_ACTIONS: ITaskActivity['action'][] = [
   'deleted',
 ];
 
-// Helper for local activities
-function getLocalActivities(): ITaskActivity[] {
-  if (typeof window === 'undefined') return [];
-  const cached = window.localStorage.getItem(cacheKey);
-  if (!cached) return [];
-  try {
-    return JSON.parse(cached) as ITaskActivity[];
-  } catch {
-    return [];
-  }
-}
 
-function saveLocalActivities(activities: ITaskActivity[]) {
-  if (typeof window === 'undefined') return;
-  window.localStorage.setItem(cacheKey, JSON.stringify(activities));
-}
 
 function normalizeActivityAction(action: string): ITaskActivity['action'] {
   return TASK_ACTIVITY_ACTIONS.includes(action as ITaskActivity['action'])
@@ -104,18 +93,17 @@ export async function createActivity(
   };
 
   if (!supabase) {
-    const localActivity: ITaskActivity = {
-      id: `act-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    const row = localCreateActivity({
       task_id: taskId,
-      task_title: taskTitle,
+      task_title: taskTitle ?? null,
       action,
-      details,
-      actor,
-      created_at: new Date().toISOString(),
-    };
-    const current = getLocalActivities();
-    saveLocalActivities([localActivity, ...current]);
-    return localActivity;
+      details: details as Json,
+      actor: actor as Json,
+      actor_id: context?.actorId ?? null,
+      board_id: context?.boardId ?? null,
+      workspace_id: context?.workspaceId ?? null,
+    });
+    return mapActivityRowToActivity(row, taskTitle ?? undefined);
   }
 
   const client = requireSupabaseClient();
@@ -138,10 +126,7 @@ export async function createActivity(
 
 export async function fetchActivitiesForTask(taskId: string): Promise<ITaskActivity[]> {
   if (!supabase) {
-    const all = getLocalActivities();
-    return all
-      .filter((a) => a.task_id === taskId)
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    return localFetchActivitiesForTask(taskId).map((row) => mapActivityRowToActivity(row));
   }
 
   const client = requireSupabaseClient();
@@ -160,8 +145,7 @@ export async function fetchActivitiesForTask(taskId: string): Promise<ITaskActiv
 
 export async function fetchBoardActivities(boardId: string): Promise<ITaskActivity[]> {
   if (!supabase) {
-    const all = getLocalActivities();
-    return all.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    return localFetchBoardActivities(boardId).map((row) => mapActivityRowToActivity(row));
   }
 
   const client = requireSupabaseClient();

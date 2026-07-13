@@ -2,6 +2,13 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 
 import supabase, { requireSupabaseClient } from '../lib/supabase';
 import { DEFAULT_TASK_PRIORITY } from '../constants';
+import {
+  localCreateTasks,
+  localUpdateTask,
+  localDeleteTask,
+  localDeleteTasksByListId,
+  localUpdateTaskPositions,
+} from '../infrastructure/local/localBoardStore';
 import type { Json, TaskInsert, TaskRow, TaskUpdate } from '../types/supabase.type';
 
 interface FetchTasksParams {
@@ -196,29 +203,7 @@ export async function createTasks(tasksData: TaskInsert[]): Promise<TaskRow[]> {
   if (!tasksData.length) return [];
 
   if (!supabase) {
-    return tasksData.map((taskData, index) => ({
-      id: `task-${Date.now()}-${index}`,
-      workspace_id: taskData.workspace_id ?? null,
-      board_id: taskData.board_id,
-      list_id: taskData.list_id,
-      title: taskData.title,
-      description: taskData.description || '',
-      position: taskData.position ?? 0,
-      priority: taskData.priority || 'Low',
-      start_date: taskData.start_date || null,
-      due_date: taskData.due_date || null,
-      category1: taskData.category1 || null,
-      category2: taskData.category2 || null,
-      assignees: taskData.assignees || null,
-      image: taskData.image || null,
-      is_done: taskData.is_done || false,
-      created_at: new Date().toISOString(),
-      created_by: taskData.created_by ?? null,
-      updated_at: null,
-      completed_at: taskData.completed_at ?? null,
-      deleted_at: null,
-      archived_at: null,
-    }));
+    return localCreateTasks(tasksData);
   }
 
   const client = requireSupabaseClient();
@@ -237,10 +222,7 @@ export async function createTasks(tasksData: TaskInsert[]): Promise<TaskRow[]> {
 
 export async function updateTask(taskId: string, taskData: TaskUpdate): Promise<TaskRow> {
   if (!supabase) {
-    return {
-      id: taskId,
-      ...taskData,
-    } as TaskRow;
+    return localUpdateTask(taskId, taskData);
   }
 
   const client = requireSupabaseClient();
@@ -264,6 +246,7 @@ export async function updateTask(taskId: string, taskData: TaskUpdate): Promise<
 
 export async function deleteTask(taskId: string): Promise<void> {
   if (!supabase) {
+    localDeleteTask(taskId);
     return;
   }
 
@@ -297,6 +280,7 @@ export async function restoreTask(taskId: string): Promise<TaskRow> {
 
 export async function deleteTasksByListId(listId: string): Promise<void> {
   if (!supabase) {
+    localDeleteTasksByListId(listId);
     return;
   }
 
@@ -313,6 +297,9 @@ export async function deleteTasksByListId(listId: string): Promise<void> {
 
 export async function updateTaskPositions(taskPositions: UpdateTaskPositionPayload[]): Promise<void> {
   if (!supabase || taskPositions.length === 0) {
+    if (!supabase && taskPositions.length > 0) {
+      localUpdateTaskPositions(taskPositions);
+    }
     return;
   }
 

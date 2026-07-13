@@ -8,6 +8,7 @@ import type { BoardData } from '../types/task.type';
 import type { BoardRow } from '../types/supabase.type';
 import { fetchBoardSnapshot, fetchBoards } from '../services/board.service';
 import { readBoardCache, writeBoardCache } from '../utils/boardCache';
+import type { StorageScope } from '../shared/storage/storageAdapter';
 import { useTaskRealtime } from './useTaskRealtime';
 import { useDueDateReminder } from './useDueDateReminder';
 
@@ -42,7 +43,11 @@ export function useBoardDataManagement({
   activeWorkspaceId,
   userId,
 }: UseBoardDataManagementParams): UseBoardDataManagementResult {
-  const cachedBoard = useMemo(() => readBoardCache(), []);
+  const storageScope: StorageScope = useMemo(() => ({
+    userId: userId ?? 'mock-user',
+    workspaceId: activeWorkspaceId,
+  }), [userId, activeWorkspaceId]);
+  const cachedBoard = useMemo(() => readBoardCache(storageScope), [storageScope]);
   const initialBoardId = cachedBoard?.boardId || null;
   const [boardData, setBoardData] = useState<BoardData>(() => cachedBoard?.boardData || data);
   const [activeBoardId, setActiveBoardId] = useState<string | null>(() => initialBoardId);
@@ -56,11 +61,11 @@ export function useBoardDataManagement({
   ), [boardSummaries, activeBoardId]);
 
   const syncBoardCache = useCallback((nextBoardId: string | null, nextBoardData: BoardData) => {
-    writeBoardCache({
+    writeBoardCache(storageScope, {
       boardId: nextBoardId,
       boardData: nextBoardData,
     });
-  }, []);
+  }, [storageScope]);
 
   const refreshBoardList = useCallback(async () => {
     const boardRows = await fetchBoards(activeWorkspaceId);

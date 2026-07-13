@@ -1,5 +1,7 @@
+# =========================================================
 # Logs
-logs
+# =========================================================
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -7,42 +9,82 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
+# Local Codex/Vite temporary logs
+/.codex-vite
+/.codex-vite.err
+/.codex-vite*
+
+# =========================================================
+# Dependencies and build outputs
+# =========================================================
+node_modules/
+dist/
+dist-ssr/
+coverage/
+.vite/
+*.tsbuildinfo
+.eslintcache
+
+# Test outputs
+playwright-report/
+test-results/
+
+# Netlify CLI local state
+.netlify/
+
+# =========================================================
+# Environment variables
+# =========================================================
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+
+# Other local configuration files
 *.local
 
-# Local agent/config and manually managed Supabase workspace files
-.agent/
-supabase/
-.kiro/
+# =========================================================
+# Local AI agent/config directories
+# =========================================================
+/.agent/
+/.agents/
+/.codex/
+/.kiro/
 
-# Editor directories and files
+# =========================================================
+# Editor and operating-system files
+# =========================================================
 .vscode/*
 !.vscode/extensions.json
-.idea
+
+.idea/
 .DS_Store
+Thumbs.db
+
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
 
-# Third-party Balatro mod sources (GPL-3.0). Only the sliced atlases under
-# public/arcana/atlas are used by the app; the full mod folders (Lua + large
-# PNGs) should not be uploaded.
+# =========================================================
+# Private/local documentation
+# =========================================================
+/docs/
+
+# =========================================================
+# Third-party source repositories
+# =========================================================
+# Only the processed runtime atlases under public/arcana/atlas
+# are committed.
 public/DX-Tarots-master/
 public/JellyMod-main/
 
-# Raw Hugging Face dataset — regenerate the normalized JSON via
-# scripts/pull_hf_tarot.py (the generated public/arcana/data/*.json is committed
-# because it is a runtime asset).
+# Raw Hugging Face dataset.
+# Generated runtime JSON under public/arcana/data is committed.
 public/tarot_readings.parquet
 
-# Project docs and local data/build scripts — kept locally, not uploaded.
-docs/
-scripts/
-SECURITY_RLS.md
+# =========================================================
+# Supabase local temporary state
+# =========================================================
+# Keep supabase/config.toml and supabase/migrations tracked.
+supabase/.temp/

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-import { readBoardCache } from '../../utils/boardCache';
+import { readGlobalJSON } from '../../shared/storage/storageAdapter';
 
 const BACK_ONLINE_VISIBLE_MS = 3000;
 
@@ -19,13 +19,13 @@ export default function OfflineBanner() {
   const [isOnline, setIsOnline] = useState<boolean>(() => (
     typeof navigator === 'undefined' ? true : navigator.onLine
   ));
-  const [cachedAt, setCachedAt] = useState<string | null>(() => readBoardCache()?.updatedAt ?? null);
+  const [cachedAt, setCachedAt] = useState<string | null>(() => readGlobalJSON<string | null>('last_board_cache_at', null));
   const [showBackOnline, setShowBackOnline] = useState(false);
   const backOnlineTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     const handleOffline = () => {
-      setCachedAt(readBoardCache()?.updatedAt ?? null);
+      setCachedAt(readGlobalJSON<string | null>('last_board_cache_at', null));
       setIsOnline(false);
       setShowBackOnline(false);
       if (backOnlineTimeoutRef.current !== null) {
@@ -35,7 +35,7 @@ export default function OfflineBanner() {
     };
 
     const handleOnline = () => {
-      setCachedAt(readBoardCache()?.updatedAt ?? null);
+      setCachedAt(readGlobalJSON<string | null>('last_board_cache_at', null));
       setIsOnline(true);
       setShowBackOnline(true);
       if (backOnlineTimeoutRef.current !== null) {

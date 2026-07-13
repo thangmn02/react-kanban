@@ -7,6 +7,7 @@ import type {
   TaskLabelRow,
 } from '../types/supabase.type';
 import { normalizeTaskLabelColor } from '../utils/taskCollections';
+import { localReplaceLabels, localFetchBoardSnapshot } from '../infrastructure/local/localBoardStore';
 
 function isMissingLabelTableError(error: unknown) {
   return typeof error === 'object'
@@ -47,6 +48,10 @@ function normalizeLabels(labels: BoardTaskItem['labels']): BoardTaskItem['labels
 
 export async function fetchLabelLinksByTaskIds(taskIds: string[]): Promise<TaskLabelLinkRow[]> {
   if (!supabase || taskIds.length === 0) {
+    if (!supabase && taskIds.length > 0) {
+      const snapshot = localFetchBoardSnapshot();
+      return snapshot.labelLinkRows.filter((link) => taskIds.includes(link.task_id));
+    }
     return [];
   }
 
@@ -70,6 +75,10 @@ export async function fetchLabelLinksByTaskIds(taskIds: string[]): Promise<TaskL
 
 export async function fetchLabelsByIds(labelIds: string[]): Promise<TaskLabelRow[]> {
   if (!supabase || labelIds.length === 0) {
+    if (!supabase && labelIds.length > 0) {
+      const snapshot = localFetchBoardSnapshot();
+      return snapshot.labelRows.filter((label) => labelIds.includes(label.id));
+    }
     return [];
   }
 
@@ -99,6 +108,7 @@ export async function replaceTaskLabels(
   workspaceId?: string | null,
 ): Promise<void> {
   if (!supabase) {
+    localReplaceLabels(taskId, boardId, labels, workspaceId);
     return;
   }
 

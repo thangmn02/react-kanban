@@ -93,9 +93,12 @@ export function normalizeTaskAssignees(value: unknown): TaskAssignee[] {
       return [];
     }
 
+    const record = assignee as Record<string, unknown>;
     return [{
-      name: (assignee as Record<string, unknown>).name as string,
-      avatar: (assignee as Record<string, unknown>).avatar as string,
+      name: record.name as string,
+      avatar: record.avatar as string,
+      ...(typeof record.userId === 'string' ? { userId: record.userId } : {}),
+      ...(typeof record.workspaceMemberId === 'string' ? { workspaceMemberId: record.workspaceMemberId } : {}),
     }];
   });
 }

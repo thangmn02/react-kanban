@@ -3,54 +3,39 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { BoardData } from '../types/task.type';
 import type { FocusTask, FocusTaskInput } from '../types/focus.type';
 import { mapTaskToFocusTask } from '../utils/focusTaskMapper';
-import { STORAGE_KEYS, MAX_FOCUS_TASKS, FOCUS_LIMIT_MESSAGE } from '../constants';
+import { MAX_FOCUS_TASKS, FOCUS_LIMIT_MESSAGE } from '../constants';
+import {
+  readScopedJSON,
+  writeScopedJSON,
+  removeScopedKey,
+  type StorageScope,
+} from '../shared/storage/storageAdapter';
 
-function readFromLocalStorage<T>(key: string, fallback: T, parse?: (raw: string) => T): T {
-  if (typeof window === 'undefined') {
-    return fallback;
-  }
-
-  try {
-    const storedValue = window.localStorage.getItem(key);
-
-    if (storedValue === null) {
-      return fallback;
-    }
-
-    return parse ? parse(storedValue) : (storedValue as unknown as T);
-  } catch {
-    return fallback;
-  }
+function readStoredFocusTasks(scope: StorageScope): FocusTask[] {
+  return readScopedJSON<FocusTask[]>(scope, 'focus_tasks', []);
 }
 
-function readStoredFocusTasks(): FocusTask[] {
-  return readFromLocalStorage<FocusTask[]>(
-    STORAGE_KEYS.FOCUS_TASKS,
-    [],
-    (raw) => JSON.parse(raw) as FocusTask[],
-  );
+function readStoredActiveFocusTaskId(scope: StorageScope): string | null {
+  return readScopedJSON<string | null>(scope, 'active_focus_task', null);
 }
 
-function readStoredActiveFocusTaskId(): string | null {
-  return readFromLocalStorage<string | null>(STORAGE_KEYS.ACTIVE_FOCUS_TASK, null);
-}
-
-export function useFocusTasks(boardData: BoardData) {
-  const [focusTasks, setFocusTasks] = useState<FocusTask[]>(readStoredFocusTasks);
-  const [activeFocusTaskId, setActiveFocusTaskId] = useState<string | null>(readStoredActiveFocusTaskId);
+export function useFocusTasks(boardData: BoardData, scope: StorageScope) {
+  const [focusTasks, setFocusTasks] = useState<FocusTask[]>(() => readStoredFocusTasks(scope));
+  const [activeFocusTaskId, setActiveFocusTaskId] = useState<string | null>(() => readStoredActiveFocusTaskId(scope));
   const [limitMessage, setLimitMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEYS.FOCUS_TASKS, JSON.stringify(focusTasks));
-  }, [focusTasks]);
+    writeScopedJSON(scope, 'focus_tasks', focusTasks);
+  }, [focusTasks, scope]);
 
   useEffect(() => {
     if (activeFocusTaskId) {
-      window.localStorage.setItem(STORAGE_KEYS.ACTIVE_FOCUS_TASK, activeFocusTaskId);
+      writeScopedJSON(scope, 'active_focus_task', activeFocusTaskId);
     } else {
-      window.localStorage.removeItem(STORAGE_KEYS.ACTIVE_FOCUS_TASK);
+      removeScopedKey(scope, 'active_focus_task');
     }
-  }, [activeFocusTaskId]);
+  }, [activeFocusTaskId, scope]);
+
 
   const focusTasksWithCurrentBoardState = useMemo(() => (
     focusTasks.map((focusTask) => {

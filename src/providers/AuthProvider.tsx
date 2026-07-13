@@ -5,6 +5,7 @@ import type { Session, User } from '@supabase/supabase-js';
 import { AuthContext, type AuthContextValue } from '../contexts/AuthContext';
 import { CURRENT_USER } from '../data/currentUser';
 import supabase, { authMode } from '../lib/supabase';
+import { clearUserData } from '../shared/storage/storageAdapter';
 import type { AppUser } from '../types/auth.type';
 
 const mockUser: AppUser = {
@@ -148,12 +149,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
       throw new Error('Supabase auth is not configured.');
     }
 
+    const currentUserId = user?.id;
+
     const { error } = await supabase.auth.signOut();
 
     if (error) {
       throw error;
     }
-  }, []);
+
+    // Clear all namespaced browser data for this user to prevent
+    // cross-account leakage (board cache, focus tasks, etc.).
+    if (currentUserId) {
+      clearUserData(currentUserId);
+    }
+  }, [user?.id]);
 
   const value = useMemo<AuthContextValue>(() => ({
     authMode,

@@ -2,6 +2,7 @@ import supabase, { requireSupabaseClient } from '../lib/supabase';
 import type { BoardTaskItem } from '../types/task.type';
 import type { TaskChecklistItemInsert, TaskChecklistItemRow } from '../types/supabase.type';
 import { buildChecklistItemInsertPayloads } from '../utils/boardDataMapper';
+import { localReplaceChecklistItems, localFetchBoardSnapshot } from '../infrastructure/local/localBoardStore';
 
 function isMissingChecklistTableError(error: unknown) {
   return typeof error === 'object'
@@ -12,6 +13,10 @@ function isMissingChecklistTableError(error: unknown) {
 
 export async function fetchChecklistItemsByTaskIds(taskIds: string[]): Promise<TaskChecklistItemRow[]> {
   if (!supabase || taskIds.length === 0) {
+    if (!supabase && taskIds.length > 0) {
+      const snapshot = localFetchBoardSnapshot();
+      return snapshot.checklistItemRows.filter((item) => taskIds.includes(item.task_id));
+    }
     return [];
   }
 
@@ -41,6 +46,7 @@ export async function replaceTaskChecklistItems(
   workspaceId?: string | null,
 ): Promise<void> {
   if (!supabase) {
+    localReplaceChecklistItems(taskId, checklistItems, workspaceId);
     return;
   }
 
