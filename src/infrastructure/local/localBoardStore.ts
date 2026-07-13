@@ -18,10 +18,12 @@
  */
 
 import { data as seedBoardData } from '../../data';
+import { findBoardTemplateById } from '../../data/boardTemplates';
 import {
   DEFAULT_BOARD_TITLE,
   DEFAULT_TASK_CATEGORIES,
   DEFAULT_TASK_PRIORITY,
+  ERROR_MESSAGES,
   LIST_POSITION_STEP,
 } from '../../constants';
 import { createLocalId } from '../../utils/idGenerator';
@@ -68,8 +70,8 @@ export interface LocalBoardSnapshot {
 
 const BOARD_STORE_FEATURE = 'board_store';
 const MOCK_SCOPE: StorageScope = { userId: 'mock-user', workspaceId: 'local-mock-workspace' };
+export const LOCAL_MOCK_WORKSPACE_ID = 'local-mock-workspace';
 const LOCAL_MOCK_BOARD_ID = 'local-mock-board';
-const LOCAL_MOCK_WORKSPACE_ID = 'local-mock-workspace';
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -206,6 +208,28 @@ export function localFetchBoards(workspaceId?: string | null): BoardRow[] {
   ));
 }
 
+/**
+ * All non-deleted, non-archived tasks for a workspace. Used by the Home and
+ * Today local services, which previously read the static seed data instead of
+ * the (mutable) local store — so local mutations never reached those pages.
+ */
+export function localFetchAllTasks(workspaceId?: string | null): TaskRow[] {
+  const state = getState();
+  return state.tasks.filter((t) => (
+    t.deleted_at === null && t.archived_at === null
+    && (workspaceId == null || t.workspace_id === workspaceId)
+  ));
+}
+
+/** All non-archived lists for a workspace (across every board). */
+export function localFetchAllLists(workspaceId?: string | null): ListRow[] {
+  const state = getState();
+  return state.lists.filter((l) => (
+    l.archived_at === null
+    && (workspaceId == null || l.workspace_id === workspaceId)
+  ));
+}
+
 export function localFetchBoardSnapshot(
   requestedBoardId?: string | null,
   workspaceId?: string | null,
@@ -260,18 +284,41 @@ export function localCreateBoardFromTemplate(params: {
   workspaceId?: string | null;
   createdBy?: string | null;
 }): BoardRow {
+  const boardTemplate = findBoardTemplateById(params.templateId);
+  if (!boardTemplate) {
+    throw new Error(ERROR_MESSAGES.INVALID_TEMPLATE);
+  }
+
   const state = getState();
+  const workspaceId = params.workspaceId ?? LOCAL_MOCK_WORKSPACE_ID;
   const boardRow: BoardRow = {
     id: createLocalId('board'),
-    workspace_id: params.workspaceId ?? LOCAL_MOCK_WORKSPACE_ID,
+    workspace_id: workspaceId,
     title: params.title,
-    description: params.description || 'Board from template',
+    description: params.description || boardTemplate.description,
     created_by: params.createdBy ?? null,
     created_at: nowIso(),
     updated_at: null,
     archived_at: null,
   };
   state.boards.push(boardRow);
+
+  // Create the template lists so the board is immediately usable, mirroring
+  // the Supabase branch of createBoardFromTemplate. Previously the local
+  // branch created only the board row and dropped every template list.
+  boardTemplate.lists.forEach((listTitle, index) => {
+    state.lists.push({
+      id: createLocalId('list'),
+      workspace_id: workspaceId,
+      board_id: boardRow.id,
+      title: listTitle,
+      position: index * LIST_POSITION_STEP,
+      created_at: nowIso(),
+      updated_at: null,
+      archived_at: null,
+    });
+  });
+
   saveState();
   return boardRow;
 }
@@ -319,7 +366,7 @@ export function localUpdateListPositions(positions: { id: string; position: numb
 export function localCreateTasks(taskInserts: TaskInsert[]): TaskRow[] {
   const state = getState();
   const now = nowIso();
-  return taskInserts.map((taskInsert) => {
+  const created: TaskRow[] = taskInserts.map((taskInsert) => {
     const maxPos = state.tasks
       .filter((t) => t.list_id === taskInsert.list_id)
       .reduce((max, t) => Math.max(max, t.position), 0);
@@ -349,6 +396,10 @@ export function localCreateTasks(taskInserts: TaskInsert[]): TaskRow[] {
     state.tasks.push(taskRow);
     return taskRow;
   });
+  // Persist after ALL task rows are added so the batch survives a refresh.
+  // (Previously this was omitted, so local task creation was lost on reload.)
+  saveState();
+  return created;
 }
 
 export function localUpdateTask(taskId: string, taskUpdate: TaskUpdate): TaskRow {

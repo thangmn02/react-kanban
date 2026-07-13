@@ -1,11 +1,16 @@
 import { isToday, isBefore, parseISO, startOfToday } from 'date-fns';
 
 import { DEFAULT_BOARD_TITLE } from '../constants';
-import { data as seedBoardData } from '../data';
-import { CURRENT_USER } from '../data/currentUser';
+import {
+  LOCAL_MOCK_WORKSPACE_ID,
+  localFetchAllLists,
+  localFetchAllTasks,
+  localFetchBoards,
+} from '../infrastructure/local/localBoardStore';
 import supabase, { requireSupabaseClient } from '../lib/supabase';
 import type { AppUser } from '../types/auth.type';
-import type { BoardTaskItem, TaskAssignee } from '../types/task.type';
+import type { BoardTaskItem } from '../types/task.type';
+import { isTaskAssignedToUser } from '../utils/taskAssignment';
 import { normalizeTaskAssignees } from '../utils/taskCollections';
 
 export interface TodayTaskSummary {
@@ -60,17 +65,6 @@ interface FetchTodayPageDataParams {
   workspaceId: string | null;
 }
 
-function isAssignedToUser(assignees: TaskAssignee[], currentUser: AppUser) {
-  if (currentUser.isMock) {
-    return assignees.some((assignee) => assignee.name === CURRENT_USER.name);
-  }
-
-  return assignees.some((assignee) => (
-    assignee.name === currentUser.name
-    || assignee.name === currentUser.email
-  ));
-}
-
 function isOverdueTask(task: TodayTaskSummary) {
   if (!task.dueDate || task.isDone) {
     return false;
@@ -107,40 +101,39 @@ function sortByActivity(currentTask: TodayTaskSummary, nextTask: TodayTaskSummar
 }
 
 function getLocalTodayData(currentUser: AppUser): TodayPageData {
-  const boardTitle = DEFAULT_BOARD_TITLE;
-  const listTitleById = new Map(seedBoardData.columns.map((listId) => [
-    listId,
-    seedBoardData.list[listId]?.title || 'Untitled list',
-  ]));
+  const boards = localFetchBoards(LOCAL_MOCK_WORKSPACE_ID);
+  const lists = localFetchAllLists(LOCAL_MOCK_WORKSPACE_ID);
+  const tasks = localFetchAllTasks(LOCAL_MOCK_WORKSPACE_ID);
+  const boardTitleById = new Map(boards.map((board) => [board.id, board.title]));
+  const listById = new Map(lists.map((list) => [list.id, list]));
 
-  const tasks = Object.values(seedBoardData.task)
-    .filter((task) => isAssignedToUser(task.assignees, currentUser))
+  const assignedTasks = tasks
+    .filter((task) => isTaskAssignedToUser(normalizeTaskAssignees(task.assignees), currentUser))
     .map<TodayTaskSummary>((task) => {
-      const listId = seedBoardData.columns.find((columnId) => (
-        seedBoardData.list[columnId]?.tasks.includes(task.id)
-      )) || 'local-list';
+      const assignees = normalizeTaskAssignees(task.assignees);
+      const list = listById.get(task.list_id);
 
       return {
         id: task.id,
-        boardId: 'local-mock-board',
-        boardTitle,
-        listId,
-        listTitle: listTitleById.get(listId) || 'Untitled list',
+        boardId: task.board_id,
+        boardTitle: boardTitleById.get(task.board_id) || DEFAULT_BOARD_TITLE,
+        listId: task.list_id,
+        listTitle: list?.title || 'Untitled list',
         title: task.title,
-        description: task.description,
-        priority: task.priority || null,
-        dueDate: task.dueDate || null,
-        assigneeAvatar: task.assignees[0]?.avatar,
-        isDone: Boolean(task.isDone),
-        updatedAt: new Date().toISOString(),
+        description: task.description || '',
+        priority: task.priority as TodayTaskSummary['priority'],
+        dueDate: task.due_date,
+        assigneeAvatar: assignees[0]?.avatar,
+        isDone: Boolean(task.is_done),
+        updatedAt: task.updated_at || task.created_at,
       };
     });
 
   return {
-    overdueTasks: tasks.filter(isOverdueTask).sort(sortByDueDate),
-    dueTodayTasks: tasks.filter(isDueTodayTask).sort(sortByDueDate),
-    assignedTasks: tasks.sort(sortByDueDate).slice(0, 10),
-    recentlyActiveTasks: [...tasks].sort(sortByActivity).slice(0, 6),
+    overdueTasks: assignedTasks.filter(isOverdueTask).sort(sortByDueDate),
+    dueTodayTasks: assignedTasks.filter(isDueTodayTask).sort(sortByDueDate),
+    assignedTasks: [...assignedTasks].sort(sortByDueDate).slice(0, 12),
+    recentlyActiveTasks: [...assignedTasks].sort(sortByActivity).slice(0, 8),
   };
 }
 
@@ -199,7 +192,7 @@ export async function fetchTodayPageData({
   const listById = new Map(((listsResult.data ?? []) as TodayListRow[]).map((list) => [list.id, list]));
 
   const assignedTasks = ((tasksResult.data ?? []) as TodayTaskRow[])
-    .filter((task) => isAssignedToUser(normalizeTaskAssignees(task.assignees), currentUser))
+    .filter((task) => isTaskAssignedToUser(normalizeTaskAssignees(task.assignees), currentUser))
     .map<TodayTaskSummary>((task) => {
       const assignees = normalizeTaskAssignees(task.assignees);
       const list = listById.get(task.list_id);

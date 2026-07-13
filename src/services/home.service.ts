@@ -1,13 +1,16 @@
 import { endOfMonth, format, startOfMonth } from 'date-fns';
 
 import { DEFAULT_BOARD_TITLE } from '../constants';
-import { data as seedBoardData } from '../data';
-import { CURRENT_USER } from '../data/currentUser';
 import { VIETNAM_HOLIDAYS_2026, mapVietnamHolidayToRow } from '../data/vietnamHolidays';
+import {
+  LOCAL_MOCK_WORKSPACE_ID,
+  localFetchAllTasks,
+  localFetchBoards,
+} from '../infrastructure/local/localBoardStore';
 import supabase, { requireSupabaseClient } from '../lib/supabase';
 import type { AppUser } from '../types/auth.type';
-import type { TaskAssignee } from '../types/task.type';
-import type { HolidayRow } from '../types/supabase.type';
+import type { HolidayRow, TaskRow } from '../types/supabase.type';
+import { isTaskAssignedToUser } from '../utils/taskAssignment';
 import { normalizeTaskAssignees } from '../utils/taskCollections';
 
 export interface HomeTaskSummary {
@@ -54,10 +57,6 @@ interface DashboardBoardRow {
 
 const fallbackVietnamHolidays: HolidayRow[] = VIETNAM_HOLIDAYS_2026.map(mapVietnamHolidayToRow);
 
-function isAssignedToCurrentUser(assignees: TaskAssignee[], currentUserName: string) {
-  return assignees.some((assignee) => assignee.name === currentUserName);
-}
-
 function sortTasksByDueDate(currentTask: HomeTaskSummary, nextTask: HomeTaskSummary) {
   if (!currentTask.dueDate && !nextTask.dueDate) {
     return currentTask.title.localeCompare(nextTask.title);
@@ -74,34 +73,54 @@ function sortTasksByDueDate(currentTask: HomeTaskSummary, nextTask: HomeTaskSumm
   return currentTask.dueDate.localeCompare(nextTask.dueDate) || currentTask.title.localeCompare(nextTask.title);
 }
 
-function getLocalDashboardData(): HomeDashboardData {
-  const boardTitle = DEFAULT_BOARD_TITLE;
-  const tasks = Object.values(seedBoardData.task);
-  const myTasks = tasks
-    .filter((task) => isAssignedToCurrentUser(task.assignees, CURRENT_USER.name))
-    .map<HomeTaskSummary>((task) => ({
-      id: task.id,
-      boardId: 'local-mock-board',
-      boardTitle,
-      title: task.title,
-      priority: task.priority || null,
-      dueDate: task.dueDate || null,
-      assigneeAvatar: task.assignees[0]?.avatar,
-    }))
-    .sort(sortTasksByDueDate);
+function getLocalDashboardData(currentUser: AppUser | null): HomeDashboardData {
+  const boards = localFetchBoards(LOCAL_MOCK_WORKSPACE_ID);
+  const tasks = localFetchAllTasks(LOCAL_MOCK_WORKSPACE_ID);
+  const boardTitleById = new Map(boards.map((board) => [board.id, board.title]));
 
-  const memberAvatars = Array.from(new Set(tasks.flatMap((task) => task.assignees.map((assignee) => assignee.avatar))));
+  const myTasks = tasks
+    .filter((task) => isTaskAssignedToUser(normalizeTaskAssignees(task.assignees), currentUser))
+    .map<HomeTaskSummary>((task) => {
+      const assignees = normalizeTaskAssignees(task.assignees);
+      return {
+        id: task.id,
+        boardId: task.board_id,
+        boardTitle: boardTitleById.get(task.board_id) || DEFAULT_BOARD_TITLE,
+        title: task.title,
+        priority: task.priority as HomeTaskSummary['priority'],
+        dueDate: task.due_date,
+        assigneeAvatar: assignees[0]?.avatar,
+      };
+    })
+    .sort(sortTasksByDueDate)
+    .slice(0, 12);
+
+  const tasksByBoardId = tasks.reduce<Map<string, TaskRow[]>>((taskMap, task) => {
+    const currentTasks = taskMap.get(task.board_id) || [];
+    currentTasks.push(task);
+    taskMap.set(task.board_id, currentTasks);
+    return taskMap;
+  }, new Map());
+
+  const recentBoards = boards.map<RecentBoardSummary>((board) => {
+    const boardTasks = tasksByBoardId.get(board.id) || [];
+    const memberAvatars = Array.from(new Set(boardTasks.flatMap((task) => (
+      normalizeTaskAssignees(task.assignees).map((assignee) => assignee.avatar)
+    ))));
+
+    return {
+      id: board.id,
+      title: board.title,
+      description: board.description,
+      taskCount: boardTasks.length,
+      memberAvatars: memberAvatars.slice(0, 5),
+      updatedAt: board.updated_at || board.created_at,
+    };
+  });
 
   return {
     myTasks,
-    recentBoards: [{
-      id: 'local-mock-board',
-      title: boardTitle,
-      description: 'Local demo board',
-      taskCount: tasks.length,
-      memberAvatars: memberAvatars.slice(0, 5),
-      updatedAt: new Date().toISOString(),
-    }],
+    recentBoards,
     holidays: fallbackVietnamHolidays,
   };
 }
@@ -116,7 +135,7 @@ export async function fetchHomeDashboardData({
   workspaceId,
 }: FetchHomeDashboardDataParams = {}): Promise<HomeDashboardData> {
   if (!supabase) {
-    return getLocalDashboardData();
+    return getLocalDashboardData(currentUser ?? null);
   }
 
   const client = requireSupabaseClient();
@@ -195,33 +214,19 @@ export async function fetchHomeDashboardData({
   }
 
   const myTasks = tasks
-    .filter((task) => {
+    .filter((task) => isTaskAssignedToUser(normalizeTaskAssignees(task.assignees), currentUser ?? null))
+    .map<HomeTaskSummary>((task) => {
       const assignees = normalizeTaskAssignees(task.assignees);
-
-      if (!currentUser || currentUser.isMock) {
-        return isAssignedToCurrentUser(assignees, CURRENT_USER.name);
-      }
-
-      return assignees.some((assignee) => (
-        assignee.name === currentUser.name
-        || assignee.name === currentUser.email
-      ));
+      return {
+        id: task.id,
+        boardId: task.board_id,
+        boardTitle: boardTitleById.get(task.board_id) || 'Untitled board',
+        title: task.title,
+        priority: task.priority,
+        dueDate: task.due_date,
+        assigneeAvatar: assignees[0]?.avatar,
+      };
     })
-    .map<HomeTaskSummary>((task) => ({
-      ...(() => {
-        const assignees = normalizeTaskAssignees(task.assignees);
-
-        return {
-          assigneeAvatar: assignees[0]?.avatar,
-        };
-      })(),
-      id: task.id,
-      boardId: task.board_id,
-      boardTitle: boardTitleById.get(task.board_id) || 'Untitled board',
-      title: task.title,
-      priority: task.priority,
-      dueDate: task.due_date,
-    }))
     .sort(sortTasksByDueDate)
     .slice(0, 12);
 

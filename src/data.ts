@@ -26,7 +26,7 @@ export const data: BoardData = {
       title: 'Redesign tables card',
       description: 'In _variables.scss on line 672 you define $table_variants. Each instance of "color-level" needs to be changed to "shift-color".',
       assignees: [
-        { name: 'Bonnie Green', avatar: 'https://flowbite.com/application-ui/demo/images/users/bonnie-green.png' },
+        { name: 'Bonnie Green', avatar: 'https://flowbite.com/application-ui/demo/images/users/bonnie-green.png', userId: 'mock-user' },
         { name: 'Roberta Casas', avatar: 'https://flowbite.com/application-ui/demo/images/users/roberta-casas.png' },
       ],
       priority: 'High',
@@ -66,7 +66,7 @@ export const data: BoardData = {
       title: 'Create Javascript elements',
       description: 'Complete the implementation of dynamic form elements.',
       assignees: [
-        { name: 'Bonnie Green', avatar: 'https://flowbite.com/application-ui/demo/images/users/bonnie-green.png' },
+        { name: 'Bonnie Green', avatar: 'https://flowbite.com/application-ui/demo/images/users/bonnie-green.png', userId: 'mock-user' },
       ],
       priority: 'Lowest',
       dueDate: format(subDays(new Date(), 2), 'yyyy-MM-dd'),

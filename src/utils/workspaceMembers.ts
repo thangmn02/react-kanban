@@ -17,6 +17,9 @@ export function mapWorkspaceMemberToAssignee(member: WorkspaceMember): TaskAssig
   return {
     name: member.name,
     avatar: member.avatarUrl,
+    // Propagate stable identity so newly-assigned mock tasks match by id.
+    userId: member.userId,
+    workspaceMemberId: member.id,
   };
 }
 
