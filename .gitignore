@@ -88,3 +88,4 @@ public/tarot_readings.parquet
 # =========================================================
 # Keep supabase/config.toml and supabase/migrations tracked.
 supabase/.temp/
+supabase/.branches/

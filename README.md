@@ -105,14 +105,11 @@ For collaborative mode with auth, workspaces, invites, realtime sync, and RLS,
 run the full Supabase stack. Migrations are tracked in `supabase/migrations/`
 and applied by `supabase db reset`.
 
-> **Caveat — not yet verified from an empty clone.** The tracked migration set
-> does **not** yet include a baseline `create table` for `boards`, `lists`, or
-> `tasks` (the earliest tracked migrations `alter` those tables assuming they
-> already exist). `focus_sessions` was only recently promoted from
-> `docs/sql/` into a tracked migration. As a result `supabase db reset` against
-> a pristine database is expected to fail until a reproducible baseline schema
-> migration is added (see [Known limitations](#known-limitations-and-project-status)).
-> Do not treat reset-from-empty as working until it has been verified locally.
+> **Verified squashed baseline.** The active migration was dumped from the
+> authoritative hosted schema and verified with Supabase CLI `2.109.1` using
+> `supabase start`, reset from an empty local database, strict database lint,
+> and a 33-case two-user/two-workspace RLS suite. The former transitional
+> migrations remain in `supabase/migrations_archive/` for audit history.
 
 **Prerequisites:** the [Supabase CLI](https://supabase.com/docs/guides/cli)
 (`supabase` on your PATH) and Docker (the CLI runs a local stack in containers).
@@ -158,12 +155,14 @@ Local Supabase services (from `supabase/config.toml`, `project_id = "react-kanba
 | API (PostgREST) | 54321 | `public` + `app_private` schemas |
 | Postgres     | 54322 | major version 15 |
 | Studio       | 54323 | local admin UI |
-| Inbucket     | 54324 | test email (auth invites) |
+| Mailpit      | 54324 | test email (auth invites) |
 | Storage      | 54325 | task cover image bucket |
 
-To target a **remote** Supabase project instead, set `VITE_SUPABASE_URL` /
-`VITE_SUPABASE_ANON_KEY` to your hosted project values and apply the migrations
-there (`supabase db push` or the Supabase dashboard).
+To target a **remote** Supabase project, set `VITE_SUPABASE_URL` and
+`VITE_SUPABASE_ANON_KEY` to its values. Do not push the squashed baseline into
+the already-provisioned authoritative project: its migration-history alignment
+is intentionally deferred to a separately reviewed operation with verified
+backups. See `supabase/schema/README.md`.
 
 ---
 
@@ -224,7 +223,10 @@ docs/
   sql/                reference SQL + RLS verification notes (NOT tracked — local only)
   *.md                design/integration/handoff notes
 supabase/
-  migrations/         tracked DB migrations (RLS, RPCs, storage bucket…)
+  migrations/         active verified squashed baseline
+  migrations_archive/ pre-squash transitional history (not applied by reset)
+  schema/              authoritative schema-only snapshots and workflow
+  tests/database/      pgTAP multi-user/workspace RLS isolation tests
   config.toml         local Supabase project config
 scripts/
   pull_hf_tarot.py    regenerates the local tarot reading corpus
@@ -260,11 +262,11 @@ tables and their workspace-scoped RLS boundaries (see `supabase/migrations/`):
 - `focus_sessions`, `holidays`
 - RPCs: `create_workspace_with_owner(...)`, `update_task_positions(jsonb)` for
   atomic, transaction-validated reordering
-- Storage bucket: task cover images (created by migration
-  `20260701000000_create_task_cover_storage_bucket.sql`)
+- Storage bucket: task cover images (created by the squashed baseline)
 
-Migrations are timestamped and applied in order by `supabase db reset`. See the
-`supabase/migrations/` directory for the full history.
+`supabase db reset` applies the active squashed baseline. The archived
+transitional files are retained for review but deliberately live outside the
+active migration directory.
 
 ### Bundle & code splitting
 
@@ -357,9 +359,9 @@ VITE_AUTH_MODE=mock
 > bundle at build time, so they must be present during the build step, not just
 > at runtime.
 
-Remember to apply the database migrations to your hosted Supabase project
-(`supabase db push --linked`, or paste the SQL from `supabase/migrations/` and
-`docs/sql/` into the SQL editor) before pointing the app at it.
+For a new hosted project, review the baseline and backup plan before applying
+it. Do not push it to the current authoritative hosted project until its empty
+migration history is aligned in a separate reviewed operation.
 
 ---
 
@@ -381,11 +383,8 @@ The full checklist and verification queries live in
 - Task reordering goes through the `update_task_positions(jsonb)` RPC so the
   database validates all task/list/workspace relationships and applies the
   reorder in a single transaction.
-- See `docs/sql/rls-verification.md` for copy-paste verification queries, and
-  the migrations under `supabase/migrations/` (notably
-  `20260616000000_harden_workspace_foundation.sql`,
-  `20260702000000_harden_rls_and_function_grants.sql`) for the hardened
-  policies.
+- See `supabase/tests/database/rls_isolation.test.sql` for executable pgTAP
+  isolation coverage and `supabase/migrations/` for the active policies.
 
 
 ---
@@ -458,11 +457,11 @@ VITE_ENABLE_DESIGN_LAB=true
   stack (or point at a hosted project) and apply all migrations; without the
   database, RLS policies, and storage bucket, collaborative features won't
   function.
-- **Database reset is not yet reproducible from an empty clone.** The tracked
-  migrations `alter` `boards`/`lists`/`tasks` without a baseline `create table`,
-  so `supabase db reset` on a pristine database is expected to fail until a
-  squashed baseline schema migration is added. `focus_sessions` is now tracked,
-  but RLS isolation has not yet been proven with multi-JWT tests.
+- **Hosted migration history is not aligned yet.** Empty local reset, strict
+  lint, schema comparison, and multi-user RLS tests are now reproducible, but
+  the authoritative hosted project's migration-history table is still empty.
+  No `migration repair` or baseline push has been run; that remains a backed-up,
+  separately reviewed production operation.
 - Arcana card/pack art is derived from GPL-3.0 third-party assets — review
   those obligations before any public/commercial release (see [License](#license)
   and `src/features/arcana/ATTRIBUTION.md`).
@@ -485,4 +484,3 @@ VITE_ENABLE_DESIGN_LAB=true
   [`src/features/arcana/ATTRIBUTION.md`](src/features/arcana/ATTRIBUTION.md)
   for the full attribution and the Hugging Face `barissglc/tarot` corpus
   notes.
-
