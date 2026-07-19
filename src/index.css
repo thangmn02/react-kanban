@@ -1527,6 +1527,12 @@
   display: grid;
   gap: 4px;
   width: 240px;
+  /* Never exceed the viewport: clamp width on narrow screens and scroll when
+     the option list is taller than the space above the dock. */
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 96px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   border: 1px solid rgba(0,0,0,0.08);
   border-radius: 20px;
   padding: 8px;
@@ -1608,11 +1614,16 @@
 }
 
 /* ===========================================================================
- * Home Appearance — DOODLE theme
- * Body gets data-home-theme="doodle" from useHomeAppearance hook effect.
+ * Home Appearance themes
+ *
+ * The `data-home-theme` attribute is set on the Home dashboard's own
+ * `.min-h-screen` container (see HomeDashboard), NOT on <body>. Selectors are
+ * therefore scoped to `[data-home-theme="…"]` and its descendants, so a theme
+ * can never leak onto the auth screen or any other route.
  * ======================================================================== */
 
-body[data-home-theme="doodle"] .min-h-screen {
+/* --- DOODLE theme --- */
+[data-home-theme="doodle"] {
   background: #fafaf4;
   background-image:
     repeating-linear-gradient(
@@ -1625,161 +1636,70 @@ body[data-home-theme="doodle"] .min-h-screen {
     );
 }
 
-body[data-home-theme="doodle"] h1,
-body[data-home-theme="doodle"] h2,
-body[data-home-theme="doodle"] h3 {
+[data-home-theme="doodle"] h1,
+[data-home-theme="doodle"] h2,
+[data-home-theme="doodle"] h3 {
   font-family: "Caveat", "Comic Sans MS", cursive;
   letter-spacing: 0.01em;
 }
 
 /* Sketch border on cards — wobbly polygon border-radius */
-body[data-home-theme="doodle"] .rounded-3xl,
-body[data-home-theme="doodle"] .rounded-2xl {
+[data-home-theme="doodle"] .rounded-3xl,
+[data-home-theme="doodle"] .rounded-2xl {
   border-radius: 8px 18px 12px 22px / 22px 12px 18px 8px !important;
   box-shadow: 2px 3px 0 rgba(0,0,0,0.12) !important;
 }
 
 /* Slight rotation on alternating section cards */
-body[data-home-theme="doodle"] section:nth-child(odd) > div:first-child {
+[data-home-theme="doodle"] section:nth-child(odd) > div:first-child {
   transform: rotate(-0.4deg);
 }
-body[data-home-theme="doodle"] section:nth-child(even) > div:first-child {
+[data-home-theme="doodle"] section:nth-child(even) > div:first-child {
   transform: rotate(0.3deg);
 }
 
 /* Marker-style buttons */
-body[data-home-theme="doodle"] button:not(.home-appearance-trigger):not(.home-appearance-option) {
+[data-home-theme="doodle"] button:not(.home-appearance-trigger):not(.home-appearance-option) {
   border-radius: 6px 14px 10px 18px / 18px 8px 14px 6px !important;
 }
 
-/* ===========================================================================
- * Home Appearance — PAPER theme
- * ======================================================================== */
-
-body[data-home-theme="paper"] .min-h-screen {
+/* --- PAPER theme --- */
+[data-home-theme="paper"] {
   background-color: #faf5e4;
   background-image:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeBlend in='SourceGraphic' mode='multiply'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
 }
 
-body[data-home-theme="paper"] h1,
-body[data-home-theme="paper"] h2,
-body[data-home-theme="paper"] h3 {
+[data-home-theme="paper"] h1,
+[data-home-theme="paper"] h2,
+[data-home-theme="paper"] h3 {
   font-family: "Lora", "Georgia", serif;
   color: #3b2a1a !important;
 }
 
-body[data-home-theme="paper"] p,
-body[data-home-theme="paper"] span,
-body[data-home-theme="paper"] button {
+[data-home-theme="paper"] p,
+[data-home-theme="paper"] span,
+[data-home-theme="paper"] button {
   color: #4a3523;
 }
 
 /* Pressed ink card feel */
-body[data-home-theme="paper"] .rounded-3xl,
-body[data-home-theme="paper"] .rounded-2xl {
+[data-home-theme="paper"] .rounded-3xl,
+[data-home-theme="paper"] .rounded-2xl {
   background: #fdf8ee !important;
   border-color: rgba(120, 80, 40, 0.18) !important;
   box-shadow: 1px 2px 6px rgba(90,60,20,0.08), inset 0 1px 0 rgba(255,255,255,0.9) !important;
 }
 
-body[data-home-theme="paper"] .bg-white {
+[data-home-theme="paper"] .bg-white {
   background-color: #fdf8ee !important;
 }
 
-body[data-home-theme="paper"] .bg-slate-50,
-body[data-home-theme="paper"] .bg-canvas {
+[data-home-theme="paper"] .bg-slate-50,
+[data-home-theme="paper"] .bg-canvas {
   background-color: #f9f3e1 !important;
 }
 
-body[data-home-theme="paper"] button:not(.home-appearance-trigger):not(.home-appearance-option) {
+[data-home-theme="paper"] button:not(.home-appearance-trigger):not(.home-appearance-option) {
   border-color: rgba(120, 80, 40, 0.28) !important;
-}
-
-/* ===========================================================================
- * Home Appearance — RETROTUNE theme
- * ======================================================================== */
-
-body[data-home-theme="retrotune"] .min-h-screen {
-  background: #080808;
-  position: relative;
-  color: #c8e6a0;
-}
-
-/* CRT scanlines overlay */
-body[data-home-theme="retrotune"] .min-h-screen::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 9999;
-  background: repeating-linear-gradient(
-    0deg,
-    rgba(0,0,0,0.22) 0px,
-    rgba(0,0,0,0.22) 1px,
-    transparent 1px,
-    transparent 3px
-  );
-}
-
-body[data-home-theme="retrotune"] h1,
-body[data-home-theme="retrotune"] h2,
-body[data-home-theme="retrotune"] h3,
-body[data-home-theme="retrotune"] p,
-body[data-home-theme="retrotune"] span,
-body[data-home-theme="retrotune"] button,
-body[data-home-theme="retrotune"] a {
-  font-family: "Courier New", "Lucida Console", monospace !important;
-  color: #b8e080 !important;
-}
-
-body[data-home-theme="retrotune"] h1 { color: #e8ff80 !important; }
-body[data-home-theme="retrotune"] h2 { color: #d4ef68 !important; }
-
-/* Phosphor glow on headings */
-body[data-home-theme="retrotune"] h1 {
-  text-shadow: 0 0 8px rgba(200, 255, 100, 0.7), 0 0 24px rgba(160, 220, 60, 0.4);
-}
-
-body[data-home-theme="retrotune"] .rounded-3xl,
-body[data-home-theme="retrotune"] .rounded-2xl,
-body[data-home-theme="retrotune"] .bg-white {
-  background: #0a0f06 !important;
-  border-color: rgba(120, 200, 60, 0.32) !important;
-  box-shadow: 0 0 0 1px rgba(100,180,40,0.2), 0 4px 24px rgba(80,160,20,0.10) !important;
-  border-radius: 4px !important;
-}
-
-body[data-home-theme="retrotune"] .bg-slate-50,
-body[data-home-theme="retrotune"] .bg-canvas {
-  background-color: #080c04 !important;
-}
-
-body[data-home-theme="retrotune"] .border-slate-200,
-body[data-home-theme="retrotune"] .border-slate-100 {
-  border-color: rgba(100, 180, 40, 0.22) !important;
-}
-
-body[data-home-theme="retrotune"] button:not(.home-appearance-trigger):not(.home-appearance-option) {
-  background: rgba(80, 160, 20, 0.12) !important;
-  border-color: rgba(100, 200, 40, 0.4) !important;
-  color: #b8e080 !important;
-  border-radius: 2px !important;
-}
-body[data-home-theme="retrotune"] button:hover:not(.home-appearance-trigger):not(.home-appearance-option) {
-  background: rgba(80, 160, 20, 0.24) !important;
-  box-shadow: 0 0 8px rgba(100, 200, 40, 0.32) !important;
-}
-
-/* Screen flicker — honor prefers-reduced-motion */
-@media (prefers-reduced-motion: no-preference) {
-  body[data-home-theme="retrotune"] .min-h-screen {
-    animation: retro-flicker 8s linear infinite;
-  }
-  @keyframes retro-flicker {
-    0%, 97%, 100% { opacity: 1; }
-    97.5% { opacity: 0.88; }
-    98% { opacity: 1; }
-    98.5% { opacity: 0.92; }
-  }
 }
