@@ -9,6 +9,11 @@ import {
   validateReadingSpecificity,
 } from '../arcanaReadingEngine';
 import { getArcanaQuestionById, getArcanaQuestionsByTopic } from '../arcanaQuestions';
+import {
+  arcanaReadingEngineVersionV2,
+  buildArcanaReadingV2,
+} from '../reading/arcanaReadingComposerV2';
+import { logArcanaEngineComparison } from '../reading/arcanaReadingCompare';
 import { createSeed } from '../arcanaRng';
 import { readArcanaHistory, saveArcanaReading } from '../arcanaStorage';
 import { arcanaSpreadOrder, resolveArcanaDraw } from '../arcanaSystems';
@@ -53,7 +58,12 @@ export function localizeArcanaReading(reading: ArcanaReading, locale: ArcanaLoca
     return { ...reading, cards, locale };
   }
 
-  const content = buildArcanaReading(cards, question, question.topic, locale, reading.id, null);
+  // Engine versioning: V1 history records keep rendering with the V1 engine
+  // (their stored snapshot stays byte-identical in meaning); only readings
+  // stamped as V2 regenerate through the semantic engine.
+  const content = reading.readingEngineVersion === arcanaReadingEngineVersionV2
+    ? buildArcanaReadingV2(cards, question, question.topic, locale, reading.id, null)
+    : buildArcanaReading(cards, question, question.topic, locale, reading.id, null);
 
   return {
     ...reading,
@@ -129,9 +139,11 @@ export function useArcanaRitualFlow(locale: ArcanaLocale) {
 
     const slugs = cards.map((card) => card.slug);
     const comboKey = buildComboKey(slugs);
-    const baseContent = buildArcanaReading(cards, question, question.topic, locale, seed, null);
+    // New readings are composed by the V2 semantic engine (spread-aware).
+    const baseContent = buildArcanaReadingV2(cards, question, question.topic, locale, seed, null);
     if (import.meta.env.DEV) {
       validateReadingSpecificity(baseContent, cards, question, locale);
+      logArcanaEngineComparison(cards, question, question.topic, locale, seed, null);
     }
 
     const baseReading: ArcanaReading = {
@@ -143,6 +155,7 @@ export function useArcanaRitualFlow(locale: ArcanaLocale) {
       cards,
       comboKey,
       messageSnapshot: normalizeVietnameseText(serializeArcanaReading(baseContent, locale)),
+      readingEngineVersion: arcanaReadingEngineVersionV2,
       locale,
       createdAt: new Date().toISOString(),
     };
@@ -152,7 +165,7 @@ export function useArcanaRitualFlow(locale: ArcanaLocale) {
 
     void findCorpusReading(slugs, seed).then((match) => {
       if (!match) return;
-      const enriched = buildArcanaReading(cards, question, question.topic, locale, seed, match);
+      const enriched = buildArcanaReadingV2(cards, question, question.topic, locale, seed, match);
       setCurrentReading((prev) => {
         if (!prev || prev.id !== baseReading.id) return prev;
         return {
