@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { useI18n, type Language } from '../../i18n';
 import type { HomeAppearance } from '../../hooks/useHomeAppearance';
@@ -34,12 +34,6 @@ const THEMES: ThemeOption[] = [
     icon: '▤',
     description: { en: 'Warm paper and classic ink.', vi: 'Giấy ấm, mực kiểu cổ điển.' },
   },
-  {
-    id: 'retrotune',
-    label: { en: 'RetroTune', vi: 'RetroTune' },
-    icon: '▣',
-    description: { en: 'Retro phosphor screen.', vi: 'Màn hình phosphor retro.' },
-  },
 ];
 
 const switcherText: Record<Language, { region: string; trigger: string; choose: string; prefix: string; fallback: string }> = {
@@ -62,14 +56,50 @@ const switcherText: Record<Language, { region: string; trigger: string; choose: 
 export default function HomeAppearanceSwitcher({ current, onChange }: HomeAppearanceSwitcherProps) {
   const { language } = useI18n();
   const [open, setOpen] = useState(false);
+  const dockRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const selectedTheme = THEMES.find((theme) => theme.id === current);
   const copy = switcherText[language];
 
+  const closeAndReturnFocus = () => {
+    setOpen(false);
+    triggerRef.current?.focus();
+  };
+
+  // Escape to close (returning focus to the trigger) and outside-click to
+  // dismiss, so keyboard and pointer users are never trapped in the panel.
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.stopPropagation();
+        closeAndReturnFocus();
+      }
+    };
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (dockRef.current && !dockRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('mousedown', handlePointerDown);
+    };
+  }, [open]);
+
   return (
-    <div className="home-appearance-dock" role="region" aria-label={copy.region}>
+    <div className="home-appearance-dock" role="region" aria-label={copy.region} ref={dockRef}>
       <button
         type="button"
         id="home-appearance-trigger"
+        ref={triggerRef}
         aria-expanded={open}
         aria-controls="home-appearance-panel"
         aria-label={copy.trigger}
@@ -106,7 +136,7 @@ export default function HomeAppearanceSwitcher({ current, onChange }: HomeAppear
                 className={`home-appearance-option ${active ? 'is-active' : ''}`}
                 onClick={() => {
                   onChange(theme.id);
-                  setOpen(false);
+                  closeAndReturnFocus();
                 }}
               >
                 <span className="home-appearance-option-icon" aria-hidden="true">

@@ -227,7 +227,7 @@ function HomeDashboard({
       : 'focus';
 
   return (
-    <div className="min-h-screen bg-canvas">
+    <div className="min-h-screen bg-canvas" data-home-theme={appearance}>
       <main className="mx-auto max-w-7xl px-5 py-6 sm:px-7" aria-busy={isLoading}>
         <PageHeader
           eyebrow={t('home.eyebrow')}
