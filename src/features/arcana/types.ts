@@ -92,6 +92,12 @@ export interface ArcanaReading {
   messageSnapshot: string;
   /** Raw English corpus reading the interpretation drew from, if matched. */
   corpusReading?: string;
+  /**
+   * Which reading engine composed `messageSnapshot`. Absent (or 1) means the
+   * legacy template engine; 2 means the spread-aware semantic engine. Old
+   * records are never silently re-generated with a newer engine.
+   */
+  readingEngineVersion?: 1 | 2;
   /** Locale the snapshot text was generated in. */
   locale: ArcanaLocale;
   createdAt: string;

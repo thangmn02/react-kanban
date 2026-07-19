@@ -69,6 +69,7 @@ function normalizeReading(reading: Partial<ArcanaReading> & LegacyReading): Arca
     comboKey: reading.comboKey ?? buildComboKey(cards.map((card) => card.slug)),
     messageSnapshot: reading.messageSnapshot ?? '',
     corpusReading: reading.corpusReading,
+    readingEngineVersion: reading.readingEngineVersion === 2 ? 2 : 1,
     locale: reading.locale ?? 'vi',
     createdAt: reading.createdAt ?? new Date().toISOString(),
   };
