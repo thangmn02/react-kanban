@@ -24,7 +24,7 @@ export default function HomeRoute() {
           />
         </div>
       )}
-      <HomeDashboard {...context.home} />
+      <HomeDashboard {...context.home} refreshKey={context.isSavingBoard} taskRevision={context.board.kanban.boardData.task} />
     </div>
   );
 }

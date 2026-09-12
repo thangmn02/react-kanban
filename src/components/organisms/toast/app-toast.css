@@ -9,7 +9,7 @@
   width: var(--toastify-toast-width);
 }
 
-.app-toast {
+.Toastify__toast.app-toast {
   --toast-accent: var(--app-accent, #2563eb);
   display: grid;
   grid-template-columns: 0.1875rem 1.25rem minmax(0, 1fr) 1.5rem;
@@ -125,7 +125,7 @@
   outline-offset: 2px;
 }
 
-.app-toast__progress {
+.Toastify__progress-bar.app-toast__progress {
   height: 0.125rem;
   background: var(--toast-accent);
 }
@@ -162,5 +162,12 @@
     left: 1rem;
     right: 1rem;
     width: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-toast .Toastify__progress-bar--wrp {
+    /* Keep the invisible animation running: animationend dismisses the toast. */
+    opacity: 0;
   }
 }

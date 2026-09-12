@@ -36,6 +36,7 @@ interface Params {
   boardDialogs: ReturnType<typeof useBoardDialogState>;
   taskEditor: ReturnType<typeof useTaskEditorState>;
   focus: FocusSessionValue;
+  onMarkFocusDone: NonNullable<AppLayoutRouteContext['home']['focusControls']>['onMarkDone'];
   routing: ReturnType<typeof useAppRoutingController>;
   handleOpenQuickPlan: () => void;
   handleOpenTaskFromToday: (task: TodayTaskSummary) => void;
@@ -99,6 +100,7 @@ export function useAppLayoutRouteContextValue(params: Params): AppLayoutRouteCon
     },
     arcana: { isOpen: true, onClose: () => routing.navigate('/home') },
     home: {
+      focusControls: { session: focus, onMarkDone: params.onMarkFocusDone },
       onOpenTask: board.handleOpenTaskFromHome,
       onOpenBoard: board.handleOpenBoardFromHome,
       onToggleFocusTask: focus.handleToggleFocusTaskFromHome,

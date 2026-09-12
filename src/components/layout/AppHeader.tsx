@@ -3,6 +3,7 @@ import CommandTrigger from './CommandTrigger';
 import UserMenu from './UserMenu';
 import WorkspaceSwitcher from './WorkspaceSwitcher';
 import { useI18n } from '../../i18n';
+import AppNavigation, { type NavigationView } from './AppNavigation';
 
 interface AppHeaderProps {
   authMode: AuthMode;
@@ -19,6 +20,8 @@ interface AppHeaderProps {
   onSignOut: () => void;
   onOpenArcanaBooth: () => void;
   arcanaAvailableDraws?: number;
+  activeView?: string;
+  onNavigate?: (view: NavigationView) => void;
 }
 
 export default function AppHeader({
@@ -36,16 +39,18 @@ export default function AppHeader({
   onSignOut,
   onOpenArcanaBooth,
   arcanaAvailableDraws = 0,
+  activeView = 'home',
+  onNavigate,
 }: AppHeaderProps) {
   const { t } = useI18n();
 
   return (
     <header className="sticky top-0 z-50 overflow-visible border-b border-slate-200/70 bg-white/88 backdrop-blur-xl">
-      <div className="flex min-h-16 items-center gap-3 px-4 sm:px-6">
+      <div className="flex min-h-16 flex-wrap items-center gap-2 px-3 py-2 sm:gap-3 sm:px-6">
         <button
           type="button"
           onClick={onGoHome}
-          className="flex cursor-pointer items-center gap-2 rounded-2xl px-2 py-1.5 text-left transition hover:bg-slate-100/80 focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"
+          className="flex cursor-pointer items-center gap-2 rounded-xl py-1.5 text-left transition hover:bg-slate-100/80 focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 lg:hidden"
           aria-label={t('app.goDashboard')}
         >
           <img
@@ -72,7 +77,7 @@ export default function AppHeader({
         <button
           type="button"
           onClick={onGoToday}
-          className="hidden cursor-pointer rounded-2xl px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-950 focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 md:inline-flex"
+          className={`${onNavigate ? 'hidden' : 'inline-flex'} cursor-pointer rounded-xl px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-950 focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100`}
         >
           {t('app.today')}
         </button>
@@ -114,6 +119,7 @@ export default function AppHeader({
           />
         </div>
       </div>
+      {onNavigate && <AppNavigation mobile activeView={activeView} onNavigate={onNavigate} />}
     </header>
   );
 }

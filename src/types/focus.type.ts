@@ -26,16 +26,29 @@ export interface FocusTaskInput {
 export interface PomodoroTimerState {
   mode: PomodoroMode;
   activeTaskId: string | null;
+  sessionTask?: FocusTask | null;
+  sessionId?: string | null;
   isRunning: boolean;
   remainingSeconds: number;
   endsAt: number | null;
   startedAt: number | null;
   plannedSeconds: number | null;
+  completedCycleFocus?: number;
+}
+
+export interface PomodoroTimerSettings {
+  focusMinutes: number;
+  shortBreakMinutes: number;
+  longBreakMinutes: number;
+  longBreakEvery: number;
+  autoStartBreaks: boolean;
+  autoStartFocus: boolean;
 }
 
 export type FocusSessionStatus = 'completed' | 'interrupted' | 'cancelled';
 
 export interface FocusSessionLogInput {
+  sessionId: string;
   workspaceId: string;
   boardId?: string | null;
   taskId?: string | null;
@@ -71,6 +84,7 @@ export interface DailyFocusStats {
 }
 
 export interface PomodoroSessionSnapshot {
+  sessionId: string;
   startedAt: number;
   endedAt: number;
   durationSeconds: number;

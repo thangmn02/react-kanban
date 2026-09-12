@@ -1,16 +1,27 @@
-import type { DailyFocusStats, FocusTask, PomodoroMode, PomodoroTimerState } from '../../types/focus.type';
+import { useState } from 'react';
+
+import type {
+  DailyFocusStats,
+  FocusTask,
+  PomodoroMode,
+  PomodoroTimerSettings,
+  PomodoroTimerState,
+} from '../../types/focus.type';
 import { formatPomodoroTime } from '../../utils/pomodoroTime';
 import PomodoroModeSwitch from './PomodoroModeSwitch';
+import PomodoroTimerSettingsPanel from './PomodoroTimerSettingsPanel';
 import { useI18n } from '../../i18n';
 
 interface PomodoroTimerProps {
   focusTasks: FocusTask[];
   activeTaskId: string | null;
   timerState: PomodoroTimerState;
+  timerSettings: PomodoroTimerSettings;
   dailyFocusStats: DailyFocusStats;
   remainingSeconds: number;
   onActiveTaskChange: (taskId: string) => void;
   onModeChange: (mode: PomodoroMode) => void;
+  onTimerSettingsChange: (patch: Partial<PomodoroTimerSettings>) => void;
   onStart: () => void;
   onPause: () => void;
   onReset: () => void;
@@ -24,10 +35,12 @@ function PomodoroTimer({
   focusTasks,
   activeTaskId,
   timerState,
+  timerSettings,
   dailyFocusStats,
   remainingSeconds,
   onActiveTaskChange,
   onModeChange,
+  onTimerSettingsChange,
   onStart,
   onPause,
   onReset,
@@ -37,6 +50,8 @@ function PomodoroTimer({
   isPictureInPictureOpen,
 }: PomodoroTimerProps) {
   const { t } = useI18n();
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const cyclePosition = Math.min((timerState.completedCycleFocus || 0) + 1, timerSettings.longBreakEvery);
 
   return (
     <section className="rounded-2xl border border-white/10 bg-white/5 p-4">
@@ -48,10 +63,41 @@ function PomodoroTimer({
           <div className="mt-1 text-4xl font-semibold tracking-[-0.06em] tabular-nums text-white">
             {formatPomodoroTime(remainingSeconds)}
           </div>
+          {timerState.mode === 'focus' && (
+            <p className="mt-1 text-xs font-medium text-slate-400">
+              {t('focus.timer.cycleProgress', { current: cyclePosition, total: timerSettings.longBreakEvery })}
+            </p>
+          )}
         </div>
 
-        <PomodoroModeSwitch mode={timerState.mode} onModeChange={onModeChange} />
+        <div className="flex items-center gap-2">
+          <PomodoroModeSwitch mode={timerState.mode} onModeChange={onModeChange} />
+          <button
+            type="button"
+            onClick={() => setIsSettingsOpen((open) => !open)}
+            aria-expanded={isSettingsOpen}
+            aria-label={isSettingsOpen ? t('focus.timer.closeSettings') : t('focus.timer.settings')}
+            title={t('focus.timer.settings')}
+            className={`flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 ${
+              isSettingsOpen
+                ? 'border-sky-300/50 bg-sky-400/20 text-sky-200'
+                : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white'
+            }`}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" />
+            </svg>
+          </button>
+        </div>
       </div>
+
+      {isSettingsOpen && (
+        <PomodoroTimerSettingsPanel
+          settings={timerSettings}
+          hasActiveSession={Boolean(timerState.startedAt)}
+          onChange={onTimerSettingsChange}
+        />
+      )}
 
       <label className="mt-4 block text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
         {t('focus.timer.task')}

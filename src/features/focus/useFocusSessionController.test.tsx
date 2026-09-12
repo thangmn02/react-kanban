@@ -1,0 +1,33 @@
+import { act, cleanup, renderHook } from '@testing-library/react';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { I18nProvider } from '../../i18n';
+import { useFocusSessionController } from './useFocusSessionController';
+
+vi.mock('../../services/activity.service', () => ({ createActivity: vi.fn().mockResolvedValue(undefined) }));
+vi.mock('../../services/focusSession.service', () => ({ fetchDailyFocusStats: vi.fn(), logFocusSession: vi.fn() }));
+vi.mock('../../components/organisms/toast/notify', () => ({ notify: { info: vi.fn(), success: vi.fn() } }));
+beforeEach(() => localStorage.clear());
+afterEach(cleanup);
+const summary = (id: string) => ({ id, title: id, boardId: 'board', boardTitle: 'Project', dueDate: null, priority: null });
+it('requires an intention for a different task and enforces the Home pin limit', () => {
+  const { result } = renderHook(() => useFocusSessionController({ user: null, workspaceId: 'workspace', boardData: { columns: [], task: {}, list: {} }, activeBoardId: null, activeBoardSummary: null }), { wrapper: I18nProvider });
+  act(() => result.current.handleStartFocusTaskFromHome(summary('a')));
+  expect(result.current.focusLaunchTask?.id).toBe('a');
+  expect(result.current.timerState.isRunning).toBe(false);
+  act(() => result.current.confirmFocusLaunch('Write introduction'));
+  expect(result.current.timerState.isRunning).toBe(true);
+  act(() => result.current.pauseTimer());
+  act(() => result.current.handleStartFocusTaskFromHome(summary('a')));
+  expect(result.current.focusLaunchTask).toBeNull();
+  expect(result.current.activeFocusIntention?.text).toBe('Write introduction');
+  act(() => result.current.handleStartFocusTaskFromHome(summary('b')));
+  expect(result.current.timerState.isRunning).toBe(false);
+  expect(result.current.focusLaunchTask?.id).toBe('b');
+  act(() => result.current.confirmFocusLaunch('Review draft'));
+  expect(result.current.activeFocusIntention).toEqual({ taskId: 'b', text: 'Review draft' });
+  act(() => result.current.handleToggleFocusTaskFromHome(summary('c')));
+  act(() => result.current.handleStartFocusTaskFromHome(summary('d')));
+  expect(result.current.focusTasks).toHaveLength(3);
+  expect(result.current.timerState.activeTaskId).toBe('b');
+  expect(result.current.timerState.isRunning).toBe(true);
+});

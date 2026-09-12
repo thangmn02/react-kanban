@@ -45,6 +45,7 @@ interface DashboardTaskRow {
   priority: HomeTaskSummary['priority'];
   due_date: string | null;
   assignees: unknown;
+  is_done: boolean | null;
 }
 
 interface DashboardBoardRow {
@@ -79,7 +80,7 @@ function getLocalDashboardData(currentUser: AppUser | null): HomeDashboardData {
   const boardTitleById = new Map(boards.map((board) => [board.id, board.title]));
 
   const myTasks = tasks
-    .filter((task) => isTaskAssignedToUser(normalizeTaskAssignees(task.assignees), currentUser))
+    .filter((task) => !task.is_done && boardTitleById.has(task.board_id) && isTaskAssignedToUser(normalizeTaskAssignees(task.assignees), currentUser))
     .map<HomeTaskSummary>((task) => {
       const assignees = normalizeTaskAssignees(task.assignees);
       return {
@@ -92,8 +93,7 @@ function getLocalDashboardData(currentUser: AppUser | null): HomeDashboardData {
         assigneeAvatar: assignees[0]?.avatar,
       };
     })
-    .sort(sortTasksByDueDate)
-    .slice(0, 12);
+    .sort(sortTasksByDueDate);
 
   const tasksByBoardId = tasks.reduce<Map<string, TaskRow[]>>((taskMap, task) => {
     const currentTasks = taskMap.get(task.board_id) || [];
@@ -135,47 +135,56 @@ export async function fetchHomeDashboardData({
   workspaceId,
 }: FetchHomeDashboardDataParams = {}): Promise<HomeDashboardData> {
   if (!supabase) {
+    if (workspaceId && workspaceId !== LOCAL_MOCK_WORKSPACE_ID) return { myTasks: [], recentBoards: [], holidays: [] };
     return getLocalDashboardData(currentUser ?? null);
   }
+
+  if (!workspaceId) return { myTasks: [], recentBoards: [], holidays: [] };
 
   const client = requireSupabaseClient();
   const visibleMonthStart = format(startOfMonth(new Date()), 'yyyy-MM-dd');
   const visibleMonthEnd = format(endOfMonth(new Date()), 'yyyy-MM-dd');
 
-  let boardsQuery = client
+  const boardsQuery = () => client
     .from('boards')
     .select('id,title,description,created_at,updated_at')
     .is('archived_at', null)
     .order('updated_at', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false })
-    .limit(6);
-  let tasksQuery = client
+    .order('id')
+    .eq('workspace_id', workspaceId);
+  const tasksQuery = () => client
     .from('tasks')
-    .select('id,board_id,title,priority,due_date,assignees')
+    .select('id,board_id,title,priority,due_date,assignees,is_done')
     .is('deleted_at', null)
     .is('archived_at', null)
-    .order('due_date', { ascending: true, nullsFirst: false });
+    .order('id')
+    .eq('workspace_id', workspaceId);
 
-  if (workspaceId) {
-    boardsQuery = boardsQuery.eq('workspace_id', workspaceId);
-    tasksQuery = tasksQuery.eq('workspace_id', workspaceId);
-  }
-
-  const [boardsResult, tasksResult] = await Promise.all([
-    boardsQuery,
-    tasksQuery,
+  // Page explicitly: PostgREST's default row cap must not truncate briefing totals.
+  const boards: DashboardBoardRow[] = [];
+  const tasks: DashboardTaskRow[] = [];
+  const pageSize = 500;
+  await Promise.all([
+    (async () => {
+      for (let offset = 0; ; offset += pageSize) {
+        const result = await boardsQuery().range(offset, offset + pageSize - 1);
+        if (result.error) throw result.error;
+        const page = result.data ?? [];
+        boards.push(...page);
+        if (page.length < pageSize) break;
+      }
+    })(),
+    (async () => {
+      for (let offset = 0; ; offset += pageSize) {
+        const result = await tasksQuery().range(offset, offset + pageSize - 1);
+        if (result.error) throw result.error;
+        const page = result.data ?? [];
+        tasks.push(...page as DashboardTaskRow[]);
+        if (page.length < pageSize) break;
+      }
+    })(),
   ]);
-
-  if (boardsResult.error) {
-    throw boardsResult.error;
-  }
-
-  if (tasksResult.error) {
-    throw tasksResult.error;
-  }
-
-  const boards = (boardsResult.data ?? []) as DashboardBoardRow[];
-  const tasks = (tasksResult.data ?? []) as DashboardTaskRow[];
   const boardTitleById = new Map(boards.map((board) => [board.id, board.title]));
   let holidays = fallbackVietnamHolidays.filter((holiday) => (
     holiday.date >= visibleMonthStart && holiday.date <= visibleMonthEnd
@@ -214,7 +223,7 @@ export async function fetchHomeDashboardData({
   }
 
   const myTasks = tasks
-    .filter((task) => isTaskAssignedToUser(normalizeTaskAssignees(task.assignees), currentUser ?? null))
+    .filter((task) => !task.is_done && boardTitleById.has(task.board_id) && isTaskAssignedToUser(normalizeTaskAssignees(task.assignees), currentUser ?? null))
     .map<HomeTaskSummary>((task) => {
       const assignees = normalizeTaskAssignees(task.assignees);
       return {
@@ -227,8 +236,7 @@ export async function fetchHomeDashboardData({
         assigneeAvatar: assignees[0]?.avatar,
       };
     })
-    .sort(sortTasksByDueDate)
-    .slice(0, 12);
+    .sort(sortTasksByDueDate);
 
   const tasksByBoardId = tasks.reduce<Map<string, DashboardTaskRow[]>>((taskMap, task) => {
     const currentTasks = taskMap.get(task.board_id) || [];
@@ -237,7 +245,7 @@ export async function fetchHomeDashboardData({
     return taskMap;
   }, new Map());
 
-  const recentBoards = boards.map<RecentBoardSummary>((board) => {
+  const recentBoards = boards.slice(0, 6).map<RecentBoardSummary>((board) => {
     const boardTasks = tasksByBoardId.get(board.id) || [];
     const memberAvatars = Array.from(new Set(boardTasks.flatMap((task) => (
       normalizeTaskAssignees(task.assignees).map((assignee) => assignee.avatar)

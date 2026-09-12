@@ -46,6 +46,7 @@ interface FocusSessionsInsertQuery {
 interface FocusSessionsTableClient {
   select(columns: string): FocusSessionsSelectQuery;
   insert(payload: Record<string, unknown>): FocusSessionsInsertQuery;
+  upsert(payload: Record<string, unknown>, options: { onConflict: string }): FocusSessionsInsertQuery;
 }
 
 interface FocusSessionsClient {
@@ -109,6 +110,7 @@ function buildDailyFocusStats(sessions: FocusSessionSummary[]): DailyFocusStats 
 
 export async function logFocusSession(input: FocusSessionLogInput): Promise<FocusSessionSummary> {
   const payload = {
+    id: input.sessionId,
     workspace_id: input.workspaceId,
     board_id: input.boardId ?? null,
     task_id: input.taskId ?? null,
@@ -122,8 +124,10 @@ export async function logFocusSession(input: FocusSessionLogInput): Promise<Focu
   };
 
   if (!supabase) {
+    const existingSession = readLocalFocusSessions().find((session) => session.id === input.sessionId);
+    if (existingSession) return existingSession;
     const localSession: FocusSessionSummary = {
-      id: `focus-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      id: input.sessionId,
       workspaceId: input.workspaceId,
       boardId: input.boardId ?? null,
       taskId: input.taskId ?? null,
@@ -143,7 +147,7 @@ export async function logFocusSession(input: FocusSessionLogInput): Promise<Focu
   const client = getFocusSessionsClient();
   const { data, error } = await client
     .from('focus_sessions')
-    .insert(payload)
+    .upsert(payload, { onConflict: 'id' })
     .select(focusSessionSelectColumns)
     .single();
 

@@ -141,13 +141,13 @@ export default function TodayPage({
   };
 
   return (
-    <main className="min-h-screen bg-canvas px-5 py-7 sm:px-7" aria-busy={isLoading}>
+    <main className="bg-canvas px-4 py-4 sm:px-6" aria-busy={isLoading}>
       <section className="mx-auto max-w-7xl">
         <PageHeader
           eyebrow={t('today.eyebrow')}
           title={t('today.title')}
           description={t('today.description')}
-          className="mb-7"
+          className="mb-4"
           actions={(
             <button
               type="button"
@@ -159,7 +159,7 @@ export default function TodayPage({
           )}
         />
 
-        <div className="mb-6 rounded-2xl border border-slate-200/80 bg-white px-4 py-3 shadow-card">
+        <div className="mb-4 rounded-2xl border border-slate-200/80 bg-white px-4 py-2 shadow-card">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm font-semibold text-slate-900">
               {t('today.stats.sessions', { count: dailyFocusStats.completedSessions, plural: dailyFocusStats.completedSessions === 1 ? '' : 's' })}
@@ -172,8 +172,8 @@ export default function TodayPage({
         </div>
 
         {isLoading && (
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-            <div className="space-y-6">
+          <div className="grid items-start gap-4 lg:grid-cols-2">
+            <div className="space-y-4">
               <SectionCard className="p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div>
@@ -189,7 +189,7 @@ export default function TodayPage({
               </SectionCard>
             </div>
 
-            <div className="space-y-6">
+            <div className="space-y-4">
               {Array.from({ length: 3 }).map((_, sectionIndex) => (
                 <SectionCard key={sectionIndex} className="p-5">
                   <Skeleton className="h-4 w-28" />
@@ -215,9 +215,9 @@ export default function TodayPage({
         )}
 
         {!isLoading && !errorMessage && (
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-            <div className="space-y-6">
-              <SectionCard className="p-5">
+          <div className={`grid items-start gap-4 ${hasUrgentTasks || hasSecondaryTasks ? 'lg:grid-cols-2' : ''}`}>
+            <div className="space-y-4">
+              <SectionCard className="p-4">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-slate-600">
@@ -235,6 +235,7 @@ export default function TodayPage({
                 <div className="mt-4 grid gap-3">
                   {focusTasks.length === 0 ? (
                     <EmptyState
+                      compact
                       title={t('today.noFocusTitle')}
                       description={t('today.noFocusDescription')}
                       action={(
@@ -289,7 +290,7 @@ export default function TodayPage({
               </SectionCard>
 
               {focusSuggestions.length > 0 && (
-                <SectionCard className="p-5">
+                <SectionCard className="p-4">
                   <div className="mb-4">
                     <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-slate-600">
                       {t('today.focusTitle')}
@@ -336,22 +337,22 @@ export default function TodayPage({
 
               {!hasUrgentTasks && (
                 <motion.div
-                  className="rounded-2xl border border-sky-100 bg-sky-50/70 p-5 text-slate-700 shadow-card"
+                  className="rounded-2xl border border-sky-100 bg-sky-50/70 p-4 text-slate-700"
                   initial={prefersReducedMotion ? false : { opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ type: 'spring', stiffness: 160, damping: 20 }}
                 >
                   <h2 className="text-sm font-semibold text-slate-950">{t('today.noUrgentTitle')}</h2>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                  <p className="mt-1 text-sm leading-5 text-slate-600">
                     {t('today.planningSpace')}
                   </p>
                 </motion.div>
               )}
             </div>
 
-            <div className="space-y-6">
+            {(hasUrgentTasks || hasSecondaryTasks) && <div className="space-y-4">
               {(todayData.overdueTasks.length > 0 || todayData.dueTodayTasks.length > 0) && (
-                <SectionCard className="p-5">
+                <SectionCard className="p-4">
                   <div className="mb-4">
                     <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-slate-600">
                       {t('today.needsAttention')}
@@ -393,11 +394,11 @@ export default function TodayPage({
               )}
 
               {hasSecondaryTasks && (
-                <details className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-card">
+                <details open={!hasUrgentTasks} className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-card">
                   <summary className="cursor-pointer text-sm font-bold uppercase tracking-[0.2em] text-slate-600">
                     {t('today.moreTasks')}
                   </summary>
-                  <div className="mt-5 grid gap-5">
+                  <div className="mt-3 grid gap-4">
                     {todayData.assignedTasks.length > 0 && (
                       <TodayTaskSection
                         title={t('today.assignedTitle')}
@@ -428,7 +429,7 @@ export default function TodayPage({
                   </div>
                 </details>
               )}
-            </div>
+            </div>}
           </div>
         )}
       </section>

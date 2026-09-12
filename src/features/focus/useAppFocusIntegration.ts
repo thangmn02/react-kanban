@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
 
 import { notify } from '../../components/organisms/toast/notify';
@@ -35,6 +35,22 @@ export function useAppFocusIntegration({
   onTaskCompleted,
   t,
 }: Params) {
+  const focusContextRef = useRef({
+    scopeKey: `${user?.id ?? 'none'}:${workspaceId ?? 'none'}`,
+    activeTaskId: focus.timerState.activeTaskId,
+    startedAt: focus.timerState.startedAt,
+    mode: focus.timerState.mode,
+    isRunning: focus.timerState.isRunning,
+  });
+  const pendingCompletionKeysRef = useRef(new Set<string>());
+  focusContextRef.current = {
+    scopeKey: `${user?.id ?? 'none'}:${workspaceId ?? 'none'}`,
+    activeTaskId: focus.timerState.activeTaskId,
+    startedAt: focus.timerState.startedAt,
+    mode: focus.timerState.mode,
+    isRunning: focus.timerState.isRunning,
+  };
+
   const handleOpenFocusTask = useCallback(async (focusTask: FocusTask) => {
     board.setIsBoardLoading(true);
     try {
@@ -58,8 +74,10 @@ export function useAppFocusIntegration({
   }, [board, focus, navigate, openEditTaskDialog, t, user?.id, workspaceId]);
 
   const handleMarkFocusTaskDone = useCallback(async (focusTask: FocusTask) => {
+    const requestScopeKey = focusContextRef.current.scopeKey;
     try {
       await updateTask(focusTask.id, buildTaskFieldUpdatePayload({ isDone: true }));
+      if (focusContextRef.current.scopeKey !== requestScopeKey) return false;
       focus.updateFocusedTask(focusTask.id, { isDone: true });
       if (board.boardData.task[focusTask.id]) {
         board.setBoardData((current) => ({
@@ -67,43 +85,68 @@ export function useAppFocusIntegration({
           task: { ...current.task, [focusTask.id]: { ...current.task[focusTask.id], isDone: true } },
         }));
       }
-      await createActivity(focusTask.id, 'status_change', {
+      void createActivity(focusTask.id, 'status_change', {
         description: 'Marked task as completed from Focus Dock',
         field: 'isDone',
         oldValue: focusTask.isDone,
         newValue: true,
-      }, undefined, undefined, { workspaceId, boardId: focusTask.boardId, actorId: user?.id });
+      }, undefined, undefined, { workspaceId, boardId: focusTask.boardId, actorId: user?.id })
+        .catch((error) => console.warn('Unable to log focus task completion activity:', error));
       if (!focusTask.isDone) onTaskCompleted();
+      const currentTimer = focusContextRef.current;
+      if (currentTimer.activeTaskId === focusTask.id && currentTimer.mode === 'focus' && currentTimer.isRunning) {
+        focus.pauseTimer();
+      }
       notify.success(t('toast.focusTaskMarkedDone'));
+      return true;
     } catch (error) {
       notify.error(error instanceof Error ? error.message : t('toast.unableMarkFocusTaskDone'));
+      return false;
     }
   }, [board, focus, onTaskCompleted, t, user?.id, workspaceId]);
 
-  const handleMarkDoneFromCompletion = useCallback(() => {
+  const handleMarkDoneFromCompletion = useCallback(async () => {
     const task = focus.focusCompletion?.task;
-    focus.closeFocusCompletion();
-    if (task) void handleMarkFocusTaskDone(task);
+    if (!task) return;
+    const requestScopeKey = focusContextRef.current.scopeKey;
+    const completionKey = `${requestScopeKey}:prompt:${task.id}:${focus.focusCompletion?.session.endedAt ?? 'none'}`;
+    if (pendingCompletionKeysRef.current.has(completionKey)) return;
+    pendingCompletionKeysRef.current.add(completionKey);
+    const didComplete = await handleMarkFocusTaskDone(task);
+    pendingCompletionKeysRef.current.delete(completionKey);
+    if (didComplete && focusContextRef.current.scopeKey === requestScopeKey) {
+      focus.closeFocusCompletion();
+    }
   }, [focus, handleMarkFocusTaskDone]);
 
   const handleActiveTaskChange = useCallback((taskId: string) => {
-    focus.setActiveFocusTaskId(taskId);
-    focus.setActiveTimerTaskId(taskId);
+    focus.handleStartFocusTimer(taskId);
   }, [focus]);
 
-  const handleMarkDoneAndNext = useCallback((taskId: string) => {
+  const handleMarkDoneAndNext = useCallback(async (taskId: string) => {
     const task = focus.focusTasks.find((item) => item.id === taskId);
     if (!task) return;
-    void handleMarkFocusTaskDone(task);
+    const requestContext = focusContextRef.current;
+    const completionKey = `${requestContext.scopeKey}:${taskId}:${requestContext.startedAt ?? 'none'}`;
+    if (pendingCompletionKeysRef.current.has(completionKey)) return;
+    pendingCompletionKeysRef.current.add(completionKey);
+    const didComplete = await handleMarkFocusTaskDone(task);
+    pendingCompletionKeysRef.current.delete(completionKey);
+    const currentContext = focusContextRef.current;
+    if (!didComplete
+      || currentContext.scopeKey !== requestContext.scopeKey
+      || currentContext.activeTaskId !== requestContext.activeTaskId
+      || currentContext.startedAt !== requestContext.startedAt) return;
+
+    focus.pauseTimer();
     const currentIndex = focus.focusTasks.findIndex((item) => item.id === taskId);
     const nextTask = focus.focusTasks.find((item, index) => index > currentIndex && !item.isDone)
       || focus.focusTasks.find((item, index) => index < currentIndex && !item.isDone);
-    if (nextTask) handleActiveTaskChange(nextTask.id);
-    else focus.pauseTimer();
-  }, [focus, handleActiveTaskChange, handleMarkFocusTaskDone]);
+    if (nextTask) focus.handleStartFocusTimer(nextTask.id);
+  }, [focus, handleMarkFocusTaskDone]);
 
   const pictureInPicture = useDocumentPictureInPicture({
-    activeTask: focus.activeFocusTask,
+    activeTask: focus.selectedTimerTask || focus.activeFocusTask,
     focusTasks: focus.focusTasks,
     timerState: focus.timerState,
     remainingSeconds: focus.remainingSeconds,

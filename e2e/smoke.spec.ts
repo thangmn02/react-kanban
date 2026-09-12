@@ -10,7 +10,7 @@ test.describe('route smoke coverage', () => {
     await page.goto('/home');
 
     await expect(
-      page.getByRole('heading', { name: 'Plan many tasks. Focus on one. Finish today.' }),
+      page.getByRole('heading', { level: 1, name: /Good (morning|afternoon|evening),/ }),
     ).toBeVisible();
     await expect(page.locator('#root')).not.toBeEmpty();
     expect(pageErrors).toEqual([]);

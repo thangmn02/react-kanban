@@ -56,8 +56,9 @@ export default function AppToastContainer() {
       pauseOnHover
       role="status"
       theme="light"
-      toastClassName={(context) => `app-toast app-toast--${context?.type || 'default'}`}
-      progressClassName={(context) => `app-toast__progress app-toast__progress--${context?.type || 'default'}`}
+      toastClassName={(context) => `${context?.defaultClassName || ''} app-toast app-toast--${context?.type || 'default'}`}
+      // Callback class names replace Toastify's defaults, including the CSS timer.
+      progressClassName={(context) => `${context?.defaultClassName || ''} app-toast__progress app-toast__progress--${context?.type || 'default'}`}
       className="app-toast-viewport"
       aria-label="Notifications"
     />

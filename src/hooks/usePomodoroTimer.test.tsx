@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { StorageScope } from '../shared/storage/storageAdapter';
 import { usePomodoroTimer } from './usePomodoroTimer';
@@ -9,6 +9,29 @@ const scopeB: StorageScope = { userId: 'user-b', workspaceId: 'workspace-a' };
 
 describe('usePomodoroTimer', () => {
   beforeEach(() => window.localStorage.clear());
+  afterEach(() => vi.useRealTimers());
+
+  it('preserves a paused session across remount and resume, but starts fresh for another task', () => {
+    vi.useFakeTimers();
+    const first = renderHook(() => usePomodoroTimer({ scope: scopeA, activeFocusTask: null }));
+    act(() => first.result.current.startTimer('task-a'));
+    act(() => vi.advanceTimersByTime(90_000));
+    act(() => first.result.current.pauseTimer());
+    const startedAt = first.result.current.timerState.startedAt;
+    expect(first.result.current.remainingSeconds).toBe(1410);
+    first.unmount();
+    const second = renderHook(() => usePomodoroTimer({ scope: scopeA, activeFocusTask: null }));
+    act(() => second.result.current.startTimer('task-a'));
+    expect(second.result.current.timerState.startedAt).toBe(startedAt);
+    expect(second.result.current.remainingSeconds).toBe(1410);
+    act(() => second.result.current.setActiveTimerTaskId('task-b'));
+    expect(second.result.current.timerState.startedAt).toBeNull();
+    expect(second.result.current.timerState.isRunning).toBe(false);
+    expect(second.result.current.remainingSeconds).toBe(1500);
+    act(() => second.result.current.startTimer('task-b'));
+    expect(second.result.current.timerState.startedAt).not.toBe(startedAt);
+    second.unmount();
+  });
 
   it('characterizes start, pause, mode, and reset transitions', () => {
     const { result } = renderHook(() => usePomodoroTimer({ scope: scopeA, activeFocusTask: null }));

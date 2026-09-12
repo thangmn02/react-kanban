@@ -23,6 +23,7 @@ import type { useAppFocusIntegration } from '../features/focus/useAppFocusIntegr
 import type { usePlanningController } from '../features/today/hooks/usePlanningController';
 import type { useCommandPaletteActions } from '../hooks/useCommandPaletteActions';
 import { useI18n } from '../i18n';
+import { getPomodoroModeSeconds } from '../utils/pomodoroTime';
 
 const ArcanaRewardToast = lazy(() => import('../features/arcana/ArcanaRewardToast'));
 
@@ -62,7 +63,9 @@ export default function AppOverlays(props: Props) {
         isOpen={Boolean(focus.focusLaunchTask)}
         task={focus.focusLaunchTask}
         mode={focus.timerState.mode}
-        suggestedSeconds={focus.timerState.remainingSeconds}
+        suggestedSeconds={focus.focusLaunchTask?.id === focus.timerState.activeTaskId
+          ? focus.remainingSeconds
+          : getPomodoroModeSeconds(focus.timerState.mode, focus.timerSettings)}
         onClose={focus.closeFocusLaunchpad}
         onStart={focus.confirmFocusLaunch}
       />
@@ -111,15 +114,17 @@ export default function AppOverlays(props: Props) {
       <BoardActivityDialog isOpen={boardDialogs.activityDialog.isOpen} onClose={boardDialogs.closeActivityDialog} boardId={board.activeBoardId} />
       <FocusDock
         focusTasks={focus.focusTasks}
-        activeTaskId={focus.activeFocusTaskId}
+        activeTaskId={focus.timerState.activeTaskId || focus.activeFocusTaskId}
         isCollapsed={focus.isFocusDockCollapsed}
         timerState={focus.timerState}
+        timerSettings={focus.timerSettings}
         dailyFocusStats={focus.dailyFocusStats}
         remainingSeconds={focus.remainingSeconds}
         onCollapseChange={focus.setIsFocusDockCollapsed}
         onActiveTaskChange={focusIntegration.handleActiveTaskChange}
         onModeChange={focus.setMode}
-        onStartTimer={focus.handleStartFocusTimer}
+        onTimerSettingsChange={focus.updateTimerSettings}
+        onStartTimer={() => focus.handleStartFocusTimer()}
         onPauseTimer={focus.pauseTimer}
         onResetTimer={focus.resetTimer}
         onPopOutTimer={focusIntegration.handleOpenFloatingFocusTimer}

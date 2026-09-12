@@ -15,11 +15,10 @@ export interface UseFocusTaskHandlersParams {
   activeBoardSummary: BoardRow | null;
   focusTasksApi: Pick<
     ReturnType<typeof useFocusTasks>,
-    'toggleFocusTask' | 'pinFocusTask' | 'isFocusTask' | 'setActiveFocusTaskId'
+    'toggleFocusTask' | 'pinFocusTask' | 'isFocusTask'
   >;
   pomodoro: {
     startFocusTimer: (taskId?: string) => void;
-    setActiveTimerTaskId: (taskId: string) => void;
   };
   setIsFocusDockCollapsed: (value: boolean) => void;
 }
@@ -42,8 +41,8 @@ export function useFocusTaskHandlers({
   setIsFocusDockCollapsed,
 }: UseFocusTaskHandlersParams): UseFocusTaskHandlersResult {
   const { t } = useI18n();
-  const { toggleFocusTask, pinFocusTask, isFocusTask, setActiveFocusTaskId } = focusTasksApi;
-  const { startFocusTimer, setActiveTimerTaskId } = pomodoro;
+  const { toggleFocusTask, pinFocusTask, isFocusTask } = focusTasksApi;
+  const { startFocusTimer } = pomodoro;
 
   const getTaskListContext = useCallback((taskId: string) => {
     const listId = boardData.columns.find((columnId) => (
@@ -103,16 +102,12 @@ export function useFocusTaskHandlers({
       }
     }
 
-    setActiveFocusTaskId(task.id);
-    setActiveTimerTaskId(task.id);
     setIsFocusDockCollapsed(false);
     startFocusTimer(task.id);
   }, [
     buildFocusTaskInput,
     isFocusTask,
     pinFocusTask,
-    setActiveFocusTaskId,
-    setActiveTimerTaskId,
     setIsFocusDockCollapsed,
     startFocusTimer,
     t,
@@ -175,8 +170,6 @@ export function useFocusTaskHandlers({
       }
     }
 
-    setActiveFocusTaskId(taskSummary.id);
-    setActiveTimerTaskId(taskSummary.id);
     setIsFocusDockCollapsed(false);
     startFocusTimer(taskSummary.id);
   }, [
@@ -184,8 +177,6 @@ export function useFocusTaskHandlers({
     getTaskListContext,
     isFocusTask,
     pinFocusTask,
-    setActiveFocusTaskId,
-    setActiveTimerTaskId,
     setIsFocusDockCollapsed,
     startFocusTimer,
     t,
@@ -236,16 +227,12 @@ export function useFocusTaskHandlers({
       }
     }
 
-    setActiveFocusTaskId(taskSummary.id);
-    setActiveTimerTaskId(taskSummary.id);
     setIsFocusDockCollapsed(false);
     startFocusTimer(taskSummary.id);
   }, [
     buildFocusTaskInputFromTodayTask,
     isFocusTask,
     pinFocusTask,
-    setActiveFocusTaskId,
-    setActiveTimerTaskId,
     setIsFocusDockCollapsed,
     startFocusTimer,
     t,

@@ -4,40 +4,52 @@ import type {
   FocusTask,
   PomodoroMode,
   PomodoroSessionSnapshot,
+  PomodoroTimerSettings,
   PomodoroTimerState,
 } from '../types/focus.type';
-import { formatPomodoroTime, POMODORO_MODE_SECONDS } from '../utils/pomodoroTime';
+import {
+  DEFAULT_POMODORO_TIMER_SETTINGS,
+  formatPomodoroTime,
+  getPomodoroModeSeconds,
+  sanitizePomodoroTimerSettings,
+} from '../utils/pomodoroTime';
 import { buildStorageKey, readScopedJSON, writeScopedJSON, type StorageScope } from '../shared/storage/storageAdapter';
 
 const pomodoroStorageFeature = 'pomodoro_timer';
+const pomodoroSettingsFeature = 'pomodoro_settings';
 const legacyPomodoroStorageKey = 'kanban_pomodoro_timer';
 
-function createInitialPomodoroState(): PomodoroTimerState {
+function createInitialPomodoroState(
+  settings: PomodoroTimerSettings = DEFAULT_POMODORO_TIMER_SETTINGS,
+): PomodoroTimerState {
   return {
     mode: 'focus',
     activeTaskId: null,
+    sessionTask: null,
+    sessionId: null,
     isRunning: false,
-    remainingSeconds: POMODORO_MODE_SECONDS.focus,
+    remainingSeconds: getPomodoroModeSeconds('focus', settings),
     endsAt: null,
     startedAt: null,
     plannedSeconds: null,
+    completedCycleFocus: 0,
   };
 }
 
-function readStoredPomodoroState(scope: StorageScope): PomodoroTimerState {
+function readStoredPomodoroState(scope: StorageScope, settings: PomodoroTimerSettings): PomodoroTimerState {
   const scopedState = readScopedJSON<Partial<PomodoroTimerState> | null>(scope, pomodoroStorageFeature, null);
   if (scopedState) {
-    return { ...createInitialPomodoroState(), ...scopedState };
+    return normalizePomodoroState(scopedState, settings);
   }
 
   if (typeof window !== 'undefined') {
     try {
       const legacyValue = window.localStorage.getItem(legacyPomodoroStorageKey);
       if (legacyValue) {
-        const migratedState = {
-          ...createInitialPomodoroState(),
-          ...JSON.parse(legacyValue) as Partial<PomodoroTimerState>,
-        };
+        const migratedState = normalizePomodoroState(
+          JSON.parse(legacyValue) as Partial<PomodoroTimerState>,
+          settings,
+        );
         writeScopedJSON(scope, pomodoroStorageFeature, migratedState);
         window.localStorage.removeItem(legacyPomodoroStorageKey);
         return migratedState;
@@ -47,7 +59,52 @@ function readStoredPomodoroState(scope: StorageScope): PomodoroTimerState {
     }
   }
 
-  return createInitialPomodoroState();
+  return createInitialPomodoroState(settings);
+}
+
+function readStoredPomodoroSettings(scope: StorageScope): PomodoroTimerSettings {
+  return sanitizePomodoroTimerSettings(
+    readScopedJSON<Partial<PomodoroTimerSettings> | null>(scope, pomodoroSettingsFeature, null),
+  );
+}
+
+function normalizePomodoroState(
+  storedState: Partial<PomodoroTimerState>,
+  settings: PomodoroTimerSettings,
+): PomodoroTimerState {
+  const mode: PomodoroMode = storedState.mode === 'shortBreak' || storedState.mode === 'longBreak'
+    ? storedState.mode
+    : 'focus';
+  const defaultSeconds = getPomodoroModeSeconds(mode, settings);
+  const remainingSeconds = Number.isFinite(storedState.remainingSeconds) && storedState.remainingSeconds! >= 0
+    ? Math.round(storedState.remainingSeconds!)
+    : defaultSeconds;
+  const endsAt = Number.isFinite(storedState.endsAt) && storedState.endsAt! > 0 ? storedState.endsAt! : null;
+  const startedAt = Number.isFinite(storedState.startedAt) && storedState.startedAt! > 0 ? storedState.startedAt! : null;
+  const plannedSeconds = Number.isFinite(storedState.plannedSeconds) && storedState.plannedSeconds! > 0
+    ? Math.round(storedState.plannedSeconds!)
+    : null;
+  const isRunning = storedState.isRunning === true && endsAt !== null && startedAt !== null && plannedSeconds !== null;
+  const sessionId = typeof storedState.sessionId === 'string'
+    ? storedState.sessionId
+    : startedAt && plannedSeconds ? createSessionId() : null;
+
+  return {
+    mode,
+    activeTaskId: typeof storedState.activeTaskId === 'string' ? storedState.activeTaskId : null,
+    sessionTask: storedState.sessionTask && typeof storedState.sessionTask.id === 'string'
+      ? storedState.sessionTask
+      : null,
+    sessionId,
+    isRunning,
+    remainingSeconds,
+    endsAt: isRunning ? endsAt : null,
+    startedAt,
+    plannedSeconds,
+    completedCycleFocus: Number.isFinite(storedState.completedCycleFocus)
+      ? Math.max(0, Math.floor(storedState.completedCycleFocus!))
+      : 0,
+  };
 }
 
 function getRemainingSeconds(state: PomodoroTimerState) {
@@ -58,39 +115,78 @@ function getRemainingSeconds(state: PomodoroTimerState) {
   return Math.max(0, Math.ceil((state.endsAt - Date.now()) / 1000));
 }
 
+function createSessionId() {
+  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (character) => {
+      const randomValue = Math.floor(Math.random() * 16);
+      return (character === 'x' ? randomValue : (randomValue & 0x3) | 0x8).toString(16);
+    });
+}
+
 interface UsePomodoroTimerParams {
   scope: StorageScope;
   activeFocusTask: FocusTask | null;
+  focusTasks?: FocusTask[];
   onComplete?: (task: FocusTask | null, mode: PomodoroMode, session: PomodoroSessionSnapshot) => void;
   onInterrupt?: (task: FocusTask | null, mode: PomodoroMode, session: PomodoroSessionSnapshot) => void;
 }
 
 function buildSessionSnapshot(state: PomodoroTimerState, endedAt: number): PomodoroSessionSnapshot | null {
-  if (!state.startedAt || !state.plannedSeconds) {
+  if (!state.sessionId || !state.startedAt || !state.plannedSeconds) {
     return null;
   }
 
   return {
+    sessionId: state.sessionId,
     startedAt: state.startedAt,
     endedAt,
-    durationSeconds: Math.max(0, Math.round((endedAt - state.startedAt) / 1000)),
+    durationSeconds: Math.max(0, state.plannedSeconds - getRemainingSeconds(state)),
     plannedSeconds: state.plannedSeconds,
   };
 }
 
-export function usePomodoroTimer({ scope, activeFocusTask, onComplete, onInterrupt }: UsePomodoroTimerParams) {
+export function usePomodoroTimer({
+  scope,
+  activeFocusTask,
+  focusTasks = [],
+  onComplete,
+  onInterrupt,
+}: UsePomodoroTimerParams) {
   const scopeKey = buildStorageKey(scope, pomodoroStorageFeature);
-  const [scopedTimer, setScopedTimer] = useState(() => ({ scopeKey, scope, state: readStoredPomodoroState(scope) }));
-  const timerState = scopedTimer.scopeKey === scopeKey ? scopedTimer.state : readStoredPomodoroState(scope);
+  const [scopedSettings, setScopedSettings] = useState(() => ({
+    scopeKey,
+    scope,
+    settings: readStoredPomodoroSettings(scope),
+  }));
+  const timerSettings = scopedSettings.scopeKey === scopeKey
+    ? scopedSettings.settings
+    : readStoredPomodoroSettings(scope);
+  const settingsRef = useRef(timerSettings);
+  settingsRef.current = timerSettings;
+  const [scopedTimer, setScopedTimer] = useState(() => ({
+    scopeKey,
+    scope,
+    state: readStoredPomodoroState(scope, timerSettings),
+  }));
+  const timerState = scopedTimer.scopeKey === scopeKey
+    ? scopedTimer.state
+    : readStoredPomodoroState(scope, timerSettings);
   const [visibleRemainingSeconds, setVisibleRemainingSeconds] = useState(() => getRemainingSeconds(timerState));
   const [isPageHidden, setIsPageHidden] = useState(() => (
     typeof document !== 'undefined' ? document.hidden : false
   ));
   const completionKeyRef = useRef<string | null>(null);
   const originalDocumentTitleRef = useRef<string | null>(null);
+  const timerStateRef = useRef(timerState);
+  timerStateRef.current = timerState;
+
+  if (scopedSettings.scopeKey !== scopeKey) {
+    setScopedSettings({ scopeKey, scope, settings: timerSettings });
+  }
 
   if (scopedTimer.scopeKey !== scopeKey) {
-    const nextState = readStoredPomodoroState(scope);
+    const nextState = readStoredPomodoroState(scope, timerSettings);
     setScopedTimer({ scopeKey, scope, state: nextState });
     setVisibleRemainingSeconds(getRemainingSeconds(nextState));
   }
@@ -102,12 +198,53 @@ export function usePomodoroTimer({ scope, activeFocusTask, onComplete, onInterru
     }));
   }, []);
 
+  const commitTimerState = useCallback((nextState: PomodoroTimerState) => {
+    timerStateRef.current = nextState;
+    setTimerState(nextState);
+    setVisibleRemainingSeconds(getRemainingSeconds(nextState));
+  }, [setTimerState]);
+
+  const resolveTimerTask = useCallback((state: Pick<PomodoroTimerState, 'activeTaskId' | 'sessionTask'>) => (
+    focusTasks.find((task) => task.id === state.activeTaskId)
+      || (activeFocusTask?.id === state.activeTaskId ? activeFocusTask : null)
+      || (state.sessionTask?.id === state.activeTaskId ? state.sessionTask : null)
+  ), [activeFocusTask, focusTasks]);
+
+  const reportInterruption = useCallback((state: PomodoroTimerState, endedAt: number) => {
+    const sessionSnapshot = buildSessionSnapshot(state, endedAt);
+    if (sessionSnapshot && sessionSnapshot.durationSeconds > 60) {
+      onInterrupt?.(resolveTimerTask(state), state.mode, sessionSnapshot);
+    }
+  }, [onInterrupt, resolveTimerTask]);
+
+  useEffect(() => {
+    writeScopedJSON(scopedSettings.scope, pomodoroSettingsFeature, scopedSettings.settings);
+  }, [scopedSettings.scope, scopedSettings.settings]);
+
   useEffect(() => {
     writeScopedJSON(scopedTimer.scope, pomodoroStorageFeature, {
       ...scopedTimer.state,
       remainingSeconds: getRemainingSeconds(scopedTimer.state),
     });
   }, [scopedTimer.scope, scopedTimer.state]);
+
+  const updateTimerSettings = useCallback((patch: Partial<PomodoroTimerSettings>) => {
+    const nextSettings = sanitizePomodoroTimerSettings({ ...settingsRef.current, ...patch });
+    settingsRef.current = nextSettings;
+    setScopedSettings((current) => ({ ...current, settings: nextSettings }));
+
+    const currentTimer = timerStateRef.current;
+    if (!currentTimer.startedAt) {
+      commitTimerState({
+        ...currentTimer,
+        remainingSeconds: getPomodoroModeSeconds(currentTimer.mode, nextSettings),
+        completedCycleFocus: Math.min(
+          currentTimer.completedCycleFocus || 0,
+          nextSettings.longBreakEvery - 1,
+        ),
+      });
+    }
+  }, [commitTimerState]);
 
   useEffect(() => {
     const updateRemainingTime = () => {
@@ -116,25 +253,51 @@ export function usePomodoroTimer({ scope, activeFocusTask, onComplete, onInterru
 
       if (timerState.isRunning && nextRemainingSeconds === 0) {
         const completionKey = `${timerState.activeTaskId || 'none'}-${timerState.mode}-${timerState.endsAt || 'none'}`;
-        const endedAt = Date.now();
+        const endedAt = timerState.endsAt || Date.now();
         const sessionSnapshot = buildSessionSnapshot(timerState, endedAt);
 
         if (completionKeyRef.current !== completionKey && sessionSnapshot) {
           completionKeyRef.current = completionKey;
-          onComplete?.(activeFocusTask, timerState.mode, {
+          onComplete?.(resolveTimerTask(timerState), timerState.mode, {
             ...sessionSnapshot,
             durationSeconds: timerState.plannedSeconds || sessionSnapshot.durationSeconds,
           });
         }
 
-        setTimerState((currentState) => ({
-          ...currentState,
-          isRunning: false,
-          remainingSeconds: POMODORO_MODE_SECONDS[currentState.mode],
-          endsAt: null,
-          startedAt: null,
-          plannedSeconds: null,
-        }));
+        const settings = settingsRef.current;
+        const completedMode = timerState.mode;
+        let completedCycleFocus = timerState.completedCycleFocus || 0;
+        let nextMode: PomodoroMode;
+
+        if (completedMode === 'focus') {
+          completedCycleFocus += 1;
+          if (completedCycleFocus >= settings.longBreakEvery) {
+            completedCycleFocus = 0;
+            nextMode = 'longBreak';
+          } else {
+            nextMode = 'shortBreak';
+          }
+        } else {
+          nextMode = 'focus';
+        }
+
+        const shouldAutoStart = completedMode === 'focus'
+          ? settings.autoStartBreaks
+          : settings.autoStartFocus && !resolveTimerTask(timerState)?.isDone;
+        const nextDurationSeconds = getPomodoroModeSeconds(nextMode, settings);
+        const nextStartedAt = shouldAutoStart ? Date.now() : null;
+
+        commitTimerState({
+          ...timerState,
+          mode: nextMode,
+          isRunning: shouldAutoStart,
+          remainingSeconds: nextDurationSeconds,
+          endsAt: nextStartedAt ? nextStartedAt + nextDurationSeconds * 1000 : null,
+          startedAt: nextStartedAt,
+          plannedSeconds: shouldAutoStart ? nextDurationSeconds : null,
+          sessionId: shouldAutoStart ? createSessionId() : null,
+          completedCycleFocus,
+        });
       }
     };
 
@@ -142,7 +305,7 @@ export function usePomodoroTimer({ scope, activeFocusTask, onComplete, onInterru
     const intervalId = window.setInterval(updateRemainingTime, 1000);
 
     return () => window.clearInterval(intervalId);
-  }, [activeFocusTask, onComplete, setTimerState, timerState]);
+  }, [commitTimerState, onComplete, resolveTimerTask, timerState]);
 
   useEffect(() => {
     if (typeof document === 'undefined') {
@@ -169,82 +332,108 @@ export function usePomodoroTimer({ scope, activeFocusTask, onComplete, onInterru
     }
 
     if (timerState.isRunning && isPageHidden) {
-      document.title = `${formatPomodoroTime(visibleRemainingSeconds)} - ${activeFocusTask?.title || 'Focus session'}`;
+      document.title = `${formatPomodoroTime(visibleRemainingSeconds)} - ${resolveTimerTask(timerState)?.title || 'Focus session'}`;
       return;
     }
 
     document.title = originalDocumentTitleRef.current;
-  }, [activeFocusTask?.title, isPageHidden, timerState.isRunning, visibleRemainingSeconds]);
+  }, [isPageHidden, resolveTimerTask, timerState, visibleRemainingSeconds]);
+
+  useEffect(() => () => {
+    if (originalDocumentTitleRef.current !== null) document.title = originalDocumentTitleRef.current;
+  }, []);
 
   const selectedTimerTask = useMemo(() => (
-    activeFocusTask?.id === timerState.activeTaskId ? activeFocusTask : null
-  ), [activeFocusTask, timerState.activeTaskId]);
+    resolveTimerTask(timerState)
+  ), [resolveTimerTask, timerState]);
 
   const startTimer = useCallback((taskId?: string) => {
-    setTimerState((currentState) => {
-      const remainingSeconds = getRemainingSeconds(currentState);
+    const currentState = timerStateRef.current;
+    const nextTaskId = taskId || currentState.activeTaskId || activeFocusTask?.id || null;
+    const sameTask = nextTaskId === currentState.activeTaskId;
+    const now = Date.now();
+    const remainingSeconds = sameTask
+      ? getRemainingSeconds(currentState)
+      : getPomodoroModeSeconds(currentState.mode, settingsRef.current);
+    const nextTask = focusTasks.find((task) => task.id === nextTaskId)
+      || (activeFocusTask?.id === nextTaskId ? activeFocusTask : null);
 
-      return {
-        ...currentState,
-        activeTaskId: taskId || currentState.activeTaskId || activeFocusTask?.id || null,
-        isRunning: true,
-        remainingSeconds,
-        endsAt: Date.now() + remainingSeconds * 1000,
-        startedAt: currentState.startedAt || Date.now(),
-        plannedSeconds: currentState.plannedSeconds || remainingSeconds,
-      };
+    if (!sameTask) reportInterruption(currentState, now);
+    commitTimerState({
+      ...currentState,
+      activeTaskId: nextTaskId,
+      sessionTask: sameTask ? currentState.sessionTask || nextTask : nextTask,
+      sessionId: sameTask && currentState.sessionId ? currentState.sessionId : createSessionId(),
+      isRunning: true,
+      remainingSeconds,
+      endsAt: now + remainingSeconds * 1000,
+      startedAt: (sameTask && currentState.startedAt) || now,
+      plannedSeconds: (sameTask && currentState.plannedSeconds) || remainingSeconds,
     });
-  }, [activeFocusTask?.id, setTimerState]);
+  }, [activeFocusTask, commitTimerState, focusTasks, reportInterruption]);
 
   const pauseTimer = useCallback(() => {
-    setTimerState((currentState) => ({
+    const currentState = timerStateRef.current;
+    commitTimerState({
       ...currentState,
       isRunning: false,
       remainingSeconds: getRemainingSeconds(currentState),
       endsAt: null,
-    }));
-  }, [setTimerState]);
+    });
+  }, [commitTimerState]);
 
   const resetTimer = useCallback(() => {
-    setTimerState((currentState) => {
-      const sessionSnapshot = buildSessionSnapshot(currentState, Date.now());
-
-      if (currentState.isRunning && sessionSnapshot && sessionSnapshot.durationSeconds > 60) {
-        onInterrupt?.(activeFocusTask, currentState.mode, sessionSnapshot);
-      }
-
-      return {
-        ...currentState,
-        isRunning: false,
-        remainingSeconds: POMODORO_MODE_SECONDS[currentState.mode],
-        endsAt: null,
-        startedAt: null,
-        plannedSeconds: null,
-      };
-    });
-  }, [activeFocusTask, onInterrupt, setTimerState]);
-
-  const setMode = useCallback((mode: PomodoroMode) => {
-    setTimerState((currentState) => ({
+    const currentState = timerStateRef.current;
+    reportInterruption(currentState, Date.now());
+    commitTimerState({
       ...currentState,
-      mode,
       isRunning: false,
-      remainingSeconds: POMODORO_MODE_SECONDS[mode],
+      remainingSeconds: getPomodoroModeSeconds(currentState.mode, settingsRef.current),
       endsAt: null,
       startedAt: null,
       plannedSeconds: null,
-    }));
-  }, [setTimerState]);
+      sessionId: null,
+    });
+  }, [commitTimerState, reportInterruption]);
+
+  const setMode = useCallback((mode: PomodoroMode) => {
+    const currentState = timerStateRef.current;
+    if (mode === currentState.mode) return;
+    reportInterruption(currentState, Date.now());
+    commitTimerState({
+      ...currentState,
+      mode,
+      isRunning: false,
+      remainingSeconds: getPomodoroModeSeconds(mode, settingsRef.current),
+      endsAt: null,
+      startedAt: null,
+      plannedSeconds: null,
+      sessionId: null,
+    });
+  }, [commitTimerState, reportInterruption]);
 
   const setActiveTimerTaskId = useCallback((taskId: string) => {
-    setTimerState((currentState) => ({
+    const currentState = timerStateRef.current;
+    if (currentState.activeTaskId === taskId) return;
+    reportInterruption(currentState, Date.now());
+    commitTimerState({
       ...currentState,
+      isRunning: false,
+      remainingSeconds: getPomodoroModeSeconds(currentState.mode, settingsRef.current),
+      endsAt: null,
+      startedAt: null,
+      plannedSeconds: null,
+      sessionId: null,
       activeTaskId: taskId,
-    }));
-  }, [setTimerState]);
+      sessionTask: focusTasks.find((task) => task.id === taskId)
+        || (activeFocusTask?.id === taskId ? activeFocusTask : null),
+    });
+  }, [activeFocusTask, commitTimerState, focusTasks, reportInterruption]);
 
   return {
     timerState,
+    timerSettings,
+    updateTimerSettings,
     selectedTimerTask,
     remainingSeconds: visibleRemainingSeconds,
     startTimer,

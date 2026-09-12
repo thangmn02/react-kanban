@@ -5,6 +5,7 @@ import { notify } from './components/organisms/toast/notify';
 import { ERROR_MESSAGES } from './constants';
 import { useI18n } from './i18n';
 import AppHeader from './components/layout/AppHeader';
+import AppNavigation from './components/layout/AppNavigation';
 import { useAuth } from './hooks/useAuth';
 import { useGlobalKeyboardShortcuts } from './hooks/useGlobalKeyboardShortcuts';
 import { useWorkspaceSession } from './hooks/useWorkspaceSession';
@@ -289,6 +290,8 @@ function AppLayout() {
       isLocalDemoMode={isLocalDemoMode}
       onGoHome={() => setActiveViewWithPath('home')}
       onGoToday={() => setActiveViewWithPath('today')}
+      activeView={activeView}
+      onNavigate={setActiveViewWithPath}
       onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
       onCreateBoard={openCreateBoardDialog}
       onWorkspaceChange={(workspaceId) => {
@@ -362,6 +365,7 @@ function AppLayout() {
     handleOpenQuickPlan,
     handleOpenTaskFromToday,
     isSavingBoard,
+    onMarkFocusDone: focusIntegration.handleMarkFocusTaskDone,
     onOpenProgressReport: () => setIsProgressReportOpen(true),
   });
 
@@ -373,7 +377,10 @@ function AppLayout() {
 
   return (
     <FocusSessionProvider value={focusSession}>
-      <Outlet context={routeContext} />
+      {shouldRenderOverlays && <AppNavigation activeView={activeView} onNavigate={setActiveViewWithPath} />}
+      <div className={shouldRenderOverlays ? 'lg:pl-20' : undefined}>
+        <Outlet context={routeContext} />
+      </div>
       {shouldRenderOverlays && sharedDialogs}
     </FocusSessionProvider>
   );

@@ -1,15 +1,15 @@
 @import "tailwindcss";
 
 /*
- * Astryx token CSS — tokens-only. Loaded BEFORE astryx-bridge.css so the
- * --app-* variables resolve to the real Astryx neutral-theme tokens. Tokens-only:
- * we intentionally do NOT import @astryxdesign/core reset.css / astryx.css —
- * those would globally reset the app's typography via :where(h1…) rules scoped
- * to [data-astryx-theme]. The Theme provider (src/providers/AstryxThemeProvider)
+ * Astryx theme CSS. Loaded BEFORE astryx-bridge.css so the
+ * --app-* variables resolve to the real Astryx neutral-theme tokens. The theme
+ * also includes typography defaults: keep them in the base layer so explicit
+ * Tailwind utilities retain control of heading sizes and text colors.
+ * The Theme provider (src/providers/AstryxThemeProvider)
  * keeps data-astryx-theme="neutral" on <html> in sync so these scoped tokens
  * reach the whole app (incl. portals).
  */
-@import "@astryxdesign/theme-neutral/theme.css";
+@import "@astryxdesign/theme-neutral/theme.css" layer(base);
 
 /* App-level Astryx → app token bridge (graceful fallbacks; active now). */
 @import "./styles/astryx-bridge.css";
@@ -45,10 +45,17 @@
   *,
   *::before,
   *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  /* Toastify's progress animation is also its auto-close clock. Keep its
+   * duration; toast-specific CSS hides the decorative motion instead. */
+  *:not(.Toastify__progress-bar),
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
 }
 

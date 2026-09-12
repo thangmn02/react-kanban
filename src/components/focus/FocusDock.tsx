@@ -1,6 +1,12 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 
-import type { DailyFocusStats, FocusTask, PomodoroMode, PomodoroTimerState } from '../../types/focus.type';
+import type {
+  DailyFocusStats,
+  FocusTask,
+  PomodoroMode,
+  PomodoroTimerSettings,
+  PomodoroTimerState,
+} from '../../types/focus.type';
 import { formatPomodoroTime } from '../../utils/pomodoroTime';
 import { useI18n } from '../../i18n';
 import FocusDockHeader from './FocusDockHeader';
@@ -12,11 +18,13 @@ interface FocusDockProps {
   activeTaskId: string | null;
   isCollapsed: boolean;
   timerState: PomodoroTimerState;
+  timerSettings: PomodoroTimerSettings;
   dailyFocusStats: DailyFocusStats;
   remainingSeconds: number;
   onCollapseChange: (isCollapsed: boolean) => void;
   onActiveTaskChange: (taskId: string) => void;
   onModeChange: (mode: PomodoroMode) => void;
+  onTimerSettingsChange: (patch: Partial<PomodoroTimerSettings>) => void;
   onStartTimer: () => void;
   onPauseTimer: () => void;
   onResetTimer: () => void;
@@ -34,11 +42,13 @@ function FocusDock({
   activeTaskId,
   isCollapsed,
   timerState,
+  timerSettings,
   dailyFocusStats,
   remainingSeconds,
   onCollapseChange,
   onActiveTaskChange,
   onModeChange,
+  onTimerSettingsChange,
   onStartTimer,
   onPauseTimer,
   onResetTimer,
@@ -112,10 +122,12 @@ function FocusDock({
                 focusTasks={focusTasks}
                 activeTaskId={activeTaskId}
                 timerState={timerState}
+                timerSettings={timerSettings}
                 dailyFocusStats={dailyFocusStats}
                 remainingSeconds={remainingSeconds}
                 onActiveTaskChange={onActiveTaskChange}
                 onModeChange={onModeChange}
+                onTimerSettingsChange={onTimerSettingsChange}
                 onStart={onStartTimer}
                 onPause={onPauseTimer}
                 onReset={onResetTimer}
