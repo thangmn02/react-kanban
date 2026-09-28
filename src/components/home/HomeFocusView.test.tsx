@@ -11,6 +11,7 @@ function controls(): HomeFocusControls {
       focusTasks: [task], timerState: { mode: 'focus', activeTaskId: 'a', isRunning: false, remainingSeconds: 1200, startedAt: 1, endsAt: null, plannedSeconds: 1500 },
       remainingSeconds: 1200, dailyFocusStats: { focusedMinutes: 25, completedSessions: 1, interruptedSessions: 0, topTaskTitle: null },
       activeFocusIntention: { taskId: 'a', text: 'Draft the opening paragraph' },
+      setFocusIntention: vi.fn(),
       handleStartFocusTimer: vi.fn(), pauseTimer: vi.fn(), resetTimer: vi.fn(), setMode: vi.fn(), setIsFocusDockCollapsed: vi.fn(),
     }, onMarkDone: vi.fn().mockResolvedValue(true),
   };

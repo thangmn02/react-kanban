@@ -14,6 +14,73 @@ export type Database = {
   }
   public: {
     Tables: {
+      briefing_pins: {
+        Row: {
+          author_name: string
+          created_at: string
+          created_by: string
+          id: string
+          link_url: string | null
+          pinned_at: string
+          quoted_text: string
+          source_label: string
+          source_type: string
+          task_id: string | null
+          why_matters: string
+          workspace_id: string
+        }
+        Insert: {
+          author_name: string
+          created_at?: string
+          created_by: string
+          id?: string
+          link_url?: string | null
+          pinned_at?: string
+          quoted_text: string
+          source_label: string
+          source_type: string
+          task_id?: string | null
+          why_matters: string
+          workspace_id: string
+        }
+        Update: {
+          author_name?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          link_url?: string | null
+          pinned_at?: string
+          quoted_text?: string
+          source_label?: string
+          source_type?: string
+          task_id?: string | null
+          why_matters?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "briefing_pins_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "briefing_pins_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "briefing_pins_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       boards: {
         Row: {
           archived_at: string | null

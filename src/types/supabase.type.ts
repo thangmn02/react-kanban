@@ -9,6 +9,10 @@ import type {
 export type Database = GeneratedDatabase;
 export type { Json };
 
+export type BriefingPinRow = Tables<'briefing_pins'>;
+export type BriefingPinInsert = TablesInsert<'briefing_pins'>;
+export type BriefingPinUpdate = TablesUpdate<'briefing_pins'>;
+
 export type ProfileRow = Tables<'profiles'>;
 export type ProfileInsert = TablesInsert<'profiles'>;
 export type ProfileUpdate = TablesUpdate<'profiles'>;

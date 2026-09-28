@@ -36,6 +36,8 @@ import type {
   ListRow,
   TaskActivityInsert,
   TaskActivityRow,
+  BriefingPinInsert,
+  BriefingPinRow,
   TaskChecklistItemRow,
   TaskInsert,
   TaskLabelLinkRow,
@@ -57,6 +59,7 @@ export interface LocalBoardState {
   labels: TaskLabelRow[];
   labelLinks: TaskLabelLinkRow[];
   activities: TaskActivityRow[];
+  briefingPins: BriefingPinRow[];
 }
 
 export interface LocalBoardSnapshot {
@@ -175,7 +178,7 @@ function seedState(): LocalBoardState {
     });
   });
 
-  return { boards: [boardRow], lists, tasks, checklistItems, labels, labelLinks, activities: [] };
+  return { boards: [boardRow], lists, tasks, checklistItems, labels, labelLinks, activities: [], briefingPins: [] };
 }
 
 let cachedState: LocalBoardState | null = null;
@@ -184,7 +187,7 @@ function getState(): LocalBoardState {
   if (cachedState) return cachedState;
   const stored = readScopedJSON<LocalBoardState | null>(MOCK_SCOPE, BOARD_STORE_FEATURE, null);
   if (stored && Array.isArray(stored.boards) && stored.boards.length > 0) {
-    cachedState = stored;
+    cachedState = { ...stored, activities: Array.isArray(stored.activities) ? stored.activities : [], briefingPins: Array.isArray(stored.briefingPins) ? stored.briefingPins : [] };
   } else {
     cachedState = seedState();
     writeScopedJSON(MOCK_SCOPE, BOARD_STORE_FEATURE, cachedState);
@@ -552,4 +555,38 @@ export function localFetchBoardActivities(boardId: string): TaskActivityRow[] {
   return state.activities
     .filter((a) => a.board_id === boardId)
     .sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+export function localFetchBriefingPins(workspaceId: string): BriefingPinRow[] {
+  return getState().briefingPins
+    .filter((pin) => pin.workspace_id === workspaceId)
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+export function localCreateBriefingPin(input: BriefingPinInsert): BriefingPinRow {
+  const state = getState();
+  const timestamp = nowIso();
+  const row: BriefingPinRow = {
+    id: input.id ?? createLocalId('pin'),
+    workspace_id: input.workspace_id,
+    created_by: input.created_by,
+    source_type: input.source_type,
+    source_label: input.source_label,
+    author_name: input.author_name,
+    quoted_text: input.quoted_text,
+    link_url: input.link_url ?? null,
+    task_id: input.task_id ?? null,
+    why_matters: input.why_matters,
+    pinned_at: input.pinned_at ?? timestamp,
+    created_at: input.created_at ?? timestamp,
+  };
+  state.briefingPins.unshift(row);
+  saveState();
+  return row;
+}
+
+export function localDeleteBriefingPin(pinId: string): void {
+  const state = getState();
+  state.briefingPins = state.briefingPins.filter((pin) => pin.id !== pinId);
+  saveState();
 }

@@ -83,6 +83,9 @@ service-account*.json
 muse code/
 /scratch/
 *.patch.txt
+opencode-session.json
+*-plan.html
+
 
 # Alternative package manager files (Project uses npm / package-lock.json)
 pnpm-lock.yaml

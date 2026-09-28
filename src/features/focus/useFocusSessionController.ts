@@ -55,6 +55,13 @@ export function useFocusSessionController({
     taskId: string | null;
     text: string;
   } | null>(null);
+  const setFocusIntention = useCallback((taskId: string, text: string) => {
+    const trimmedText = text.trim();
+    setActiveFocusIntention((current) => {
+      if (trimmedText) return { taskId, text: trimmedText };
+      return current?.taskId === taskId ? null : current;
+    });
+  }, []);
   const [focusCompletion, setFocusCompletion] = useState<{
     task: FocusTask;
     session: PomodoroSessionSnapshot;
@@ -271,6 +278,7 @@ export function useFocusSessionController({
     ...handlers,
     dailyFocusStats,
     activeFocusIntention,
+    setFocusIntention,
     refreshDailyFocusStats,
     isFocusDockCollapsed,
     setIsFocusDockCollapsed,
