@@ -44,15 +44,29 @@ const primaryButton = `${quietButton} bg-blue-600 text-white hover:bg-blue-700 h
 const sectionLabel = 'text-xs font-semibold uppercase tracking-[0.16em] text-slate-500';
 const dismissedFocusStoragePrefix = 'home-focus-dismissed';
 
-function dismissedFocusStorageKey(userId: string, workspaceId?: string) {
+export function dismissedFocusStorageKey(userId: string, workspaceId?: string | null) {
   return `${dismissedFocusStoragePrefix}:${userId}:${workspaceId ?? 'none'}`;
 }
 
-function readDismissedFocusSession(key: string) {
+export function readDismissedFocusSession(key: string) {
   try {
     return window.sessionStorage.getItem(key);
   } catch {
     return null;
+  }
+}
+
+export function isHomeFocusSessionActive(
+  timerState?: { startedAt: number | null; activeTaskId: string | null } | null,
+  userId?: string | null,
+  workspaceId?: string | null
+) {
+  if (!timerState?.startedAt || !timerState.activeTaskId || !userId) return false;
+  try {
+    const dismissed = window.sessionStorage.getItem(dismissedFocusStorageKey(userId, workspaceId));
+    return dismissed !== String(timerState.startedAt);
+  } catch {
+    return false;
   }
 }
 
@@ -177,7 +191,7 @@ function HomeBriefing({ currentUser, activeWorkspace, onOpenTask, onOpenBoard,
   };
 
   if (focusControls && focusViewTask) {
-    return <div className="bg-canvas" data-home-theme={appearance}><HomeFocusView {...focusControls} task={focusViewTask} onExit={exitFocusView} /></div>;
+    return <div className="bg-canvas" data-home-theme={appearance}><HomeFocusView {...focusControls} task={focusViewTask} onOpenTask={onOpenTask} onExit={exitFocusView} /></div>;
   }
 
   return (

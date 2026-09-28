@@ -8,13 +8,14 @@ import DueDateBadge from '../atoms/DueDateBadge';
 export interface HomeFocusControls {
   session: Pick<FocusSessionValue, 'timerState' | 'remainingSeconds' | 'focusTasks' | 'dailyFocusStats' | 'activeFocusIntention' | 'setFocusIntention' | 'handleStartFocusTimer' | 'pauseTimer' | 'resetTimer' | 'setMode' | 'setIsFocusDockCollapsed'>;
   onMarkDone: (task: FocusTask) => Promise<boolean>;
+  onOpenTask?: (taskId: string, boardId: string) => void;
 }
 
 const button = 'min-h-11 cursor-pointer rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-wait disabled:opacity-50';
 const primaryAction = `${button} bg-blue-600 text-white hover:bg-blue-700 hover:text-white`;
 const quietText = 'cursor-pointer text-[13px] font-medium text-slate-400 transition-colors hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-blue-600';
 
-export default function HomeFocusView({ task, session, onMarkDone, onExit }: HomeFocusControls & { task: FocusTask; onExit: () => void }) {
+export default function HomeFocusView({ task, session, onMarkDone, onOpenTask, onExit }: HomeFocusControls & { task: FocusTask; onExit: () => void }) {
   const { t } = useI18n();
   const heading = useRef<HTMLHeadingElement>(null);
   const cancelIntentionCommitRef = useRef(false);
@@ -95,6 +96,16 @@ export default function HomeFocusView({ task, session, onMarkDone, onExit }: Hom
       </div>
       <p className="mt-6 text-sm text-slate-500">{t('briefing.focusMinutesToday', { count: session.dailyFocusStats.focusedMinutes })}</p>
       <div className="mt-8 flex flex-wrap gap-2">
+        {onOpenTask && (
+          <button
+            type="button"
+            disabled={saving}
+            className={button}
+            onClick={() => onOpenTask(task.id, task.boardId)}
+          >
+            {t('briefing.details')}
+          </button>
+        )}
         <button type="button" disabled={saving || task.isDone} className={primaryAction} onClick={() => void complete()}>{t('common.markDone')}</button>
         <button type="button" disabled={saving} className={button} onClick={onExit}>{t('briefing.exitFocus')}</button>
       </div>

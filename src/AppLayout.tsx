@@ -31,6 +31,7 @@ import { usePlanningController } from './features/today/hooks/usePlanningControl
 import AppOverlays from './app/AppOverlays';
 import { useAppRoutingController } from './app/useAppRoutingController';
 import { useAppLayoutRouteContextValue } from './app/createAppLayoutRouteContext';
+import { isHomeFocusSessionActive } from './components/organisms/HomeDashboard';
 
 function AppLayout() {
   const {
@@ -332,6 +333,7 @@ function AppLayout() {
         isOpen: isProgressReportOpen,
         onClose: () => setIsProgressReportOpen(false),
       }}
+      isHomeFocusActive={location.pathname === '/home' && Boolean(user && isHomeFocusSessionActive(focusSession.timerState, user.id, activeWorkspaceId))}
     />
   );
 

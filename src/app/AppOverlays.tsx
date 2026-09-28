@@ -50,6 +50,7 @@ interface Props {
     onLater: () => void;
   };
   progressReport: { isOpen: boolean; onClose: () => void };
+  isHomeFocusActive?: boolean;
 }
 
 export default function AppOverlays(props: Props) {
@@ -112,29 +113,31 @@ export default function AppOverlays(props: Props) {
       {boardDialogs.groupDialog.isOpen && <AddGroupDialog onClose={boardDialogs.closeGroupDialog} onSubmitGroup={board.onSubmitList} />}
       {boardDialogs.boardDialog.isOpen && <CreateBoardDialog onClose={boardDialogs.closeCreateBoardDialog} onSubmitBoard={board.handleCreateBoard} />}
       <BoardActivityDialog isOpen={boardDialogs.activityDialog.isOpen} onClose={boardDialogs.closeActivityDialog} boardId={board.activeBoardId} />
-      <FocusDock
-        focusTasks={focus.focusTasks}
-        activeTaskId={focus.timerState.activeTaskId || focus.activeFocusTaskId}
-        isCollapsed={focus.isFocusDockCollapsed}
-        timerState={focus.timerState}
-        timerSettings={focus.timerSettings}
-        dailyFocusStats={focus.dailyFocusStats}
-        remainingSeconds={focus.remainingSeconds}
-        onCollapseChange={focus.setIsFocusDockCollapsed}
-        onActiveTaskChange={focusIntegration.handleActiveTaskChange}
-        onModeChange={focus.setMode}
-        onTimerSettingsChange={focus.updateTimerSettings}
-        onStartTimer={() => focus.handleStartFocusTimer()}
-        onPauseTimer={focus.pauseTimer}
-        onResetTimer={focus.resetTimer}
-        onPopOutTimer={focusIntegration.handleOpenFloatingFocusTimer}
-        onOpenShutdown={() => planning.setIsShutdownRitualOpen(true)}
-        onOpenTask={focusIntegration.handleOpenFocusTask}
-        onMarkDone={focusIntegration.handleMarkFocusTaskDone}
-        onRemoveTask={focus.removeFocusTask}
-        isPictureInPictureSupported={focusIntegration.isPictureInPictureSupported}
-        isPictureInPictureOpen={focusIntegration.isPictureInPictureOpen}
-      />
+      {!props.isHomeFocusActive && (
+        <FocusDock
+          focusTasks={focus.focusTasks}
+          activeTaskId={focus.timerState.activeTaskId || focus.activeFocusTaskId}
+          isCollapsed={focus.isFocusDockCollapsed}
+          timerState={focus.timerState}
+          timerSettings={focus.timerSettings}
+          dailyFocusStats={focus.dailyFocusStats}
+          remainingSeconds={focus.remainingSeconds}
+          onCollapseChange={focus.setIsFocusDockCollapsed}
+          onActiveTaskChange={focusIntegration.handleActiveTaskChange}
+          onModeChange={focus.setMode}
+          onTimerSettingsChange={focus.updateTimerSettings}
+          onStartTimer={() => focus.handleStartFocusTimer()}
+          onPauseTimer={focus.pauseTimer}
+          onResetTimer={focus.resetTimer}
+          onPopOutTimer={focusIntegration.handleOpenFloatingFocusTimer}
+          onOpenShutdown={() => planning.setIsShutdownRitualOpen(true)}
+          onOpenTask={focusIntegration.handleOpenFocusTask}
+          onMarkDone={focusIntegration.handleMarkFocusTaskDone}
+          onRemoveTask={focus.removeFocusTask}
+          isPictureInPictureSupported={focusIntegration.isPictureInPictureSupported}
+          isPictureInPictureOpen={focusIntegration.isPictureInPictureOpen}
+        />
+      )}
       <FocusLimitToast message={focus.limitMessage} onDismiss={focus.clearLimitMessage} />
       <ShutdownRitualDialog
         isOpen={planning.isShutdownRitualOpen}
