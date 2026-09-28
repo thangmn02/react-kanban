@@ -105,6 +105,7 @@ export function useAppLayoutRouteContextValue(params: Params): AppLayoutRouteCon
       onOpenBoard: board.handleOpenBoardFromHome,
       onToggleFocusTask: focus.handleToggleFocusTaskFromHome,
       onStartFocusTask: focus.handleStartFocusTaskFromHome,
+      onPlanFocusTasks: focus.handlePlanFocusTasksFromHome,
       isFocusTask: focus.isFocusTask,
       currentUser: params.user!,
       activeWorkspace: params.activeWorkspace,

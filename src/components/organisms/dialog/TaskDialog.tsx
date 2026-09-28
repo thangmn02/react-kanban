@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { useForm, useWatch, type Resolver } from 'react-hook-form';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
@@ -7,7 +7,8 @@ import * as yup from 'yup';
 import { EditorContent, useEditor } from '@tiptap/react';
 import Placeholder from '@tiptap/extension-placeholder';
 import StarterKit from '@tiptap/starter-kit';
-import { formatDistanceToNow, parseISO } from 'date-fns';
+import { format, formatDistanceToNow, parseISO } from 'date-fns';
+import { enUS, vi } from 'date-fns/locale';
 
 import Button from '../../atoms/Button';
 import InputField from '../../molecules/InputField';
@@ -32,6 +33,7 @@ import { mapWorkspaceMembersToAssignees, mockWorkspaceMembers } from '../../../u
 import { Skeleton } from '../../atoms/skeleton';
 import TaskCoverPicker from '../../task/TaskCoverPicker';
 import { useI18n } from '../../../i18n';
+import { parseSmartTaskInput } from '../../../utils/smartTaskParser';
 
 
 interface TaskDialogProps {
@@ -50,7 +52,8 @@ const taskSchema = yup.object({
   description: yup.string(),
   priority: yup.string(),
   startDate: yup.string(),
-  dueDate: yup.string(),
+  dueDate: yup.string().when('repeatInterval', { is: (value: string | undefined) => Boolean(value), then: (schema) => schema.required('A due date is required for repeating tasks') }),
+  repeatInterval: yup.string(),
   image: yup.string(),
   assignees: yup.array(),
 }).required();
@@ -89,6 +92,7 @@ interface TaskDialogValues {
   priority?: string;
   startDate?: string;
   dueDate?: string;
+  repeatInterval?: string;
   image?: string;
   assignees?: Array<{ name: string; avatar: string }>;
 }
@@ -105,7 +109,7 @@ function TaskDialog({
 }: TaskDialogProps) {
   const isEditMode = Boolean(taskData);
   const shouldReduceMotion = useReducedMotion();
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [showAssigneeSelect, setShowAssigneeSelect] = useState(false);
   const [labels, setLabels] = useState<TaskLabel[]>([]);
   const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
@@ -142,6 +146,7 @@ function TaskDialog({
       priority: taskData?.priority || 'Low',
       startDate: taskData?.startDate || '',
       dueDate: taskData?.dueDate || '',
+      repeatInterval: taskData?.repeatInterval || '',
       image: taskData?.image || '',
       assignees: taskData?.assignees || [],
     }
@@ -150,6 +155,9 @@ function TaskDialog({
   const currentAssignees = useWatch({ control, name: 'assignees' }) || [];
   const assigneeOptions = mapWorkspaceMembersToAssignees(workspaceMembers);
   const imagePreview = useWatch({ control, name: 'image' });
+  const currentTitle = useWatch({ control, name: 'title' }) || '';
+  const currentRepeatInterval = useWatch({ control, name: 'repeatInterval' }) || '';
+  const smartTask = useMemo(() => isEditMode ? null : parseSmartTaskInput(currentTitle), [currentTitle, isEditMode]);
   const checklistProgress = getChecklistProgress(checklistItems);
 
   const editor = useEditor({
@@ -246,6 +254,7 @@ function TaskDialog({
       priority: taskData?.priority || 'Low',
       startDate: taskData?.startDate || '',
       dueDate: taskData?.dueDate || '',
+      repeatInterval: taskData?.repeatInterval || '',
       image: taskData?.image || '',
       assignees: taskData?.assignees || [],
     };
@@ -260,12 +269,14 @@ function TaskDialog({
   }, [editor, isOpen, reset, setValue, taskData]);
 
   const handleFormSubmit = (formData: TaskDialogValues) => {
+    const parsedTask = isEditMode ? null : parseSmartTaskInput(formData.title);
     onSubmitTask({
-      title: formData.title.trim(),
+      title: parsedTask?.matched ? parsedTask.title : formData.title.trim(),
       description: formData.description || '',
       priority: formData.priority as TaskDialogFormData['priority'],
       startDate: formData.startDate || '',
-      dueDate: formData.dueDate || '',
+      dueDate: formData.dueDate || parsedTask?.dueDate || '',
+      repeatInterval: (formData.repeatInterval || undefined) as TaskDialogFormData['repeatInterval'],
       assignees: formData.assignees || [],
       image: formData.image?.trim() || '',
       labels,
@@ -414,6 +425,7 @@ function TaskDialog({
                     placeholder="Refine the task title"
                     {...register('title')}
                   />
+                  {smartTask?.dueDate && <div className="flex flex-wrap items-center gap-2"><span className="inline-flex rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">{t('smartAdd.due', { date: format(parseISO(smartTask.dueDate), 'PP', { locale: language === 'vi' ? vi : enUS }) })}</span><span className="text-xs text-slate-400">{t('smartAdd.hint')}</span></div>}
 
                   <div>
                     <label className="mb-2 block text-sm font-semibold text-gray-700">
@@ -691,9 +703,18 @@ function TaskDialog({
                       <input
                         type="date"
                         {...register('dueDate')}
+                        aria-invalid={Boolean(errors.dueDate)}
                         className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
+                  </div>
+                  {errors.dueDate?.message && <p role="alert" className="text-xs font-medium text-rose-600">{errors.dueDate.message}</p>}
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-gray-700">{t('repeat.label')}</label>
+                    <select {...register('repeatInterval')} className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                      <option value="">{t('repeat.none')}</option><option value="daily">{t('repeat.daily')}</option><option value="weekly">{t('repeat.weekly')}</option><option value="monthly">{t('repeat.monthly')}</option>
+                    </select>
+                    <p className="mt-2 text-xs leading-5 text-slate-400">{currentRepeatInterval ? t('repeat.hint') : t('repeat.chooseHint')}</p>
                   </div>
                 </section>
 

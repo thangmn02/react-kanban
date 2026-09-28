@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 
 import type { CreateBriefingPinInput, BriefingPinSourceType } from '../../types/briefing.type';
@@ -43,6 +43,7 @@ export default function BriefingPinForm({
   const [linkUrl, setLinkUrl] = useState('');
   const [taskId, setTaskId] = useState('');
   const [whyMatters, setWhyMatters] = useState('');
+  const lastAutoWhyRef = useRef('');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,8 +61,18 @@ export default function BriefingPinForm({
     setLinkUrl('');
     setTaskId('');
     setWhyMatters('');
+    lastAutoWhyRef.current = '';
     setError(null);
     onClose();
+  };
+  const handleTaskChange = (nextId: string) => {
+    setTaskId(nextId);
+    const task = tasks.find((item) => item.id === nextId);
+    const autoWhy = task ? buildTaskReason(task, t) : '';
+    if (whyMatters === '' || whyMatters === lastAutoWhyRef.current) {
+      setWhyMatters(autoWhy);
+    }
+    lastAutoWhyRef.current = autoWhy;
   };
   const canSubmit = quotedText.trim().length > 0
     && sourceLabel.trim().length > 0
@@ -109,7 +120,7 @@ export default function BriefingPinForm({
             <label className="text-sm font-semibold text-slate-700">{t('briefing.pin.sourceLabel')}<input required value={sourceLabel} onChange={(event) => setSourceLabel(event.target.value)} placeholder={t('briefing.pin.sourcePlaceholder')} className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2 font-normal outline-none focus:border-blue-400" /></label>
             <label className="text-sm font-semibold text-slate-700">{t('briefing.pin.authorLabel')}<input required value={authorName} onChange={(event) => setAuthorName(event.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2 font-normal outline-none focus:border-blue-400" /></label>
             <label className="text-sm font-semibold text-slate-700">{t('briefing.pin.linkLabel')}<input type="url" value={linkUrl} onChange={(event) => setLinkUrl(event.target.value)} placeholder="https://" className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2 font-normal outline-none focus:border-blue-400" /></label>
-            <label className="sm:col-span-2 text-sm font-semibold text-slate-700">{t('briefing.pin.taskLabel')}<select value={taskId} onChange={(event) => { const nextId = event.target.value; setTaskId(nextId); const task = tasks.find((item) => item.id === nextId); if (task) setWhyMatters(buildTaskReason(task, t)); }} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-normal outline-none focus:border-blue-400"><option value="">{t('briefing.pin.noTask')}</option>{tasks.map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}</select></label>
+            <label className="sm:col-span-2 text-sm font-semibold text-slate-700">{t('briefing.pin.taskLabel')}<select value={taskId} onChange={(event) => handleTaskChange(event.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-normal outline-none focus:border-blue-400"><option value="">{t('briefing.pin.noTask')}</option>{tasks.map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}</select></label>
             <label className="sm:col-span-2 text-sm font-semibold text-slate-700">{t('briefing.pin.whyLabel')}<textarea required maxLength={300} rows={3} value={whyMatters} onChange={(event) => setWhyMatters(event.target.value)} placeholder={t('briefing.pin.whyPlaceholder')} className="mt-1.5 w-full resize-y rounded-xl border border-slate-200 px-3 py-2 font-normal outline-none focus:border-blue-400" /></label>
           </div>
           {error && <p role="alert" className="mt-3 text-sm text-rose-600">{error}</p>}

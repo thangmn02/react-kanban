@@ -20,6 +20,7 @@ import {
   resolveTaskCover,
   type TaskCoverUpdateEventDetail,
 } from '../../utils/coverBackground';
+import { taskStatusBorderClass, type TaskStatusColor } from '../../utils/taskStatus';
 
 interface TaskItemProps {
   task: ITaskItem;
@@ -31,6 +32,7 @@ interface TaskItemProps {
   onToggleFocusTask: (task: ITaskItem) => void;
   isFocusTask: boolean;
   workspaceMembers?: WorkspaceMember[];
+  statusColor?: TaskStatusColor;
 }
 
 function TaskItem({
@@ -43,6 +45,7 @@ function TaskItem({
   onToggleFocusTask,
   isFocusTask,
   workspaceMembers = mockWorkspaceMembers,
+  statusColor = 'gray',
 }: TaskItemProps) {
   const [showPriorityMenu, setShowPriorityMenu] = useState(false);
   const [showAssigneeMenu, setShowAssigneeMenu] = useState(false);
@@ -124,7 +127,7 @@ function TaskItem({
               handleEditTask(task);
             }
           }}
-          className={`group relative rounded-2xl border bg-white p-4 shadow-card ring-1 transition-[box-shadow,transform,border,background] duration-200 ${
+          className={`group relative rounded-2xl border border-l-[3px] bg-white p-4 shadow-card ring-1 transition-[box-shadow,transform,border,background] duration-200 ${taskStatusBorderClass[statusColor]} ${
             isFocusTask && !isOverlay
               ? 'border-sky-200 ring-sky-100'
               : 'border-slate-200/80 ring-slate-900/[0.02]'
@@ -332,6 +335,8 @@ function TaskItem({
               )}
             </div>
           )}
+
+          {task.repeatInterval && <div className="mb-3"><span className="inline-flex items-center gap-1.5 rounded-full border border-violet-100 bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700"><span aria-hidden="true">↻</span>{t(`repeat.${task.repeatInterval}`)}</span></div>}
 
           {/* Divider */}
           <div className="my-2.5 border-t border-slate-100" />

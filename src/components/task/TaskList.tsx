@@ -11,6 +11,7 @@ import type { BoardDeleteItem, IListItem, ITaskItem } from '../../types/task.typ
 import type { WorkspaceMember } from '../../types/auth.type';
 import Typography from '../atoms/Typography';
 import TaskItem from './TaskItem';
+import { columnStatusColor, statusColor as statusColorForTask, taskStatusDotClass } from '../../utils/taskStatus';
 
 interface TaskListProps {
   listItem: IListItem;
@@ -25,6 +26,7 @@ interface TaskListProps {
   onToggleFocusTask: (task: ITaskItem) => void;
   isFocusTask: (taskId: string) => boolean;
   workspaceMembers?: WorkspaceMember[];
+  isFinalActiveColumn?: boolean;
 }
 
 function TaskList({
@@ -40,8 +42,10 @@ function TaskList({
   onToggleFocusTask,
   isFocusTask,
   workspaceMembers,
+  isFinalActiveColumn = false,
 }: TaskListProps) {
   const taskIds = tasks.map(task => task.id);
+  const status = columnStatusColor(tasks, isFinalActiveColumn);
   const {
     attributes,
     listeners,
@@ -103,6 +107,7 @@ function TaskList({
           <svg className="w-4 h-4 text-gray-400 shrink-0" aria-hidden="true" fill="currentColor" viewBox="0 0 20 20">
             <path d="M7 2a2 2 0 10.001 4.001A2 2 0 007 2zm0 6a2 2 0 10.001 4.001A2 2 0 007 8zm0 6a2 2 0 10.001 4.001A2 2 0 007 14zm6-12a2 2 0 10.001 4.001A2 2 0 0013 2zm0 6a2 2 0 10.001 4.001A2 2 0 0013 8zm0 6a2 2 0 10.001 4.001A2 2 0 0013 14z" />
           </svg>
+          <span className={`h-2 w-2 shrink-0 rounded-full ${taskStatusDotClass[status]}`} aria-hidden="true" />
           <Typography
             className="flex-1 truncate text-xs font-semibold uppercase tracking-[0.2em] text-slate-700"
             content={listItem.title}
@@ -180,6 +185,7 @@ function TaskList({
                   onToggleFocusTask={onToggleFocusTask}
                   isFocusTask={isFocusTask(task.id)}
                   workspaceMembers={workspaceMembers}
+                  statusColor={statusColorForTask(task, isFinalActiveColumn)}
                 />
               ))}
               {tasks.length === 0 && !isDragging && (

@@ -346,7 +346,7 @@ function KanbanBoard({
           strategy={horizontalListSortingStrategy}
         >
           <div className="flex items-start gap-5 overflow-x-auto pb-6 pt-1">
-            {boardColumns.map(({ columnId, listItem, displayTasks }) => (
+            {boardColumns.map(({ columnId, listItem, displayTasks }, columnIndex) => (
                 <MemoizedTaskList
                   key={columnId}
                   listItem={listItem}
@@ -360,6 +360,7 @@ function KanbanBoard({
                   onToggleFocusTask={handlers.onToggleFocusTask}
                   isFocusTask={isFocusTask}
                   workspaceMembers={workspaceMembers}
+                  isFinalActiveColumn={columnIndex === boardColumns.length - 2}
                 />
             ))}
 

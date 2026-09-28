@@ -10,6 +10,8 @@ import {
   localUpdateTaskPositions,
 } from '../infrastructure/local/localBoardStore';
 import type { Json, TaskInsert, TaskRow, TaskUpdate } from '../types/supabase.type';
+import type { TaskRepeatInterval } from '../types/task.type';
+import { addDays, addMonths, format, parseISO } from 'date-fns';
 
 interface FetchTasksParams {
   boardId?: string;
@@ -62,6 +64,7 @@ const STABLE_TASK_FIELD_NORMALIZERS = {
   assignees: (value: TaskInsert['assignees']) => value ?? [],
   image: (value: TaskInsert['image']) => value ?? null,
   is_done: (value: TaskInsert['is_done']) => value ?? false,
+  repeat_interval: (value: TaskInsert['repeat_interval']) => value ?? null,
 } as const;
 
 /**
@@ -84,6 +87,7 @@ function normalizeTaskData(taskData: TaskInsert): TaskInsert {
     assignees: STABLE_TASK_FIELD_NORMALIZERS.assignees(taskData.assignees),
     image: STABLE_TASK_FIELD_NORMALIZERS.image(taskData.image),
     is_done: STABLE_TASK_FIELD_NORMALIZERS.is_done(taskData.is_done),
+    repeat_interval: STABLE_TASK_FIELD_NORMALIZERS.repeat_interval(taskData.repeat_interval),
     position: taskData.position ?? 0,
     created_by: taskData.created_by ?? undefined,
   };
@@ -108,6 +112,7 @@ function normalizeTaskDataPartial(taskData: TaskUpdate): TaskUpdate {
   if ('assignees' in taskData) stablePayload.assignees = STABLE_TASK_FIELD_NORMALIZERS.assignees(taskData.assignees);
   if ('image' in taskData) stablePayload.image = STABLE_TASK_FIELD_NORMALIZERS.image(taskData.image);
   if ('is_done' in taskData) stablePayload.is_done = STABLE_TASK_FIELD_NORMALIZERS.is_done(taskData.is_done);
+  if ('repeat_interval' in taskData) stablePayload.repeat_interval = STABLE_TASK_FIELD_NORMALIZERS.repeat_interval(taskData.repeat_interval);
   if ('list_id' in taskData) stablePayload.list_id = taskData.list_id;
   if ('workspace_id' in taskData) stablePayload.workspace_id = taskData.workspace_id;
   if ('position' in taskData) stablePayload.position = taskData.position;
@@ -196,6 +201,31 @@ export async function createTasks(tasksData: TaskInsert[]): Promise<TaskRow[]> {
   }
 
   return data ?? [];
+}
+
+export function nextRecurringDueDate(dueDate: string, interval: TaskRepeatInterval) {
+  const current = parseISO(dueDate);
+  const next = interval === 'daily' ? addDays(current, 1) : interval === 'weekly' ? addDays(current, 7) : addMonths(current, 1);
+  return format(next, 'yyyy-MM-dd');
+}
+
+export async function createNextRecurringTaskOccurrence(completedTask: TaskRow): Promise<TaskRow | null> {
+  if (!completedTask.due_date || !['daily', 'weekly', 'monthly'].includes(completedTask.repeat_interval || '')) return null;
+  const repeatInterval = completedTask.repeat_interval as TaskRepeatInterval;
+  return createTask({
+    board_id: completedTask.board_id,
+    list_id: completedTask.list_id,
+    workspace_id: completedTask.workspace_id ?? undefined,
+    created_by: completedTask.created_by ?? undefined,
+    title: completedTask.title,
+    description: completedTask.description,
+    priority: completedTask.priority,
+    due_date: nextRecurringDueDate(completedTask.due_date, repeatInterval),
+    assignees: completedTask.assignees,
+    repeat_interval: repeatInterval,
+    position: completedTask.position + 1,
+    is_done: false,
+  });
 }
 
 

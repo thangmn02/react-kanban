@@ -25,6 +25,7 @@ interface BuildTaskInsertParams {
   assignees?: BoardTaskItem['assignees'];
   attachments?: BoardTaskItem['attachments'];
   image?: string;
+  repeatInterval?: BoardTaskItem['repeatInterval'];
 }
 
 interface BuildTaskUpdateParams {
@@ -36,6 +37,7 @@ interface BuildTaskUpdateParams {
   assignees?: BoardTaskItem['assignees'];
   attachments?: BoardTaskItem['attachments'];
   image?: string;
+  repeatInterval?: BoardTaskItem['repeatInterval'];
 }
 
 export function createEmptyBoardData(): BoardData {
@@ -60,6 +62,7 @@ export function mapTaskRowToTaskItem(taskRow: TaskRow): BoardTaskItem {
     image: taskRow.image || undefined,
     isDone: taskRow.is_done,
     updatedAt: taskRow.updated_at || undefined,
+    repeatInterval: (taskRow.repeat_interval as BoardTaskItem['repeatInterval']) || undefined,
     attachments: normalizeTaskAttachments(taskRow.attachments ?? null),
     labels: [],
     checklistItems: [],
@@ -83,11 +86,12 @@ interface ApplyTaskDefaultsParams {
   dueDate?: string;
   assignees?: BoardTaskItem['assignees'];
   image?: string;
+  repeatInterval?: BoardTaskItem['repeatInterval'];
 }
 
 type TaskDefaultsPayload = Pick<
   TaskInsert,
-  'title' | 'description' | 'priority' | 'start_date' | 'due_date' | 'assignees' | 'image'
+  'title' | 'description' | 'priority' | 'start_date' | 'due_date' | 'assignees' | 'image' | 'repeat_interval'
 >;
 
 function applyTaskDefaults({
@@ -98,6 +102,7 @@ function applyTaskDefaults({
   dueDate,
   assignees,
   image,
+  repeatInterval,
 }: ApplyTaskDefaultsParams): TaskDefaultsPayload {
   return {
     title,
@@ -107,6 +112,7 @@ function applyTaskDefaults({
     due_date: dueDate || null,
     assignees: serializeTaskAssignees(assignees),
     image: image || null,
+    repeat_interval: repeatInterval || null,
   };
 }
 
@@ -225,9 +231,10 @@ export function buildTaskInsertPayload({
   position,
   assignees,
   image,
+  repeatInterval,
 }: BuildTaskInsertParams): TaskInsert {
   return {
-    ...applyTaskDefaults({ title, description, priority, startDate, dueDate, assignees, image }),
+    ...applyTaskDefaults({ title, description, priority, startDate, dueDate, assignees, image, repeatInterval }),
     board_id: boardId,
     list_id: listId,
     category1: DEFAULT_TASK_CATEGORIES.CATEGORY_1,
@@ -245,8 +252,9 @@ export function buildTaskUpdatePayload({
   dueDate,
   assignees,
   image,
+  repeatInterval,
 }: BuildTaskUpdateParams): TaskUpdate {
-  return applyTaskDefaults({ title, description, priority, startDate, dueDate, assignees, image });
+  return applyTaskDefaults({ title, description, priority, startDate, dueDate, assignees, image, repeatInterval });
 }
 
 export function buildTaskFieldUpdatePayload(

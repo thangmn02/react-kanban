@@ -19,6 +19,7 @@ import {
   deleteTasksByListId,
   restoreTask,
   updateTask,
+  createNextRecurringTaskOccurrence,
   updateTaskPositions,
 } from '../services/task.service';
 import {
@@ -206,6 +207,7 @@ export function useTaskOperations({
           assignees: formData.assignees,
           attachments: formData.attachments,
           image: formData.image,
+          repeatInterval: formData.repeatInterval,
         }),
         workspace_id: activeWorkspaceId ?? undefined,
         created_by: userId,
@@ -251,6 +253,7 @@ export function useTaskOperations({
         assignees: formData.assignees,
         attachments: formData.attachments,
         image: formData.image,
+        repeatInterval: formData.repeatInterval,
       }));
       await Promise.all([
         replaceTaskChecklistItems(editingTask.id, formData.checklistItems, activeWorkspaceId),
@@ -276,6 +279,7 @@ export function useTaskOperations({
       if ((formData.image || '') !== (editingTask.image || '')) {
         changes.push(`updated cover image`);
       }
+      if (formData.repeatInterval !== editingTask.repeatInterval) changes.push(`changed repeat to ${formData.repeatInterval || 'none'}`);
 
       const prevAssignees = editingTask.assignees?.map(a => a.name).join(', ') || '';
       const nextAssignees = formData.assignees?.map(a => a.name).join(', ') || '';
@@ -507,7 +511,7 @@ export function useTaskOperations({
     try {
       const payload = buildTaskFieldUpdatePayload(fields);
 
-      await updateTask(taskId, payload);
+      const updatedTask = await updateTask(taskId, payload);
 
       const originalTask = previousBoardData.task[taskId];
       if (originalTask) {
@@ -552,6 +556,8 @@ export function useTaskOperations({
           });
 
           if (fields.isDone) {
+            const nextOccurrence = !originalTask.isDone ? await createNextRecurringTaskOccurrence(updatedTask) : null;
+            if (nextOccurrence) await refreshBoardData();
             onTaskCompleted?.();
           }
         }

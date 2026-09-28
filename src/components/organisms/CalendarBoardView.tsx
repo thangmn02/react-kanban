@@ -1,21 +1,11 @@
 import { useMemo, useState } from 'react';
-import {
-  addDays,
-  addMonths,
-  endOfMonth,
-  endOfWeek,
-  format,
-  isSameMonth,
-  isToday,
-  startOfMonth,
-  startOfWeek,
-  subMonths,
-} from 'date-fns';
+import { addDays, addMonths, differenceInCalendarDays, endOfMonth, endOfWeek, format, isSameDay, isSameMonth, isToday, parseISO, startOfDay, startOfMonth, startOfWeek, subMonths } from 'date-fns';
+import { enUS, vi } from 'date-fns/locale';
 
 import type { BoardData, ITaskItem } from '../../types/task.type';
 import { doesTaskMatchFilters } from '../../utils/taskFilters';
-import { getDueDateStatus } from '../../utils/taskMetadata';
-import { getTaskLabelClass } from '../../utils/taskCollections';
+import { statusColor, taskStatusDotClass, type TaskStatusColor } from '../../utils/taskStatus';
+import { useI18n } from '../../i18n';
 
 interface CalendarBoardViewProps {
   boardData: BoardData;
@@ -26,199 +16,123 @@ interface CalendarBoardViewProps {
   onOpenTask: (task: ITaskItem) => void;
 }
 
-const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+interface ScheduledTask { task: ITaskItem; color: TaskStatusColor }
 
-function CalendarBoardView({
-  boardData,
-  searchQuery,
-  filterPriority,
-  filterAssignee,
-  filterDueDate,
-  onOpenTask,
-}: CalendarBoardViewProps) {
+function CalendarBoardView({ boardData, searchQuery, filterPriority, filterAssignee, filterDueDate, onOpenTask }: CalendarBoardViewProps) {
+  const { language, t } = useI18n();
+  const locale = language === 'vi' ? vi : enUS;
   const [activeMonth, setActiveMonth] = useState(() => startOfMonth(new Date()));
+  const [selectedDay, setSelectedDay] = useState(() => startOfDay(new Date()));
+  const finalActiveColumnId = boardData.columns.at(-2);
 
-  const scheduledTasks = useMemo(() => {
-    return Object.values(boardData.task)
-      .filter((task): task is ITaskItem => Boolean(task))
-      .filter((task) => Boolean(task.dueDate))
-      .filter((task) => doesTaskMatchFilters(task, {
-        searchQuery,
-        filterPriority,
-        filterAssignee,
-        filterDueDate,
-      }))
-      .sort((currentTask, nextTask) => {
-        return (currentTask.dueDate || '').localeCompare(nextTask.dueDate || '') || currentTask.title.localeCompare(nextTask.title);
-      });
-  }, [boardData.task, searchQuery, filterPriority, filterAssignee, filterDueDate]);
+  const taskColumnById = useMemo(() => {
+    const mapping = new Map<string, string>();
+    boardData.columns.forEach((columnId) => boardData.list[columnId]?.tasks.forEach((taskId) => mapping.set(taskId, columnId)));
+    return mapping;
+  }, [boardData.columns, boardData.list]);
 
   const tasksByDueDate = useMemo(() => {
-    return scheduledTasks.reduce<Map<string, ITaskItem[]>>((taskGroups, task) => {
-      const dueDateKey = task.dueDate;
-
-      if (!dueDateKey) {
-        return taskGroups;
-      }
-
-      const currentTasks = taskGroups.get(dueDateKey) || [];
-      currentTasks.push(task);
-      taskGroups.set(dueDateKey, currentTasks);
-
-      return taskGroups;
-    }, new Map<string, ITaskItem[]>());
-  }, [scheduledTasks]);
+    const groups = new Map<string, ScheduledTask[]>();
+    Object.values(boardData.task)
+      .filter((task): task is ITaskItem => Boolean(task?.dueDate))
+      .filter((task) => doesTaskMatchFilters(task, { searchQuery, filterPriority, filterAssignee, filterDueDate }))
+      .sort((first, second) => first.title.localeCompare(second.title))
+      .forEach((task) => {
+        const dueDate = task.dueDate;
+        if (!dueDate) return;
+        const tasks = groups.get(dueDate) || [];
+        tasks.push({ task, color: statusColor(task, taskColumnById.get(task.id) === finalActiveColumnId) });
+        groups.set(dueDate, tasks);
+      });
+    return groups;
+  }, [boardData.task, filterAssignee, filterDueDate, filterPriority, finalActiveColumnId, searchQuery, taskColumnById]);
 
   const calendarDays = useMemo(() => {
-    const firstVisibleDay = startOfWeek(startOfMonth(activeMonth));
-    const lastVisibleDay = endOfWeek(endOfMonth(activeMonth));
+    const firstVisibleDay = startOfWeek(startOfMonth(activeMonth), { weekStartsOn: 1 });
+    const lastVisibleDay = endOfWeek(endOfMonth(activeMonth), { weekStartsOn: 1 });
     const days: Date[] = [];
-
-    let currentDay = firstVisibleDay;
-
-    while (currentDay <= lastVisibleDay) {
-      days.push(currentDay);
-      currentDay = addDays(currentDay, 1);
-    }
-
+    for (let day = firstVisibleDay; day <= lastVisibleDay; day = addDays(day, 1)) days.push(day);
     return days;
   }, [activeMonth]);
 
-  const scheduledTaskCount = scheduledTasks.length;
-  const overdueTaskCount = scheduledTasks.filter((task) => getDueDateStatus(task.dueDate, task.isDone).status === 'overdue').length;
+  const selectedTasks = tasksByDueDate.get(format(selectedDay, 'yyyy-MM-dd')) || [];
+  const weekdayLabels = Array.from({ length: 7 }, (_, index) => format(addDays(new Date(2026, 0, 5), index), 'EEEEE', { locale }));
+
+  const chooseMonth = (month: Date) => {
+    const firstDay = startOfMonth(month);
+    setActiveMonth(firstDay);
+    setSelectedDay(firstDay);
+  };
+
+  const dueLabel = (task: ITaskItem) => {
+    if (!task.dueDate) return '';
+    const difference = differenceInCalendarDays(startOfDay(parseISO(task.dueDate)), startOfDay(new Date()));
+    if (difference < 0) return t('calendar.overdue', { count: Math.abs(difference) });
+    if (difference === 0) return t('calendar.dueToday');
+    if (difference === 1) return t('calendar.dueTomorrow');
+    return format(parseISO(task.dueDate), 'd MMM', { locale });
+  };
 
   return (
-    <div className="px-6 pb-6">
-      <div className="mb-5 rounded-2xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-600">
-              Calendar View
-            </p>
-            <h2 className="mt-1 text-2xl font-bold tracking-tight text-gray-900">
-              {format(activeMonth, 'MMMM yyyy')}
-            </h2>
-            <p className="mt-1 text-sm text-gray-500">
-              {scheduledTaskCount} scheduled tasks, {overdueTaskCount} overdue
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setActiveMonth((currentMonth) => subMonths(currentMonth, 1))}
-              className="cursor-pointer rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"
-            >
-              Previous
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveMonth(startOfMonth(new Date()))}
-              className="cursor-pointer rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-100"
-            >
-              Today
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveMonth((currentMonth) => addMonths(currentMonth, 1))}
-              className="cursor-pointer rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-        <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50">
-          {weekdayLabels.map((weekdayLabel) => (
-            <div
-              key={weekdayLabel}
-              className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.22em] text-gray-500"
-            >
-              {weekdayLabel}
+    <main className="px-4 pb-8 pt-2 sm:px-6">
+      <div className="mx-auto grid max-w-6xl gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)]">
+        <section className="rounded-[1.4rem] border border-slate-200 bg-white p-4 shadow-sm sm:p-6" aria-label={t('calendar.title')}>
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <span className="inline-flex rounded-full bg-sky-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-sky-700">{t('calendar.lazyBadge')}</span>
+              <h2 className="mt-3 text-xl font-bold tracking-[-0.03em] text-slate-950">{format(activeMonth, 'LLLL yyyy', { locale })}</h2>
             </div>
-          ))}
-        </div>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => chooseMonth(subMonths(activeMonth, 1))} aria-label={t('calendar.previousMonth')} className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white text-xl text-slate-500 transition hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100">‹</button>
+              <button type="button" onClick={() => chooseMonth(new Date())} className="cursor-pointer rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-700 transition hover:bg-sky-100 focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100">{t('calendar.today')}</button>
+              <button type="button" onClick={() => chooseMonth(addMonths(activeMonth, 1))} aria-label={t('calendar.nextMonth')} className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white text-xl text-slate-500 transition hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100">›</button>
+            </div>
+          </div>
 
-        <div className="grid grid-cols-7">
-          {calendarDays.map((day) => {
-            const tasksForDay = tasksByDueDate.get(format(day, 'yyyy-MM-dd')) || [];
-            const isOutsideActiveMonth = !isSameMonth(day, activeMonth);
-
-            return (
-              <div
-                key={day.toISOString()}
-                className={`min-h-[180px] border-b border-r border-gray-100 p-3 align-top ${
-                  isOutsideActiveMonth ? 'bg-gray-50/80' : 'bg-white'
-                } ${isToday(day) ? 'ring-1 ring-inset ring-blue-200' : ''}`}
-              >
-                <div className="mb-3 flex items-center justify-between">
-                  <span
-                    className={`inline-flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ${
-                      isToday(day)
-                        ? 'bg-blue-600 text-white'
-                        : isOutsideActiveMonth
-                          ? 'text-gray-400'
-                          : 'text-gray-800'
-                    }`}
-                  >
-                    {format(day, 'd')}
+          <div className="grid grid-cols-7 gap-1 sm:gap-2">
+            {weekdayLabels.map((label, index) => <div key={`${label}-${index}`} className="py-2 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400 sm:text-xs">{label}</div>)}
+            {calendarDays.map((day) => {
+              const key = format(day, 'yyyy-MM-dd');
+              const tasks = tasksByDueDate.get(key) || [];
+              const outsideMonth = !isSameMonth(day, activeMonth);
+              const selected = isSameDay(day, selectedDay);
+              return (
+                <button key={key} type="button" onClick={() => setSelectedDay(day)} aria-label={format(day, 'PPPP', { locale })} aria-pressed={selected} className={`group flex aspect-square min-h-11 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 text-xs font-semibold transition focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 sm:rounded-2xl sm:text-sm ${selected ? 'border-sky-500' : 'border-transparent hover:bg-slate-50'} ${isToday(day) ? 'bg-slate-950 text-white hover:bg-slate-800' : outsideMonth ? 'text-slate-300' : 'text-slate-700'}`}>
+                  <span>{format(day, 'd')}</span>
+                  <span className="flex h-2 items-center gap-1" aria-label={tasks.length > 0 ? t('calendar.taskCount', { count: tasks.length }) : undefined}>
+                    {tasks.slice(0, 3).map(({ task, color }) => <span key={task.id} className={`h-1.5 w-1.5 rounded-full ${taskStatusDotClass[color]}`} />)}
+                    {tasks.length > 3 && <span className={`text-[9px] font-bold ${isToday(day) ? 'text-slate-200' : 'text-slate-400'}`}>+{tasks.length - 3}</span>}
                   </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
 
-                  {tasksForDay.length > 0 && (
-                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-600">
-                      {tasksForDay.length}
-                    </span>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  {tasksForDay.length === 0 ? (
-                    <div className="text-xs text-gray-300">
-                      No tasks
-                    </div>
-                  ) : (
-                    tasksForDay.slice(0, 4).map((task) => {
-                      const dueStatus = getDueDateStatus(task.dueDate, task.isDone);
-
-                      return (
-                        <button
-                          key={task.id}
-                          type="button"
-                          onClick={() => onOpenTask(task)}
-                          className="w-full cursor-pointer rounded-xl border border-gray-200 bg-white px-3 py-2 text-left shadow-sm transition-colors hover:border-blue-300 hover:bg-blue-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
-                          aria-label={`Open task: ${task.title}`}
-                        >
-                          <div className="mb-1 flex flex-wrap gap-1">
-                            {task.labels.slice(0, 1).map((label) => (
-                              <span
-                                key={label.id}
-                                className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${getTaskLabelClass(label.color)}`}
-                              >
-                                {label.name}
-                              </span>
-                            ))}
-                          </div>
-                          <p className="line-clamp-2 text-xs font-semibold text-gray-800">{task.title}</p>
-                          <p className="mt-1 text-[11px] text-gray-500">{dueStatus.label}</p>
-                        </button>
-                      );
-                    })
-                  )}
-
-                  {tasksForDay.length > 4 && (
-                    <div className="rounded-lg bg-gray-50 px-3 py-2 text-[11px] font-semibold text-gray-500">
-                      +{tasksForDay.length - 4} more
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <aside className="self-start rounded-[1.4rem] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-sky-600">{isToday(selectedDay) ? t('calendar.today') : t('calendar.selectedDay')}</p>
+          <h3 className="mt-1 text-lg font-bold tracking-[-0.02em] text-slate-950">{format(selectedDay, 'EEEE, d MMMM', { locale })}</h3>
+          <p className="mt-1 text-sm text-slate-500">{t('calendar.taskCount', { count: selectedTasks.length })}</p>
+          <div className="mt-5 divide-y divide-slate-100">
+            {selectedTasks.map(({ task, color }) => (
+              <button key={task.id} type="button" onClick={() => onOpenTask(task)} className="group flex w-full cursor-pointer items-center gap-3 py-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300">
+                <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${taskStatusDotClass[color]}`} />
+                <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800 transition group-hover:text-sky-700">{task.title}</span>
+                <span className="shrink-0 text-xs font-medium text-slate-500">{dueLabel(task)}</span>
+              </button>
+            ))}
+          </div>
+          {selectedTasks.length === 0 && (
+            <div className="mt-6 rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-5 py-10 text-center">
+              <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-white text-lg text-slate-300 shadow-sm">✓</div>
+              <p className="text-sm font-semibold text-slate-500">{t('calendar.emptyTitle')}</p>
+              <p className="mt-1 text-xs leading-5 text-slate-400">{t('calendar.emptyDescription')}</p>
+            </div>
+          )}
+          <div className="mt-6 border-t border-slate-100 pt-4 text-xs leading-5 text-slate-400">{t('calendar.helper')}</div>
+        </aside>
       </div>
-    </div>
+    </main>
   );
 }
 

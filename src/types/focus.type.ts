@@ -13,6 +13,7 @@ export interface FocusTask {
   dueDate?: string;
   assigneeAvatar?: string;
   isDone?: boolean;
+  repeatInterval?: BoardTaskItem['repeatInterval'];
 }
 
 export interface FocusTaskInput {

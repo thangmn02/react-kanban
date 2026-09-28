@@ -16,7 +16,7 @@ export const BOARD_TEMPLATES: BoardTemplateDefinition[] = [
     id: 'software-mini-project',
     name: 'Software Mini Project',
     description: 'A small product workflow for planning, building, reviewing, and shipping.',
-    lists: ['Backlog', 'In Progress', 'Review', 'Done'],
+    lists: ['Backlog', 'In Progress', 'Nearly done', 'Done'],
   },
   {
     id: 'presentation',

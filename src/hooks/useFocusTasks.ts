@@ -91,6 +91,7 @@ export function useFocusTasks(boardData: BoardData, scope: StorageScope) {
         dueDate: liveTask.dueDate,
         assigneeAvatar: liveTask.assignees[0]?.avatar,
         isDone: liveTask.isDone,
+        repeatInterval: liveTask.repeatInterval,
         listId: liveListId || focusTask.listId,
         listTitle: liveList?.title || focusTask.listTitle,
       };
@@ -125,6 +126,14 @@ export function useFocusTasks(boardData: BoardData, scope: StorageScope) {
 
     return nextFocusTasks.length;
   }, [focusTasks, setActiveFocusTaskId, setFocusTasks]);
+
+  const replaceFocusTasks = useCallback((inputs: FocusTaskInput[]) => {
+    const nextFocusTasks = inputs.slice(0, MAX_FOCUS_TASKS).map(mapTaskToFocusTask);
+    setFocusTasks(nextFocusTasks);
+    setActiveFocusTaskId(nextFocusTasks[0]?.id || null);
+    setLimitMessage(null);
+    return nextFocusTasks.length;
+  }, [setActiveFocusTaskId, setFocusTasks]);
 
   const pinFocusTask = useCallback((input: FocusTaskInput) => {
     const nextFocusTask = mapTaskToFocusTask(input);
@@ -183,6 +192,7 @@ export function useFocusTasks(boardData: BoardData, scope: StorageScope) {
     isFocusTask: (taskId: string) => focusTaskIds.has(taskId),
     pinFocusTask,
     carryOverFocusTasks,
+    replaceFocusTasks,
     removeFocusTask,
     setActiveFocusTaskId,
     toggleFocusTask,

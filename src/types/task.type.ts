@@ -18,6 +18,8 @@ export interface BoardTaskMap {
   [key: string]: BoardTaskItem
 }
 
+export type TaskRepeatInterval = 'daily' | 'weekly' | 'monthly';
+
 export interface TaskAssignee {
   name: string,
   avatar: string,
@@ -61,6 +63,7 @@ export interface BoardTaskItem {
   image?: string,
   isDone?: boolean,
   updatedAt?: string,
+  repeatInterval?: TaskRepeatInterval,
   labels: TaskLabel[],
   attachments: TaskAttachment[],
   checklistItems: TaskChecklistItem[]
@@ -77,6 +80,7 @@ export interface TaskDialogFormData {
   attachments: BoardTaskItem['attachments'];
   checklistItems: BoardTaskItem['checklistItems'];
   image?: string;
+  repeatInterval?: TaskRepeatInterval;
 }
 
 export type QuickPlanAssignmentMode = 'per-line' | 'per-assignee';

@@ -413,6 +413,7 @@ export type Database = {
           list_id: string
           position: number
           priority: string | null
+          repeat_interval: string | null
           start_date: string | null
           title: string
           updated_at: string | null
@@ -436,6 +437,7 @@ export type Database = {
           list_id: string
           position?: number
           priority?: string | null
+          repeat_interval?: string | null
           start_date?: string | null
           title: string
           updated_at?: string | null
@@ -459,6 +461,7 @@ export type Database = {
           list_id?: string
           position?: number
           priority?: string | null
+          repeat_interval?: string | null
           start_date?: string | null
           title?: string
           updated_at?: string | null

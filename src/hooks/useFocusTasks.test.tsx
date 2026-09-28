@@ -79,4 +79,12 @@ describe('useFocusTasks', () => {
     expect(result.current.focusTasks[0].id).toBe('a');
     expect(result.current.activeFocusTaskId).toBe('a');
   });
+
+  it('replaces the Focus Dock in the supplied plan order', () => {
+    const { result } = renderHook(() => useFocusTasks(boardData, scopeA));
+    const makeInput = (id: string) => ({ task: { ...task, id, title: id }, boardId: 'board-1', boardTitle: 'Board' });
+    act(() => expect(result.current.replaceFocusTasks([makeInput('first'), makeInput('second'), makeInput('third')])).toBe(3));
+    expect(result.current.focusTasks.map((item) => item.id)).toEqual(['first', 'second', 'third']);
+    expect(result.current.activeFocusTaskId).toBe('first');
+  });
 });

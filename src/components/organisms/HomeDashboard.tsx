@@ -16,6 +16,7 @@ import HomeAppearanceSwitcher from '../home/HomeAppearanceSwitcher';
 import HomeFocusView, { type HomeFocusControls } from '../home/HomeFocusView';
 import BriefingPinForm from '../home/BriefingPinForm';
 import type { BriefingPin } from '../../types/briefing.type';
+import PlanMyDayDialog from '../../features/today/components/PlanMyDayDialog';
 
 interface HomeDashboardProps {
   focusControls?: HomeFocusControls;
@@ -23,6 +24,7 @@ interface HomeDashboardProps {
   onOpenBoard: (boardId: string) => void;
   onToggleFocusTask: (task: HomeTaskSummary) => void;
   onStartFocusTask?: (task: HomeTaskSummary) => void;
+  onPlanFocusTasks?: (tasks: HomeTaskSummary[]) => void;
   isFocusTask: (taskId: string) => boolean;
   currentUser: AppUser;
   activeWorkspace: WorkspaceSummary | null;
@@ -40,6 +42,28 @@ interface HomeDashboardProps {
 const quietButton = 'inline-flex cursor-pointer items-center justify-center rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600';
 const primaryButton = `${quietButton} bg-blue-600 text-white hover:bg-blue-700 hover:text-white`;
 const sectionLabel = 'text-xs font-semibold uppercase tracking-[0.16em] text-slate-500';
+const dismissedFocusStoragePrefix = 'home-focus-dismissed';
+
+function dismissedFocusStorageKey(userId: string, workspaceId?: string) {
+  return `${dismissedFocusStoragePrefix}:${userId}:${workspaceId ?? 'none'}`;
+}
+
+function readDismissedFocusSession(key: string) {
+  try {
+    return window.sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeDismissedFocusSession(key: string, startedAt: number | null) {
+  try {
+    if (startedAt) window.sessionStorage.setItem(key, String(startedAt));
+    else window.sessionStorage.removeItem(key);
+  } catch {
+    // Ignore unavailable storage; focus mode still exits for the current mount.
+  }
+}
 
 function formatPinnedAgo(value: string, language: 'en' | 'vi') {
   const elapsedSeconds = Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 1000));
@@ -94,16 +118,23 @@ export default function HomeDashboard(props: HomeDashboardProps) {
 
 function HomeBriefing({ currentUser, activeWorkspace, onOpenTask, onOpenBoard,
   onToggleFocusTask, onStartFocusTask, isFocusTask, onCreateBoard, onCreateTask,
-  onOpenQuickPlan, onOpenToday, focusTaskCount = 0, focusSessionsToday = 0, refreshKey, taskRevision, focusControls,
+  onPlanFocusTasks, onOpenQuickPlan, onOpenToday, focusTaskCount = 0, focusSessionsToday = 0, refreshKey, taskRevision, focusControls,
 }: HomeDashboardProps) {
   const { t, language } = useI18n();
   const { appearance, setAppearance } = useHomeAppearance();
+  const workspaceId = activeWorkspace?.id;
   const [data, setData] = useState<HomeDashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
-  const [focusViewId, setFocusViewId] = useState<string | null>(() => focusControls?.session.timerState.startedAt ? focusControls.session.timerState.activeTaskId : null);
+  const focusDismissalKey = dismissedFocusStorageKey(currentUser.id, workspaceId);
+  const focusStartedAt = focusControls?.session.timerState.startedAt ?? null;
+  const [focusViewId, setFocusViewId] = useState<string | null>(() => (
+    focusStartedAt && readDismissedFocusSession(focusDismissalKey) !== String(focusStartedAt)
+      ? focusControls?.session.timerState.activeTaskId ?? null
+      : null
+  ));
   const [isPinFormOpen, setIsPinFormOpen] = useState(false);
-  const workspaceId = activeWorkspace?.id;
+  const [isPlanMyDayOpen, setIsPlanMyDayOpen] = useState(false);
   const { pins, isLoading: arePinsLoading, error: pinsError, createPin, removePin } = useBriefingPins(workspaceId);
 
   useEffect(() => {
@@ -140,9 +171,13 @@ function HomeBriefing({ currentUser, activeWorkspace, onOpenTask, onOpenBoard,
     }
   };
   const focusViewTask = focusControls?.session.focusTasks.find((task) => task.id === focusViewId && task.id === focusControls.session.timerState.activeTaskId && !task.isDone);
+  const exitFocusView = () => {
+    writeDismissedFocusSession(focusDismissalKey, focusStartedAt);
+    setFocusViewId(null);
+  };
 
   if (focusControls && focusViewTask) {
-    return <div className="bg-canvas" data-home-theme={appearance}><HomeFocusView {...focusControls} task={focusViewTask} onExit={() => setFocusViewId(null)} /></div>;
+    return <div className="bg-canvas" data-home-theme={appearance}><HomeFocusView {...focusControls} task={focusViewTask} onExit={exitFocusView} /></div>;
   }
 
   return (
@@ -176,7 +211,7 @@ function HomeBriefing({ currentUser, activeWorkspace, onOpenTask, onOpenBoard,
                 </button>
                 <p className="mt-4 border-l-2 border-blue-200 pl-3 text-sm leading-6 text-slate-600">{isFocusTask(featured.id) ? t('home.focusNowHelper') : t('briefing.suggestionHelper')}</p>
                 <div className="mt-5 flex flex-wrap gap-2">
-                  {onStartFocusTask && <button type="button" className={primaryButton} onClick={() => { setFocusViewId(featured.id); onStartFocusTask(featured); }}>{t('home.startFocus')}</button>}
+                  {onStartFocusTask && <button type="button" className={primaryButton} onClick={() => { writeDismissedFocusSession(focusDismissalKey, null); setFocusViewId(featured.id); onStartFocusTask(featured); }}>{t('home.startFocus')}</button>}
                   <button type="button" className={quietButton} onClick={() => onOpenTask(featured.id, featured.boardId)}>{t('briefing.details')}</button>
                   <button type="button" className={quietButton} aria-pressed={isFocusTask(featured.id)} onClick={() => onToggleFocusTask(featured)}>{isFocusTask(featured.id) ? t('home.removeFromFocus') : t('home.addToFocus')}</button>
                 </div>
@@ -202,6 +237,7 @@ function HomeBriefing({ currentUser, activeWorkspace, onOpenTask, onOpenBoard,
               <h2 id="briefing-plan" className={sectionLabel}>{t('briefing.makeRoom')}</h2>
               <p className="mt-3 text-sm leading-6 text-slate-600">{t('briefing.planHelper')}</p>
               <div className="mt-3 flex flex-wrap gap-2">
+                {onStartFocusTask && onPlanFocusTasks && <button type="button" className={primaryButton} onClick={() => setIsPlanMyDayOpen(true)}>{t('planDay.action')}</button>}
                 {onOpenQuickPlan && <button type="button" className={primaryButton} onClick={onOpenQuickPlan}>{t('home.quickPlan')}</button>}
                 {onCreateTask && <button type="button" className={quietButton} onClick={onCreateTask}>{t('home.createSingleTask')}</button>}
               </div>
@@ -228,6 +264,7 @@ function HomeBriefing({ currentUser, activeWorkspace, onOpenTask, onOpenBoard,
         </div>}
       </main>
       {workspaceId && <BriefingPinForm isOpen={isPinFormOpen} workspaceId={workspaceId} currentUser={currentUser} tasks={tasks} onClose={() => setIsPinFormOpen(false)} onSubmit={async (input) => { await createPin(input); notify.success(t('briefing.pin.created')); }} />}
+      {isPlanMyDayOpen && onStartFocusTask && onPlanFocusTasks && <PlanMyDayDialog tasks={tasks} onClose={() => setIsPlanMyDayOpen(false)} onStart={(task) => { writeDismissedFocusSession(focusDismissalKey, null); setFocusViewId(task.id); onStartFocusTask(task); }} onAddTopThree={onPlanFocusTasks} />}
       {import.meta.env.DEV && <HomeAppearanceSwitcher current={appearance} onChange={setAppearance} />}
     </div>
   );

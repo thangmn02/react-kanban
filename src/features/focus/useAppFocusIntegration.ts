@@ -5,7 +5,7 @@ import { notify } from '../../components/organisms/toast/notify';
 import { useDocumentPictureInPicture } from '../../hooks/useDocumentPictureInPicture';
 import { createActivity } from '../../services/activity.service';
 import { fetchBoardSnapshot } from '../../services/board.service';
-import { updateTask } from '../../services/task.service';
+import { createNextRecurringTaskOccurrence, updateTask } from '../../services/task.service';
 import type { AppUser } from '../../types/auth.type';
 import type { FocusTask } from '../../types/focus.type';
 import type { ITaskItem } from '../../types/task.type';
@@ -76,7 +76,8 @@ export function useAppFocusIntegration({
   const handleMarkFocusTaskDone = useCallback(async (focusTask: FocusTask) => {
     const requestScopeKey = focusContextRef.current.scopeKey;
     try {
-      await updateTask(focusTask.id, buildTaskFieldUpdatePayload({ isDone: true }));
+      const updatedTask = await updateTask(focusTask.id, buildTaskFieldUpdatePayload({ isDone: true }));
+      const nextOccurrence = !focusTask.isDone ? await createNextRecurringTaskOccurrence(updatedTask) : null;
       if (focusContextRef.current.scopeKey !== requestScopeKey) return false;
       focus.updateFocusedTask(focusTask.id, { isDone: true });
       if (board.boardData.task[focusTask.id]) {
@@ -85,6 +86,7 @@ export function useAppFocusIntegration({
           task: { ...current.task, [focusTask.id]: { ...current.task[focusTask.id], isDone: true } },
         }));
       }
+      if (nextOccurrence) await board.refreshBoardData();
       void createActivity(focusTask.id, 'status_change', {
         description: 'Marked task as completed from Focus Dock',
         field: 'isDone',
