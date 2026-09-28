@@ -17,6 +17,7 @@ import HomeFocusView, { type HomeFocusControls } from '../home/HomeFocusView';
 import BriefingPinForm from '../home/BriefingPinForm';
 import type { BriefingPin } from '../../types/briefing.type';
 import PlanMyDayDialog from '../../features/today/components/PlanMyDayDialog';
+import { dismissedFocusStorageKey, readDismissedFocusSession } from '../../utils/homeFocusSession';
 
 interface HomeDashboardProps {
   focusControls?: HomeFocusControls;
@@ -42,34 +43,6 @@ interface HomeDashboardProps {
 const quietButton = 'inline-flex cursor-pointer items-center justify-center rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600';
 const primaryButton = `${quietButton} bg-blue-600 text-white hover:bg-blue-700 hover:text-white`;
 const sectionLabel = 'text-xs font-semibold uppercase tracking-[0.16em] text-slate-500';
-const dismissedFocusStoragePrefix = 'home-focus-dismissed';
-
-export function dismissedFocusStorageKey(userId: string, workspaceId?: string | null) {
-  return `${dismissedFocusStoragePrefix}:${userId}:${workspaceId ?? 'none'}`;
-}
-
-export function readDismissedFocusSession(key: string) {
-  try {
-    return window.sessionStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-
-export function isHomeFocusSessionActive(
-  timerState?: { startedAt: number | null; activeTaskId: string | null } | null,
-  userId?: string | null,
-  workspaceId?: string | null
-) {
-  if (!timerState?.startedAt || !timerState.activeTaskId || !userId) return false;
-  try {
-    const dismissed = window.sessionStorage.getItem(dismissedFocusStorageKey(userId, workspaceId));
-    return dismissed !== String(timerState.startedAt);
-  } catch {
-    return false;
-  }
-}
-
 function writeDismissedFocusSession(key: string, startedAt: number | null) {
   try {
     if (startedAt) window.sessionStorage.setItem(key, String(startedAt));

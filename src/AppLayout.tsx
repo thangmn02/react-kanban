@@ -31,7 +31,7 @@ import { usePlanningController } from './features/today/hooks/usePlanningControl
 import AppOverlays from './app/AppOverlays';
 import { useAppRoutingController } from './app/useAppRoutingController';
 import { useAppLayoutRouteContextValue } from './app/createAppLayoutRouteContext';
-import { isHomeFocusSessionActive } from './components/organisms/HomeDashboard';
+import { isHomeFocusSessionActive } from './utils/homeFocusSession';
 
 function AppLayout() {
   const {
