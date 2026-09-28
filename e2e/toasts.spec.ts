@@ -2,10 +2,14 @@ import { expect, test } from '@playwright/test';
 
 for (const reducedMotion of ['no-preference', 'reduce'] as const) {
   test.describe(`toast lifetime (${reducedMotion})`, () => {
-    test.use({ reducedMotion });
+    test.beforeEach(async ({ page }) => {
+      await page.emulateMedia({ reducedMotion });
+      await page.goto('/home');
+      expect(await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches))
+        .toBe(reducedMotion === 'reduce');
+    });
 
     test('focus confirmation disappears automatically', async ({ page }) => {
-      await page.goto('/home');
       await page.getByRole('button', { name: 'Start focus', exact: true }).click();
       await page.getByRole('button', { name: 'Start without intention' }).click();
       await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
@@ -26,7 +30,6 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
     });
 
     test('due-date notification pauses on hover and disappears after leaving', async ({ page }) => {
-      await page.goto('/home');
       const toast = page.getByRole('status').filter({ hasText: /due today.*overdue/ });
       await expect(toast).toBeVisible();
       const progress = toast.getByRole('progressbar');
