@@ -121,7 +121,28 @@ export async function handleTaskBreakdown(request: Request, config: BreakdownCon
         generationConfig: { temperature: 0.4, maxOutputTokens: 2048, ...(model.startsWith('gemini-2.5-flash') ? { thinkingConfig: { thinkingBudget: 0 } } : {}), responseMimeType: 'application/json', responseJsonSchema: { type: 'object', properties: { steps: { type: 'array', minItems: 3, maxItems: 3, items: { type: 'string', maxLength: 240 } } }, required: ['steps'] } },
       }),
     });
-    if (!generated.ok) throw new RequestError(generated.status === 429 ? 'rate_limited' : 'unavailable', generated.status === 429 ? 429 : 502);
+    if (!generated.ok) {
+      // Keep credentials and user content out of logs. Google's error response is
+      // useful for diagnosing an invalid model, key, quota, or malformed request.
+      const googleErrorBody = await generated.text();
+      console.error('[Gemini API error]', {
+        status: generated.status,
+        model,
+        body: googleErrorBody.slice(0, 2_000),
+      });
+
+      if (generated.status === 429) throw new RequestError('rate_limited', 429);
+      if (generated.status === 401 || generated.status === 403) {
+        throw new RequestError('gemini_auth_failed', 502);
+      }
+      if (generated.status === 404) {
+        throw new RequestError('gemini_model_not_found', 502);
+      }
+      if (generated.status >= 500) {
+        throw new RequestError('gemini_unavailable', 503);
+      }
+      throw new RequestError('gemini_request_failed', 502);
+    }
     const result = await generated.json() as { candidates?: { finishReason?: string; content?: { parts?: { thought?: boolean; text?: string }[] } }[] };
     const candidate = result.candidates?.[0];
     if (candidate?.finishReason !== 'STOP') throw new RequestError('invalid_response', 502);
@@ -129,7 +150,14 @@ export async function handleTaskBreakdown(request: Request, config: BreakdownCon
     try { return reply({ steps: parseTaskSteps(JSON.parse(output ?? '')) }); }
     catch { throw new RequestError('invalid_response', 502); }
   } catch (error) {
-    if (error instanceof RequestError) return reply({ error: error.message }, error.status);
+    if (error instanceof RequestError) {
+      console.error('[task-breakdown]', { code: error.message, status: error.status });
+      return reply({ error: error.message }, error.status);
+    }
+    console.error('[task-breakdown unexpected error]', {
+      message: error instanceof Error ? error.message : String(error),
+      aborted: signal.aborted,
+    });
     return reply({ error: signal.aborted ? 'timeout' : 'unavailable' }, signal.aborted ? 504 : 503);
   }
 }
