@@ -1,12 +1,14 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
+import { aiDevelopmentPlugin } from './server/viteAiPlugin'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
-    tailwindcss()
+    tailwindcss(),
+    aiDevelopmentPlugin({ ...loadEnv(mode, process.cwd(), ''), ...process.env } as Record<string, string>)
   ],
   build: {
     rollupOptions: {
@@ -31,4 +33,4 @@ export default defineConfig({
       },
     },
   },
-})
+}))

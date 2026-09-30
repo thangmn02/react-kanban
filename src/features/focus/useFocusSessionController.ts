@@ -51,6 +51,7 @@ export function useFocusSessionController({
   const focusTasksApi = useFocusTasks(boardData, scope);
   const [isFocusDockCollapsed, setIsFocusDockCollapsed] = useState(false);
   const [focusLaunchTaskId, setFocusLaunchTaskId] = useState<string | null>(null);
+  const [focusLaunchIntention, setFocusLaunchIntention] = useState('');
   const [activeFocusIntention, setActiveFocusIntention] = useState<{
     taskId: string | null;
     text: string;
@@ -90,6 +91,7 @@ export function useFocusSessionController({
 
   useEffect(() => {
     setFocusLaunchTaskId(null);
+    setFocusLaunchIntention('');
     setActiveFocusIntention(null);
     setFocusCompletion(null);
     setDailyFocusStats(EMPTY_DAILY_STATS);
@@ -207,22 +209,22 @@ export function useFocusSessionController({
 
     focusTasksApi.setActiveFocusTaskId(nextTaskId);
     setIsFocusDockCollapsed(false);
-    if (!pomodoro.timerState.startedAt || pomodoro.timerState.activeTaskId !== nextTaskId) setActiveFocusIntention({ taskId: nextTaskId, text: intention });
+    if (intention || !pomodoro.timerState.startedAt || pomodoro.timerState.activeTaskId !== nextTaskId) setActiveFocusIntention({ taskId: nextTaskId, text: intention });
     pomodoro.startTimer(nextTaskId);
     return true;
   }, [focusTasksApi, pomodoro, resolveRunnableTaskId, t]);
 
-  const handleStartFocusTimer = useCallback((taskId?: string) => {
+  const handleStartFocusTimer = useCallback((taskId?: string, nextStep = '') => {
     const nextTaskId = resolveRunnableTaskId(taskId);
     if (!nextTaskId) {
       notify.info(t('toast.chooseFocusTaskBeforeTimer'));
       return;
     }
-    if (pomodoro.timerState.mode !== 'focus') {
+    if (pomodoro.timerState.mode !== 'focus' && !nextStep) {
       startFocusSessionNow(nextTaskId);
       return;
     }
-    if (pomodoro.timerState.activeTaskId === nextTaskId && (pomodoro.timerState.startedAt || pomodoro.timerState.isRunning)) {
+    if (!nextStep && pomodoro.timerState.activeTaskId === nextTaskId && (pomodoro.timerState.startedAt || pomodoro.timerState.isRunning)) {
       startFocusSessionNow(nextTaskId);
       return;
     }
@@ -230,6 +232,8 @@ export function useFocusSessionController({
     if (pomodoro.timerState.isRunning) {
       pomodoro.pauseTimer();
     }
+    if (nextStep && pomodoro.timerState.mode !== 'focus') pomodoro.setMode('focus');
+    setFocusLaunchIntention(nextStep);
     setFocusLaunchTaskId(nextTaskId);
   }, [focusTasksApi.activeFocusTaskId, pomodoro, resolveRunnableTaskId, startFocusSessionNow, t]);
 
@@ -237,6 +241,7 @@ export function useFocusSessionController({
     ? focusTasksApi.focusTasks.find((task) => task.id === focusLaunchTaskId) || null
     : null;
   const closeFocusLaunchpad = useCallback(() => {
+    setFocusLaunchIntention('');
     focusTasksApi.setActiveFocusTaskId(launchPreviousTaskIdRef.current);
     launchPreviousTaskIdRef.current = null;
     setFocusLaunchTaskId(null);
@@ -244,6 +249,7 @@ export function useFocusSessionController({
   const confirmFocusLaunch = useCallback((intention: string) => {
     if (!focusLaunchTask) return closeFocusLaunchpad();
     if (startFocusSessionNow(focusLaunchTask.id, intention)) {
+      setFocusLaunchIntention('');
       launchPreviousTaskIdRef.current = null;
       setFocusLaunchTaskId(null);
       notify.success(t('toast.focusStarted', { task: focusLaunchTask.title }));
@@ -266,6 +272,7 @@ export function useFocusSessionController({
     const taskId = focusCompletion?.task.id;
     setFocusCompletion(null);
     if (taskId) {
+      setFocusLaunchIntention('');
       pomodoro.setMode('focus');
       launchPreviousTaskIdRef.current = focusTasksApi.activeFocusTaskId;
       setFocusLaunchTaskId(taskId);
@@ -283,6 +290,7 @@ export function useFocusSessionController({
     isFocusDockCollapsed,
     setIsFocusDockCollapsed,
     focusLaunchTask,
+    focusLaunchIntention,
     closeFocusLaunchpad,
     confirmFocusLaunch,
     focusCompletion,

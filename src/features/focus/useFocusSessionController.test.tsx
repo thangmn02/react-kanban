@@ -9,6 +9,17 @@ vi.mock('../../components/organisms/toast/notify', () => ({ notify: { info: vi.f
 beforeEach(() => localStorage.clear());
 afterEach(cleanup);
 const summary = (id: string) => ({ id, title: id, boardId: 'board', boardTitle: 'Project', dueDate: null, priority: null });
+it('prefills a reviewed AI step without starting the timer before confirmation', () => {
+  const { result } = renderHook(() => useFocusSessionController({ user: null, workspaceId: 'workspace', boardData: { columns: [], task: {}, list: {} }, activeBoardId: null, activeBoardSummary: null }), { wrapper: I18nProvider });
+  act(() => result.current.setMode('shortBreak'));
+  act(() => result.current.handleStartFocusTaskFromHome(summary('mission'), 'Open the research notes'));
+  expect(result.current.timerState.mode).toBe('focus');
+  expect(result.current.focusLaunchIntention).toBe('Open the research notes');
+  expect(result.current.timerState.isRunning).toBe(false);
+  act(() => result.current.confirmFocusLaunch('Read the notes and mark three findings'));
+  expect(result.current.activeFocusIntention).toEqual({ taskId: 'mission', text: 'Read the notes and mark three findings' });
+  expect(result.current.timerState.isRunning).toBe(true);
+});
 it('requires an intention for a different task and enforces the Home pin limit', () => {
   const { result } = renderHook(() => useFocusSessionController({ user: null, workspaceId: 'workspace', boardData: { columns: [], task: {}, list: {} }, activeBoardId: null, activeBoardSummary: null }), { wrapper: I18nProvider });
   act(() => result.current.handleStartFocusTaskFromHome(summary('a')));

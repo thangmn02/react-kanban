@@ -61,6 +61,8 @@ export default function AppOverlays(props: Props) {
       <CommandPalette {...props.commandPalette} />
       <Suspense fallback={null}><ArcanaRewardToast {...props.arcanaReward} /></Suspense>
       <FocusLaunchpadDialog
+        key={`${focus.focusLaunchTask?.id ?? 'closed'}:${focus.focusLaunchIntention}`}
+        initialIntention={focus.focusLaunchIntention}
         isOpen={Boolean(focus.focusLaunchTask)}
         task={focus.focusLaunchTask}
         mode={focus.timerState.mode}

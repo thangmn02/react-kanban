@@ -9,6 +9,7 @@ interface FocusLaunchpadDialogProps {
   task: FocusTask | null;
   mode: PomodoroMode;
   suggestedSeconds: number;
+  initialIntention?: string;
   onClose: () => void;
   onStart: (intention: string) => void;
 }
@@ -18,10 +19,11 @@ function FocusLaunchpadDialog({
   task,
   mode,
   suggestedSeconds,
+  initialIntention = '',
   onClose,
   onStart,
 }: FocusLaunchpadDialogProps) {
-  const [intention, setIntention] = useState('');
+  const [intention, setIntention] = useState(initialIntention);
   const titleId = useId();
   const intentionId = useId();
   const { t } = useI18n();

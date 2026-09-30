@@ -18,7 +18,7 @@ export interface UseFocusTaskHandlersParams {
     'toggleFocusTask' | 'pinFocusTask' | 'replaceFocusTasks' | 'isFocusTask'
   >;
   pomodoro: {
-    startFocusTimer: (taskId?: string) => void;
+    startFocusTimer: (taskId?: string, nextStep?: string) => void;
   };
   setIsFocusDockCollapsed: (value: boolean) => void;
 }
@@ -27,7 +27,7 @@ export interface UseFocusTaskHandlersResult {
   handleToggleFocusTask: (task: ITaskItem) => void;
   handleStartFocusTask: (task: ITaskItem) => void;
   handleToggleFocusTaskFromHome: (taskSummary: HomeTaskSummary) => void;
-  handleStartFocusTaskFromHome: (taskSummary: HomeTaskSummary) => void;
+  handleStartFocusTaskFromHome: (taskSummary: HomeTaskSummary, nextStep?: string) => void;
   handlePlanFocusTasksFromHome: (tasks: HomeTaskSummary[]) => void;
   handleToggleFocusTaskFromToday: (taskSummary: TodayTaskSummary) => void;
   handleStartFocusTaskFromToday: (taskSummary: TodayTaskSummary) => void;
@@ -141,7 +141,7 @@ export function useFocusTaskHandlers({
     }
   }, [boardData.task, getTaskListContext, t, toggleFocusTask]);
 
-  const handleStartFocusTaskFromHome = useCallback((taskSummary: HomeTaskSummary) => {
+  const handleStartFocusTaskFromHome = useCallback((taskSummary: HomeTaskSummary, nextStep?: string) => {
     const liveTask = boardData.task[taskSummary.id];
     const fallbackTask: ITaskItem = liveTask || {
       id: taskSummary.id,
@@ -172,7 +172,7 @@ export function useFocusTaskHandlers({
     }
 
     setIsFocusDockCollapsed(false);
-    startFocusTimer(taskSummary.id);
+    startFocusTimer(taskSummary.id, nextStep);
   }, [
     boardData.task,
     getTaskListContext,

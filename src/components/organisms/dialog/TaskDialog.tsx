@@ -34,6 +34,8 @@ import { Skeleton } from '../../atoms/skeleton';
 import TaskCoverPicker from '../../task/TaskCoverPicker';
 import { useI18n } from '../../../i18n';
 import { parseSmartTaskInput } from '../../../utils/smartTaskParser';
+import TaskBreakdownEditor from '../../../features/today/components/TaskBreakdownEditor';
+import { generateTaskBreakdown } from '../../../services/taskBreakdown.service';
 
 
 interface TaskDialogProps {
@@ -505,6 +507,10 @@ function TaskDialog({
                     </span>
                   </div>
 
+                  <TaskBreakdownEditor key={`${taskData?.id ?? 'new'}:${workspaceId}:${currentTitle}:${language}`} disabled={!currentTitle.trim() || !workspaceId}
+                    onGenerate={(signal) => generateTaskBreakdown({ workspaceId: workspaceId!, language, draftContext: { title: currentTitle.slice(0, 300), description: (editor?.getText() ?? '').slice(0, 3000), existingSteps: checklistItems.slice(0, 30).map((item) => item.text.slice(0, 240)) } }, signal)}
+                    onApply={(items) => setChecklistItems((current) => [...current, ...items.filter((item) => !current.some((existing) => existing.text.trim().toLocaleLowerCase() === item.text.trim().toLocaleLowerCase()))])} />
+                  <p className="text-xs text-stone-400">{t('aiPlan.formHint')}</p>
                   <div className="h-2 rounded-full bg-gray-100">
                     <div
                       className="h-full rounded-full bg-emerald-500 transition-[width] duration-200"

@@ -324,6 +324,36 @@ Tests run in jsdom via Vitest. Coverage is collected through
 
 ## Deployment
 
+### AI task planning (Gemini)
+
+The task drawer can turn a new task or mission into three editable checklist steps.
+Home → Plan my day supports reordering/removing suggested tasks, AI step planning,
+and saving a task's steps before starting Focus with the first step prefilled.
+Suggestions are never saved automatically, and appending them preserves existing
+checklist items and their completion state.
+
+For local development, put `GEMINI_API_KEY` in `.env` and restart `npm run dev`.
+`GEMINI_MODEL` optionally overrides the default `gemini-2.5-flash` model.
+The Vite server reads the key; it is never included in client JavaScript.
+Local mock AI requests are accepted only on loopback hosts with a matching origin.
+
+On Netlify, set `GEMINI_API_KEY` (Functions scope), `VITE_SUPABASE_URL`, and
+`VITE_SUPABASE_ANON_KEY` in the site's environment and use `VITE_AUTH_MODE=supabase`.
+Deploy the included `netlify/functions/task-breakdown.mts` and redirects together.
+Local `.env` files are ignored by Git and do not configure the hosted function.
+Other static hosts need an equivalent server endpoint at `/api/task-breakdown`.
+The production endpoint requires a valid Supabase session and checks workspace/task
+access with that user's RLS token; it does not accept unauthenticated demo calls.
+
+Only the selected task's title, notes, and up to 30 checklist items are sent to
+Gemini, after the user presses the AI button. Responses are validated as three
+bounded plain-text steps. The endpoint has a 25-second upstream timeout and a
+per-instance limit of five requests per user per minute. Configure provider quotas
+for a project-wide spending limit; an in-memory limiter does not span server instances.
+Unit tests mock provider calls and never use the real key.
+
+API reference: [Gemini structured output](https://ai.google.dev/gemini-api/docs/structured-output).
+
 The repo ships with a `netlify.toml` containing a single SPA fallback redirect
 so client-side routing works on Netlify:
 

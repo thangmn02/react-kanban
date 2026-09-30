@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 import { fetchHomeDashboardData, type HomeDashboardData, type HomeTaskSummary } from '../../services/home.service';
 import type { AppUser, WorkspaceSummary } from '../../types/auth.type';
@@ -24,7 +24,7 @@ interface HomeDashboardProps {
   onOpenTask: (taskId: string, boardId: string) => void;
   onOpenBoard: (boardId: string) => void;
   onToggleFocusTask: (task: HomeTaskSummary) => void;
-  onStartFocusTask?: (task: HomeTaskSummary) => void;
+  onStartFocusTask?: (task: HomeTaskSummary, nextStep?: string) => void;
   onPlanFocusTasks?: (tasks: HomeTaskSummary[]) => void;
   isFocusTask: (taskId: string) => boolean;
   currentUser: AppUser;
@@ -122,6 +122,7 @@ function HomeBriefing({ currentUser, activeWorkspace, onOpenTask, onOpenBoard,
   ));
   const [isPinFormOpen, setIsPinFormOpen] = useState(false);
   const [isPlanMyDayOpen, setIsPlanMyDayOpen] = useState(false);
+  const closePlanMyDay = useCallback(() => setIsPlanMyDayOpen(false), []);
   const { pins, isLoading: arePinsLoading, error: pinsError, createPin, removePin } = useBriefingPins(workspaceId);
 
   useEffect(() => {
@@ -251,7 +252,7 @@ function HomeBriefing({ currentUser, activeWorkspace, onOpenTask, onOpenBoard,
         </div>}
       </main>
       {workspaceId && <BriefingPinForm isOpen={isPinFormOpen} workspaceId={workspaceId} currentUser={currentUser} tasks={tasks} onClose={() => setIsPinFormOpen(false)} onSubmit={async (input) => { await createPin(input); notify.success(t('briefing.pin.created')); }} />}
-      {isPlanMyDayOpen && onStartFocusTask && onPlanFocusTasks && <PlanMyDayDialog tasks={tasks} onClose={() => setIsPlanMyDayOpen(false)} onStart={(task) => { writeDismissedFocusSession(focusDismissalKey, null); setFocusViewId(task.id); onStartFocusTask(task); }} onAddTopThree={onPlanFocusTasks} />}
+      {isPlanMyDayOpen && onStartFocusTask && onPlanFocusTasks && <PlanMyDayDialog tasks={tasks} workspaceId={workspaceId} onCreateTask={onCreateTask} onClose={closePlanMyDay} onStart={(task, nextStep) => { writeDismissedFocusSession(focusDismissalKey, null); setFocusViewId(task.id); onStartFocusTask(task, nextStep); }} onAddTopThree={onPlanFocusTasks} />}
       {import.meta.env.DEV && <HomeAppearanceSwitcher current={appearance} onChange={setAppearance} />}
     </div>
   );
