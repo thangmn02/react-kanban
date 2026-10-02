@@ -4,6 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "music:package": "node scripts/package-music-extension.mjs",
+    "predev": "npm run music:package",
+    "prebuild": "npm run music:package",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",

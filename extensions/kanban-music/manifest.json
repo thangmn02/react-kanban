@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Kanban Music Companion",
+  "description": "Let your Kanban Floating Focus window show and pause or play supported music tabs.",
+  "version": "0.3.1",
+  "icons": { "16": "icons/16.png", "48": "icons/48.png", "128": "icons/128.png" },
+  "minimum_chrome_version": "120",
+  "permissions": ["scripting", "activeTab", "tabCapture", "offscreen"],
+  "action": { "default_title": "Enable live beats for this music tab" },
+  "host_permissions": [
+    "https://*.youtube.com/*",
+    "https://*.soundcloud.com/*",
+    "https://open.spotify.com/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "content_scripts": [{
+    "matches": ["https://kanthangboard.netlify.app/*", "http://localhost/*", "http://127.0.0.1/*"],
+    "js": ["relay.js"],
+    "run_at": "document_start"
+  }, {
+    "matches": ["https://*.youtube.com/*", "https://*.soundcloud.com/*", "https://open.spotify.com/*", "http://localhost/*", "http://127.0.0.1/*"],
+    "js": ["clock.js"],
+    "run_at": "document_idle"
+  }],
+  "options_page": "setup.html"
+}

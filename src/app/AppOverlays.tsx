@@ -58,6 +58,7 @@ export default function AppOverlays(props: Props) {
   const { board, boardDialogs, taskEditor, focus, focusIntegration, planning } = props;
   return (
     <>
+      {focusIntegration.floatingFocusPortal}
       <CommandPalette {...props.commandPalette} />
       <Suspense fallback={null}><ArcanaRewardToast {...props.arcanaReward} /></Suspense>
       <FocusLaunchpadDialog

@@ -152,6 +152,7 @@ export function useAppFocusIntegration({
     focusTasks: focus.focusTasks,
     timerState: focus.timerState,
     remainingSeconds: focus.remainingSeconds,
+    cycleTotal: focus.timerSettings.longBreakEvery,
     onStart: () => focus.startFocusSessionNow(),
     onPause: focus.pauseTimer,
     onReset: focus.resetTimer,
