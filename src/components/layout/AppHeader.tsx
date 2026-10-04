@@ -4,6 +4,7 @@ import UserMenu from './UserMenu';
 import WorkspaceSwitcher from './WorkspaceSwitcher';
 import { useI18n } from '../../i18n';
 import AppNavigation, { type NavigationView } from './AppNavigation';
+import { isNativeWidget } from '../../features/native/runtime';
 
 interface AppHeaderProps {
   authMode: AuthMode;
@@ -97,6 +98,18 @@ export default function AppHeader({
         </div>
 
         <div className="flex items-center gap-2">
+          {!isNativeWidget() && <a
+            href="/downloads/Kora-setup.exe"
+            download="Kora-setup.exe"
+            aria-label={t('app.downloadWindows')}
+            title={t('app.downloadWindows')}
+            className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 active:bg-slate-100 focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 sm:w-auto sm:px-3"
+          >
+            <svg className="h-4 w-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v12m-4-4 4 4 4-4M4 16v4h16v-4" />
+            </svg>
+            <span className="ml-2 hidden text-sm font-semibold sm:inline">{t('app.downloadKora')}</span>
+          </a>}
           <button
             type="button"
             onClick={onCreateBoard}

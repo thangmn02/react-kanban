@@ -98,10 +98,10 @@ export default function AuthPage({ onAuthenticated }: AuthPageProps) {
               className="h-12 w-12 rounded-2xl object-cover shadow-[0_14px_36px_rgba(37,99,235,0.28)]"
             />
             <h1 className="mt-8 text-4xl font-semibold tracking-[-0.04em] text-white">
-              Kanban Workspace
+              Kora Workspace
             </h1>
             <p className="mt-4 max-w-sm text-base leading-7 text-slate-300">
-              Focus-first Kanban for personal work and small teams.
+              Focus-first Kora for personal work and small teams.
             </p>
           </div>
 
@@ -110,7 +110,7 @@ export default function AuthPage({ onAuthenticated }: AuthPageProps) {
               Workspace-isolated boards protected by Supabase RLS.
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              Realtime Kanban, Focus Dock, Pomodoro, and lightweight team flow.
+              Realtime Kora, Focus Dock, Pomodoro, and lightweight team flow.
             </div>
           </div>
         </aside>

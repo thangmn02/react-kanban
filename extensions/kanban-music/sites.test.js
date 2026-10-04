@@ -19,4 +19,3 @@ it.each(musicHosts)('allows generic detection on %s but not lookalikes', (host) 
   expect(isMusicUrl(`https://${host}.evil.test/track`)).toBe(false);
   expect(isMusicUrl(`http://${host}/track`)).toBe(false);
 });
-

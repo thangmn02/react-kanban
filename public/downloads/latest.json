@@ -1,0 +1,10 @@
+{
+  "version": "0.1.5",
+  "pub_date": "2026-10-04T14:36:41.794Z",
+  "platforms": {
+    "windows-x86_64": {
+      "url": "https://kanthangboard.netlify.app/downloads/Kora-setup.exe?version=0.1.5",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSYTExK2tpc3RSVUZkQ0tEV3FvY2h2V3ZpNWdNUUsyRFFPbHBQSWxvbU1xdkJHaXFoeVlEV1BIRTlPdTN6OVBYdW9YYlJjNGxjMytyQUQ0OU1jbkNSUkNSbWdBSmNyTUFZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxMTI0NjAwCWZpbGU6S29yYV8wLjEuNV94NjQtc2V0dXAuZXhlCXZlcnNpb246MC4xLjUKa2hjeUdYd2M2dnJCVzhXdDQ3WGpWZTdNTFc1SjR6a3NWeHNYVnRWQ2VXOVpCYWpodWRJcXdaMDR4V3M0ZGZ1cmxSK3pEVlQyUm5icGxTOXdyWnh5Q0E9PQo="
+    }
+  }
+}

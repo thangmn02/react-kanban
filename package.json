@@ -1,10 +1,11 @@
 {
-  "name": "react-kanban-tailwind",
+  "name": "kora",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "tauri": "tauri",
+    "desktop:package": "node scripts/package-desktop-installer.mjs",
     "dev:native": "vite --host 127.0.0.1 --port 1420 --strictPort",
     "music:package": "node scripts/package-music-extension.mjs",
     "predev": "npm run music:package",
@@ -32,6 +33,7 @@
     "@supabase/supabase-js": "^2.106.0",
     "@tailwindcss/vite": "^4.2.2",
     "@tauri-apps/api": "^2.12.1",
+    "@tauri-apps/plugin-updater": "^2.13.1",
     "@tiptap/extension-placeholder": "^3.23.1",
     "@tiptap/react": "^3.23.1",
     "@tiptap/starter-kit": "^3.23.1",

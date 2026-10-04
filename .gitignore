@@ -22,6 +22,7 @@ dist/
 dist-ssr/
 /src-tauri/target/
 /src-tauri/gen/
+/src-tauri/.signing/
 coverage/
 .vite/
 *.tsbuildinfo
@@ -85,6 +86,7 @@ service-account*.json
 muse code/
 /scratch/
 *.patch.txt
+*.patch
 opencode-session.json
 *-plan.html
 

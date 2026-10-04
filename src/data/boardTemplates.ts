@@ -8,7 +8,7 @@ export interface BoardTemplateDefinition {
 export const BOARD_TEMPLATES: BoardTemplateDefinition[] = [
   {
     id: 'simple-kanban',
-    name: 'Simple Kanban',
+    name: 'Simple Kora',
     description: 'A lightweight board for personal tasks and straightforward delivery tracking.',
     lists: ['To-do', 'Doing', 'Done'],
   },

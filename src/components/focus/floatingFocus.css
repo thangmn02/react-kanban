@@ -15,6 +15,14 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .dock-icon-button svg { width: 18px; height: 18px; }
 .dock-settings { position: absolute; top: calc(100% + 4px); right: 8px; width: min(260px,calc(100vw - 24px)); border-radius: 14px; padding: 12px; display: grid; gap: 10px; box-shadow: 0 12px 35px #25203925; }
 .dock-settings label { display: grid; gap: 5px; color: #716b7d; font-size: 11px; }
+.dock-time-button { border:0; background:transparent; padding:0; }
+.dock-timer-settings { border:0; padding:0 0 8px; margin:0; display:grid; gap:6px; border-bottom:1px solid var(--hairline); }
+.dock-timer-settings legend { font-size:12px; font-weight:650; margin-bottom:8px; }
+.dock-timer-settings label { grid-template-columns:minmax(0,1fr) 64px; align-items:center; }
+.dock-timer-settings input { min-width:0; width:64px; padding:5px; border:1px solid var(--hairline); border-radius:6px; background:#fff; color:#24222d; }
+.dock-mode-switch { display:flex; gap:3px; }
+.dock-mode-switch button { flex:1; padding:6px 3px; font-size:10px; }
+.dock-mode-switch button[aria-pressed='true'] { background:#eae4ff; }
 .dock-settings select { width: 100%; padding: 7px 9px; border: 1px solid var(--hairline); border-radius: 8px; background: #ffffffb3; color: #2f293b; font-size: 12px; }
 .dock-layout { position: relative; display: grid; width: 100%; gap: 0; grid-template-areas: "focus" "music" "beat"; }
 .dock-scaffold { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(130deg,#f4f0ff30,#ffffff12); border-radius: 0 0 22px 22px; }
@@ -26,7 +34,7 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .dock-session-row { display: flex; align-items: center; width: 100%; gap: 8px; min-width: 0; }
 .dock-task-select { min-width: 0; flex: 1; width: 100%; padding: 7px 0; background: transparent; color: #24222d; border: 0; font-size: 13px; font-weight: 650; text-overflow: ellipsis; }
 .dock-ring { position: relative; width: 124px; height: 124px; display: grid; place-items: center; }
-.dock-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.dock-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); pointer-events:none; }
 .dock-ring circle { fill: none; stroke-width: 4; }
 .dock-ring-track { stroke: rgba(123,112,160,.13); }
 .dock-ring-progress { stroke: #ac9beb; stroke-linecap: round; transition: stroke-dashoffset .35s ease; }
@@ -97,30 +105,60 @@ h2 { font-size: 15px; line-height: 1.4; margin: 0; overflow-wrap: anywhere; }
 .music-play { width: 44px; height: 44px; }
 .music-pattern { display: grid; gap: 10px; margin: 0; }
 .music-pattern.horizontal > .beat-channel { display: grid; grid-template-columns: 18px repeat(8,minmax(0,1fr)); align-items: center; gap: 7px; }
-.music-pattern.vertical { grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; }
+.music-pattern.vertical { grid-template-columns: repeat(5,minmax(0,1fr)); gap: 12px; }
 .music-pattern.vertical > .beat-channel { display: flex; flex-direction: column; align-items: center; gap: 7px; min-width: 0; }
 .music-pattern.vertical .beat-square { width: 100%; }
 .music-pattern svg { width: 18px; height: 18px; }
-.beat-square { aspect-ratio: 1.5; border: 1px solid #e4e4e9; background: #eef0f3; border-radius: 7px; transform: scale(1); }
+.beat-square { position: relative; aspect-ratio: 1.5; border: 1px solid #e4e4e9; background: #eef0f3; border-radius: 7px; transform: scale(1); }
 .music-pattern.live .beat-square.active { background: var(--ci); border-color: transparent; }
 .music-pattern .beat-square.onset { animation: square-onset 150ms ease-out var(--pulse-delay) both; }
 .music-pattern.flow .beat-square { animation: hue-cycle 9s linear var(--hue-delay) infinite; }
 .music-pattern.flow .beat-square.onset { animation: square-onset 150ms ease-out var(--pulse-delay) both, hue-cycle 9s linear var(--hue-delay) infinite; }
+.music-pattern:is([data-pattern='wave'],[data-pattern='ripple']) .beat-square.onset { animation: square-wave 700ms ease-out var(--pulse-delay) both; }
+.music-pattern.flow:is([data-pattern='wave'],[data-pattern='ripple']) .beat-square.onset { animation: square-wave 700ms ease-out var(--pulse-delay) both, hue-cycle 9s linear var(--hue-delay) infinite; }
 @keyframes square-onset {
   0% { background: var(--ci); transform: scale(1); }
   5%, 35% { background: var(--c); border-color: transparent; transform: scale(1.12); box-shadow: 0 0 18px color-mix(in srgb, var(--c) 55%, transparent); }
   100% { background: var(--ci); border-color: transparent; transform: scale(1); box-shadow: none; }
 }
+@keyframes square-wave {
+  0% { background: var(--ci); transform: scale(1); }
+  8%, 65% { background: var(--c); border-color: transparent; transform: scale(1.12); box-shadow: 0 0 18px color-mix(in srgb, var(--c) 55%, transparent); }
+  100% { background: var(--ci); border-color: transparent; transform: scale(1); box-shadow: none; }
+}
 @keyframes hue-cycle { to { filter: hue-rotate(360deg); } }
 .music-pattern.moment .beat-square, .music-pattern.moment .beat-square.active { background: #eef0f3; border-color: #e4e4e9; animation: none; box-shadow: none; transform: scale(1); }
-.music-pattern.moment .beat-square.moment-lit { animation: moment-flash 230ms ease-out var(--moment-delay) both; }
-.music-pattern.moment.flow .beat-square.moment-lit { animation: moment-flash 230ms ease-out var(--moment-delay) both, hue-cycle 9s linear var(--hue-delay) infinite; }
+.music-pattern.moment .beat-square.moment-lit { animation: moment-flash var(--moment-duration) ease-out var(--moment-delay) both; }
+.music-pattern.moment.flow .beat-square.moment-lit { animation: moment-flash var(--moment-duration) ease-out var(--moment-delay) both, hue-cycle 9s linear var(--hue-delay) infinite; }
 @keyframes moment-flash {
   0% { background: #eef0f3; transform: scale(1); }
-  12%, 55% { background: var(--c); border-color: transparent; transform: scale(1.1); box-shadow: 0 0 18px color-mix(in srgb, var(--c) 55%, transparent); }
+  3%, 90% { background: var(--ci); border-color: transparent; transform: scale(1); box-shadow: 0 0 8px color-mix(in srgb, var(--c) 25%, transparent); }
   100% { background: #eef0f3; transform: scale(1); box-shadow: none; }
 }
 .channel-icon { color: var(--c); opacity: .35; animation: none; transform: none; }
+.music-pattern .beat-square { transition: background-color .4s ease, box-shadow .4s ease; }
+.music-pattern.live .beat-square.melody-held,
+.music-pattern.moment .beat-square.melody-held {
+  background: var(--ci); border-color: transparent;
+  animation: none;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--c) 40%, transparent);
+}
+.shape-beat-flash {
+  position: absolute; inset: -1px; border-radius: inherit; pointer-events: none;
+  background: color-mix(in srgb, var(--c) 70%, white);
+  border: 1px solid color-mix(in srgb, var(--c) 45%, white);
+  box-shadow: 0 0 20px color-mix(in srgb, var(--c) 70%, transparent), inset 0 0 8px #ffffffa0;
+  animation: shape-beat-flash 360ms ease-out var(--shape-hit-delay) both;
+}
+@keyframes shape-beat-flash {
+  0% { opacity: 0; transform: scale(1); }
+  8%, 35% { opacity: 1; transform: scale(1.08); }
+  100% { opacity: 0; transform: scale(1); }
+}
+@media(prefers-reduced-motion:reduce) {
+  .music-pattern.live .beat-square.melody-held, .music-pattern.moment .beat-square.melody-held { animation:none !important; transform:none; }
+  .shape-beat-flash { animation: none; display: none; }
+}
 .dock-panel.ultraviolet { background: rgba(13,12,26,.86); color: #f9f8ff; border-color: rgba(255,255,255,.12); }
 .dock-panel.ultraviolet .muted, .dock-panel.ultraviolet .eyebrow { color: #b9b6cc; }
 .dock-panel.ultraviolet .music-sessions { background: rgba(255,255,255,.1); color: #fff; border-color: rgba(255,255,255,.18); }
@@ -153,4 +191,4 @@ h2 { font-size: 15px; line-height: 1.4; margin: 0; overflow-wrap: anywhere; }
   .dock-island .dock-ring .time { font-size: 17px; }
   .music-pattern.horizontal > .beat-channel { gap: 4px; }
 }
-@media(prefers-reduced-motion:reduce) { .music-dot.playing, .music-pattern .beat-square, .music-pattern.flow .beat-square.onset, .music-pattern.moment .beat-square.moment-lit { animation: none; } .beat-square, .dock-ring-progress { transition: none; } }
+@media(prefers-reduced-motion:reduce) { .music-dot.playing, .music-pattern .beat-square, .music-pattern .beat-square.onset, .music-pattern.flow .beat-square.onset, .music-pattern.moment .beat-square.moment-lit { animation: none !important; } .beat-square, .dock-ring-progress { transition: none; } .music-pattern.live .beat-square.onset, .music-pattern.moment .beat-square.moment-lit { background: var(--c); border-color: transparent; } }

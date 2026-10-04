@@ -4,6 +4,7 @@ import { isNativeWidget } from './features/native/runtime';
 
 import AppLayout from './AppLayout';
 import RequireAuth from './app/RequireAuth';
+import { ARCANA_ENABLED } from './constants/features';
 
 const AuthRoute = lazy(() => import('./pages/auth/AuthRoute'));
 const OnboardingRoute = lazy(() => import('./pages/onboarding/OnboardingRoute'));
@@ -33,7 +34,7 @@ export default function App() {
               <Route path="onboarding" element={<OnboardingRoute />} />
               <Route path="home" element={<HomeRoute />} />
               <Route path="today" element={<TodayRoute />} />
-              <Route path="arcana" element={<ArcanaRoute />} />
+              <Route path="arcana" element={ARCANA_ENABLED ? <ArcanaRoute /> : <Navigate to="/home" replace />} />
               <Route path="workspaces/:workspaceId/members" element={<WorkspaceMembersRoute />} />
               <Route path="workspaces/:workspaceId/boards/:boardId" element={<BoardRoute />} />
               <Route path="workspaces/:workspaceId/boards/:boardId/calendar" element={<CalendarRoute />} />

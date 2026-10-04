@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { I18nProvider } from '../i18n';
-import { useDocumentPictureInPicture } from './useDocumentPictureInPicture';
+import { copyPictureInPictureStyles, useDocumentPictureInPicture } from './useDocumentPictureInPicture';
 import type { FloatingFocusProps } from '../components/focus/FloatingFocus';
 import { sendMusicRequest } from '../features/music/mediaBridge';
 
@@ -37,7 +37,9 @@ afterEach(() => { cleanup(); popupFrame.remove(); delete window.documentPictureI
 it('renders timer and music together in the detached document, with shared timer callbacks', async () => {
   const view = render(<I18nProvider><Harness /></I18nProvider>);
   await act(async () => { fireEvent.click(screen.getByText('Open popup')); });
-  const popup = within(popupDocument.body);
+  const host = popupDocument.getElementById('floating-focus-widget')!;
+  const root = host.shadowRoot!.getElementById('floating-focus-root') as HTMLElement;
+  const popup = within(root);
   expect(popup.getByText('01:30')).toBeInTheDocument();
   expect(popup.getByRole('region', { name: 'Music' })).toBeInTheDocument();
   expect(screen.queryByRole('region', { name: 'Music' })).not.toBeInTheDocument();
@@ -49,7 +51,55 @@ it('renders timer and music together in the detached document, with shared timer
   expect(popup.getByText('01:29')).toBeInTheDocument();
   expect(popup.getByRole('region', { name: 'Music' })).toBe(musicPanel);
   act(() => hide());
-  expect(popup.queryByRole('region', { name: 'Music' })).not.toBeInTheDocument();
+  expect(host.ownerDocument).toBe(document);
+  expect(popup.getByRole('region', { name: 'Music' })).toBe(musicPanel);
+  expect(popup.getByRole('button', { name: 'Pop out dock' }).hasAttribute('disabled')).toBe(false);
+  expect(popupDocument.getElementById('floating-focus-widget')).toBeNull();
+});
+
+it('preserves layout and live DOM when returning to the tab and popping out again', async () => {
+  render(<I18nProvider><Harness /></I18nProvider>);
+  await act(async () => { fireEvent.click(screen.getByText('Open popup')); });
+  const host = popupDocument.getElementById('floating-focus-widget')!;
+  const root = host.shadowRoot!.getElementById('floating-focus-root') as HTMLElement;
+  const dock = within(root);
+  const ring = root.querySelector('.dock-ring');
+  const grid = root.querySelector('.music-pattern');
+  fireEvent.click(dock.getByRole('button', { name: 'Switch dock style' }));
+  fireEvent.click(dock.getByRole('button', { name: 'Return dock to tab' }));
+  expect(close).toHaveBeenCalledOnce();
+  expect(root.querySelector('.dock-mixer')).not.toBeNull();
+  expect(root.querySelector('.dock-ring')).toBe(ring);
+  await act(async () => { fireEvent.click(dock.getByRole('button', { name: 'Pop out dock' })); });
+  expect(requestWindow).toHaveBeenCalledTimes(2);
+  expect(host.ownerDocument).toBe(popupDocument);
+  expect(root.querySelector('.music-pattern')).toBe(grid);
+  expect(root.querySelector('.dock-ring')).toBe(ring);
+});
+
+it('copies stylesheet rules and falls back to external links without losing base URLs', () => {
+  const readable = { cssRules: [{ cssText: '.test { color: red; }' }], media: { mediaText: 'screen' } };
+  const external = { get cssRules() { throw new DOMException('Cross origin', 'SecurityError'); }, href: 'https://example.com/font.css', media: { mediaText: 'all' } };
+  const source = { baseURI: 'https://example.com/app/', styleSheets: [readable, external] } as unknown as Document;
+  copyPictureInPictureStyles(source, popupDocument);
+  expect(popupDocument.querySelector('base')).toHaveAttribute('href', source.baseURI);
+  expect(popupDocument.querySelector('link[rel="stylesheet"]')).toHaveAttribute('href', external.href);
+  expect(Array.from(popupDocument.querySelectorAll('style')).some((style) => style.textContent?.includes('.test'))).toBe(true);
+});
+
+it('keeps the returned dock intact when a new PiP request is denied', async () => {
+  render(<I18nProvider><Harness /></I18nProvider>);
+  await act(async () => { fireEvent.click(screen.getByText('Open popup')); });
+  const host = popupDocument.getElementById('floating-focus-widget')!;
+  const root = host.shadowRoot!.getElementById('floating-focus-root') as HTMLElement;
+  const dock = within(root);
+  const ring = root.querySelector('.dock-ring');
+  act(() => hide());
+  requestWindow.mockRejectedValueOnce(new DOMException('Denied', 'NotAllowedError'));
+  await act(async () => { fireEvent.click(dock.getByRole('button', { name: 'Pop out dock' })); });
+  expect(host.ownerDocument).toBe(document);
+  expect(root.querySelector('.dock-ring')).toBe(ring);
+  expect(dock.getByText('Could not open the widget. Try again from this tab.')).not.toBeNull();
 });
 
 it('closes the detached window on app unmount', async () => {

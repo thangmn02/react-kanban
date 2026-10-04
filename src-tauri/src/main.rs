@@ -1,23 +1,29 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod audio;
+#[cfg(test)]
 mod beat;
+mod browser_music;
+mod window_chrome;
+#[cfg(test)]
 mod tempo;
 
 use tauri::Manager;
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
-            let audio = audio::NativeAudio::new(app.handle().clone());
-            app.manage(audio.clone());
-            audio.start();
+            app.manage(window_chrome::WindowShape::default());
+            let music = browser_music::BrowserMusic::new(app.handle().clone());
+            app.manage(music.clone());
+            music.start();
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            audio::native_music_request,
-            audio::native_audio_enable
+            browser_music::native_music_request,
+            browser_music::native_music_setup,
+            window_chrome::native_dock_shape
         ])
         .run(tauri::generate_context!())
-        .expect("Unable to start Kanban Focus");
+        .expect("Unable to start Kora");
 }

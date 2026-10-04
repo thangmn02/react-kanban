@@ -1,4 +1,6 @@
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { useIslandPosition } from './useIslandPosition';
+import './focusIsland.css';
+import { motion, useReducedMotion } from 'framer-motion';
 
 import type {
   DailyFocusStats,
@@ -15,6 +17,7 @@ import PomodoroTimer from './PomodoroTimer';
 
 interface FocusDockProps {
   focusTasks: FocusTask[];
+  showWhenEmpty?: boolean;
   activeTaskId: string | null;
   isCollapsed: boolean;
   timerState: PomodoroTimerState;
@@ -39,6 +42,7 @@ interface FocusDockProps {
 
 function FocusDock({
   focusTasks,
+  showWhenEmpty = false,
   activeTaskId,
   isCollapsed,
   timerState,
@@ -62,35 +66,39 @@ function FocusDock({
 }: FocusDockProps) {
   const shouldReduceMotion = useReducedMotion();
   const { t } = useI18n();
+  const { ref: islandRef, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onKeyDown } = useIslandPosition(focusTasks.length > 0);
+  const activeTask = focusTasks.find((task) => task.id === (timerState.activeTaskId || activeTaskId)) || focusTasks[0];
+  const cycle = Math.min((timerState.completedCycleFocus || 0) + 1, timerSettings.longBreakEvery);
 
-  if (focusTasks.length === 0) {
+  if (focusTasks.length === 0 && !showWhenEmpty) {
     return null;
   }
 
   return (
-    <div className="fixed bottom-5 right-5 z-40 max-w-[calc(100vw-2.5rem)]">
-      <AnimatePresence mode="wait">
-        {isCollapsed ? (
-          <motion.button
-            key="focus-dock-pill"
-            type="button"
-            onClick={() => onCollapseChange(false)}
-            className="cursor-pointer rounded-full border border-white/60 bg-slate-900/90 px-4 py-3 text-sm font-semibold text-white shadow-focus-surface backdrop-blur-md transition hover:-translate-y-0.5 focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-300 active:scale-[0.98]"
-            initial={shouldReduceMotion ? false : { opacity: 0, y: 16, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 16, scale: 0.96 }}
-            transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 260, damping: 24 }}
-            aria-label={t('focus.dock.expand')}
-          >
-            <span className="inline-flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-emerald-400" aria-hidden="true" />
-              {t('focus.dock.taskCount', { count: focusTasks.length, plural: focusTasks.length === 1 ? '' : 's' })} · <span className="tabular-nums">{formatPomodoroTime(remainingSeconds)}</span>
-            </span>
-          </motion.button>
-        ) : (
+    <div ref={islandRef} className="focus-island">
+      <div className="island-bar island-glass" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerCancel}>
+        <button type="button" data-drag-handle className="island-grip" onKeyDown={onKeyDown} aria-label={t('focus.island.move')} title={t('focus.island.move')}>
+          <svg viewBox="0 0 16 24" aria-hidden="true" fill="currentColor"><circle cx="5" cy="6" r="1.3" /><circle cx="11" cy="6" r="1.3" /><circle cx="5" cy="12" r="1.3" /><circle cx="11" cy="12" r="1.3" /><circle cx="5" cy="18" r="1.3" /><circle cx="11" cy="18" r="1.3" /></svg>
+        </button>
+        <span className={`island-live ${timerState.isRunning ? 'is-running' : ''}`} aria-hidden="true" />
+        <button type="button" className="island-task" onClick={() => onCollapseChange(!isCollapsed)} aria-expanded={!isCollapsed} aria-label={isCollapsed ? t('focus.dock.expand') : t('focus.dock.minimizeLabel')} title={activeTask?.title}>
+          {activeTask?.title || t('focus.dock.title')}
+        </button>
+        <span className="island-cycle" title={t('focus.timer.cycleProgress', { current: cycle, total: timerSettings.longBreakEvery })}>{cycle}/{timerSettings.longBreakEvery}</span>
+        <button type="button" className="island-time" aria-label={t('focus.timer.settings')}
+          onClick={() => onCollapseChange(false)}>{formatPomodoroTime(remainingSeconds)}</button>
+        <span className="island-divider" aria-hidden="true" />
+        <button type="button" className="island-icon island-icon-solid" onClick={timerState.isRunning ? onPauseTimer : onStartTimer} aria-label={timerState.isRunning ? t('focus.timer.pause') : t('focus.timer.start')}>
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">{timerState.isRunning ? <path d="M7 5h4v14H7zm6 0h4v14h-4z" /> : <path d="m8 5 11 7-11 7z" />}</svg>
+        </button>
+        <button type="button" className="island-icon" onClick={onPopOutTimer} disabled={!isPictureInPictureSupported} aria-label={t('dock.widget')} title={t('dock.widget')}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2" /><rect x="11" y="11" width="8" height="7" rx="1" /></svg>
+        </button>
+      </div>
+      {!isCollapsed && (
           <motion.aside
             key="focus-dock-panel"
-            className="w-[min(420px,calc(100vw-2.5rem))] rounded-3xl border border-white/60 bg-slate-900/90 p-4 shadow-focus-surface backdrop-blur-md"
+            className="island-details island-glass"
             initial={shouldReduceMotion ? false : { opacity: 0, y: 24, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 24, scale: 0.96 }}
@@ -132,14 +140,13 @@ function FocusDock({
                 onPause={onPauseTimer}
                 onReset={onResetTimer}
                 onPopOutTimer={onPopOutTimer}
-                canPopOutTimer={focusTasks.length > 0 || Boolean(timerState.activeTaskId)}
+                canPopOutTimer={isPictureInPictureSupported}
                 isPictureInPictureSupported={isPictureInPictureSupported}
                 isPictureInPictureOpen={isPictureInPictureOpen}
               />
             </div>
           </motion.aside>
         )}
-      </AnimatePresence>
     </div>
   );
 }

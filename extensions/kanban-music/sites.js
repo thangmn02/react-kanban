@@ -15,4 +15,3 @@ export function isMusicUrl(value) {
       || (url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname) && ['5173', '5174'].includes(url.port));
   } catch { return false; }
 }
-

@@ -1,87 +1,141 @@
-# Kanban Focus — Windows widget
+# Kora — Windows widget
 
-Status: native compile-check, all four Rust analyzer/tempo tests, and 51 frontend
-music/native integration tests pass locally. Live WASAPI/SMTC and installer
-acceptance checks are **not yet verified**. Smart App Control blocked the first
-compile attempt; a later retry succeeded without changing security settings.
+The frameless, resizable window runs independently of the web app. Dock and
+Tasks share one Pomodoro controller. The dock stays on top and adapts to its
+window dimensions; Tasks does not stay on top. Empty focus lists support a
+standalone timer without creating a task. Musical shapes hold for eight seconds
+and reflash on captured onsets or confident audio-tempo ticks, with no breathing loop.
+Maximize/restore controls are available
+in both surfaces. Dock uses Windows Acrylic blur with a bright translucent tint;
+Tasks clears the effect and remains opaque. Unsupported effects retain CSS glass.
+The Windows dock clips its Acrylic backdrop to 22 logical-pixel rounded corners,
+recalculating the region on resize/DPI changes. Returning to Tasks removes the
+region. CSS adds a light translucent gradient and inset edge glow, not an opaque
+stack of panels.
 
-## Development
+## Browser music only
 
-Requires Rust's MSVC toolchain, Visual Studio Desktop development with C++
-(Windows SDK included), Node.js, and WebView2.
+Kora no longer starts WASAPI system loopback or reads Windows media sessions.
+It cannot hear Zalo calls, notifications, native music apps or other desktop
+audio. The previous system-audio checkbox and its IPC command are removed;
+saved `native.systemAudio` values are ignored.
 
-```powershell
-npm install
-npm run tauri dev
-```
+Install/reload **Kora Music Companion 0.3.9** in the browser used for music.
+The companion discovers only the explicitly supported music websites. It
+automatically connects to the running widget and sends metadata and beat
+events, never PCM audio. No web-app tab is needed. Capture can still require
+one browser-toolbar invocation on the playing music tab; the native app
+cannot grant or bypass that browser permission. Silent/denied capture means
+still squares, never a clock-driven imitation. Close the music tab/browser
+and its music feed stops; the native timer remains independent.
 
-The widget uses port 1420, separate from browser testing on port 5173. Sign in
-inside the native app; browser cookies are not copied. Use Tasks to pick/pin
-focus tasks, then Dock to return. Both views use one existing Pomodoro
-controller. All five dock layouts are available; switching keeps the same
-beat-grid/timer elements, with monitor-bounded window sizing. Resizing Split
-to narrow widths stacks its panes.
+The Rust WebSocket bridge binds only `127.0.0.1:47635`, path `/kora-music`.
+It rejects web/null/missing origins, non-extension origins, incorrect hosts
+and paths, oversized frames, stale events and unsupported actions. Each
+connection has a new nonce. At most eight browser-profile connections are
+accepted, with separate session namespaces and bounded queues/timeouts.
+Only allowlisted music-site session metadata is exposed to the frontend.
+The nonce prevents stale/cross-connection traffic; it is not proof of the
+extension publisher. Installed extensions with their own WebSocket access
+are a local trust boundary. No arbitrary execution, filesystem commands,
+audio upload or LAN listener is exposed.
 
-Enable **System audio beats** once to listen to the default Windows output.
-This captures the system mix, including other apps and notifications, not an
-isolated chosen music source. No microphone, PCM files, audio uploads, or local
-network listener are used. Disable the switch to stop loopback listening.
-Metadata/play/pause use Windows media sessions. A player that does not publish
-SMTC metadata appears as System audio, without invented playback controls.
-The extension is only needed for the existing web surface.
+The companion exchanges keepalives and uses a reconnect alarm so worker/app
+restarts recover automatically. This adds the `alarms` extension permission.
+The old web protocol and app origin are retained for compatibility. The app
+identifier `app.kanthangboard.focus` is deliberately unchanged to preserve
+existing native sign-in and preferences. Branding, product/version and the
+executable are now Kora / 0.1.5 / `kora.exe`.
 
-Native detector work runs in Rust, not the browser tab. UI rendering can still
-be paused by Windows when minimized; old queued flashes are discarded on
-resume. Pomodoro wakes calculate the original deadline, never a second timer.
-Keep the native app running; closing the browser does not close it.
+## Development and distribution
 
-Protected content, exclusive-mode output, or unavailable/silent devices can
-still make audio uncapturable. Only recent audible PCM and a playing session
-report capture mode. Silence/failure/paused music keep the squares still.
-Native capture IDs and increasing onset sequences are validated in the same
-frontend path as browser capture. Tempo pulses require actual audio and a
-confident tempo lock; there is no decorative clock fallback.
+Requires Rust MSVC, Visual Studio C++ Build Tools with Windows SDK, Node.js
+and WebView2. Use `npm run tauri dev` (Vite port 1420), or
+`npm run tauri build`. Installer output is `target/release/bundle/nsis/`.
+Use the installer for the WebView2 prerequisite bootstrap.
 
-## Build/distribute
+Set `TAURI_SIGNING_PRIVATE_KEY` to the path of your protected signing key before
+building. Locally this key lives outside the repository, under local AppData.
+After building, run `npm run desktop:package` to copy that exact version's NSIS
+installer to `public/downloads/Kora-setup.exe`. The web header's **Download Kora**
+button serves this file; it is hidden in the native app. Web builds include the
+download, while Tauri builds explicitly exclude it from their embedded assets
+to avoid recursively bundling previous installers. Build and stage a new
+installer before deploying a matching web version. Packaging also generates
+`public/downloads/latest.json` with the actual installer signature. Deploy both
+files atomically; the updater checks the existing HTTPS Netlify host.
+The CI artifact includes the installer, signature and feed; CI does not publish
+a release or deploy the website. Updater signatures are not Windows Authenticode
+publisher signing, so Windows may still show an unknown-publisher warning.
+Keep Windows security enabled and review the source
+and publisher warnings before choosing whether to install.
 
-```powershell
-npm run tauri build
-```
+Use public Supabase URL/anon configuration and `VITE_AUTH_MODE=supabase`.
+Never embed Gemini or Supabase service-role keys in the frontend. Native
+sign-in is separate from browser sign-in; cookies are not copied.
 
-Installer output (after a successful build): `target/release/bundle/nsis/`.
-Executable: `target/release/kanban-widget.exe`; distribute the installer for
-the WebView2 prerequisite bootstrap. Build with production Supabase URL/anon
-key and `VITE_AUTH_MODE=supabase`; never ship Gemini or service-role secrets in
-the frontend. The unsigned installer is not yet published to GitHub Releases.
-Signing is needed for a trusted distribution; don't ask end users to disable
-antivirus to run the app.
+The **Windows widget** GitHub Actions workflow produces update-signed installer
+and executable artifacts, not a public release. Repository Actions variables
+are `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. An explicitly selected
+mock-auth demo is labeled separately. Artifacts expire after 14 days.
+The encrypted Actions secret `TAURI_SIGNING_PRIVATE_KEY` must contain the same
+private key whose public half is configured in `tauri.conf.json`; optionally
+set `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` for a password-protected key. Never
+commit either value. Back up the signing key securely: losing it prevents
+existing installations from accepting future updates.
+Do not ask users to disable Defender or Smart App Control. If Windows blocks
+a local Rust build helper, use the reviewed Windows CI build instead.
 
-The **Windows widget** GitHub Actions workflow builds unsigned download artifacts,
-not a public release. Add repository Actions variables `VITE_SUPABASE_URL` and
-`VITE_SUPABASE_ANON_KEY` for the connected app. These are public frontend values;
-never put a service-role key or Gemini API key there. A manual run can explicitly
-choose an offline mock-auth demo; it is labeled `demo`, never a connected build.
-After success, download the ZIP under the workflow run's Artifacts, extract it,
-and run the NSIS `setup.exe`. Artifacts expire after 14 days. A portable executable
-is included but requires WebView2 already installed. No workflow has run until
-these changes are reviewed and pushed.
+## In-app updates
 
-## Acceptance before shipping
+Install 0.1.5 once to enable the updater. Existing older executables cannot gain
+this control without a bootstrap installation. In Tasks choose **Update**; in
+Dock choose the download-arrow control. Kora checks for a newer signed version,
+then offers **Update and restart**. Save any open draft first. Only that explicit
+confirmation downloads and installs; checks never interrupt a focus session.
+The passive Windows installer replaces the app and restarts it without requiring
+a manual reinstall. The application identifier and stored user data stay intact.
+Offline checks or rejected downloads show Retry, not a false success state.
+No signature or TLS bypass is enabled. Keep the configured endpoint reachable.
+If a deployment changes between checking and downloading, signature validation
+rejects mismatched bytes; Retry fetches the current feed before downloading again.
 
-- `cargo test --manifest-path src-tauri/Cargo.toml`: analyzer silence/transient
-  tests, tempo lock/unlock tests; run frontend native integration tests too.
-- Enable audio, play YouTube/SoundCloud and native Spotify/Apple Music sources.
-  In dev, append `?musicDebug` to the page URL (before its hash route). Confirm
-  source tauri-events, mode capture, increasing per-band onsets, matching square
-  pops, and static channel icons. Actual protected-audio behavior must be tested,
-  not assumed from a site name.
-- Pause, stop, switch track/session, turn off audio, change the default device:
-  stale captures/events never flash, and new streams get new capture IDs.
-- Test silence and free tempo: calm squares, no manufactured grid pulses.
-- Switch all layouts and Tasks/Dock; verify one timer and one completion log.
-- Minimize/restore, close browser, then inspect timer deadline and event freshness.
-- Test the installer on a clean Windows machine before publishing a release.
+For each update, bump both native version fields, build with the same signing
+key, run `npm run desktop:package`, and deploy the installer and feed together.
+Do not publish a mock-auth demo feed as a connected-app update.
 
-If Application Control blocks a build helper, preserve the protection and use
-an appropriate isolated development environment or signed build pipeline.
-Disabling Defender antivirus does not resolve an Application Control policy.
+## Validation
+
+- Frontend/native/companion regression tests and Rust bridge-origin tests.
+- Live: load 0.3.9, play supported browser music, open the native Dock without
+  a web-app tab, verify actual capture mode and increasing onset counts in
+  dev, with matching square pops and static icons.
+- Pause/close the music tab, disconnect the browser, restart/reload the
+  companion/widget: expired captures never flash and reconnection recovers.
+- Play Zalo/desktop audio while browser music is paused: no squares flash.
+- Resize all five layouts, maximize/restore and Tasks/Dock; no scrollbars,
+  clipped controls, duplicate timer or duplicate completion log.
+
+The former system-audio version was confirmed working by the user. The new
+browser-only native bridge needs live acceptance after a successful build.
+
+## Matrix and timer controls
+
+The matrix has Kick, Clap, Hi-hat, Bass and Melody rows. Melody uses a
+250–4000Hz tonal-energy envelope, not isolated instruments or note
+transcription. Sustained tonal audio holds a steady pattern; silence,
+pause, stale envelopes and capture loss clear it. Percussion remains
+transient-driven (or an explicitly confident tempo lock). Clock fallback
+never invents flashes. Shapes hold for eight seconds and reflash within their
+mask on captured onsets or confident audio-tempo ticks. Each hit brightens and
+pops against the softer held cells; there is no breathing loop or clock-mode flash.
+The arrow button is the only layout selector; color/palette controls remain in
+the settings popover.
+
+Tasks retains its Focus Dock even with an empty focus list. Click its time
+to expand timer controls. Click the native music dock's time to open the
+shared duration/mode settings. Both use the existing Pomodoro controller;
+changing a duration does not rewrite an already-started session. Start also
+works without a pinned task, as a standalone focus or break session. Only
+the pop-out Dock is always-on-top; returning to Tasks restores a normal
+window, and startup/sign-in is never pinned above other apps.

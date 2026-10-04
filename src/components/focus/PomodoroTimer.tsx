@@ -99,9 +99,9 @@ function PomodoroTimer({
         />
       )}
 
-      <label className="mt-4 block text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+      {focusTasks.length > 0 && <label className="mt-4 block text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
         {t('focus.timer.task')}
-      </label>
+      </label>}
       <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-slate-200">
         {t('focus.timer.todayStats', {
           sessions: dailyFocusStats.completedSessions,
@@ -109,7 +109,7 @@ function PomodoroTimer({
           minutes: dailyFocusStats.focusedMinutes,
         })}
       </div>
-      <select
+      {focusTasks.length > 0 && <select
         value={activeTaskId || ''}
         onChange={(event) => onActiveTaskChange(event.target.value)}
         className="mt-2 w-full cursor-pointer rounded-2xl border border-white/15 bg-white/10 px-3 py-2 text-sm font-medium text-white outline-none transition focus:ring-4 focus:ring-sky-400/30"
@@ -120,7 +120,7 @@ function PomodoroTimer({
             {focusTask.title}
           </option>
         ))}
-      </select>
+      </select>}
 
       <div className="mt-4 flex items-center gap-2">
         {timerState.isRunning ? (
@@ -137,7 +137,6 @@ function PomodoroTimer({
             type="button"
             onClick={onStart}
             className="flex-1 cursor-pointer rounded-2xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-transform hover:-translate-y-0.5 hover:bg-blue-500 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-300/40 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={focusTasks.length === 0}
             aria-label={t('focus.timer.start')}
           >
             {t('focus.timer.start')}

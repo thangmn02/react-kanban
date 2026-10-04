@@ -3,6 +3,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { notify } from './components/organisms/toast/notify';
 
 import { ERROR_MESSAGES } from './constants';
+import { ARCANA_ENABLED } from './constants/features';
 import { useI18n } from './i18n';
 import AppHeader from './components/layout/AppHeader';
 import AppNavigation from './components/layout/AppNavigation';
@@ -31,7 +32,7 @@ import { usePlanningController } from './features/today/hooks/usePlanningControl
 import AppOverlays from './app/AppOverlays';
 import { useAppRoutingController } from './app/useAppRoutingController';
 import { useAppLayoutRouteContextValue } from './app/createAppLayoutRouteContext';
-import { isHomeFocusSessionActive } from './utils/homeFocusSession';
+import { useHomeFocusView } from './hooks/useHomeFocusView';
 import { isNativeWidget } from './features/native/runtime';
 import NativeSurface from './features/native/NativeSurface';
 
@@ -70,6 +71,7 @@ function AppLayout() {
   } = useWorkspaceMembers(activeWorkspaceId);
 
   const taskEditor = useTaskEditorState();
+  const { focusViewId } = useHomeFocusView(user?.id, activeWorkspaceId);
   const boardDialogs = useBoardDialogState();
   const {
     openGroupDialog,
@@ -100,6 +102,7 @@ function AppLayout() {
   const [isRetryingWorkspace, setIsRetryingWorkspace] = useState(false);
 
   const handleArcanaTaskCompleted = useCallback(() => {
+    if (!ARCANA_ENABLED) return;
     const rewardResult = registerArcanaTaskCompletion();
     setArcanaRewardState(rewardResult.state);
     if (rewardResult.shouldPrompt) setIsArcanaRewardPromptOpen(true);
@@ -215,6 +218,7 @@ function AppLayout() {
   };
 
   const handleOpenArcanaBooth = useCallback((consumeRewardDraw = false) => {
+    if (!ARCANA_ENABLED) return;
     if (consumeRewardDraw) {
       setArcanaRewardState(consumeArcanaRewardDraw());
     } else {
@@ -337,7 +341,8 @@ function AppLayout() {
         isOpen: isProgressReportOpen,
         onClose: () => setIsProgressReportOpen(false),
       }}
-      isHomeFocusActive={location.pathname === '/home' && Boolean(user && isHomeFocusSessionActive(focusSession.timerState, user.id, activeWorkspaceId))}
+      isHomeFocusActive={location.pathname === '/home' && focusSession.focusTasks.some((task) => task.id === focusViewId && task.id === focusSession.timerState.activeTaskId && !task.isDone)}
+      onOpenNativeDock={native ? () => setNativeDock(true) : undefined}
     />
   );
 
@@ -400,6 +405,7 @@ function AppLayout() {
       activeTask: focusSession.selectedTimerTask || focusSession.activeFocusTask,
       focusTasks: focusSession.focusTasks, timerState: focusSession.timerState,
       remainingSeconds: focusSession.remainingSeconds, cycleTotal: focusSession.timerSettings.longBreakEvery,
+      timerSettings: focusSession.timerSettings, onTimerSettingsChange: focusSession.updateTimerSettings, onModeChange: focusSession.setMode,
       onStart: () => { focusSession.startFocusSessionNow(); }, onPause: pauseTimer, onReset: resetTimer,
       onActiveTaskChange: (taskId) => { focusSession.startFocusSessionNow(taskId); },
       onMarkDoneAndNext: focusIntegration.handleMarkDoneAndNext,

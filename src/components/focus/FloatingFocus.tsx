@@ -1,17 +1,19 @@
 import { useEffect, useId, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'framer-motion';
-import type { FocusTask, PomodoroTimerState } from '../../types/focus.type';
+import type { FocusTask, PomodoroTimerState, PomodoroTimerSettings, PomodoroMode } from '../../types/focus.type';
 import { formatPomodoroTime } from '../../utils/pomodoroTime';
 import { useI18n } from '../../i18n';
 import { MusicFeedback, MusicGrid, MusicSetup, MusicTrack } from '../../features/music/MusicPlayer';
 import { useBrowserMusic } from '../../features/music/useBrowserMusic';
 import { useDockPreferences, dockStyles, beatColorModes, beatPalettes } from './useDockPreferences';
-import { isNativeWidget } from '../../features/native/runtime';
 
 export interface FloatingFocusProps {
   activeTask: FocusTask | null;
   focusTasks: FocusTask[];
   timerState: PomodoroTimerState;
+  timerSettings?: PomodoroTimerSettings;
+  onTimerSettingsChange?: (patch: Partial<PomodoroTimerSettings>) => void;
+  onModeChange?: (mode: PomodoroMode) => void;
   remainingSeconds: number;
   cycleTotal: number;
   onStart: () => void;
@@ -25,7 +27,7 @@ export interface FloatingFocusProps {
   isWidget?: boolean;
   canPopOut?: boolean;
   widgetError?: string;
-  onLayoutChange?: (style: typeof dockStyles[number], expanded: boolean) => void;
+  onLayoutChange?: (style: typeof dockStyles[number], expanded: boolean, hasMusic?: boolean) => void;
   onDragStart?: () => void;
   nativeControls?: ReactNode;
   returnLabel?: string;
@@ -59,6 +61,7 @@ export default function FloatingFocus(props: FloatingFocusProps) {
   const [soloCard, setSoloCard] = useState<Card>('focus');
   const toolbarRef = useRef<HTMLDivElement>(null);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
+  const timeButtonRef = useRef<HTMLButtonElement>(null);
   const dockRef = useRef<HTMLElement>(null);
   const [compact, setCompact] = useState(false);
   useEffect(() => {
@@ -73,7 +76,8 @@ export default function FloatingFocus(props: FloatingFocusProps) {
     if (!settingsOpen) return;
     const toolbar = toolbarRef.current;
     const owner = toolbar?.ownerDocument;
-    const close = (event: PointerEvent) => { if (toolbar && !event.composedPath().includes(toolbar)) setSettingsOpen(false); };
+    const close = (event: PointerEvent) => { if (toolbar && !event.composedPath().includes(toolbar)
+      && !event.composedPath().includes(timeButtonRef.current as EventTarget)) setSettingsOpen(false); };
     const escape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') { setSettingsOpen(false); settingsButtonRef.current?.focus(); }
     };
@@ -90,7 +94,7 @@ export default function FloatingFocus(props: FloatingFocusProps) {
   const style = preferences.style;
   const deck = hasMusic ? deckState : 'stacked';
   const onLayoutChange = props.onLayoutChange;
-  useEffect(() => { onLayoutChange?.(style, deck === 'fanned'); }, [style, deck, onLayoutChange]);
+  useEffect(() => { onLayoutChange?.(style, deck === 'fanned', hasMusic); }, [style, deck, hasMusic, onLayoutChange]);
   const cycle = Math.min((timerState.completedCycleFocus || 0) + 1, cycleTotal);
   const progress = Math.max(0, Math.min(1, remainingSeconds / Math.max(1, timerState.plannedSeconds || remainingSeconds || 1500)));
   const layoutTransition = reducedMotion ? { duration: 0 } : style === 'deck' ? deckSpring : glide;
@@ -125,8 +129,21 @@ export default function FloatingFocus(props: FloatingFocusProps) {
         <AnimatePresence>
           {settingsOpen && <motion.div id={settingsId} className="dock-settings glass" role="dialog" aria-label={t('dock.settings')}
             initial={{ opacity: 0, y: reducedMotion ? 0 : -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: reducedMotion ? 0 : 0.15 }}>
-            <label>{t('dock.style')}<select value={style} onChange={(event) => preferences.setStyle(event.target.value as typeof style)}>
-              {dockStyles.map((value) => <option key={value} value={value}>{t(`dock.style.${value}`)}</option>)}</select></label>
+            {props.timerSettings && props.onTimerSettingsChange && <fieldset className="dock-timer-settings">
+              <legend>{t('focus.timer.settings')}</legend>
+              {props.onModeChange && <div className="dock-mode-switch">
+                {(['focus', 'shortBreak', 'longBreak'] as const).map((mode) => <button type="button" key={mode}
+                  aria-pressed={timerState.mode === mode} onClick={() => props.onModeChange?.(mode)}>{t(`focus.mode.${mode}`)}</button>)}
+              </div>}
+              {([
+                ['focusMinutes', 'focusLength', 5, 180], ['shortBreakMinutes', 'shortBreakLength', 1, 60], ['longBreakMinutes', 'longBreakLength', 1, 90],
+              ] as const).map(([key, label, min, max]) => <label key={key}>{t(`focus.timer.${label}`)}
+                <input type="number" min={min} max={max} step="1" value={props.timerSettings![key]}
+                  onChange={(event) => { const value = event.target.valueAsNumber;
+                    if (Number.isFinite(value) && value >= min && value <= max) props.onTimerSettingsChange?.({ [key]: value }); }} />
+              </label>)}
+              {timerState.startedAt !== null && <p className="muted">{t('focus.timer.settingsApplyNext')}</p>}
+            </fieldset>}
             <label>{t('dock.colors')}<select value={preferences.colorMode} onChange={(event) => preferences.setColorMode(event.target.value as typeof preferences.colorMode)}>
               {beatColorModes.map((value) => <option key={value} value={value}>{t(`dock.colors.${value}`)}</option>)}</select></label>
             <label>{t('dock.palette')}<select value={preferences.palette} onChange={(event) => preferences.setPalette(event.target.value as typeof preferences.palette)}>
@@ -162,11 +179,14 @@ export default function FloatingFocus(props: FloatingFocusProps) {
           <motion.div layout layoutId="timer-ring" className="dock-ring" transition={{ layout: layoutTransition }}>
             <svg viewBox="0 0 120 120" aria-hidden="true"><circle className="dock-ring-track" cx="60" cy="60" r="54" />
               <circle className="dock-ring-progress" cx="60" cy="60" r="54" strokeDasharray={ringCircumference} strokeDashoffset={ringCircumference * (1 - progress)} /></svg>
-            <span className="time">{formatPomodoroTime(remainingSeconds)}</span>
+            {props.onTimerSettingsChange ? <button ref={timeButtonRef} className="time dock-time-button" type="button" aria-label={t('focus.timer.settings')}
+              title={t('focus.timer.settings')} aria-expanded={settingsOpen} aria-controls={settingsId}
+              onClick={() => setSettingsOpen((current) => !current)}>{formatPomodoroTime(remainingSeconds)}</button>
+              : <span className="time">{formatPomodoroTime(remainingSeconds)}</span>}
           </motion.div>
           <div className="dock-cycle">{modeLabel}</div>
           <div className="dock-focus-actions">
-            <button type="button" className="solid dock-start" disabled={!tasks.length} onClick={timerState.isRunning ? onPause : onStart}
+            <button type="button" className="solid dock-start" onClick={timerState.isRunning ? onPause : onStart}
               aria-label={timerState.isRunning ? t('focus.timer.pause') : t('focus.timer.start')}>
               <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">{timerState.isRunning ? <path d="M7 5h4v14H7zm6 0h4v14h-4z" /> : <path d="m8 5 11 7-11 7z" />}</svg>
               <span>{timerState.isRunning ? t('focus.timer.pause') : t('focus.timer.start')}</span></button>
@@ -190,7 +210,7 @@ export default function FloatingFocus(props: FloatingFocusProps) {
             {card === 'focus' ? t('focus.timer.pomodoro') : card === 'beat' ? t('dock.beat') : t('focus.island.music')}</button>)}
         </div>
       </motion.div>
-      {!isNativeWidget() && <MusicSetup music={music} />}
+      <MusicSetup music={music} />
       {props.widgetError && <p className="widget-error muted" role="status">{props.widgetError}</p>}
     </main>
   </LayoutGroup>;

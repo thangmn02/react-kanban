@@ -7,8 +7,37 @@ vi.mock('../../services/activity.service', () => ({ createActivity: vi.fn().mock
 vi.mock('../../services/focusSession.service', () => ({ fetchDailyFocusStats: vi.fn(), logFocusSession: vi.fn() }));
 vi.mock('../../components/organisms/toast/notify', () => ({ notify: { info: vi.fn(), success: vi.fn() } }));
 beforeEach(() => localStorage.clear());
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.useRealTimers(); });
 const summary = (id: string) => ({ id, title: id, boardId: 'board', boardTitle: 'Project', dueDate: null, priority: null });
+it('starts, counts down, pauses and resumes without a task or launch modal', () => {
+  vi.useFakeTimers();
+  const { result } = renderHook(() => useFocusSessionController({ user: null, workspaceId: 'workspace', boardData: { columns: [], task: {}, list: {} }, activeBoardId: null, activeBoardSummary: null }), { wrapper: I18nProvider });
+  act(() => result.current.handleStartFocusTimer());
+  expect(result.current.timerState.isRunning).toBe(true);
+  expect(result.current.timerState.activeTaskId).toBeNull();
+  expect(result.current.focusTasks).toHaveLength(0);
+  expect(result.current.focusLaunchTask).toBeNull();
+  const sessionId = result.current.timerState.sessionId;
+  act(() => vi.advanceTimersByTime(5000));
+  expect(result.current.remainingSeconds).toBe(1495);
+  act(() => result.current.pauseTimer());
+  expect(result.current.timerState.isRunning).toBe(false);
+  act(() => result.current.startFocusSessionNow());
+  expect(result.current.timerState.isRunning).toBe(true);
+  expect(result.current.timerState.sessionId).toBe(sessionId);
+  expect(result.current.remainingSeconds).toBe(1495);
+  act(() => result.current.resetTimer());
+  expect(result.current.remainingSeconds).toBe(1500);
+  expect(result.current.timerState.isRunning).toBe(false);
+});
+it.each(['shortBreak', 'longBreak'] as const)('starts %s without requiring a focused task', (mode) => {
+  const { result } = renderHook(() => useFocusSessionController({ user: null, workspaceId: 'workspace', boardData: { columns: [], task: {}, list: {} }, activeBoardId: null, activeBoardSummary: null }), { wrapper: I18nProvider });
+  act(() => result.current.setMode(mode));
+  act(() => result.current.handleStartFocusTimer());
+  expect(result.current.timerState.isRunning).toBe(true);
+  expect(result.current.timerState.mode).toBe(mode);
+  expect(result.current.timerState.activeTaskId).toBeNull();
+});
 it('prefills a reviewed AI step without starting the timer before confirmation', () => {
   const { result } = renderHook(() => useFocusSessionController({ user: null, workspaceId: 'workspace', boardData: { columns: [], task: {}, list: {} }, activeBoardId: null, activeBoardSummary: null }), { wrapper: I18nProvider });
   act(() => result.current.setMode('shortBreak'));

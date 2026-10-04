@@ -90,9 +90,9 @@ export default function BoardHeader({
             </select>
           </div>
 
-          <p className="mt-2 hidden max-w-2xl text-sm leading-6 text-slate-500 md:block">
-            {activeBoardSummary?.description || t('board.defaultDescription')}
-          </p>
+          {activeBoardSummary?.description && activeBoardSummary.description !== 'A focused board for today, this week, and done work.' && (
+            <p className="mt-2 hidden max-w-2xl text-sm leading-6 text-slate-500 md:block">{activeBoardSummary.description}</p>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">

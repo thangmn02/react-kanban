@@ -18,4 +18,4 @@ export function subscribeNativeMusic(receive: (value: unknown) => void) {
   void ensureFeed().catch(() => {});
   return () => { receivers.delete(receive); };
 }
-export const enableNativeAudio = (enabled: boolean) => invoke<boolean>('native_audio_enable', { enabled });
+export const openNativeMusicSetup = () => invoke<void>('native_music_setup');

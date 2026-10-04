@@ -1,4 +1,4 @@
-# React Kanban
+# Kora
 
 [![React 19](https://img.shields.io/badge/React-19-149eca?logo=react&logoColor=white)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -8,15 +8,20 @@
 [![Supabase](https://img.shields.io/badge/backend-Supabase(optional)-3ecf8e?logo=supabase&logoColor=white)](https://supabase.com)
 
 A calm, focus-first task manager for **individuals and small teams**. Plan your
-day, organize work on a drag-and-drop Kanban board, run Pomodoro focus sessions,
+day, organize work on a drag-and-drop Kora board, run Pomodoro focus sessions,
 and collaborate in shared workspaces — with a fully bilingual
 (English / Vietnamese) interface.
 
-React Kanban is built to answer one question well: *what should I focus on
+Kora is built to answer one question well: *what should I focus on
 right now?* Today planning surfaces a small set of recommended focus tasks,
 grouped by due/overdue context, while the board stays available for the wider
-picture. It also includes **Arcana** — a playful, collectible tarot mini-game
-you can unlock by completing tasks, for a moment of reflection between work.
+picture. Arcana is currently hidden; its retained implementation is not a
+user-facing navigation option.
+
+The web header offers **Download Kora** for Windows. The frameless desktop
+Dock and Tasks share one controller; only Dock stays on top. Install the
+update-enabled build once, then use **Update** inside Kora for later signed
+updates. See [Windows setup and updates](src-tauri/README.md).
 
 > **Two ways to run it:** A no-backend **local mode** (mock auth + persistent
 > `localStorage`) for exploring and demoing, and a full **Supabase mode** with
@@ -47,7 +52,7 @@ you can unlock by completing tasks, for a moment of reflection between work.
 
 | Feature | Local mode (`mock`) | Supabase mode (`supabase`) |
 | --- | :---: | :---: |
-| Kanban board (drag-and-drop columns/cards, priorities, due dates, Tiptap rich-text) | ✅ | ✅ |
+| Kora board (drag-and-drop columns/cards, priorities, due dates, Tiptap rich-text) | ✅ | ✅ |
 | Today daily planning + focus task suggestions | ✅ | ✅ |
 | Home overview dashboard | ✅ | ✅ |
 | Focus dock + Pomodoro timer | ✅ | ✅ |
@@ -287,7 +292,7 @@ Navigation is URL-addressable. The browser URL is the single source of truth
 | --- | --- |
 | `/home` | Home overview dashboard |
 | `/today` | Daily planning + focus task suggestions |
-| `/board` | Kanban board (default sub-view) |
+| `/board` | Kora board (default sub-view) |
 | `/calendar` | Calendar view of the current board |
 | `/auth` | Sign-in / sign-up |
 | `/onboarding` | First-run workspace + board setup |
@@ -345,9 +350,15 @@ Other static hosts need an equivalent server endpoint at `/api/task-breakdown`.
 The production endpoint requires a valid Supabase session and checks workspace/task
 access with that user's RLS token; it does not accept unauthenticated demo calls.
 
-Only the selected task's title, notes, and up to 30 checklist items are sent to
-Gemini, after the user presses the AI button. Responses are validated as three
-bounded plain-text steps. The endpoint has a 25-second upstream timeout and a
+The selected task's title, notes, labels, due date, board/column names, and up to
+30 checklist items are sent to Gemini only after the user presses the AI button.
+AI input is capped at 200 title characters and 2,000 note characters (the saved
+task itself is not shortened). The server prompt requests concrete actions under
+30 minutes, in the title's language, and asks for missing facts instead of
+inventing them. Task fields are untrusted data, separate from fixed instructions.
+Responses must contain exactly three distinct plain-text steps of at most 200
+characters, without code fences or extra keys; invalid output is rejected.
+The endpoint has a 25-second upstream timeout and a
 per-instance limit of five requests per user per minute. Configure provider quotas
 for a project-wide spending limit; an in-memory limiter does not span server instances.
 Unit tests mock provider calls and never use the real key.

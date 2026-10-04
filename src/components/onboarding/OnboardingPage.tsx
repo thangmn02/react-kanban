@@ -21,7 +21,7 @@ export default function OnboardingPage({
 }: OnboardingPageProps) {
   const [workspaceName, setWorkspaceName] = useState('My Workspace');
   const [boardTitle, setBoardTitle] = useState('Personal Tasks');
-  const [boardDescription, setBoardDescription] = useState('A focused board for today, this week, and done work.');
+  const [boardDescription, setBoardDescription] = useState('');
   const [templateId, setTemplateId] = useState(DEFAULT_BOARD_TEMPLATE_ID);
   const [isSubmitting, setIsSubmitting] = useState(false);
 

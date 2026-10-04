@@ -2,6 +2,17 @@
   directory = "netlify/functions"
   node_bundler = "esbuild"
 
+[[headers]]
+  for = "/downloads/latest.json"
+  [headers.values]
+    Cache-Control = "no-store"
+
+[[headers]]
+  for = "/downloads/Kora-setup.exe"
+  [headers.values]
+    Cache-Control = "no-cache"
+    Content-Type = "application/octet-stream"
+
 [[redirects]]
   from = "/api/task-breakdown"
   to = "/.netlify/functions/task-breakdown"

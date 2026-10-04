@@ -134,7 +134,7 @@ export default function AcceptInvitePage({
               Workspace invite
             </p>
             <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em] text-slate-950">
-              Join a Kanban workspace
+              Join a Kora workspace
             </h1>
             <p className="mt-2 text-sm leading-6 text-slate-500">
               Signed in as {currentUser.email || currentUser.name}.
