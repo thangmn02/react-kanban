@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, HashRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { isNativeWidget } from './features/native/runtime';
 
 import AppLayout from './AppLayout';
 import RequireAuth from './app/RequireAuth';
@@ -19,8 +20,9 @@ const NotFoundRoute = lazy(() => import('./pages/not-found/NotFoundRoute'));
 const routeFallback = <div className="flex min-h-screen items-center justify-center bg-canvas text-sm font-medium text-slate-500">Loading workspace...</div>;
 
 export default function App() {
+  const Router = isNativeWidget() ? HashRouter : BrowserRouter;
   return (
-    <BrowserRouter>
+    <Router>
       <Suspense fallback={routeFallback}>
         <Routes>
           <Route element={<AppLayout />}>
@@ -41,6 +43,6 @@ export default function App() {
           </Route>
         </Routes>
       </Suspense>
-    </BrowserRouter>
+    </Router>
   );
 }

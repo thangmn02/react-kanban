@@ -32,8 +32,12 @@ import AppOverlays from './app/AppOverlays';
 import { useAppRoutingController } from './app/useAppRoutingController';
 import { useAppLayoutRouteContextValue } from './app/createAppLayoutRouteContext';
 import { isHomeFocusSessionActive } from './utils/homeFocusSession';
+import { isNativeWidget } from './features/native/runtime';
+import NativeSurface from './features/native/NativeSurface';
 
 function AppLayout() {
+  const native = isNativeWidget();
+  const [nativeDock, setNativeDock] = useState(true);
   const {
     authMode,
     user,
@@ -377,7 +381,7 @@ function AppLayout() {
 
   const shouldRenderOverlays = Boolean(user) && !['auth', 'onboarding', 'invite', 'not-found'].includes(activeView);
 
-  return (
+  const content = (
     <FocusSessionProvider value={focusSession}>
       {shouldRenderOverlays && <AppNavigation activeView={activeView} onNavigate={setActiveViewWithPath} />}
       <div className={shouldRenderOverlays ? 'lg:pl-20' : undefined}>
@@ -386,6 +390,20 @@ function AppLayout() {
       {shouldRenderOverlays && sharedDialogs}
     </FocusSessionProvider>
   );
+  if (!native) return content;
+  const showDock = nativeDock && shouldRenderOverlays;
+  // The existing AppLayout controller owns both native views. Switching to
+  // Tasks never creates a second Pomodoro timer or a second session log.
+  return <FocusSessionProvider value={focusSession}><NativeSurface dock={showDock}
+    onToggle={shouldRenderOverlays ? () => setNativeDock((current) => !current) : undefined}
+    focusProps={{
+      activeTask: focusSession.selectedTimerTask || focusSession.activeFocusTask,
+      focusTasks: focusSession.focusTasks, timerState: focusSession.timerState,
+      remainingSeconds: focusSession.remainingSeconds, cycleTotal: focusSession.timerSettings.longBreakEvery,
+      onStart: () => { focusSession.startFocusSessionNow(); }, onPause: pauseTimer, onReset: resetTimer,
+      onActiveTaskChange: (taskId) => { focusSession.startFocusSessionNow(taskId); },
+      onMarkDoneAndNext: focusIntegration.handleMarkDoneAndNext,
+    }}>{content}</NativeSurface></FocusSessionProvider>;
 }
 
 export default AppLayout;

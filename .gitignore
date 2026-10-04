@@ -20,6 +20,8 @@ lerna-debug.log*
 node_modules/
 dist/
 dist-ssr/
+/src-tauri/target/
+/src-tauri/gen/
 coverage/
 .vite/
 *.tsbuildinfo

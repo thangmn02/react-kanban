@@ -1,0 +1,12 @@
+html[data-native-surface], html[data-native-surface] body, html[data-native-surface] #root { margin:0; background:transparent !important; }
+.native-surface { color:#25222d; font-family:Inter,system-ui,sans-serif; height:100dvh; display:flex; flex-direction:column; overflow:hidden; }
+.native-workspace { background:#f7f8fa; }
+.native-chrome { display:flex; align-items:center; min-height:32px; gap:3px; padding:0 8px; background:rgba(255,255,255,.78); border-bottom:1px solid #71648920; }
+.native-chrome span { flex:1; align-self:stretch; display:flex; align-items:center; font-size:11px; color:#787182; user-select:none; cursor:grab; }
+.native-chrome button { font:500 12px system-ui; padding:2px 9px; border:0; border-radius:6px; background:transparent; color:#63586f; cursor:pointer; }
+.native-chrome button:hover { background:#9a88bb20; }
+.native-dock-scroll { overflow:auto; flex:1; min-height:0; scrollbar-width:thin; }
+.native-workspace-content { overflow:auto; flex:1; min-height:0; }
+.native-audio-switch { display:flex; gap:7px; align-items:center; padding:7px 10px; font-size:11px; background:rgba(255,255,255,.8); border-top:1px solid #71648920; flex-shrink:0; }
+.native-audio-switch input { accent-color:#8e7ab6; }
+.native-error { margin:0; padding:5px 10px; font-size:11px; background:#fff; }

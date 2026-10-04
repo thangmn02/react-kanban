@@ -14,6 +14,8 @@ import {
   sanitizePomodoroTimerSettings,
 } from '../utils/pomodoroTime';
 import { buildStorageKey, readScopedJSON, writeScopedJSON, type StorageScope } from '../shared/storage/storageAdapter';
+import { isNativeWidget } from '../features/native/runtime';
+import { listen } from '@tauri-apps/api/event';
 
 const pomodoroStorageFeature = 'pomodoro_timer';
 const pomodoroSettingsFeature = 'pomodoro_settings';
@@ -303,8 +305,12 @@ export function usePomodoroTimer({
 
     updateRemainingTime();
     const intervalId = window.setInterval(updateRemainingTime, 1000);
-
-    return () => window.clearInterval(intervalId);
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    if (isNativeWidget()) void listen('native-clock', () => { if (!disposed) updateRemainingTime(); })
+      .then((stop) => { if (disposed) stop(); else unlisten = stop; }).catch(() => {});
+    // Both wakeups compute the same deadline; Rust never owns a second timer.
+    return () => { disposed = true; unlisten?.(); window.clearInterval(intervalId); };
   }, [commitTimerState, onComplete, resolveTimerTask, timerState]);
 
   useEffect(() => {

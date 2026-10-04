@@ -13,6 +13,7 @@ import { buildTaskFieldUpdatePayload } from '../../utils/boardDataMapper';
 import type { useI18n } from '../../i18n';
 import type { FocusSessionValue } from './useFocusSessionController';
 import type { useBoardPageController } from '../board/hooks/useBoardPageController';
+import { isNativeWidget } from '../native/runtime';
 
 interface Params {
   focus: FocusSessionValue;
@@ -144,7 +145,10 @@ export function useAppFocusIntegration({
     const currentIndex = focus.focusTasks.findIndex((item) => item.id === taskId);
     const nextTask = focus.focusTasks.find((item, index) => index > currentIndex && !item.isDone)
       || focus.focusTasks.find((item, index) => index < currentIndex && !item.isDone);
-    if (nextTask) focus.handleStartFocusTimer(nextTask.id);
+    if (nextTask) {
+      if (isNativeWidget()) focus.startFocusSessionNow(nextTask.id);
+      else focus.handleStartFocusTimer(nextTask.id);
+    }
   }, [focus, handleMarkFocusTaskDone]);
 
   const pictureInPicture = useDocumentPictureInPicture({
@@ -176,6 +180,7 @@ export function useAppFocusIntegration({
     handleMarkFocusTaskDone,
     handleMarkDoneFromCompletion,
     handleActiveTaskChange,
+    handleMarkDoneAndNext,
     handleOpenFloatingFocusTimer,
   };
 }

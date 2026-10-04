@@ -1,3 +1,6 @@
+import { isNativeWidget } from '../native/runtime';
+import { requestNativeMusic, subscribeNativeMusic } from '../native/nativeMusic';
+
 export interface BrowserMusicSession {
   id: string;
   title: string;
@@ -5,9 +8,12 @@ export interface BrowserMusicSession {
   source: string;
   paused: boolean;
   playing?: boolean;
+  canControl?: boolean;
   currentTime?: number;
   playbackRate?: number;
   sampledAt?: number;
+  selectionToken?: string;
+  syncState?: { mode: 'clock' | 'capture'; reason?: string; captureId?: string };
 }
 
 export interface MusicClock {
@@ -20,10 +26,12 @@ export interface MusicClock {
 export type BeatBand = 'kick' | 'bass' | 'snare' | 'hat';
 export type BeatEvent = { kind: 'clock'; clock: MusicClock }
   | { kind: 'sync.state'; mode: 'clock' | 'capture'; reason?: string; captureId?: string }
-  | { kind: 'onset'; bands: BeatBand[]; captureId?: string; sequence?: number };
+  | { kind: 'onset'; bands: BeatBand[]; captureId?: string; sequence?: number }
+  | { kind: 'tempo.state'; captureId: string; tempo: { locked: boolean; bpm: number | null; confidence: number } }
+  | { kind: 'tempo.tick'; captureId: string; tick: { step: number; bands: BeatBand[] } };
 
 const channel = 'kanban-music-v1';
-export type MusicAction = 'sessions.get' | 'media.play' | 'media.pause';
+export type MusicAction = 'sessions.get' | 'diagnostics.get' | 'media.play' | 'media.pause' | 'media.focus';
 type BeatAction = 'dock.beat.sync.start' | 'dock.beat.sync.stop';
 
 export class MusicBridgeError extends Error {
@@ -51,10 +59,25 @@ export function isMusicSession(value: unknown): value is BrowserMusicSession {
   return ['id', 'title', 'artist', 'source'].every((key) => typeof item[key] === 'string' && (item[key] as string).length <= 1000)
     && typeof item.paused === 'boolean'
     && (item.playing === undefined || typeof item.playing === 'boolean')
+    && (item.canControl === undefined || typeof item.canControl === 'boolean')
+    && (item.selectionToken === undefined || (typeof item.selectionToken === 'string' && item.selectionToken.length <= 100))
+    && (item.syncState === undefined || isSyncState(item.syncState))
     && ['currentTime', 'playbackRate', 'sampledAt'].every((key) => item[key] === undefined || (typeof item[key] === 'number' && Number.isFinite(item[key]) && (item[key] as number) >= 0));
 }
 
+function isSyncState(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false;
+  const state = value as Record<string, unknown>;
+  return (state.mode === 'clock' || state.mode === 'capture')
+    && (state.reason === undefined || (typeof state.reason === 'string' && state.reason.length <= 80))
+    && (state.captureId === undefined || (typeof state.captureId === 'string' && state.captureId.length <= 100));
+}
+
 function requestBridge(action: MusicAction | BeatAction, sessionId?: string, subscriptionId?: string): Promise<Record<string, unknown>> {
+  if (isNativeWidget()) return requestNativeMusic(action, sessionId, subscriptionId).then((response) => {
+    if (response.ok !== true) throw new MusicBridgeError('unavailable');
+    return response;
+  }).catch(() => { throw new MusicBridgeError(action.startsWith('media.') ? 'playback' : 'unavailable'); });
   return new Promise((resolve, reject) => {
     const requestId = crypto.randomUUID();
     const cleanup = () => { clearTimeout(timeout); window.removeEventListener('message', receive); };
@@ -76,18 +99,30 @@ function requestBridge(action: MusicAction | BeatAction, sessionId?: string, sub
 export async function sendMusicRequest(action: MusicAction, sessionId?: string): Promise<BrowserMusicSession[]> {
   const response = await requestBridge(action, sessionId);
   if (!Array.isArray(response.sessions) || !response.sessions.every(isMusicSession)) throw new MusicBridgeError('invalid-response');
-  return response.sessions.slice(0, 30);
+  return response.sessions;
 }
 
 export async function sendBeatRequest(action: BeatAction, sessionId: string, subscriptionId: string): Promise<void> {
   await requestBridge(action, sessionId, subscriptionId);
 }
 
+export async function sendMusicDiagnostics(): Promise<unknown[]> {
+  const response = await requestBridge('diagnostics.get');
+  if (!Array.isArray(response.tabs)) throw new MusicBridgeError('invalid-response');
+  return response.tabs;
+}
+
 export function subscribeBeatEvents(sessionId: string, subscriptionId: string, receive: (event: BeatEvent) => void) {
-  const listener = (event: MessageEvent) => {
-    const message = event.data;
-    if (event.source !== window || event.origin !== window.location.origin || !message || message.channel !== channel
-      || message.direction !== 'extension-event' || message.event !== 'beat' || message.sessionId !== sessionId || message.subscriptionId !== subscriptionId) return;
+  const parse = (data: unknown, native = false) => {
+    if (!data || typeof data !== 'object') return;
+    // Payload fields are checked below before reaching the controller.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const message = data as Record<string, any>;
+    if (message.sessionId !== sessionId || message.subscriptionId !== subscriptionId) return;
+    if (!native && (message.channel !== channel || message.direction !== 'extension-event' || message.event !== 'beat')) return;
+    // Never replay queued flashes when a minimized webview resumes.
+    if (native && (typeof message.emittedAt !== 'number' || !Number.isFinite(message.emittedAt)
+      || Date.now() - message.emittedAt > 600 || message.emittedAt > Date.now() + 100)) return;
     if (['sync.state', 'status'].includes(message.kind) && ['clock', 'capture'].includes(message.mode)) receive({
       kind: 'sync.state', mode: message.mode,
       reason: typeof (message.reason ?? message.fallbackReason) === 'string' ? String(message.reason ?? message.fallbackReason).slice(0, 80) : undefined,
@@ -99,11 +134,28 @@ export function subscribeBeatEvents(sessionId: string, subscriptionId: string, r
         ...(typeof message.captureId === 'string' ? { captureId: message.captureId.slice(0, 100) } : {}),
         ...(Number.isSafeInteger(message.sequence) && message.sequence > 0 ? { sequence: message.sequence } : {}),
       });
+    if (message.kind === 'tempo.state' && typeof message.captureId === 'string' && message.captureId.length <= 100
+      && typeof message.tempo?.locked === 'boolean' && typeof message.tempo.confidence === 'number'
+      && Number.isFinite(message.tempo.confidence) && message.tempo.confidence >= 0 && message.tempo.confidence <= 1
+      && (message.tempo.bpm === null || typeof message.tempo.bpm === 'number' && Number.isFinite(message.tempo.bpm)
+        && message.tempo.bpm >= 60 && message.tempo.bpm <= 180)) receive({ kind: 'tempo.state', captureId: message.captureId,
+        tempo: { locked: message.tempo.locked, bpm: message.tempo.bpm, confidence: message.tempo.confidence } });
+    if (message.kind === 'tempo.tick' && typeof message.captureId === 'string' && message.captureId.length <= 100
+      && Number.isInteger(message.tick?.step) && message.tick.step >= 0 && message.tick.step < 8
+      && Array.isArray(message.tick.bands) && message.tick.bands.length <= 3
+      && message.tick.bands.every((band: unknown) => typeof band === 'string' && ['kick', 'bass', 'snare', 'hat'].includes(band))) receive({
+        kind: 'tempo.tick', captureId: message.captureId,
+        tick: { step: message.tick.step, bands: [...new Set<BeatBand>(message.tick.bands)] },
+      });
     if (message.kind === 'clock') {
       const clock = message.clock;
       if (clock && typeof clock.playing === 'boolean' && typeof clock.paused === 'boolean'
         && ['currentTime', 'playbackRate', 'sampledAt'].every((key) => typeof clock[key] === 'number' && Number.isFinite(clock[key]) && clock[key] >= 0)) receive({ kind: 'clock', clock });
     }
+  };
+  if (isNativeWidget()) return subscribeNativeMusic((payload) => parse(payload, true));
+  const listener = (event: MessageEvent) => {
+    if (event.source === window && event.origin === window.location.origin) parse(event.data);
   };
   window.addEventListener('message', listener);
   return () => window.removeEventListener('message', listener);
