@@ -78,7 +78,7 @@ collaborative, multi-user configuration.
 Run the whole app in your browser, no backend required. Data persists to
 `localStorage`, scoped per mock user/workspace.
 
-**Prerequisites:** Node.js 20+ (a current LTS is required by Vite 8) and npm.
+**Prerequisites:** Node.js 22.12+ and npm. CI uses Node 22, including its native WebSocket support.
 
 ```bash
 # 1. Install dependencies

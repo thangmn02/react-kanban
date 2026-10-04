@@ -7,6 +7,10 @@ import type { AppUser, WorkspaceSummary } from '../../types/auth.type';
 import type { HomeFocusControls } from '../home/HomeFocusView';
 
 vi.mock('../../services/home.service', () => ({ fetchHomeDashboardData: vi.fn() }));
+// These dashboard fixtures use the local store even in connected-build CI.
+// Remote service behavior is covered separately by the service integration tests.
+vi.mock('../../lib/supabase', () => ({ default: null, authMode: 'mock', isLocalDemoMode: true,
+  requireSupabaseClient: () => { throw new Error('Unexpected remote client in local dashboard test'); } }));
 const user: AppUser = { id: 'user', name: 'Alex', email: null, avatarUrl: '', isMock: true };
 const workspace = (id: string): WorkspaceSummary => ({ id, name: id, role: 'owner', ownerId: user.id });
 const data = (title: string): HomeDashboardData => ({ myTasks: [{ id: title, title, boardId: 'board', boardTitle: 'Project', dueDate: null, priority: null }], recentBoards: [], holidays: [] });
