@@ -74,9 +74,10 @@ function zip(files) {
 
 await mkdir(join(extension, 'icons'), { recursive: true });
 for (const size of [16, 48, 128]) await writeFile(join(extension, 'icons', `${size}.png`), icon(size));
-const names = ['manifest.json', 'background.js', 'media.js', 'protocol.js', 'relay.js', 'clock.js', 'beat-sync.js', 'beat-detector.js', 'capture-engine.js', 'offscreen.html', 'offscreen.js', 'setup.html', 'setup.css', 'icons/16.png', 'icons/48.png', 'icons/128.png'];
+const names = ['manifest.json', 'background.js', 'widget-bridge.js', 'sites.js', 'companion-action.js', 'media.js', 'media-observer.js', 'discovery-diagnostics.js', 'protocol.js', 'relay.js', 'clock.js', 'beat-sync.js', 'beat-detector.js', 'melody-detector.js', 'tempo-tracker.js', 'capture-engine.js', 'offscreen.html', 'offscreen.js', 'setup.html', 'setup.js', 'setup.css', 'icons/16.png', 'icons/48.png', 'icons/128.png'];
 const files = await Promise.all(names.map(async (name) => ({ name, bytes: await readFile(join(extension, name)) })));
 JSON.parse(files.find((file) => file.name === 'manifest.json').bytes.toString());
 await mkdir(output, { recursive: true });
 await writeFile(join(output, 'kanban-music-companion.zip'), zip(files));
+await writeFile(join(output, 'kora-music-companion.zip'), zip(files));
 console.log(`Music companion packaged: ${files.length} files → public/downloads/kanban-music-companion.zip`);

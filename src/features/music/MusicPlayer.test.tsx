@@ -109,7 +109,7 @@ it('offers manual recovery if opening the music tab fails', async () => {
   act(() => beatReceiver.receive?.({ kind: 'sync.state', mode: 'clock', reason: 'capture-permission' }));
   vi.mocked(sendMusicRequest).mockRejectedValueOnce(new MusicBridgeError('unavailable'));
   fireEvent.click(screen.getByRole('button', { name: 'Open music tab' }));
-  await screen.findByText('Could not open the music tab. Open it manually and click Kanban Music Companion.');
+  await screen.findByText('Could not open the music tab. Open it manually and click Kora Music Companion.');
 });
 
 it('selects the toolbar-clicked song but preserves manual choices until a new toolbar click', async () => {
@@ -148,7 +148,7 @@ it('keeps the dock empty when connected without a music session', async () => {
 it('explains how to reconnect when an installed extension becomes unavailable', async () => {
   vi.mocked(sendMusicRequest).mockRejectedValue(new MusicBridgeError('unavailable'));
   renderPlayer();
-  await screen.findByText('Refresh your Kanban tab to reconnect music controls.');
+  await screen.findByText('Refresh your Kora tab to reconnect music controls.');
   expect(screen.queryByRole('region', { name: 'Music' })).not.toBeInTheDocument();
 });
 
@@ -183,13 +183,13 @@ it('shows the heartbeat dot only while playing, keeps the paused panel, and hide
   await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
   expect(dot()).toHaveClass('music-dot', 'playing');
   expect(screen.getByRole('region', { name: 'Music' })).toBeInTheDocument();
-  expect(view.container.querySelectorAll('.channel-icon')).toHaveLength(4);
+  expect(view.container.querySelectorAll('.channel-icon')).toHaveLength(5);
   expect(view.container.querySelectorAll('.channel-icon.lit')).toHaveLength(0);
   expect(view.container.querySelectorAll('.beat-square.lit, .beat-square.onset')).toHaveLength(0);
   await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
   expect(dot()).toBeNull();
   expect(screen.getByRole('region', { name: 'Music' })).toBeInTheDocument();
-  expect(view.container.querySelectorAll('.channel-icon')).toHaveLength(4);
+  expect(view.container.querySelectorAll('.channel-icon')).toHaveLength(5);
   expect(view.container.querySelectorAll('.channel-icon.lit')).toHaveLength(0);
   expect(view.container.querySelectorAll('.beat-square.hit')).toHaveLength(0);
   expect(view.container.querySelectorAll('.beat-square.lit, .beat-square.onset')).toHaveLength(0);

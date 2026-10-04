@@ -6,7 +6,9 @@ export type BeatPalette = 'bloom' | 'ultraviolet';
 export type MomentShape = 'heart' | 'diamond' | 'smile';
 export type MomentEffect = 'cascade' | 'wave' | 'rain';
 
-export const beatBands: BeatBand[] = ['kick', 'snare', 'hat', 'bass'];
+export const beatBands: BeatBand[] = ['kick', 'clap', 'hat', 'bass', 'melody'];
+export const trackNames: Record<BeatBand, string> = { kick: 'Drum (Kick)', clap: 'Clap', hat: 'Hi-hat', bass: 'Bass', melody: 'Melody' };
+export const momentFlashMs = 8000;
 export const patternNames: BeatPatternName[] = ['pop', 'wave', 'splash', 'ripple'];
 export const shapeNames: MomentShape[] = ['heart', 'diamond', 'smile'];
 export const effectNames: MomentEffect[] = ['cascade', 'wave', 'rain'];
@@ -18,19 +20,21 @@ export const fixedColors: Record<BeatPalette, { hit: string; idle: string }[]> =
     { idle: '#bae6fd', hit: '#38bdf8' },
     { idle: '#fde68a', hit: '#fbbf24' },
     { idle: '#ddd6fe', hit: '#a78bfa' },
+    { idle: '#a7f3d0', hit: '#34d399' },
   ],
   ultraviolet: [
     { idle: '#56273e', hit: '#ff2e88' },
     { idle: '#164953', hit: '#00e5ff' },
     { idle: '#544d16', hit: '#ffe600' },
     { idle: '#412358', hit: '#9d4edd' },
+    { idle: '#15493b', hit: '#00ffb3' },
   ],
 };
 
 const shapes: Record<MomentShape, string[]> = {
-  heart: ['01100110', '11111111', '01111110', '00011000'],
-  diamond: ['00011000', '00111100', '01111110', '00011000'],
-  smile: ['01111110', '01011010', '01000010', '00111100'],
+  heart: ['01100110', '11111111', '11111111', '01111110', '00011000'],
+  diamond: ['00011000', '00111100', '01111110', '00111100', '00011000'],
+  smile: ['01111110', '01011010', '01000010', '01011010', '00111100'],
 };
 
 export function hashText(value: string): number {
@@ -70,7 +74,7 @@ export function channelColors(mode: BeatColorMode, palette: BeatPalette, session
   const seed = hashText(`${sessionId}:${epoch}:hue`);
   const base = Math.floor(randomUnit(seed) * 360);
   const jitter = Math.floor(randomUnit(seed + row * 997) * 25) - 12;
-  const hue = (base + row * 90 + jitter + 360) % 360;
+  const hue = (base + row * (360 / beatBands.length) + jitter + 360) % 360;
   return { hit: `hsl(${hue} 80% 62%)`, idle: `hsl(${hue} 85% 90%)` };
 }
 
@@ -89,6 +93,12 @@ export function momentDelay(effect: MomentEffect, row: number, step: number, see
   if (effect === 'cascade') return row * 110;
   if (effect === 'wave') return step * 65;
   return step * 75 + Math.floor(randomUnit(seed + row * 79 + step * 17) * 65);
+}
+
+export function momentDuration(effect: MomentEffect, seed: number): number {
+  const delays = beatBands.flatMap((_, row) => Array.from({ length: 8 }, (_, step) => momentDelay(effect, row, step, seed)));
+  // Keep the whole shape mounted through the last square's hold and fade.
+  return momentFlashMs + Math.max(...delays) + 50;
 }
 
 export function nextDifferent<T>(items: readonly T[], previous: T | undefined, random: number): T {

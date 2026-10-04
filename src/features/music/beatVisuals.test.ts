@@ -1,8 +1,8 @@
 import { expect, it } from 'vitest';
-import { activeSteps, channelColors, isShapeCell, nextDifferent, patternAt, pulseDelay, reshuffleEpoch } from './beatVisuals';
+import { activeSteps, beatBands, channelColors, effectNames, isShapeCell, momentDelay, momentDuration, momentFlashMs, nextDifferent, patternAt, pulseDelay, reshuffleEpoch, shapeNames } from './beatVisuals';
 
 it('keeps two to four deterministic active squares per row and changes them after eight locked bars', () => {
-  for (let row = 0; row < 4; row++) {
+  for (let row = 0; row < 5; row++) {
     const first = activeSteps('song', 0, row);
     expect(first).toHaveLength(8);
     expect(first.filter(Boolean).length).toBeGreaterThanOrEqual(2);
@@ -15,12 +15,24 @@ it('keeps two to four deterministic active squares per row and changes them afte
   expect(reshuffleEpoch(19.2)).toBe(1);
 });
 
+it('supplies colors and shape squares for all five rows, with a long hold and complete fade', () => {
+  for (const palette of ['bloom', 'ultraviolet'] as const) {
+    beatBands.forEach((_, row) => expect(channelColors('pastel', palette, 'song', 0, row).hit).toBeTruthy());
+  }
+  for (const shape of shapeNames) expect(Array.from({ length: 8 }, (_, step) => isShapeCell(shape, 4, step)).some(Boolean)).toBe(true);
+  for (const effect of effectNames) {
+    const lastDelay = Math.max(...beatBands.flatMap((_, row) => Array.from({ length: 8 }, (_, step) => momentDelay(effect, row, step, 1))));
+    expect(momentDuration(effect, 1)).toBeGreaterThanOrEqual(lastDelay + momentFlashMs);
+  }
+  expect(momentFlashMs).toBe(8000);
+});
+
 it('cycles onset styles without moving icons and keeps channel colors distinct', () => {
   expect([0, 8, 16, 24].map(patternAt)).toEqual(['pop', 'wave', 'splash', 'ripple']);
   expect(pulseDelay('wave', 4, 1)).toBe(160);
   expect(pulseDelay('ripple', 3, 1)).toBe(20);
-  const hues = Array.from({ length: 4 }, (_, row) => channelColors('random', 'bloom', 'song', 0, row).hit);
-  expect(new Set(hues).size).toBe(4);
+  const hues = Array.from({ length: 5 }, (_, row) => channelColors('random', 'bloom', 'song', 0, row).hit);
+  expect(new Set(hues).size).toBe(5);
   expect(nextDifferent(['heart', 'diamond', 'smile'], 'heart', .1)).not.toBe('heart');
   expect(isShapeCell('heart', 0, 1)).toBe(true);
 });

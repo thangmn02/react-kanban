@@ -19,8 +19,8 @@ if (allowedOrigins.has(location.origin)) {
     if (event.source !== window || event.origin !== location.origin || !message
       || message.channel !== channel || message.direction !== 'app-to-extension'
       || typeof message.requestId !== 'string' || message.requestId.length > 100
-      || !['sessions.get', 'media.play', 'media.pause', 'dock.beat.sync.start', 'dock.beat.sync.stop'].includes(message.action) || pending >= 4) return;
-    if (message.action !== 'sessions.get' && (typeof message.sessionId !== 'string' || message.sessionId.length > 250)) return;
+      || !['sessions.get', 'diagnostics.get', 'media.play', 'media.pause', 'media.focus', 'dock.beat.sync.start', 'dock.beat.sync.stop'].includes(message.action) || pending >= 4) return;
+    if (!['sessions.get', 'diagnostics.get'].includes(message.action) && (typeof message.sessionId !== 'string' || message.sessionId.length > 250)) return;
     if (message.action.startsWith('dock.beat.') && (typeof message.subscriptionId !== 'string' || message.subscriptionId.length > 100)) return;
     pending++;
     const reply = (result) => {

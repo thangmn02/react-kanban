@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { sendBeatRequest, subscribeBeatEvents, type BeatBand, type MusicClock } from './mediaBridge';
+import { sendBeatRequest, subscribeBeatEvents, type BeatBand, type MusicClock, type MelodyState } from './mediaBridge';
 
 export interface MusicBeatState {
   sessionId: string;
@@ -10,6 +10,7 @@ export interface MusicBeatState {
   ticks?: Partial<Record<BeatBand, number>>;
   reason?: string;
   captureId?: string;
+  melody?: MelodyState;
 }
 
 export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessionId: string, clock: MusicClock) => void): MusicBeatState {
@@ -23,8 +24,10 @@ export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessio
     let sequence = 0;
     let captureId: string | undefined;
     let liveMode: 'clock' | 'capture' = 'clock';
-    const recent: Record<BeatBand, number[]> = { kick: [], bass: [], snare: [], hat: [] };
-    const lastAccepted: Record<BeatBand, number> = { kick: -Infinity, bass: -Infinity, snare: -Infinity, hat: -Infinity };
+    let melodySequence = -1;
+    let melodyLease: ReturnType<typeof setTimeout> | undefined;
+    const recent: Record<BeatBand, number[]> = { kick: [], clap: [], hat: [], bass: [], melody: [] };
+    const lastAccepted: Record<BeatBand, number> = { kick: -Infinity, clap: -Infinity, hat: -Infinity, bass: -Infinity, melody: -Infinity };
     const clearRates = () => { (Object.keys(recent) as BeatBand[]).forEach((band) => { recent[band] = []; lastAccepted[band] = -Infinity; }); };
     const rates = (now: number) => {
       const result: Partial<Record<BeatBand, number>> = {};
@@ -64,6 +67,17 @@ export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessio
         });
         return;
       }
+      if (event.kind === 'melody.state') {
+        if (liveMode !== 'capture' || event.captureId !== captureId || event.melody.note < melodySequence) return;
+        melodySequence = event.melody.note;
+        lastLiveState = Date.now();
+        clearTimeout(melodyLease);
+        setState((current) => current.sessionId === sessionId && current.mode === 'capture' && current.captureId === event.captureId
+          ? { ...current, melody: event.melody, rates: rates(Date.now()) } : current);
+        // A dead/stalled feed must never leave a held note behind.
+        melodyLease = setTimeout(() => setState((current) => ({ ...current, melody: undefined })), 700);
+        return;
+      }
       let acceptedBands: BeatBand[] = [];
       if (event.kind === 'onset') {
         if (liveMode !== 'capture' || (captureId && event.captureId !== captureId)
@@ -78,7 +92,9 @@ export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessio
         });
         if (!acceptedBands.length) return;
       } else {
-        if (captureId !== event.captureId || liveMode !== event.mode) { sequence = 0; clearRates(); }
+        if (captureId !== event.captureId || liveMode !== event.mode) {
+          sequence = 0; melodySequence = -1; clearRates(); clearTimeout(melodyLease);
+        }
         captureId = event.captureId;
         liveMode = event.mode;
       }
@@ -92,6 +108,7 @@ export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessio
           rates: event.mode === 'capture' ? rates(Date.now()) : {},
           tempo: current.mode === event.mode && current.captureId === event.captureId ? current.tempo : undefined,
           ticks: current.mode === event.mode && current.captureId === event.captureId ? current.ticks : {},
+          melody: current.mode === event.mode && current.captureId === event.captureId ? current.melody : undefined,
         };
         if (current.mode !== 'capture') return current;
         const onsets = { ...current.onsets };
@@ -108,6 +125,7 @@ export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessio
     };
     const stop = () => {
       cancelled = true;
+      clearTimeout(melodyLease);
       clearInterval(interval);
       clearInterval(watchdog);
       void sendBeatRequest('dock.beat.sync.stop', sessionId, subscriptionId).catch(() => {});

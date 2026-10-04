@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { allowedRequest } from './protocol.js';
 import { controlMedia, readMedia } from './media.js';
 
-afterEach(() => { document.body.replaceChildren(); vi.restoreAllMocks(); });
+afterEach(() => { document.body.replaceChildren(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 it('allows only exact app origins and known commands', () => {
   const message = { protocol: 'kanban-music-v1', action: 'sessions.get' };
   expect(allowedRequest(message, { url: 'https://kanthangboard.netlify.app/home' })).toBe(true);
@@ -10,6 +10,39 @@ it('allows only exact app origins and known commands', () => {
   expect(allowedRequest(message, { url: 'https://kanthangboard.netlify.app.evil.com/' })).toBe(false);
   expect(allowedRequest(message, { url: 'http://localhost:9999/' })).toBe(false);
   expect(allowedRequest({ ...message, action: 'execute' }, { url: 'http://localhost:5173/' })).toBe(false);
+  expect(allowedRequest({ ...message, action: 'media.focus', sessionId: 'song' }, { url: 'http://localhost:5173/' })).toBe(true);
+  expect(allowedRequest({ ...message, action: 'media.focus', sessionId: 'song' }, { url: 'https://evil.example/' })).toBe(false);
+});
+
+it('detects every ready audio/video element generically and reads Media Session metadata for protected playback too', async () => {
+  vi.stubGlobal('navigator', { mediaSession: { metadata: { title: 'Actual song', artist: 'Actual artist' } } });
+  const audio = document.createElement('audio');
+  const video = document.createElement('video');
+  Object.defineProperties(audio, { currentSrc: { value: 'blob:protected-song' }, readyState: { value: 4 }, paused: { value: false }, mediaKeys: { value: {} } });
+  Object.defineProperties(video, { currentSrc: { value: 'https://example.com/video' }, readyState: { value: 4 }, paused: { value: true } });
+  document.body.append(audio, video, document.createElement('audio'));
+  const pause = vi.spyOn(audio, 'pause').mockImplementation(() => {});
+  const play = vi.spyOn(audio, 'play').mockResolvedValue();
+  expect(readMedia()).toEqual([
+    expect.objectContaining({ index: 0, title: 'Actual song', artist: 'Actual artist', playing: true, protectedMedia: true }),
+    expect.objectContaining({ index: 1, title: 'Actual song', paused: true, protectedMedia: false }),
+  ]);
+  await controlMedia(0, 'blob:protected-song', 'media.pause');
+  await controlMedia(0, 'blob:protected-song', 'media.play');
+  expect(pause).toHaveBeenCalledOnce();
+  expect(play).toHaveBeenCalledOnce();
+});
+
+it('supports media backed by srcObject and refuses controls after its stream is replaced', async () => {
+  const media = document.createElement('audio');
+  Object.defineProperties(media, { srcObject: { value: { id: 'stream-one' }, writable: true }, readyState: { value: 4 }, paused: { value: false } });
+  document.body.append(media);
+  const pause = vi.spyOn(media, 'pause').mockImplementation(() => {});
+  expect(readMedia()[0]).toMatchObject({ src: 'stream:stream-one', playing: true });
+  await controlMedia(0, 'stream:stream-one', 'media.pause');
+  expect(pause).toHaveBeenCalledOnce();
+  media.srcObject = { id: 'stream-two' };
+  await expect(controlMedia(0, 'stream:stream-one', 'media.play')).rejects.toThrow('Track changed');
 });
 it('reads metadata and controls the real media element, rejecting a changed source', async () => {
   const media = document.createElement('audio');

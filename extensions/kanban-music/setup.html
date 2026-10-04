@@ -1,3 +1,22 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>Kanban Music Companion</title><link rel="stylesheet" href="setup.css"></head>
-<body><main><h1>Your music controls are ready</h1><p>Return to Kanban and refresh that tab once. Open Floating Focus: music connects automatically.</p><p><a href="https://kanthangboard.netlify.app/" target="_blank" rel="noopener">Open Kanban</a></p><p>Play a song on YouTube, SoundCloud, or Spotify Web in the same browser. Keep the music tab open. Floating Focus shows its name and lets you pause or resume.</p><h2>Live beat lights</h2><p>Select your song in Floating Focus. Capture is attempted automatically. If Chrome needs permission, open the music tab and click Kanban Music Companion once. The listening line appears when live beat sync is active. Chrome shows its capture indicator; your music keeps playing normally.</p><p lang="vi">Chọn bài trong Floating Focus. Tiện ích tự thử đồng bộ nhịp. Nếu Chrome cần quyền, mở thẻ nhạc rồi nhấn Kanban Music Companion một lần. Các ô vuông đứng yên khi chưa có nhịp thật. Dòng “Dock đang nghe nhịp” hiện khi đã kết nối. Nhạc vẫn phát bình thường.</p><p>Audio is analyzed only inside your browser; nothing is recorded or uploaded. Pause the song or close Floating Focus to stop listening. If live sync is unavailable, the squares stay still. Only real onset events animate the squares.</p><p>There is no account connection or extension ID to enter.</p></main></body></html>
+<html lang="en"><head><meta charset="utf-8"><title>Kora Music Companion</title><link rel="stylesheet" href="setup.css"></head>
+<body><main>
+<h1>Your music controls are ready</h1>
+<p>Companion version <span id="companion-version"></span></p>
+<p>Refresh Kora once after installing or updating. Pin Kora Music Companion: open your browser’s puzzle-piece Extensions menu and click the pin beside its name.</p>
+<h2>Play → click → focus</h2>
+<p>Play a song on YouTube, YouTube Music, SoundCloud, Spotify Web, Apple Music, Deezer, or Tidal in this same browser. Open Floating Focus to see music controls; use its picker to switch songs. If the browser requires access for live beats, click the pinned companion on the music tab. It returns to Kora and selects that song.</p>
+<p><a href="https://kanthangboard.netlify.app/" target="_blank" rel="noopener">Open Kora</a></p>
+<h2>Live beat lights</h2>
+<p>Capture starts automatically when permitted. You do not need another extension click for every app refresh or pause/resume while access remains granted. A new music tab or an extension reload may need a fresh click. If access is missing, Floating Focus shows an “Open music tab” button and instructions. The listening line appears only when real capture is live; the browser shows its capture indicator.</p>
+<p lang="vi">Ghim Kora Music Companion một lần trong menu Tiện ích. Phát nhạc, rồi nhấn tiện ích ngay trên thẻ nhạc: bạn sẽ tự quay lại Kora và bài đó được chọn. Mở Floating Focus từ đồng hồ tập trung. Không cần nhấn lại mỗi lần tải lại ứng dụng hay tạm dừng/phát tiếp khi quyền vẫn còn. Thẻ nhạc mới hoặc tải lại tiện ích có thể cần cấp quyền lại; ứng dụng sẽ hướng dẫn rõ.</p>
+<p>Keep the music tab open. Audio is analyzed only inside your browser; nothing is recorded or uploaded. Pause the song or close Floating Focus to stop listening. If live sync is unavailable, the squares stay gray and still. Only real onset events animate the squares.</p>
+<p>All listed music services try the same browser-approved tab capture, including Apple Music, Spotify, Deezer and Tidal. Beats appear only if audible audio reaches the analyser; silence or denial keeps the squares still and music controls available. No DRM or browser capture restriction is bypassed.</p>
+<p lang="vi">Mọi dịch vụ nhạc đã liệt kê đều thử bắt âm thanh thẻ khi trình duyệt cho phép, gồm Apple Music, Spotify, Deezer và Tidal. Chỉ nháy theo nhịp thật khi bộ phân tích nhận được âm thanh; nếu im lặng hoặc bị từ chối, các ô vuông đứng yên và vẫn phát/dừng được. Không vượt cơ chế bảo vệ nội dung hay giới hạn bắt âm thanh của trình duyệt.</p>
+<p>There is no account connection or extension ID to enter. Install the companion separately in each browser/profile you use.</p>
+<h2>Music not appearing?</h2>
+<p>Keep Kora and your playing music tab open in this same browser/profile. Check detection below. The report contains only website names, media counts and status codes—no account data, song URLs or audio. A paused YouTube session can be an old loaded player; it does not mean YouTube is playing music.</p>
+<button id="check-detection" type="button">Check music detection / Kiểm tra nhận nhạc</button>
+<pre id="detection-result" aria-live="polite" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>
+<script src="setup.js"></script>
+</main></body></html>

@@ -15,6 +15,31 @@ beforeEach(() => { vi.useFakeTimers(); bridge.send.mockResolvedValue(undefined);
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks(); });
 const emit = (event: BeatEvent) => act(() => { bridge.receive?.(event); });
 
+it('leases Melody only from the current live capture and clears stalled notes, pause and capture replacement', async () => {
+  const onClock = vi.fn();
+  const { result } = renderHook(() => useMusicBeatSync('song', onClock));
+  const note = { kind: 'melody.state' as const, captureId: 'capture', melody: { active: true, level: .6, note: 1 } };
+  emit(note);
+  expect(result.current.melody).toBeUndefined();
+  emit({ kind: 'sync.state', mode: 'capture', captureId: 'capture' });
+  emit(note);
+  expect(result.current.melody?.active).toBe(true);
+  await act(async () => { await vi.advanceTimersByTimeAsync(600); });
+  emit({ ...note, melody: { ...note.melody, level: .8 } });
+  await act(async () => { await vi.advanceTimersByTimeAsync(600); });
+  expect(result.current.melody?.active).toBe(true);
+  await act(async () => { await vi.advanceTimersByTimeAsync(101); });
+  expect(result.current.melody).toBeUndefined();
+  emit(note);
+  emit({ kind: 'sync.state', mode: 'capture', captureId: 'replacement' });
+  expect(result.current.melody).toBeUndefined();
+  emit(note);
+  expect(result.current.melody).toBeUndefined();
+  emit({ ...note, captureId: 'replacement' });
+  emit({ kind: 'clock', clock: { playing: false, paused: true, currentTime: 5, sampledAt: Date.now(), playbackRate: 1 } });
+  expect(result.current.melody).toBeUndefined();
+});
+
 it('requests sync automatically, counts each onset once, and rejects old captures', () => {
   const onClock = vi.fn();
   const { result } = renderHook(() => useMusicBeatSync('song', onClock));
@@ -24,10 +49,10 @@ it('requests sync automatically, counts each onset once, and rejects old capture
   emit({ kind: 'sync.state', mode: 'capture', captureId: 'capture' });
   emit({ kind: 'onset', captureId: 'capture', sequence: 1, bands: ['kick', 'hat'] });
   emit({ kind: 'onset', captureId: 'capture', sequence: 1, bands: ['kick', 'hat'] });
-  emit({ kind: 'onset', captureId: 'old-capture', sequence: 2, bands: ['snare'] });
+  emit({ kind: 'onset', captureId: 'old-capture', sequence: 2, bands: ['clap'] });
   expect(result.current.onsets).toEqual({ kick: 1, hat: 1 });
-  emit({ kind: 'onset', captureId: 'capture', sequence: 2, bands: ['snare'] });
-  expect(result.current.onsets).toEqual({ kick: 1, hat: 1, snare: 1 });
+  emit({ kind: 'onset', captureId: 'capture', sequence: 2, bands: ['clap'] });
+  expect(result.current.onsets).toEqual({ kick: 1, hat: 1, clap: 1 });
   emit({ kind: 'sync.state', mode: 'clock', reason: 'muted' });
   expect(result.current).toMatchObject({ mode: 'clock', reason: 'muted', onsets: {} });
 });

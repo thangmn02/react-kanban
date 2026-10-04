@@ -29,6 +29,14 @@ it('does not relay messages from other pages or unknown commands', () => {
   other.receive(request);
   expect(other.sendMessage).not.toHaveBeenCalled();
 });
+it('relays a music-tab focus request only with a bounded session ID', () => {
+  const h = harness();
+  h.receive({ ...request, action: 'media.focus', sessionId: 'song' });
+  expect(h.sendMessage).toHaveBeenCalledWith(expect.objectContaining({ action: 'media.focus', sessionId: 'song' }), expect.any(Function));
+  h.sendMessage.mockClear();
+  h.receive({ ...request, action: 'media.focus', sessionId: 'x'.repeat(251) });
+  expect(h.sendMessage).not.toHaveBeenCalled();
+});
 it('bounds concurrent requests and reports an invalidated extension cleanly', () => {
   const h = harness();
   h.sendMessage.mockImplementation(() => {});

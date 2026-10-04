@@ -1,12 +1,19 @@
 const offscreenPath = 'offscreen.html';
-const validBands = new Set(['kick', 'bass', 'snare', 'hat']);
-const sameOwner = (a, b) => a.tabId === b.tabId && a.documentId === b.documentId;
+const validBands = new Set(['kick', 'bass', 'clap', 'hat']);
+const sameOwner = (a, b) => a.native === b.native && a.tabId === b.tabId && a.documentId === b.documentId;
+function captureFailure(stage, error) {
+  if (stage !== 'capture-permission') return stage;
+  const message = String(error?.message || '');
+  if (/permission|denied|not (?:been )?invoked|activeTab|not allowed/i.test(message)) return 'capture-permission';
+  if (/already|in use|being captured/i.test(message)) return 'capture-busy';
+  return 'capture-request';
+}
 const timeout = (promise, ms) => {
   let timer;
   return Promise.race([promise, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Timeout')), ms); })]).finally(() => clearTimeout(timer));
 };
 
-export function createBeatSync(api) {
+export function createBeatSync(api, nativePublish) {
   let state;
   let creating;
   let queue = Promise.resolve();
@@ -24,8 +31,20 @@ export function createBeatSync(api) {
     publish(current, { kind: 'sync.state', mode: current.mode, reason: clockReason(current), captureId: current.mode === 'capture' ? current.captureId : undefined });
   }
 
+  function confirmCapture(current) {
+    if (state !== current || !current.captureId || !current.captureReady || !current.audioDetected
+      || !current.clock?.playing || current.clock.muted || current.tabMuted) return;
+    current.mode = 'capture';
+    current.fallbackReason = undefined;
+    publishState(current);
+  }
+
   function publish(current, event) {
     if (state !== current) return;
+    if (current.owner.native) {
+      nativePublish?.(current.owner.native, { sessionId: current.session.id, subscriptionId: current.subscriptionId, ...event });
+      return;
+    }
     void api.tabs.sendMessage(current.owner.tabId, { protocol: 'kanban-music-v1', event: 'beat',
       sessionId: current.session.id, subscriptionId: current.subscriptionId, ...event },
     { documentId: current.owner.documentId }).catch(() => { void stopIfCurrent(current); });
@@ -45,17 +64,27 @@ export function createBeatSync(api) {
     const captureId = current.captureId;
     if (!captureId && current.mode === 'clock') return;
     current.captureId = undefined;
+    current.captureReady = false;
+    current.audioDetected = false;
     current.mode = 'clock';
     publishState(current);
     if (captureId) void offscreenMessage({ kind: 'stop', captureId }).catch(() => {});
   }
 
   async function capture(current, force = false) {
+    if (state !== current) return;
+    // Every allowlisted service uses the same browser-approved tab stream.
+    // A host name or mediaKeys flag is not evidence that output is silent.
+    // Only audible analyser proof can confirm capture; browser restrictions
+    // and genuinely silent streams still fall back without fabricated beats.
     if (state !== current || current.captureTask || current.captureId || !current.clock?.playing
       || current.clock.muted || current.tabMuted
       || (!force && Date.now() < current.retryAt)) return;
     const captureId = crypto.randomUUID();
     current.captureId = captureId;
+    current.captureReady = false;
+    current.audioDetected = false;
+    current.sequence = 0;
     current.fallbackReason = undefined;
     publishState(current);
     current.captureTask = (async () => {
@@ -72,14 +101,14 @@ export function createBeatSync(api) {
           void offscreenMessage({ kind: 'stop', captureId }).catch(() => {}); return;
         }
         if (!response?.ok) throw new Error('Capture unavailable');
-        current.mode = 'capture';
-        current.fallbackReason = undefined;
-        current.sequence = 0;
-        publishState(current);
-      } catch {
+        current.captureReady = true;
+        // An open stream can still be silent/protected. Wait for analyser proof.
+        confirmCapture(current);
+      } catch (error) {
         if (state === current && current.captureId === captureId) {
-          current.retryAt = Date.now() + (stage === 'capture-permission' ? 30000 : 3000);
-          current.fallbackReason = stage;
+          const reason = captureFailure(stage, error);
+          current.retryAt = Date.now() + (reason === 'capture-permission' ? 30000 : 3000);
+          current.fallbackReason = reason;
           cancelCapture(current);
         }
       } finally { current.captureTask = undefined; }
@@ -106,14 +135,15 @@ export function createBeatSync(api) {
 
   function stop(owner, subscriptionId) {
     return serialize(async () => {
-      if (owner && (!state || !sameOwner(state.owner, owner) || state.subscriptionId !== subscriptionId)) return;
+      if (owner && (!state || !sameOwner(state.owner, owner) || subscriptionId !== undefined && state.subscriptionId !== subscriptionId)) return;
       await stopCurrent();
     });
   }
 
   async function startClock(current) {
     const target = { documentId: current.session.documentId };
-    const message = { target: 'beat-clock', kind: 'watch', index: current.session.index, token: current.token };
+    const message = { target: 'beat-clock', kind: 'watch', index: current.session.index, src: current.session.src,
+      observed: current.session.observed, token: current.token };
     let result;
     try { result = await api.tabs.sendMessage(current.session.tabId, message, target); }
     catch {
@@ -124,6 +154,12 @@ export function createBeatSync(api) {
   }
 
   return {
+    status(session) {
+      if (state?.session.id === session.id) return { mode: state.mode, reason: clockReason(state),
+        ...(state.mode === 'capture' ? { captureId: state.captureId } : {}) };
+      return { mode: 'clock', reason: !session.playing ? 'not-playing'
+        : session.muted || session.tabMuted ? 'muted' : 'not-selected' };
+    },
     start(session, owner, subscriptionId) {
       return serialize(async () => {
         if (state && sameOwner(state.owner, owner) && state.subscriptionId === subscriptionId && state.session.id === session.id) {
@@ -175,12 +211,37 @@ export function createBeatSync(api) {
     offscreen(message, sender) {
       const current = state;
       if (sender.url !== api.runtime.getURL(offscreenPath) || sender.tab || !current || message.captureId !== current.captureId) return;
+      if (message.kind === 'audible') {
+        current.audioDetected = true;
+        confirmCapture(current);
+      }
       if (message.kind === 'onset' && current.mode === 'capture' && current.clock?.playing
         && Array.isArray(message.bands) && message.bands.length <= 4 && message.bands.every((band) => validBands.has(band))) {
         publish(current, { kind: 'onset', captureId: current.captureId, sequence: ++current.sequence, bands: [...new Set(message.bands)] });
       }
+      if (message.kind === 'tempo.state' && current.mode === 'capture' && current.clock?.playing
+        && typeof message.tempo?.locked === 'boolean' && Number.isFinite(message.tempo.confidence)
+        && message.tempo.confidence >= 0 && message.tempo.confidence <= 1
+        && (message.tempo.bpm === null || Number.isFinite(message.tempo.bpm) && message.tempo.bpm >= 60 && message.tempo.bpm <= 180)) {
+        publish(current, { kind: 'tempo.state', captureId: current.captureId, tempo: message.tempo });
+      }
+      if (message.kind === 'melody.state' && current.mode === 'capture' && current.clock?.playing
+        && typeof message.melody?.active === 'boolean' && Number.isFinite(message.melody.level)
+        && message.melody.level >= 0 && message.melody.level <= 1
+        && Number.isSafeInteger(message.melody.note) && message.melody.note >= 0) {
+        publish(current, { kind: 'melody.state', captureId: current.captureId,
+          melody: { active: message.melody.active, level: message.melody.level, note: message.melody.note } });
+      }
+      if (message.kind === 'tempo.tick' && current.mode === 'capture' && current.clock?.playing
+        && Number.isInteger(message.tick?.step) && message.tick.step >= 0 && message.tick.step < 8
+        && Array.isArray(message.tick.bands) && message.tick.bands.length <= 3
+        && message.tick.bands.every((band) => validBands.has(band))) {
+        publish(current, { kind: 'tempo.tick', captureId: current.captureId, tick: message.tick });
+      }
       if (message.kind === 'stopped') {
-        current.retryAt = Date.now() + 3000;
+        // Do not repeatedly suppress a silent/protected tab's output every
+        // three seconds. Resume/unmute or a toolbar click still retries now.
+        current.retryAt = Date.now() + (message.reason === 'silent' ? 30000 : 3000);
         current.fallbackReason = ['expired', 'silent', 'ended', 'failed'].includes(message.reason) ? message.reason : 'stopped';
         cancelCapture(current);
         if (message.reason === 'expired') void stopIfCurrent(current);

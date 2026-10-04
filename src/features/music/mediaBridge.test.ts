@@ -3,6 +3,21 @@ import { getMusicInstallUrl, isMusicSession, sendMusicRequest, sendMusicDiagnost
 
 afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); vi.unstubAllEnvs(); });
 const session = { id: '1', title: 'Song', artist: 'Artist', source: 'youtube.com', paused: true };
+
+it('validates sustained Melody envelopes and canonicalizes a legacy snare to Clap', () => {
+  const receive = vi.fn();
+  const stop = subscribeBeatEvents('song', 'subscription', receive);
+  const send = (data: object) => window.dispatchEvent(new MessageEvent('message', { source: window, origin: location.origin,
+    data: { channel: 'kanban-music-v1', direction: 'extension-event', event: 'beat', sessionId: 'song', subscriptionId: 'subscription', captureId: 'live', ...data } }));
+  send({ kind: 'melody.state', melody: { active: true, level: NaN, note: 1 } });
+  send({ kind: 'melody.state', melody: { active: true, level: 2, note: 1 } });
+  expect(receive).not.toHaveBeenCalled();
+  send({ kind: 'melody.state', melody: { active: true, level: .6, note: 1 } });
+  expect(receive).toHaveBeenCalledWith({ kind: 'melody.state', captureId: 'live', melody: { active: true, level: .6, note: 1 } });
+  send({ kind: 'onset', bands: ['snare'] });
+  expect(receive).toHaveBeenLastCalledWith({ kind: 'onset', captureId: 'live', bands: ['clap'] });
+  stop();
+});
 function reply(request: Record<string, unknown>, data: object, origin = window.location.origin, source: Window | null = window) {
   window.dispatchEvent(new MessageEvent('message', { source, origin, data: {
     channel: 'kanban-music-v1', direction: 'extension-to-app', requestId: request.requestId, ...data,
@@ -55,7 +70,7 @@ it('validates tempo lock updates and rejects fabricated grid ticks', () => {
   const base = { channel: 'kanban-music-v1', direction: 'extension-event', event: 'beat', sessionId: 'song', subscriptionId: 'subscription', captureId: 'live' };
   const emit = (payload: object) => window.dispatchEvent(new MessageEvent('message', { source: window, origin: window.location.origin, data: { ...base, ...payload } }));
   emit({ kind: 'tempo.state', tempo: { locked: true, bpm: 120, confidence: .8 } });
-  emit({ kind: 'tempo.tick', tick: { step: 2, bands: ['kick', 'hat', 'snare'] } });
+  emit({ kind: 'tempo.tick', tick: { step: 2, bands: ['kick', 'hat', 'clap'] } });
   expect(receive).toHaveBeenCalledTimes(2);
   emit({ kind: 'tempo.state', tempo: { locked: true, bpm: 200, confidence: .8 } });
   emit({ kind: 'tempo.tick', tick: { step: 8, bands: ['hat'] } });

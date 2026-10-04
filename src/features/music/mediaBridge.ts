@@ -23,14 +23,18 @@ export interface MusicClock {
   playbackRate: number;
   sampledAt: number;
 }
-export type BeatBand = 'kick' | 'bass' | 'snare' | 'hat';
+export type BeatBand = 'kick' | 'clap' | 'hat' | 'bass' | 'melody';
+export interface MelodyState { active: boolean; level: number; note: number }
 export type BeatEvent = { kind: 'clock'; clock: MusicClock }
   | { kind: 'sync.state'; mode: 'clock' | 'capture'; reason?: string; captureId?: string }
   | { kind: 'onset'; bands: BeatBand[]; captureId?: string; sequence?: number }
+  | { kind: 'melody.state'; captureId: string; melody: MelodyState }
   | { kind: 'tempo.state'; captureId: string; tempo: { locked: boolean; bpm: number | null; confidence: number } }
   | { kind: 'tempo.tick'; captureId: string; tick: { step: number; bands: BeatBand[] } };
 
 const channel = 'kanban-music-v1';
+const supportedBands = ['kick', 'clap', 'hat', 'bass', 'melody', 'snare'];
+const canonicalBand = (band: string): BeatBand => band === 'snare' ? 'clap' : band as BeatBand;
 export type MusicAction = 'sessions.get' | 'diagnostics.get' | 'media.play' | 'media.pause' | 'media.focus';
 type BeatAction = 'dock.beat.sync.start' | 'dock.beat.sync.stop';
 
@@ -75,9 +79,12 @@ function isSyncState(value: unknown): boolean {
 
 function requestBridge(action: MusicAction | BeatAction, sessionId?: string, subscriptionId?: string): Promise<Record<string, unknown>> {
   if (isNativeWidget()) return requestNativeMusic(action, sessionId, subscriptionId).then((response) => {
-    if (response.ok !== true) throw new MusicBridgeError('unavailable');
+    if (response.ok !== true) throw new MusicBridgeError(response.error === 'not-installed' ? 'not-installed' : 'unavailable');
     return response;
-  }).catch(() => { throw new MusicBridgeError(action.startsWith('media.') ? 'playback' : 'unavailable'); });
+  }).catch((error) => {
+    if (error instanceof MusicBridgeError) throw error;
+    throw new MusicBridgeError(action.startsWith('media.') ? 'playback' : 'unavailable');
+  });
   return new Promise((resolve, reject) => {
     const requestId = crypto.randomUUID();
     const cleanup = () => { clearTimeout(timeout); window.removeEventListener('message', receive); };
@@ -128,9 +135,9 @@ export function subscribeBeatEvents(sessionId: string, subscriptionId: string, r
       reason: typeof (message.reason ?? message.fallbackReason) === 'string' ? String(message.reason ?? message.fallbackReason).slice(0, 80) : undefined,
       captureId: typeof message.captureId === 'string' ? message.captureId.slice(0, 100) : undefined,
     });
-    if (message.kind === 'onset' && Array.isArray(message.bands) && message.bands.length <= 4
-      && message.bands.every((band: unknown) => typeof band === 'string' && ['kick', 'bass', 'snare', 'hat'].includes(band))) receive({
-        kind: 'onset', bands: [...new Set<BeatBand>(message.bands)],
+    if (message.kind === 'onset' && Array.isArray(message.bands) && message.bands.length <= 5
+      && message.bands.every((band: unknown) => typeof band === 'string' && supportedBands.includes(band))) receive({
+        kind: 'onset', bands: [...new Set<BeatBand>(message.bands.map(canonicalBand))],
         ...(typeof message.captureId === 'string' ? { captureId: message.captureId.slice(0, 100) } : {}),
         ...(Number.isSafeInteger(message.sequence) && message.sequence > 0 ? { sequence: message.sequence } : {}),
       });
@@ -140,12 +147,19 @@ export function subscribeBeatEvents(sessionId: string, subscriptionId: string, r
       && (message.tempo.bpm === null || typeof message.tempo.bpm === 'number' && Number.isFinite(message.tempo.bpm)
         && message.tempo.bpm >= 60 && message.tempo.bpm <= 180)) receive({ kind: 'tempo.state', captureId: message.captureId,
         tempo: { locked: message.tempo.locked, bpm: message.tempo.bpm, confidence: message.tempo.confidence } });
+    if (message.kind === 'melody.state' && typeof message.captureId === 'string' && message.captureId.length <= 100
+      && typeof message.melody?.active === 'boolean' && Number.isFinite(message.melody.level)
+      && message.melody.level >= 0 && message.melody.level <= 1
+      && Number.isSafeInteger(message.melody.note) && message.melody.note >= 0) receive({
+        kind: 'melody.state', captureId: message.captureId,
+        melody: { active: message.melody.active, level: message.melody.level, note: message.melody.note },
+      });
     if (message.kind === 'tempo.tick' && typeof message.captureId === 'string' && message.captureId.length <= 100
       && Number.isInteger(message.tick?.step) && message.tick.step >= 0 && message.tick.step < 8
       && Array.isArray(message.tick.bands) && message.tick.bands.length <= 3
-      && message.tick.bands.every((band: unknown) => typeof band === 'string' && ['kick', 'bass', 'snare', 'hat'].includes(band))) receive({
+      && message.tick.bands.every((band: unknown) => typeof band === 'string' && ['kick', 'clap', 'snare', 'hat'].includes(band))) receive({
         kind: 'tempo.tick', captureId: message.captureId,
-        tick: { step: message.tick.step, bands: [...new Set<BeatBand>(message.tick.bands)] },
+        tick: { step: message.tick.step, bands: [...new Set<BeatBand>(message.tick.bands.map(canonicalBand))] },
       });
     if (message.kind === 'clock') {
       const clock = message.clock;

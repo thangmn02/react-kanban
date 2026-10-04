@@ -5,6 +5,10 @@ const engine = createCaptureEngine({
   getUserMedia: (constraints) => navigator.mediaDevices.getUserMedia(constraints),
   createAudioContext: () => new AudioContext(),
   onBeat: (captureId, bands) => send({ kind: 'onset', captureId, bands }),
+  onTempo: (captureId, tempo) => send({ kind: 'tempo.state', captureId, tempo }),
+  onTempoTick: (captureId, tick) => send({ kind: 'tempo.tick', captureId, tick }),
+  onMelody: (captureId, melody) => send({ kind: 'melody.state', captureId, melody }),
+  onAudible: (captureId) => send({ kind: 'audible', captureId }),
   onStop: (captureId, reason) => send({ kind: 'stopped', captureId, reason }),
 });
 

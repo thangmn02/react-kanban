@@ -4,6 +4,8 @@ import type { BrowserMusicController } from './useBrowserMusic';
 import { patternAt } from './beatVisuals';
 import type { BeatColorMode, BeatPalette } from './beatVisuals';
 import BeatPattern from './BeatPattern';
+import { openNativeMusicSetup } from '../native/nativeMusic';
+import { isNativeWidget } from '../native/runtime';
 
 export interface MusicVisualOptions {
   colorMode?: BeatColorMode;
@@ -37,6 +39,7 @@ export function MusicGrid({ music, colorMode = 'random', palette = 'bloom', orie
     {showDebug && <details className="music-debug" open><summary>Beat debug</summary><pre aria-label="Beat sync debug">{JSON.stringify({
       source: music.source, mode: music.beat.mode, reason: music.beat.reason, onsets: music.beat.onsets, rates: music.beat.rates,
       tempo: music.beat.tempo, ticks: music.beat.ticks, pattern: patternAt(music.selected?.currentTime || 0), captureId: music.beat.captureId,
+      melody: music.beat.melody,
     }, null, 2)}</pre></details>}
   </>;
 }
@@ -71,12 +74,13 @@ export default function MusicPlayer({ music, colorMode = 'random', palette = 'bl
 
 export function MusicSetup({ music }: { music: BrowserMusicController }) {
   const { t, language } = useI18n();
-  if (music.source === 'tauri-events') return null;
   if (music.connected || music.checking) return null;
   return <div className="music-setup">
     {music.error && <p className="muted" role="status">{music.error}</p>}
     <div className="music-connect-actions">
-      <a className="install-button solid" href={getMusicInstallUrl(language)} target="_blank" rel="noopener noreferrer">{t('music.addControls')}</a>
+      {isNativeWidget()
+        ? <button className="install-button solid" type="button" onClick={() => void openNativeMusicSetup().catch(() => {})}>{t('music.addControls')}</button>
+        : <a className="install-button solid" href={getMusicInstallUrl(language)} target="_blank" rel="noopener noreferrer">{t('music.addControls')}</a>}
       <button type="button" className="text-button" onClick={music.refresh}>{t('music.checkAgain')}</button>
     </div>
   </div>;

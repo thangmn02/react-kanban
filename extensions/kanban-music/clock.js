@@ -6,6 +6,10 @@ function stopClock() {
   if (!watcher) return;
   clearInterval(watcher.interval);
   watcher.events.forEach((name) => document.removeEventListener(name, watcher.report, true));
+  if (watcher.bridge) {
+    document.removeEventListener('kanban-music-media-clock', watcher.report);
+    document.dispatchEvent(new CustomEvent('kanban-music-media-watch', { detail: JSON.stringify({ kind: 'stop' }) }));
+  }
   watcher = undefined;
 }
 
@@ -14,11 +18,33 @@ const receive = (message, sender, respond) => {
   if (message.kind === 'stop') { stopClock(); respond({ ok: true }); return false; }
   if (message.kind === 'lease') {
     const ok = watcher?.token === message.token;
-    if (ok) watcher.leaseUntil = Date.now() + 6000;
+    if (ok) {
+      watcher.leaseUntil = Date.now() + 6000;
+      if (watcher.bridge) document.dispatchEvent(new CustomEvent('kanban-music-media-watch', { detail: JSON.stringify({ kind: 'lease', token: message.token }) }));
+    }
     respond({ ok }); return false;
   }
   if (message.kind !== 'watch' || !Number.isInteger(message.index) || typeof message.token !== 'string') return false;
   stopClock();
+  if (message.observed === true && typeof message.src === 'string') {
+    const state = { bridge: true, token: message.token, events: [], leaseUntil: Date.now() + 6000 };
+    state.report = (event) => {
+      if (watcher !== state || typeof event.detail !== 'string' || event.detail.length > 4000) return;
+      if (Date.now() > state.leaseUntil) { stopClock(); return; }
+      let sample;
+      try { sample = JSON.parse(event.detail); } catch { return; }
+      if (sample?.token !== state.token || typeof sample.valid !== 'boolean') return;
+      void chrome.runtime.sendMessage({ target: 'beat-worker', kind: 'clock', token: state.token,
+        valid: sample.valid, clock: sample.clock }).catch(() => { if (watcher === state) stopClock(); });
+      if (!sample.valid) stopClock();
+    };
+    watcher = state;
+    document.addEventListener('kanban-music-media-clock', state.report);
+    state.interval = setInterval(() => { if (watcher === state && Date.now() > state.leaseUntil) stopClock(); }, 1000);
+    document.dispatchEvent(new CustomEvent('kanban-music-media-watch', { detail: JSON.stringify({ kind: 'watch', index: message.index, src: message.src, token: message.token }) }));
+    respond({ ok: watcher === state });
+    return false;
+  }
   const media = document.querySelectorAll('audio,video')[message.index];
   if (!media) { respond({ ok: false }); return false; }
   const state = { token: message.token, leaseUntil: Date.now() + 6000,
@@ -26,12 +52,12 @@ const receive = (message, sender, respond) => {
   state.report = () => {
     if (watcher !== state) return;
     if (Date.now() > state.leaseUntil) { stopClock(); return; }
-    const valid = media.isConnected && document.querySelectorAll('audio,video')[message.index] === media && Boolean(media.currentSrc) && !media.ended;
+    const valid = media.isConnected && document.querySelectorAll('audio,video')[message.index] === media && Boolean(media.currentSrc || media.srcObject?.id) && !media.ended;
     void chrome.runtime.sendMessage({ target: 'beat-worker', kind: 'clock', token: state.token, valid,
       clock: { currentTime: Number.isFinite(media.currentTime) ? media.currentTime : 0,
         playbackRate: media.playbackRate, sampledAt: Date.now(), paused: media.paused,
         playing: valid && !media.paused && !media.seeking && media.readyState >= 3,
-        muted: media.muted || media.volume === 0 } }).catch(() => { if (watcher === state) stopClock(); });
+        muted: media.muted || media.volume === 0, protectedMedia: Boolean(media.mediaKeys) } }).catch(() => { if (watcher === state) stopClock(); });
     if (!valid) stopClock();
   };
   watcher = state;

@@ -10,7 +10,8 @@ export function allowedRequest(message, sender) {
     if (!appOrigins.has(origin) || (sender.origin && sender.origin !== origin)) return false;
     return message?.protocol === 'kanban-music-v1' && (
       message.action === 'sessions.get'
-      || (['media.play', 'media.pause'].includes(message.action) && typeof message.sessionId === 'string' && message.sessionId.length < 250)
+      || message.action === 'diagnostics.get'
+      || (['media.play', 'media.pause', 'media.focus'].includes(message.action) && typeof message.sessionId === 'string' && message.sessionId.length < 250)
       || (['dock.beat.sync.start', 'dock.beat.sync.stop'].includes(message.action)
         && typeof message.sessionId === 'string' && message.sessionId.length < 250
         && typeof message.subscriptionId === 'string' && message.subscriptionId.length > 0 && message.subscriptionId.length <= 100)
