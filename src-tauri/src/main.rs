@@ -13,6 +13,10 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
+            if let Some(window) = app.get_webview_window("main") {
+                window_chrome::initialize(&window).map_err(std::io::Error::other)?;
+                window.show()?;
+            }
             app.manage(window_chrome::WindowShape::default());
             let music = browser_music::BrowserMusic::new(app.handle().clone());
             app.manage(music.clone());

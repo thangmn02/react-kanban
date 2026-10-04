@@ -10,6 +10,14 @@ import { useI18n } from '../../i18n';
 import './nativeSurface.css';
 import NativeUpdateDialog from './NativeUpdateDialog';
 
+async function updateNativeShape(rounded: boolean) {
+  const radius = await invoke<number>('native_dock_shape', { rounded });
+  if (Number.isFinite(radius)) document.documentElement.style.setProperty('--native-dock-radius', `${radius}px`);
+  // Older Windows versions do not expose compositor corner clipping.
+  // Keep their rounded transparent CSS surface instead of a square backdrop.
+  if (rounded && radius === 22) await getCurrentWindow().clearEffects();
+}
+
 function NativeDock({ props }: { props: FloatingFocusProps }) {
   const [target, setTarget] = useState<HTMLDivElement | null>(null);
   const maxSize = useRef({ width: 1100, height: 900 });
@@ -61,13 +69,13 @@ export default function NativeSurface({ dock, onToggle, focusProps, children }: 
   const [updateOpen, setUpdateOpen] = useState(false);
   const effectQueue = useRef(Promise.resolve());
   useEffect(() => {
-    // Serialize surface changes so an older Acrylic request cannot overwrite
+    // Serialize surface changes so an older blur request cannot overwrite
     // the normal Tasks window after a rapid Dock → Tasks switch.
     effectQueue.current = effectQueue.current.then(async () => {
       const window = getCurrentWindow();
-      if (dock) await window.setEffects({ effects: [Effect.Acrylic], color: [250, 248, 255, 64] }).catch(() => {});
+      if (dock) await window.setEffects({ effects: [Effect.Blur], color: [245, 241, 255, 20] }).catch(() => {});
       else await window.clearEffects().catch(() => {});
-      await invoke('native_dock_shape', { rounded: dock });
+      await updateNativeShape(dock);
     }).catch(() => {}); // Unsupported effects retain the CSS glass fallback.
   }, [dock]);
   useEffect(() => {
@@ -86,7 +94,7 @@ export default function NativeSurface({ dock, onToggle, focusProps, children }: 
     void update().catch(() => {});
     void nativeWindow.onResized(() => {
       void update().catch(() => {});
-      void invoke('native_dock_shape', { rounded: dock }).catch(() => {});
+      void updateNativeShape(dock).catch(() => {});
     }).then((stop) => {
       if (active) unlisten = stop; else stop();
     }).catch(() => {});
@@ -98,7 +106,8 @@ export default function NativeSurface({ dock, onToggle, focusProps, children }: 
       void getCurrentWindow().setMinSize(new LogicalSize(560, 540)).catch(() => {});
       void getCurrentWindow().setSize(new LogicalSize(1100, 780)).catch(() => {});
     }
-    return () => { delete document.documentElement.dataset.nativeSurface; };
+    return () => { delete document.documentElement.dataset.nativeSurface;
+      document.documentElement.style.removeProperty('--native-dock-radius'); };
   }, [dock]);
   const action = (fn: () => Promise<unknown>) => { void fn().catch(() => setError(vi ? 'Không thể cập nhật cửa sổ.' : 'Window action failed.')); };
   const toggleMaximize = () => action(async () => {

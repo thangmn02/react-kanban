@@ -60,11 +60,15 @@ try {
   const glass = await page.locator('.floating-focus').evaluate((dock) => {
     const css = getComputedStyle(dock);
     return { radius: css.borderRadius, background: css.backgroundImage,
-      blur: css.backdropFilter, shadow: css.boxShadow };
+      blur: css.backdropFilter, shadow: css.boxShadow,
+      rim: getComputedStyle(dock, '::before').boxShadow,
+      rimPointerEvents: getComputedStyle(dock, '::before').pointerEvents };
   });
-  assert.equal(glass.radius, '22px');
+  assert.equal(glass.radius, '8px');
   assert(glass.background.includes('linear-gradient') && glass.blur.includes('blur(22px)'), JSON.stringify(glass));
   assert(glass.shadow.includes('inset'), 'Native CSS keeps its inner glow');
+  assert(glass.rim.includes('inset'), 'The bevel stays above the dock panes');
+  assert.equal(glass.rimPointerEvents, 'none', 'The glass rim must not intercept controls');
   async function check(size) {
     await page.waitForTimeout(450);
     const result = await page.evaluate(() => {

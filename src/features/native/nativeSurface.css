@@ -6,7 +6,7 @@ html[data-native-surface], html[data-native-surface] body, html[data-native-surf
 .native-chrome button { font:500 12px system-ui; padding:2px 9px; border:0; border-radius:6px; background:transparent; color:#63586f; cursor:pointer; }
 .native-chrome button:hover { background:#9a88bb20; }
 .native-dock-scroll { overflow:hidden; flex:1; min-height:0; }
-.native-dock { border-radius:22px; }
+.native-dock { border-radius:var(--native-dock-radius,8px); }
 .native-dock-host { height:100%; min-height:0; }
 .native-workspace-content { overflow:auto; flex:1; min-height:0; }
 .native-error { margin:0; padding:5px 10px; font-size:11px; background:#fff; }
