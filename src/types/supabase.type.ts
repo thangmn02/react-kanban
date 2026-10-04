@@ -6,7 +6,16 @@ import type {
   TablesUpdate,
 } from './database.types';
 
-export type Database = GeneratedDatabase;
+// Optional task fields are proposed separately from the hosted schema snapshot.
+// Keep the generated baseline intact; services handle exact missing-column errors.
+type TaskTable = GeneratedDatabase['public']['Tables']['tasks'];
+export type Database = Omit<GeneratedDatabase, 'public'> & {
+  public: Omit<GeneratedDatabase['public'], 'Tables'> & {
+    Tables: Omit<GeneratedDatabase['public']['Tables'], 'tasks'> & {
+      tasks: Omit<TaskTable, 'Row' | 'Insert' | 'Update'> & { Row: TaskRow; Insert: TaskInsert; Update: TaskUpdate };
+    };
+  };
+};
 export type { Json };
 
 export type BriefingPinRow = Tables<'briefing_pins'>;
@@ -36,8 +45,8 @@ export type ListUpdate = TablesUpdate<'lists'>;
 export type TaskRow = Tables<'tasks'> & {
   attachments?: Json | null;
 };
-export type TaskInsert = TablesInsert<'tasks'>;
-export type TaskUpdate = TablesUpdate<'tasks'>;
+export type TaskInsert = TablesInsert<'tasks'> & { attachments?: Json };
+export type TaskUpdate = TablesUpdate<'tasks'> & { attachments?: Json };
 
 export type TaskChecklistItemRow = Tables<'task_checklist_items'>;
 export type TaskChecklistItemInsert = TablesInsert<'task_checklist_items'>;

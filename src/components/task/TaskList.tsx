@@ -12,6 +12,7 @@ import type { WorkspaceMember } from '../../types/auth.type';
 import Typography from '../atoms/Typography';
 import TaskItem from './TaskItem';
 import { columnStatusColor, statusColor as statusColorForTask, taskStatusDotClass } from '../../utils/taskStatus';
+import { useI18n } from '../../i18n';
 
 interface TaskListProps {
   listItem: IListItem;
@@ -44,7 +45,9 @@ function TaskList({
   workspaceMembers,
   isFinalActiveColumn = false,
 }: TaskListProps) {
+  const { t } = useI18n();
   const taskIds = tasks.map(task => task.id);
+  const isCompletedColumn = /^(done|completed|hoàn thành|đã xong)$/i.test(listItem.title.trim());
   const status = columnStatusColor(tasks, isFinalActiveColumn);
   const {
     attributes,
@@ -186,16 +189,9 @@ function TaskList({
                   isFocusTask={isFocusTask(task.id)}
                   workspaceMembers={workspaceMembers}
                   statusColor={statusColorForTask(task, isFinalActiveColumn)}
+                  hideDueDate={isCompletedColumn}
                 />
               ))}
-              {tasks.length === 0 && !isDragging && (
-                <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 py-8 text-slate-400">
-                  <svg className="h-8 w-8 mb-1.5 opacity-50" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                  </svg>
-                  <span className="text-xs">No tasks in list</span>
-                </div>
-              )}
             </div>
           </div>
         </SortableContext>
@@ -207,7 +203,7 @@ function TaskList({
           onClick={setIsModalOpen}
           className="mt-2 w-full shrink-0 cursor-pointer rounded-2xl border border-dashed border-slate-200 bg-white/72 py-3 text-sm font-semibold text-slate-500 shadow-sm transition-[background,box-shadow,transform,color] hover:-translate-y-0.5 hover:bg-white hover:text-slate-700 hover:shadow-md active:scale-[0.99] focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"
         >
-          + Add new task
+          + {t('board.addTask')}
         </button>
       )}
     </div>

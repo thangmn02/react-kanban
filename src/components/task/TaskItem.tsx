@@ -33,6 +33,7 @@ interface TaskItemProps {
   isFocusTask: boolean;
   workspaceMembers?: WorkspaceMember[];
   statusColor?: TaskStatusColor;
+  hideDueDate?: boolean;
 }
 
 function TaskItem({
@@ -46,6 +47,7 @@ function TaskItem({
   isFocusTask,
   workspaceMembers = mockWorkspaceMembers,
   statusColor = 'gray',
+  hideDueDate = false,
 }: TaskItemProps) {
   const [showPriorityMenu, setShowPriorityMenu] = useState(false);
   const [showAssigneeMenu, setShowAssigneeMenu] = useState(false);
@@ -99,7 +101,7 @@ function TaskItem({
   const visibleLabels = task.labels.slice(0, 2);
   const hiddenLabelCount = Math.max(0, task.labels.length - visibleLabels.length);
   const shouldShowPriority = task.priority === 'High';
-  const shouldShowDueDate = Boolean(task.dueDate) && dueStatus.status !== 'none';
+  const shouldShowDueDate = !hideDueDate && Boolean(task.dueDate) && dueStatus.status !== 'none';
 
   const style = isOverlay ? {} : {
     transform: CSS.Transform.toString(transform),
@@ -446,9 +448,9 @@ function TaskItem({
                     : 'border border-slate-200 bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
                 aria-pressed={task.isDone}
-                aria-label={`${task.isDone ? 'Mark not done' : 'Mark done'}: ${task.title}`}
+                aria-label={`${t(task.isDone ? 'common.markNotDone' : 'common.markDone')}: ${task.title}`}
               >
-                {task.isDone ? 'Done ✓' : 'Mark Done'}
+                {task.isDone ? `${t('common.completed')} ✓` : t('common.markDone')}
               </button>
             )}
           </div>

@@ -47,6 +47,8 @@ interface TaskDialogProps {
   onToggleFocusTask?: () => void;
   workspaceMembers?: WorkspaceMember[];
   workspaceId?: string | null;
+  boardTitle?: string;
+  columnTitle?: string;
 }
 
 const taskSchema = yup.object({
@@ -108,6 +110,8 @@ function TaskDialog({
   onToggleFocusTask,
   workspaceMembers = mockWorkspaceMembers,
   workspaceId = null,
+  boardTitle = '',
+  columnTitle = '',
 }: TaskDialogProps) {
   const isEditMode = Boolean(taskData);
   const shouldReduceMotion = useReducedMotion();
@@ -158,6 +162,7 @@ function TaskDialog({
   const assigneeOptions = mapWorkspaceMembersToAssignees(workspaceMembers);
   const imagePreview = useWatch({ control, name: 'image' });
   const currentTitle = useWatch({ control, name: 'title' }) || '';
+  const currentDueDate = useWatch({ control, name: 'dueDate' }) || '';
   const currentRepeatInterval = useWatch({ control, name: 'repeatInterval' }) || '';
   const smartTask = useMemo(() => isEditMode ? null : parseSmartTaskInput(currentTitle), [currentTitle, isEditMode]);
   const checklistProgress = getChecklistProgress(checklistItems);
@@ -166,7 +171,7 @@ function TaskDialog({
     extensions: [
       StarterKit,
       Placeholder.configure({
-        placeholder: 'Capture context, notes, or acceptance criteria...',
+        placeholder: 'Add notes…',
       }),
     ],
     content: taskData?.description || '',
@@ -359,6 +364,9 @@ function TaskDialog({
           />
 
           <motion.aside
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="task-dialog-title"
             className="absolute right-0 top-0 flex h-full w-full max-w-3xl flex-col overflow-hidden rounded-l-[2rem] bg-white shadow-[0_32px_100px_rgba(15,23,42,0.28)]"
             initial={shouldReduceMotion ? false : { x: '100%', opacity: 0.72, scale: 0.98 }}
             animate={{ x: 0, opacity: 1, scale: 1 }}
@@ -367,15 +375,9 @@ function TaskDialog({
           >
         <div className="flex items-start justify-between border-b border-gray-200 bg-white px-6 py-5">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-600">
-              {isEditMode ? 'Task Detail' : 'Create Task'}
-            </p>
-            <h3 className="mt-2 text-2xl font-bold tracking-tight text-gray-900">
-              {isEditMode ? 'Edit task in context' : 'Add a richer task'}
+            <h3 id="task-dialog-title" className="text-2xl font-bold tracking-tight text-gray-900">
+              {t(isEditMode ? 'task.edit' : 'task.create')}
             </h3>
-            <p className="mt-1 text-sm text-gray-500">
-              Keep the board visible while editing the task, checklist, labels, and attachments.
-            </p>
           </div>
 
           <div className="flex items-center gap-2">
@@ -412,19 +414,11 @@ function TaskDialog({
             <div className="grid gap-8 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)]">
               <div className="space-y-8">
                 <section className="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-gray-500">
-                      Core details
-                    </h4>
-                    <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-                      Board-first editing
-                    </span>
-                  </div>
-
                   <InputField
-                    label="Title"
+                    label={t('task.title')}
+                    aria-label={t('task.title')}
                     messageError={errors.title?.message}
-                    placeholder="Refine the task title"
+                    placeholder={t('task.title')}
                     {...register('title')}
                   />
                   {smartTask?.dueDate && <div className="flex flex-wrap items-center gap-2"><span className="inline-flex rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">{t('smartAdd.due', { date: format(parseISO(smartTask.dueDate), 'PP', { locale: language === 'vi' ? vi : enUS }) })}</span><span className="text-xs text-slate-400">{t('smartAdd.hint')}</span></div>}
@@ -498,32 +492,32 @@ function TaskDialog({
                       <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-gray-500">
                         Checklist
                       </h4>
-                      <p className="mt-1 text-sm text-gray-500">
-                        Break work into smaller steps and show progress directly on the card.
-                      </p>
                     </div>
-                    <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                    {checklistProgress.total > 0 && <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
                       {checklistProgress.completed}/{checklistProgress.total}
-                    </span>
+                    </span>}
                   </div>
 
                   <TaskBreakdownEditor key={`${taskData?.id ?? 'new'}:${workspaceId}:${currentTitle}:${language}`} disabled={!currentTitle.trim() || !workspaceId}
-                    onGenerate={(signal) => generateTaskBreakdown({ workspaceId: workspaceId!, language, draftContext: { title: currentTitle.slice(0, 300), description: (editor?.getText() ?? '').slice(0, 3000), existingSteps: checklistItems.slice(0, 30).map((item) => item.text.slice(0, 240)) } }, signal)}
+                    onGenerate={(signal) => generateTaskBreakdown({
+                      workspaceId: workspaceId!, language,
+                      draftContext: {
+                        title: currentTitle, description: editor?.getText() ?? '',
+                        existingSteps: checklistItems.map((item) => item.text),
+                        labels: labels.map((label) => label.name), dueDate: currentDueDate,
+                        boardTitle, columnTitle,
+                      },
+                    }, signal)}
                     onApply={(items) => setChecklistItems((current) => [...current, ...items.filter((item) => !current.some((existing) => existing.text.trim().toLocaleLowerCase() === item.text.trim().toLocaleLowerCase()))])} />
-                  <p className="text-xs text-stone-400">{t('aiPlan.formHint')}</p>
-                  <div className="h-2 rounded-full bg-gray-100">
+                  {checklistProgress.total > 0 && <div className="h-2 rounded-full bg-gray-100">
                     <div
                       className="h-full rounded-full bg-emerald-500 transition-[width] duration-200"
                       style={{ width: `${checklistProgress.percent}%` }}
                     />
-                  </div>
+                  </div>}
 
                   <div className="space-y-3">
-                    {checklistItems.length === 0 ? (
-                      <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-5 text-sm text-gray-400">
-                        No checklist items yet.
-                      </div>
-                    ) : (
+                    {checklistItems.length > 0 && (
                       checklistItems.map((item) => (
                         <div key={item.id} className="flex items-center gap-3 rounded-xl border border-gray-200 px-3 py-2.5">
                           <input
@@ -578,7 +572,8 @@ function TaskDialog({
                             handleAddChecklistItem();
                           }
                         }}
-                        placeholder="Add a checklist item"
+                        placeholder="Checklist item"
+                        aria-label="Checklist item"
                         className="flex-1 rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                       <Button text="Add item" variant="outline" onClick={handleAddChecklistItem} />
@@ -589,10 +584,6 @@ function TaskDialog({
 
               <div className="space-y-8">
                 <section className="space-y-5 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                  <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-gray-500">
-                    Ownership and timing
-                  </h4>
-
                   <div>
                     <label className="mb-2 block text-sm font-semibold text-gray-700">
                       Assignees
@@ -610,9 +601,7 @@ function TaskDialog({
                             />
                           ))}
                         </div>
-                      ) : (
-                        <span className="text-sm italic text-gray-400">No one assigned yet</span>
-                      )}
+                      ) : null}
 
                       <div className="relative">
                         <button
@@ -705,8 +694,9 @@ function TaskDialog({
                       />
                     </div>
                     <div>
-                      <label className="mb-2 block text-sm font-semibold text-gray-700">Due date</label>
+                      <label htmlFor="task-due-date" className="mb-2 block text-sm font-semibold text-gray-700">Due date</label>
                       <input
+                        id="task-due-date"
                         type="date"
                         {...register('dueDate')}
                         aria-invalid={Boolean(errors.dueDate)}
@@ -720,7 +710,7 @@ function TaskDialog({
                     <select {...register('repeatInterval')} className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
                       <option value="">{t('repeat.none')}</option><option value="daily">{t('repeat.daily')}</option><option value="weekly">{t('repeat.weekly')}</option><option value="monthly">{t('repeat.monthly')}</option>
                     </select>
-                    <p className="mt-2 text-xs leading-5 text-slate-400">{currentRepeatInterval ? t('repeat.hint') : t('repeat.chooseHint')}</p>
+                    {currentRepeatInterval && <p className="mt-2 text-xs leading-5 text-slate-400">{t('repeat.hint')}</p>}
                   </div>
                 </section>
 
@@ -729,15 +719,9 @@ function TaskDialog({
                     <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-gray-500">
                       Labels
                     </h4>
-                    <p className="mt-1 text-sm text-gray-500">
-                      Keep priority for urgency and use labels for category.
-                    </p>
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    {labels.length === 0 && (
-                      <span className="text-sm italic text-gray-400">No labels added yet</span>
-                    )}
                     {labels.map((label) => (
                       <span
                         key={label.id}
@@ -767,7 +751,8 @@ function TaskDialog({
                           handleAddLabel();
                         }
                       }}
-                      placeholder="Design, Backend, Presentation..."
+                      placeholder="Label name"
+                      aria-label="Label name"
                       className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
 
@@ -797,17 +782,10 @@ function TaskDialog({
                     <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-gray-500">
                       Attachments
                     </h4>
-                    <p className="mt-1 text-sm text-gray-500">
-                      Lightweight link attachments for briefs, docs, boards, or repos.
-                    </p>
                   </div>
 
                   <div className="space-y-3">
-                    {attachments.length === 0 ? (
-                      <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-5 text-sm text-gray-400">
-                        No attachments yet.
-                      </div>
-                    ) : (
+                    {attachments.length > 0 && (
                       attachments.map((attachment) => (
                         <div key={attachment.id} className="flex items-center gap-3 rounded-xl border border-gray-200 px-3 py-3">
                           <div className="rounded-lg bg-blue-50 p-2 text-blue-700">
@@ -989,14 +967,11 @@ function TaskDialog({
           </div>
 
           <div className="border-t border-gray-200 bg-white px-6 py-4">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="text-sm text-gray-500">
-                {isEditMode ? 'Changes save back into the same task record.' : 'New task will be created in the selected list.'}
-              </div>
+            <div className="flex flex-wrap items-center justify-end gap-4">
               <div className="flex items-center gap-3">
-                <Button text="Cancel" variant="outline" onClick={onClose} />
+                <Button text={t('common.cancel')} variant="outline" onClick={onClose} />
                 <Button
-                  text={isEditMode ? 'Save changes' : 'Add new task'}
+                  text={t(isEditMode ? 'task.saveChanges' : 'board.addTask')}
                   variant="primary"
                   onClick={handleSubmit(handleFormSubmit)}
                 />

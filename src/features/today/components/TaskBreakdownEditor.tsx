@@ -54,10 +54,8 @@ export default function TaskBreakdownEditor({ onGenerate, onApply, onStart, disa
   });
   const button = 'cursor-pointer rounded-full px-4 py-2.5 text-sm font-semibold transition-colors disabled:cursor-default disabled:opacity-40';
   return (
-    <section className="rounded-xl border border-stone-200 bg-white p-5" aria-label={t('aiPlan.title')} aria-busy={busy}>
-      <div className="flex items-center justify-between gap-3"><h3 className="text-xs font-bold uppercase tracking-[0.18em] text-stone-600">{t('aiPlan.title')}</h3><span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold tracking-wide text-amber-800">GEMINI</span></div>
-      <p className="mt-2 text-sm leading-6 text-stone-500">{t('aiPlan.description')}</p>
-      {!steps.length && !busy && <button type="button" disabled={disabled} className={`${button} mt-4 bg-stone-950 text-white hover:bg-stone-800`} onClick={() => void generate()}>{t('aiPlan.generate')} <span aria-hidden="true">↗</span></button>}
+    <section aria-label={t('aiPlan.title')} aria-busy={busy}>
+      {!steps.length && !busy && <button type="button" disabled={disabled} className={`${button} bg-stone-950 text-white hover:bg-stone-800`} onClick={() => void generate()}>{t('aiPlan.generate')}</button>}
       {phase === 'generating' && <div role="status" className="flex items-center gap-3 py-6 text-sm text-stone-500"><span className="flex gap-1.5" aria-hidden="true">{[0, 1, 2].map((i) => <span key={i} className="h-2 w-2 rounded-full bg-amber-700 motion-safe:animate-pulse" style={{ animationDelay: `${i * 150}ms` }} />)}</span>{t('aiPlan.thinking')}</div>}
       {steps.length > 0 && <ol className="mt-5 border-t border-stone-900">
         {steps.map((step, index) => <li key={step.id} className="flex items-start gap-3 border-b border-stone-200 py-4">
@@ -72,7 +70,6 @@ export default function TaskBreakdownEditor({ onGenerate, onApply, onStart, disa
         {onStart && <button type="button" disabled={busy || !valid || disabled} className={`${button} text-stone-600 hover:bg-stone-100`} onClick={() => void apply(false)}>{t('aiPlan.saveOnly')}</button>}
         <button type="button" disabled={busy || disabled} className={`${button} text-stone-400 hover:text-stone-800`} onClick={() => void generate()}>{t('aiPlan.retry')}</button>
       </div>}
-      <p className="mt-4 text-xs leading-5 text-stone-400">{t('aiPlan.disclosure')}</p>
     </section>
   );
 }

@@ -24,6 +24,8 @@ import type { usePlanningController } from '../features/today/hooks/usePlanningC
 import type { useCommandPaletteActions } from '../hooks/useCommandPaletteActions';
 import { useI18n } from '../i18n';
 import { getPomodoroModeSeconds } from '../utils/pomodoroTime';
+import { ARCANA_ENABLED } from '../constants/features';
+import { isNativeWidget } from '../features/native/runtime';
 
 const ArcanaRewardToast = lazy(() => import('../features/arcana/ArcanaRewardToast'));
 
@@ -51,6 +53,7 @@ interface Props {
   };
   progressReport: { isOpen: boolean; onClose: () => void };
   isHomeFocusActive?: boolean;
+  onOpenNativeDock?: () => void;
 }
 
 export default function AppOverlays(props: Props) {
@@ -60,7 +63,7 @@ export default function AppOverlays(props: Props) {
     <>
       {focusIntegration.floatingFocusPortal}
       <CommandPalette {...props.commandPalette} />
-      <Suspense fallback={null}><ArcanaRewardToast {...props.arcanaReward} /></Suspense>
+      {ARCANA_ENABLED && <Suspense fallback={null}><ArcanaRewardToast {...props.arcanaReward} /></Suspense>}
       <FocusLaunchpadDialog
         key={`${focus.focusLaunchTask?.id ?? 'closed'}:${focus.focusLaunchIntention}`}
         initialIntention={focus.focusLaunchIntention}
@@ -90,6 +93,10 @@ export default function AppOverlays(props: Props) {
         onToggleFocusTask={taskEditor.state.editingTask ? () => focus.handleToggleFocusTask(taskEditor.state.editingTask!) : undefined}
         workspaceMembers={props.workspaceMembers}
         workspaceId={props.workspaceId}
+        boardTitle={board.activeBoardSummary?.title}
+        columnTitle={Object.values(board.boardData.list).find((list) => taskEditor.state.mode === 'edit'
+          ? list.tasks.includes(taskEditor.state.editingTask.id)
+          : list.id === taskEditor.state.activeListId)?.title}
       />
       {boardDialogs.quickPlanDialog.isOpen && props.user && (
         <TodayQuickPlanDialog
@@ -116,8 +123,9 @@ export default function AppOverlays(props: Props) {
       {boardDialogs.groupDialog.isOpen && <AddGroupDialog onClose={boardDialogs.closeGroupDialog} onSubmitGroup={board.onSubmitList} />}
       {boardDialogs.boardDialog.isOpen && <CreateBoardDialog onClose={boardDialogs.closeCreateBoardDialog} onSubmitBoard={board.handleCreateBoard} />}
       <BoardActivityDialog isOpen={boardDialogs.activityDialog.isOpen} onClose={boardDialogs.closeActivityDialog} boardId={board.activeBoardId} />
-      {!props.isHomeFocusActive && (
+      {(!props.isHomeFocusActive || isNativeWidget()) && (
         <FocusDock
+          showWhenEmpty={isNativeWidget()}
           focusTasks={focus.focusTasks}
           activeTaskId={focus.timerState.activeTaskId || focus.activeFocusTaskId}
           isCollapsed={focus.isFocusDockCollapsed}
@@ -132,12 +140,12 @@ export default function AppOverlays(props: Props) {
           onStartTimer={() => focus.handleStartFocusTimer()}
           onPauseTimer={focus.pauseTimer}
           onResetTimer={focus.resetTimer}
-          onPopOutTimer={focusIntegration.handleOpenFloatingFocusTimer}
+          onPopOutTimer={props.onOpenNativeDock || focusIntegration.handleOpenFloatingFocusTimer}
           onOpenShutdown={() => planning.setIsShutdownRitualOpen(true)}
           onOpenTask={focusIntegration.handleOpenFocusTask}
           onMarkDone={focusIntegration.handleMarkFocusTaskDone}
           onRemoveTask={focus.removeFocusTask}
-          isPictureInPictureSupported={focusIntegration.isPictureInPictureSupported}
+          isPictureInPictureSupported={Boolean(props.onOpenNativeDock) || focusIntegration.isPictureInPictureSupported}
           isPictureInPictureOpen={focusIntegration.isPictureInPictureOpen}
         />
       )}

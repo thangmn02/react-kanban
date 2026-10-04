@@ -56,7 +56,7 @@ export default function PlanMyDayDialog({ tasks, workspaceId, onClose, onStart, 
     <div className="fixed inset-0 z-[70] overflow-y-auto bg-stone-950/40 px-3 py-6 backdrop-blur-sm sm:px-6 sm:py-12" onClick={onClose}>
       <section ref={dialog} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="plan-day-title" onClick={(event) => event.stopPropagation()} className="mx-auto w-full max-w-4xl rounded-2xl border border-white/80 bg-[#fafaf8] p-5 shadow-2xl outline-none sm:p-8">
         <div className="flex items-start justify-between gap-4">
-          <div><p className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500">{t('planDay.eyebrow')}</p><h2 id="plan-day-title" className="mt-2 text-3xl font-bold tracking-tight text-stone-950">{t('planDay.title')}</h2><p className="mt-2 max-w-xl text-sm leading-6 text-stone-500">{t('aiPlan.intro')}</p></div>
+          <h2 id="plan-day-title" className="text-3xl font-bold tracking-tight text-stone-950">{t('planDay.title')}</h2>
           <button type="button" onClick={onClose} aria-label={t('common.close')} className="h-10 w-10 shrink-0 cursor-pointer rounded-full text-xl text-stone-400 hover:bg-stone-200">×</button>
         </div>
         <div className="mt-7 grid gap-7 md:grid-cols-2">

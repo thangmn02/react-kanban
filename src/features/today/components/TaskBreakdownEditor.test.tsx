@@ -8,7 +8,7 @@ it('requires review, preserves edits after a save error, and only starts after a
   const onApply = vi.fn().mockRejectedValueOnce(new Error('save_failed')).mockResolvedValue(undefined);
   const onStart = vi.fn();
   render(<I18nProvider><TaskBreakdownEditor onGenerate={async () => ['Read notes', 'Write outline', 'Review draft']} onApply={onApply} onStart={onStart} /></I18nProvider>);
-  fireEvent.click(screen.getByRole('button', { name: /Help me plan this/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Suggest steps with AI' }));
   await screen.findByDisplayValue('Read notes');
   expect(onApply).not.toHaveBeenCalled();
   fireEvent.change(screen.getByLabelText('Step 1'), { target: { value: 'Read the customer brief' } });
@@ -27,7 +27,7 @@ it('aborts a pending suggestion when the mission changes/unmounts', async () => 
   let finish!: (steps: string[]) => void;
   const onApply = vi.fn();
   const view = render(<I18nProvider><TaskBreakdownEditor onGenerate={(value) => { signal = value; return new Promise((resolve) => { finish = resolve; }); }} onApply={onApply} /></I18nProvider>);
-  fireEvent.click(screen.getByRole('button', { name: /Help me plan this/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Suggest steps with AI' }));
   view.unmount();
   expect(signal?.aborted).toBe(true);
   await act(async () => finish(['One', 'Two', 'Three']));

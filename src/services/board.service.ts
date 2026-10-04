@@ -236,7 +236,7 @@ async function seedDefaultBoard(workspaceId?: string | null, createdBy?: string 
   const boardRow = await createBoard({
     workspace_id: workspaceId ?? undefined,
     title: DEFAULT_BOARD_TITLE,
-    description: 'Seeded Kanban board',
+    description: 'Seeded Kora board',
     created_by: createdBy ?? undefined,
   });
 

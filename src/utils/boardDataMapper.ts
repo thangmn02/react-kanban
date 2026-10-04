@@ -85,13 +85,14 @@ interface ApplyTaskDefaultsParams {
   startDate?: string;
   dueDate?: string;
   assignees?: BoardTaskItem['assignees'];
+  attachments?: BoardTaskItem['attachments'];
   image?: string;
   repeatInterval?: BoardTaskItem['repeatInterval'];
 }
 
 type TaskDefaultsPayload = Pick<
   TaskInsert,
-  'title' | 'description' | 'priority' | 'start_date' | 'due_date' | 'assignees' | 'image' | 'repeat_interval'
+  'title' | 'description' | 'priority' | 'start_date' | 'due_date' | 'assignees' | 'image' | 'repeat_interval' | 'attachments'
 >;
 
 function applyTaskDefaults({
@@ -101,6 +102,7 @@ function applyTaskDefaults({
   startDate,
   dueDate,
   assignees,
+  attachments,
   image,
   repeatInterval,
 }: ApplyTaskDefaultsParams): TaskDefaultsPayload {
@@ -111,6 +113,7 @@ function applyTaskDefaults({
     start_date: startDate || null,
     due_date: dueDate || null,
     assignees: serializeTaskAssignees(assignees),
+    ...(attachments !== undefined ? { attachments: attachments.map(({ id, name, url, type }) => ({ id, name, url, type })) } : {}),
     image: image || null,
     repeat_interval: repeatInterval || null,
   };
@@ -230,11 +233,12 @@ export function buildTaskInsertPayload({
   dueDate,
   position,
   assignees,
+  attachments,
   image,
   repeatInterval,
 }: BuildTaskInsertParams): TaskInsert {
   return {
-    ...applyTaskDefaults({ title, description, priority, startDate, dueDate, assignees, image, repeatInterval }),
+    ...applyTaskDefaults({ title, description, priority, startDate, dueDate, assignees, attachments, image, repeatInterval }),
     board_id: boardId,
     list_id: listId,
     category1: DEFAULT_TASK_CATEGORIES.CATEGORY_1,
@@ -251,10 +255,11 @@ export function buildTaskUpdatePayload({
   startDate,
   dueDate,
   assignees,
+  attachments,
   image,
   repeatInterval,
 }: BuildTaskUpdateParams): TaskUpdate {
-  return applyTaskDefaults({ title, description, priority, startDate, dueDate, assignees, image, repeatInterval });
+  return applyTaskDefaults({ title, description, priority, startDate, dueDate, assignees, attachments, image, repeatInterval });
 }
 
 export function buildTaskFieldUpdatePayload(

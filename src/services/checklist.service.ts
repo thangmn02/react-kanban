@@ -3,12 +3,10 @@ import type { BoardTaskItem } from '../types/task.type';
 import type { TaskChecklistItemInsert, TaskChecklistItemRow } from '../types/supabase.type';
 import { buildChecklistItemInsertPayloads } from '../utils/boardDataMapper';
 import { localReplaceChecklistItems, localFetchBoardSnapshot } from '../infrastructure/local/localBoardStore';
+import { isMissingDatabaseTable } from '../utils/dataError';
 
 function isMissingChecklistTableError(error: unknown) {
-  return typeof error === 'object'
-    && error !== null
-    && 'message' in error
-    && String((error as { message?: unknown }).message).includes('task_checklist_items');
+  return isMissingDatabaseTable(error, ['task_checklist_items']);
 }
 
 export async function fetchChecklistItemsByTaskIds(taskIds: string[]): Promise<TaskChecklistItemRow[]> {

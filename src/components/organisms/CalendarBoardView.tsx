@@ -79,8 +79,7 @@ function CalendarBoardView({ boardData, searchQuery, filterPriority, filterAssig
         <section className="rounded-[1.4rem] border border-slate-200 bg-white p-4 shadow-sm sm:p-6" aria-label={t('calendar.title')}>
           <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
             <div>
-              <span className="inline-flex rounded-full bg-sky-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-sky-700">{t('calendar.lazyBadge')}</span>
-              <h2 className="mt-3 text-xl font-bold tracking-[-0.03em] text-slate-950">{format(activeMonth, 'LLLL yyyy', { locale })}</h2>
+              <h2 className="text-xl font-bold tracking-[-0.03em] text-slate-950">{format(activeMonth, 'LLLL yyyy', { locale })}</h2>
             </div>
             <div className="flex items-center gap-2">
               <button type="button" onClick={() => chooseMonth(subMonths(activeMonth, 1))} aria-label={t('calendar.previousMonth')} className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white text-xl text-slate-500 transition hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100">‹</button>
@@ -126,10 +125,8 @@ function CalendarBoardView({ boardData, searchQuery, filterPriority, filterAssig
             <div className="mt-6 rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-5 py-10 text-center">
               <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-white text-lg text-slate-300 shadow-sm">✓</div>
               <p className="text-sm font-semibold text-slate-500">{t('calendar.emptyTitle')}</p>
-              <p className="mt-1 text-xs leading-5 text-slate-400">{t('calendar.emptyDescription')}</p>
             </div>
           )}
-          <div className="mt-6 border-t border-slate-100 pt-4 text-xs leading-5 text-slate-400">{t('calendar.helper')}</div>
         </aside>
       </div>
     </main>

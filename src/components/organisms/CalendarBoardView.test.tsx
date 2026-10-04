@@ -66,6 +66,6 @@ describe('CalendarBoardView', () => {
     renderCalendar();
     fireEvent.click(screen.getByRole('button', { name: 'Tuesday, September 29th, 2026' }));
     expect(screen.getByText('Nothing is due.')).toBeTruthy();
-    expect(screen.getByText(/Empty is good/)).toBeTruthy();
+    expect(screen.queryByText(/Empty is good|No events to maintain|Automatic · no data entry/)).toBeNull();
   });
 });

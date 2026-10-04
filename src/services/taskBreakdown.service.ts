@@ -1,14 +1,15 @@
 import supabase from '../lib/supabase';
-import { localFetchAllTasks, localFetchBoardSnapshot, localReplaceChecklistItems } from '../infrastructure/local/localBoardStore';
+import { localFetchAllTasks, localFetchBoards, localFetchBoardSnapshot, localReplaceChecklistItems } from '../infrastructure/local/localBoardStore';
 import type { TaskChecklistItem } from '../types/task.type';
-import { MAX_STEP_LENGTH, parseTaskSteps } from '../features/today/utils/taskBreakdown';
+import { MAX_STEP_LENGTH, normalizeBreakdownContext, parseTaskSteps, type TaskBreakdownContext } from '../features/today/utils/taskBreakdown';
+import { isNativeWidget } from '../features/native/runtime';
 
 interface BreakdownInput {
   taskId?: string;
   boardId?: string;
   workspaceId: string;
   language: 'en' | 'vi';
-  draftContext?: { title: string; description: string; existingSteps: string[] };
+  draftContext?: TaskBreakdownContext;
 }
 
 export async function generateTaskBreakdown(input: BreakdownInput, signal: AbortSignal): Promise<string[]> {
@@ -22,11 +23,21 @@ export async function generateTaskBreakdown(input: BreakdownInput, signal: Abort
     const snapshot = localFetchBoardSnapshot(input.boardId, input.workspaceId);
     const task = snapshot.taskRows.find((row) => row.id === input.taskId && !row.is_done);
     if (!task) throw new Error('task_unavailable');
-    localContext = { title: task.title, description: (task.description ?? '').slice(0, 3000), existingSteps: snapshot.checklistItemRows.filter((item) => item.task_id === task.id).slice(0, 30).map((item) => item.content) };
+    const labelIds = new Set(snapshot.labelLinkRows.filter((link) => link.task_id === task.id).map((link) => link.label_id));
+    localContext = normalizeBreakdownContext({
+      title: task.title, description: task.description, dueDate: task.due_date,
+      boardTitle: localFetchBoards(input.workspaceId).find((board) => board.id === task.board_id)?.title,
+      columnTitle: snapshot.listRows.find((list) => list.id === task.list_id)?.title,
+      labels: snapshot.labelRows.filter((label) => labelIds.has(label.id)).map((label) => label.name),
+      existingSteps: snapshot.checklistItemRows.filter((item) => item.task_id === task.id).map((item) => item.content),
+    });
   }
-  const response = await fetch('/api/task-breakdown', {
+  // The bundled webview has no API server. Web requests stay same-origin;
+  // native requests use the existing authenticated hosted backend.
+  const endpoint = isNativeWidget() ? 'https://kanthangboard.netlify.app/api/task-breakdown' : '/api/task-breakdown';
+  const response = await fetch(endpoint, {
     method: 'POST', headers, signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]),
-    body: JSON.stringify({ ...input, localContext }),
+    body: JSON.stringify({ ...input, draftContext: input.draftContext ? normalizeBreakdownContext(input.draftContext) : undefined, localContext }),
   });
   let payload: unknown;
   try { payload = await response.json(); } catch { throw new Error('not_configured'); }

@@ -21,27 +21,27 @@ test('task CRUD persists after reload and the task drawer opens and closes', asy
 
   await openBoard(page);
   await page.getByRole('button', { name: 'Add task' }).first().click();
-  await expect(page.getByRole('heading', { name: 'Add a richer task' })).toBeVisible();
-  await page.getByRole('textbox', { name: 'Refine the task title' }).fill(originalTitle);
-  await page.getByRole('button', { name: 'Add new task', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Create task' })).toBeVisible();
+  await page.getByRole('textbox', { name: 'Title', exact: true }).fill(originalTitle);
+  await page.getByRole('button', { name: 'Add task', exact: true }).last().click();
   await expect(page.getByRole('button', { name: `Open task: ${originalTitle}`, exact: true })).toBeVisible();
 
   await page.reload();
   await page.getByRole('button', { name: `Open task: ${originalTitle}`, exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Edit task in context' })).toBeVisible();
-  await expect(page.getByRole('textbox', { name: 'Refine the task title' })).toHaveValue(originalTitle);
-  await page.getByRole('textbox', { name: 'Refine the task title' }).fill(updatedTitle);
+  await expect(page.getByRole('heading', { name: 'Edit task' })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(originalTitle);
+  await page.getByRole('textbox', { name: 'Title', exact: true }).fill(updatedTitle);
   await page.getByRole('button', { name: 'Save changes', exact: true }).click();
   await expect(page.getByRole('button', { name: `Open task: ${updatedTitle}`, exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: `Open task: ${updatedTitle}`, exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Edit task in context' })).toBeVisible();
-  await expect(page.getByRole('textbox', { name: 'Refine the task title' })).toHaveValue(updatedTitle);
+  await expect(page.getByRole('heading', { name: 'Edit task' })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(updatedTitle);
   for (const dismissButton of await page.getByRole('button', { name: 'Dismiss notification' }).all()) {
     await dismissButton.click({ force: true });
   }
   await page.getByRole('button', { name: 'Close task drawer' }).click();
-  await expect(page.getByRole('heading', { name: 'Edit task in context' })).toBeHidden();
+  await expect(page.getByRole('heading', { name: 'Edit task' })).toBeHidden();
 
   await page.getByRole('button', { name: `Open task: ${updatedTitle}`, exact: true }).hover();
   await page.getByRole('button', { name: `Delete task: ${updatedTitle}`, exact: true }).click();
@@ -59,9 +59,10 @@ test('focus and Pomodoro state survives reload', async ({ page }) => {
   await page.getByRole('button', { name: 'Start focus session: Redesign tables card', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Start with intention' })).toBeVisible();
   await page.getByRole('button', { name: 'Start without intention' }).click();
-  await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Pause', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Start', exact: true })).toBeVisible();
+  const dock = page.getByRole('complementary', { name: 'Focus Dock' });
+  await expect(dock.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
+  await dock.getByRole('button', { name: 'Pause', exact: true }).click();
+  await expect(dock.getByRole('button', { name: 'Start', exact: true })).toBeVisible();
 
   await page.reload();
   const expandDock = page.getByRole('button', { name: 'Expand Focus Dock' });
@@ -69,8 +70,8 @@ test('focus and Pomodoro state survives reload', async ({ page }) => {
   await expect(page.getByRole('combobox', { name: 'Choose active focus timer task' })).toContainText(
     'Redesign tables card',
   );
-  await page.getByRole('button', { name: 'Start', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
+  await dock.getByRole('button', { name: 'Start', exact: true }).click();
+  await expect(dock.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
   expect(errors).toEqual([]);
 });
 

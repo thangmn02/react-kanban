@@ -390,6 +390,7 @@ export function localCreateTasks(taskInserts: TaskInsert[]): TaskRow[] {
       image: taskInsert.image ?? null,
       is_done: taskInsert.is_done ?? false,
       repeat_interval: taskInsert.repeat_interval ?? null,
+      attachments: taskInsert.attachments ?? [],
       position: taskInsert.position ?? maxPos + LIST_POSITION_STEP,
       created_by: taskInsert.created_by ?? null,
       deleted_at: null,
@@ -423,6 +424,7 @@ export function localUpdateTask(taskId: string, taskUpdate: TaskUpdate): TaskRow
   if (taskUpdate.is_done !== undefined) {
     updated.completed_at = taskUpdate.is_done ? (current.completed_at ?? now) : null;
   }
+  if (taskUpdate.attachments !== undefined) updated.attachments = taskUpdate.attachments;
   state.tasks[index] = updated;
   saveState();
   return updated;

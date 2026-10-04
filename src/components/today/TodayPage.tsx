@@ -146,7 +146,6 @@ export default function TodayPage({
         <PageHeader
           eyebrow={t('today.eyebrow')}
           title={t('today.title')}
-          description={t('today.description')}
           className="mb-4"
           actions={(
             <button
@@ -223,9 +222,6 @@ export default function TodayPage({
                     <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-slate-600">
                       {t('today.plan')}
                     </h2>
-                    <p className="mt-1 text-sm text-slate-500">
-                      {t('today.planDescription')}
-                    </p>
                   </div>
                   <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
                     {focusTasks.length}/3
@@ -343,9 +339,6 @@ export default function TodayPage({
                   transition={{ type: 'spring', stiffness: 160, damping: 20 }}
                 >
                   <h2 className="text-sm font-semibold text-slate-950">{t('today.noUrgentTitle')}</h2>
-                  <p className="mt-1 text-sm leading-5 text-slate-600">
-                    {t('today.planningSpace')}
-                  </p>
                 </motion.div>
               )}
             </div>

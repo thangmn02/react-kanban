@@ -11,6 +11,7 @@ import { useBoardDataManagement } from '../../../hooks/useBoardDataManagement';
 import { useTaskOperations } from '../../../hooks/useTaskOperations';
 import { useBoardFileCommands } from './useBoardFileCommands';
 import { useI18n } from '../../../i18n';
+import { dataErrorMessage } from '../../../utils/dataError';
 
 interface Params {
   authMode: AuthMode;
@@ -97,7 +98,7 @@ export function useBoardPageController(params: Params) {
       closeGroupDialog();
       notify.success(t('toast.listAdded'));
     } catch (error) {
-      notify.error(error instanceof Error ? error.message : t('toast.unableAddList'));
+      notify.error(dataErrorMessage(error, t('toast.unableAddList')));
     } finally {
       board.setIsSavingBoard(false);
     }
@@ -117,7 +118,7 @@ export function useBoardPageController(params: Params) {
       if (workspaceId) navigate(`/workspaces/${workspaceId}/boards/${createdBoard.id}`);
       notify.success(t('toast.boardCreated'));
     } catch (error) {
-      notify.error(error instanceof Error ? error.message : t('toast.unableCreateBoard'));
+      notify.error(dataErrorMessage(error, t('toast.unableCreateBoard')));
     } finally {
       board.setIsSavingBoard(false);
     }
@@ -150,7 +151,7 @@ export function useBoardPageController(params: Params) {
       if (task) openEditTaskDialog(task);
       if (workspaceId) navigate(`/workspaces/${workspaceId}/boards/${boardId}`);
     } catch (error) {
-      notify.error(error instanceof Error ? error.message : t('toast.unableOpenTask'));
+      notify.error(dataErrorMessage(error, t('toast.unableOpenTask')));
     } finally {
       board.setIsBoardLoading(false);
     }

@@ -12,6 +12,19 @@ import {
 import type { Json, TaskInsert, TaskRow, TaskUpdate } from '../types/supabase.type';
 import type { TaskRepeatInterval } from '../types/task.type';
 import { addDays, addMonths, format, parseISO } from 'date-fns';
+import { isMissingDatabaseField } from '../utils/dataError';
+
+export class RecurrenceSchemaError extends Error {
+  constructor() { super('Repeating tasks require a database update. This change was not saved.'); }
+}
+export class AttachmentSchemaError extends Error {
+  constructor() { super('Attachments require a database update. This change was not saved.'); }
+}
+
+function throwOptionalSchemaError(error: unknown): void {
+  if (isMissingDatabaseField(error, 'repeat_interval')) throw new RecurrenceSchemaError();
+  if (isMissingDatabaseField(error, 'attachments')) throw new AttachmentSchemaError();
+}
 
 interface FetchTasksParams {
   boardId?: string;
@@ -87,7 +100,10 @@ function normalizeTaskData(taskData: TaskInsert): TaskInsert {
     assignees: STABLE_TASK_FIELD_NORMALIZERS.assignees(taskData.assignees),
     image: STABLE_TASK_FIELD_NORMALIZERS.image(taskData.image),
     is_done: STABLE_TASK_FIELD_NORMALIZERS.is_done(taskData.is_done),
-    repeat_interval: STABLE_TASK_FIELD_NORMALIZERS.repeat_interval(taskData.repeat_interval),
+    // Older hosted schemas do not have this optional column. Never send null
+    // on insert; a real recurrence selection must still be persisted or fail.
+    ...(taskData.repeat_interval ? { repeat_interval: taskData.repeat_interval } : {}),
+    ...(Array.isArray(taskData.attachments) && taskData.attachments.length ? { attachments: taskData.attachments } : {}),
     position: taskData.position ?? 0,
     created_by: taskData.created_by ?? undefined,
   };
@@ -113,6 +129,7 @@ function normalizeTaskDataPartial(taskData: TaskUpdate): TaskUpdate {
   if ('image' in taskData) stablePayload.image = STABLE_TASK_FIELD_NORMALIZERS.image(taskData.image);
   if ('is_done' in taskData) stablePayload.is_done = STABLE_TASK_FIELD_NORMALIZERS.is_done(taskData.is_done);
   if ('repeat_interval' in taskData) stablePayload.repeat_interval = STABLE_TASK_FIELD_NORMALIZERS.repeat_interval(taskData.repeat_interval);
+  if ('attachments' in taskData) stablePayload.attachments = taskData.attachments ?? [];
   if ('list_id' in taskData) stablePayload.list_id = taskData.list_id;
   if ('workspace_id' in taskData) stablePayload.workspace_id = taskData.workspace_id;
   if ('position' in taskData) stablePayload.position = taskData.position;
@@ -173,6 +190,7 @@ export async function createTask(taskData: TaskInsert): Promise<TaskRow> {
     .single();
 
   if (error) {
+    throwOptionalSchemaError(error);
     throw error;
   }
 
@@ -197,6 +215,7 @@ export async function createTasks(tasksData: TaskInsert[]): Promise<TaskRow[]> {
     .select();
 
   if (error) {
+    throwOptionalSchemaError(error);
     throw error;
   }
 
@@ -223,6 +242,7 @@ export async function createNextRecurringTaskOccurrence(completedTask: TaskRow):
     due_date: nextRecurringDueDate(completedTask.due_date, repeatInterval),
     assignees: completedTask.assignees,
     repeat_interval: repeatInterval,
+    attachments: completedTask.attachments ?? [],
     position: completedTask.position + 1,
     is_done: false,
   });
@@ -235,12 +255,22 @@ export async function updateTask(taskId: string, taskData: TaskUpdate): Promise<
   }
 
   const client = requireSupabaseClient();
-  const { data, error } = await client
-    .from('tasks')
-    .update(normalizeTaskDataPartial(taskData))
-    .eq('id', taskId)
-    .select()
-    .single();
+  const payload = normalizeTaskDataPartial(taskData);
+  const send = () => Object.keys(payload).length
+    ? client.from('tasks').update(payload).eq('id', taskId).select().single()
+    : client.from('tasks').select('*').eq('id', taskId).single();
+  let { data, error } = await send();
+  for (let retry = 0; error && retry < 2; retry++) {
+    const field = (['repeat_interval', 'attachments'] as const)
+      .find((name) => name in payload && isMissingDatabaseField(error, name));
+    if (!field) break;
+    const nonEmpty = field === 'attachments' ? Array.isArray(payload.attachments) && payload.attachments.length > 0 : Boolean(payload.repeat_interval);
+    if (nonEmpty) throwOptionalSchemaError(error);
+    // Only remove empty optional fields that provably do not exist. Never
+    // retry permissions/network errors or discard a user's chosen value.
+    delete payload[field];
+    ({ data, error } = await send());
+  }
 
   if (error) {
     throw error;

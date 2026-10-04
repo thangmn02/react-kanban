@@ -8,6 +8,7 @@ import { createTasks } from '../../../services/task.service';
 import { buildTaskInsertPayload } from '../../../utils/boardDataMapper';
 import { parseTaskLines } from '../../../utils/taskParser';
 import { useI18n } from '../../../i18n';
+import { dataErrorMessage } from '../../../utils/dataError';
 import {
   downloadTextFile,
   normalizeCsvDueDate,
@@ -65,7 +66,7 @@ export function useBoardFileCommands({
       await refreshBoardData({ boardId: activeBoardId });
       notify.success(t('toast.createdTasksFromPaste', { count: tasksToCreate.length }));
     } catch (error) {
-      notify.error(error instanceof Error ? error.message : t('toast.failedCreatePastedTasks'));
+      notify.error(dataErrorMessage(error, t('toast.failedCreatePastedTasks')));
     } finally {
       setIsSavingBoard(false);
     }
@@ -136,7 +137,7 @@ export function useBoardFileCommands({
       await refreshBoardData({ boardId: activeBoardId });
       notify.success(t('toast.importedCsv', { count: tasksToCreate.length }));
     } catch (error) {
-      notify.error(error instanceof Error ? error.message : t('toast.csvImportFailed'));
+      notify.error(dataErrorMessage(error, t('toast.csvImportFailed')));
     } finally {
       setIsSavingBoard(false);
     }

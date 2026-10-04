@@ -21,7 +21,10 @@ import {
   updateTask,
   createNextRecurringTaskOccurrence,
   updateTaskPositions,
+  RecurrenceSchemaError,
+  AttachmentSchemaError,
 } from '../services/task.service';
+import { dataErrorMessage } from '../utils/dataError';
 import {
   buildTaskFieldUpdatePayload,
   buildTaskInsertPayload,
@@ -85,6 +88,9 @@ export function useTaskOperations({
   onTaskCompleted,
 }: UseTaskOperationsParams): UseTaskOperationsResult {
   const { t } = useI18n();
+  const taskErrorMessage = (error: unknown, fallback: string) => error instanceof RecurrenceSchemaError
+    ? t('toast.recurrenceNeedsDatabaseUpdate') : error instanceof AttachmentSchemaError
+      ? t('toast.attachmentsNeedDatabaseUpdate') : dataErrorMessage(error, fallback);
 
   const onSubmitQuickPlan = async (formData: QuickPlanFormData) => {
     if (!activeBoardId || !formData.targetListId) return;
@@ -157,7 +163,7 @@ export function useTaskOperations({
         } catch (error) {
           failureCount += 1;
           if (!firstErrorMessage) {
-            firstErrorMessage = error instanceof Error ? error.message : t('toast.unableCreateTasks');
+            firstErrorMessage = taskErrorMessage(error, t('toast.unableCreateTasks'));
           }
         }
       }
@@ -181,7 +187,7 @@ export function useTaskOperations({
         plural: successCount === 1 ? '' : 's',
       }));
     } catch (error) {
-      const message = error instanceof Error ? error.message : t('toast.unableFinishQuickPlan');
+      const message = taskErrorMessage(error, t('toast.unableFinishQuickPlan'));
       notify.error(message);
     } finally {
       setIsSavingBoard(false);
@@ -189,7 +195,10 @@ export function useTaskOperations({
   };
 
   const onSubmitCard = async (formData: TaskDialogFormData) => {
-    if (!activeListId || !activeBoardId) return;
+    if (!activeListId || !activeBoardId || !boardData.list[activeListId]) {
+      notify.error(t('toast.chooseValidTargetList'));
+      return;
+    }
 
     setIsSavingBoard(true);
 
@@ -230,8 +239,9 @@ export function useTaskOperations({
       closeTaskDialog();
       notify.success(t('toast.cardAdded'));
     } catch (error) {
-      const message = error instanceof Error ? error.message : t('toast.unableAddTask');
-
+      const message = taskErrorMessage(error, t('toast.unableAddTask'));
+      console.error('[tasks] Create failed:', message,
+        error && typeof error === 'object' && 'code' in error ? String(error.code) : '');
       notify.error(message);
     } finally {
       setIsSavingBoard(false);
@@ -312,7 +322,7 @@ export function useTaskOperations({
       closeTaskDialog();
       notify.success(t('toast.taskUpdated'));
     } catch (error) {
-      const message = error instanceof Error ? error.message : t('toast.unableUpdateTask');
+      const message = taskErrorMessage(error, t('toast.unableUpdateTask'));
 
       notify.error(message);
     } finally {
@@ -326,7 +336,7 @@ export function useTaskOperations({
       await refreshBoardData();
       notify.success(t('toast.taskRestored'));
     } catch (error) {
-      const message = error instanceof Error ? error.message : t('toast.unableRestoreTask');
+      const message = taskErrorMessage(error, t('toast.unableRestoreTask'));
       notify.error(message);
     }
   };
@@ -435,7 +445,7 @@ export function useTaskOperations({
       setBoardData(previousBoardData);
       syncBoardCache(activeBoardId, previousBoardData);
 
-      const message = error instanceof Error ? error.message : t('toast.unableDeleteItem', { type: itemToDelete.type });
+      const message = taskErrorMessage(error, t('toast.unableDeleteItem', { type: itemToDelete.type }));
       notify.error(message);
     } finally {
       setIsSavingBoard(false);
@@ -484,7 +494,7 @@ export function useTaskOperations({
       setBoardData(previousBoardData);
       syncBoardCache(activeBoardId, previousBoardData);
 
-      const message = error instanceof Error ? error.message : t('toast.unableSaveDragDrop');
+      const message = taskErrorMessage(error, t('toast.unableSaveDragDrop'));
       notify.error(message);
     }
   };
@@ -565,7 +575,7 @@ export function useTaskOperations({
     } catch (error) {
       setBoardData(previousBoardData);
       syncBoardCache(activeBoardId, previousBoardData);
-      const message = error instanceof Error ? error.message : t('toast.unableUpdateTask');
+      const message = taskErrorMessage(error, t('toast.unableUpdateTask'));
       notify.error(message);
     }
   };

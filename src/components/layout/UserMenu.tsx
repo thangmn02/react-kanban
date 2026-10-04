@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import type { AppUser, AuthMode, WorkspaceSummary } from '../../types/auth.type';
 import { useI18n, type Language } from '../../i18n';
+import { ARCANA_ENABLED } from '../../constants/features';
 
 interface UserMenuProps {
   user: AppUser;
@@ -98,7 +99,7 @@ export default function UserMenu({
 
             {authMode === 'supabase' ? (
               <>
-              <button
+              {ARCANA_ENABLED && <button
                 type="button"
                 onClick={() => {
                   setIsOpen(false);
@@ -113,7 +114,7 @@ export default function UserMenu({
                     {t('arcana.reward.menuBadge', { count: arcanaAvailableDraws })}
                   </span>
                 )}
-              </button>
+              </button>}
               <button
                 type="button"
                 onClick={() => {
@@ -128,7 +129,7 @@ export default function UserMenu({
               </>
             ) : (
               <>
-                <button
+                {ARCANA_ENABLED && <button
                   type="button"
                   onClick={() => {
                     setIsOpen(false);
@@ -143,7 +144,7 @@ export default function UserMenu({
                       {t('arcana.reward.menuBadge', { count: arcanaAvailableDraws })}
                     </span>
                   )}
-                </button>
+                </button>}
                 <p className="rounded-xl px-3 py-2 text-sm text-slate-500" role="menuitem">
                   {t('app.demoData.description')}
                 </p>

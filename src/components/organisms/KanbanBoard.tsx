@@ -20,6 +20,7 @@ import TaskList from '../task/TaskList';
 import TaskItem from '../task/TaskItem';
 import TaskListOverlay from '../task/TaskListOverlay';
 import EmptyState from '../atoms/EmptyState';
+import { useI18n } from '../../i18n';
 import type { BoardData, BoardDeleteItem, ITaskItem } from '../../types/task.type';
 import type { WorkspaceMember } from '../../types/auth.type';
 import { doesTaskMatchFilters } from '../../utils/taskFilters';
@@ -108,6 +109,7 @@ function KanbanBoard({
   workspaceMembers,
   activeBoardId = null,
 }: KanbanBoardProps) {
+  const { t } = useI18n();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeType, setActiveType] = useState<'list' | 'task' | null>(null);
 
@@ -369,7 +371,7 @@ function KanbanBoard({
                 onClick={handlers.onOpenAddGroup}
                 className="w-full cursor-pointer rounded-2xl border border-dashed border-slate-200 bg-white/40 py-6 text-sm font-semibold text-slate-400 transition-[background,color] hover:bg-white hover:text-slate-600 focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"
               >
-                Add group
+                {t('board.addGroup')}
               </button>
             </div>
           </div>

@@ -8,15 +8,10 @@ import type {
 } from '../types/supabase.type';
 import { normalizeTaskLabelColor } from '../utils/taskCollections';
 import { localReplaceLabels, localFetchBoardSnapshot } from '../infrastructure/local/localBoardStore';
+import { isMissingDatabaseTable } from '../utils/dataError';
 
 function isMissingLabelTableError(error: unknown) {
-  return typeof error === 'object'
-    && error !== null
-    && 'message' in error
-    && (
-      String((error as { message?: unknown }).message).includes('task_labels')
-      || String((error as { message?: unknown }).message).includes('task_label_links')
-    );
+  return isMissingDatabaseTable(error, ['task_labels', 'task_label_links']);
 }
 
 function normalizeLabels(labels: BoardTaskItem['labels']): BoardTaskItem['labels'] {

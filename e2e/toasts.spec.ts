@@ -10,6 +10,7 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
     });
 
     test('focus confirmation disappears automatically', async ({ page }) => {
+      await page.getByRole('button', { name: /^Add to focus:/ }).first().click();
       await page.getByRole('button', { name: 'Start focus', exact: true }).click();
       await page.getByRole('button', { name: 'Start without intention' }).click();
       await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();

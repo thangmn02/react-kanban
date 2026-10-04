@@ -32,13 +32,12 @@ it('discards a previous workspace retry and immediately clears old tasks', async
 
 it('delegates details, focus and planning to the real workflow callbacks', async () => {
   vi.mocked(fetchHomeDashboardData).mockResolvedValueOnce(data('Suggested task'));
-  render(<I18nProvider><HomeDashboard {...props} /></I18nProvider>);
-  await screen.findByText('Suggested task');
-  fireEvent.click(screen.getByRole('button', { name: 'View details' }));
+  render(<I18nProvider><HomeDashboard {...props} isFocusTask={() => true} /></I18nProvider>);
+  fireEvent.click(await screen.findByRole('button', { name: 'View details: Suggested task' }));
   expect(props.onOpenTask).toHaveBeenCalledWith('Suggested task', 'board');
   fireEvent.click(screen.getByRole('button', { name: 'Start focus' }));
-  expect(props.onStartFocusTask).toHaveBeenCalledWith(data('Suggested task').myTasks[0]);
-  fireEvent.click(screen.getByRole('button', { name: 'Quick Plan' }));
+  expect(props.onStartFocusTask).toHaveBeenCalledWith(expect.objectContaining(data('Suggested task').myTasks[0]));
+  fireEvent.click(screen.getByRole('button', { name: 'Add multiple tasks' }));
   expect(props.onOpenQuickPlan).toHaveBeenCalledOnce();
 });
 
@@ -46,7 +45,7 @@ it('adds the ranked plan to Today from Home', async () => {
   vi.mocked(fetchHomeDashboardData).mockResolvedValueOnce(data('Planned task'));
   render(<I18nProvider><HomeDashboard {...props} /></I18nProvider>);
   await screen.findByText('Planned task');
-  fireEvent.click(screen.getByRole('button', { name: 'Plan my day' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Order today’s tasks' }));
   fireEvent.click(screen.getByRole('button', { name: 'Add top 3 to Today' }));
   expect(props.onPlanFocusTasks).toHaveBeenCalledWith([expect.objectContaining({ id: 'Planned task' })]);
 });
@@ -69,14 +68,32 @@ it('keeps focus mode dismissed after Home unmounts and mounts again', async () =
     },
     onMarkDone: vi.fn().mockResolvedValue(true),
   };
-  vi.mocked(fetchHomeDashboardData).mockResolvedValue(data('Focused task'));
+  vi.mocked(fetchHomeDashboardData).mockResolvedValue(data('Assigned task'));
 
   const view = render(<I18nProvider><HomeDashboard {...props} focusControls={focusControls} /></I18nProvider>);
-  fireEvent.click(screen.getByRole('button', { name: 'Exit focus' }));
-  await screen.findByText('Suggested next step');
-  view.unmount();
-
-  render(<I18nProvider><HomeDashboard {...props} focusControls={focusControls} /></I18nProvider>);
-  await screen.findByText('Suggested next step');
+  // Restoring a paused timer must not enter full focus by itself.
+  await screen.findByText('Needs attention');
   expect(screen.queryByRole('button', { name: 'Exit focus' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Start focus' }));
+  expect(screen.getByRole('timer')).toHaveTextContent('20:00');
+  fireEvent.click(screen.getByRole('button', { name: 'Exit focus' }));
+  await screen.findByText('Needs attention');
+  expect(focusControls.session.pauseTimer).not.toHaveBeenCalled();
+  expect(focusControls.session.resetTimer).not.toHaveBeenCalled();
+  view.unmount();
+  // A fresh tab/browser run has no dismissal marker in sessionStorage.
+  sessionStorage.clear();
+
+  const nextView = render(<I18nProvider><HomeDashboard {...props} focusControls={focusControls} /></I18nProvider>);
+  await screen.findByText('Needs attention');
+  expect(screen.queryByRole('button', { name: 'Exit focus' })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'View details: Focused task' })).toBeInTheDocument();
+  expect(screen.getByText('Assigned task')).toBeInTheDocument();
+  // Starting/resuming in the dock creates a different timer session, not a
+  // request to reopen full Home focus.
+  nextView.rerender(<I18nProvider><HomeDashboard {...props} focusControls={{ ...focusControls, session: { ...focusControls.session, timerState: { ...focusControls.session.timerState, startedAt: 84, isRunning: true } } }} /></I18nProvider>);
+  expect(screen.queryByRole('button', { name: 'Exit focus' })).not.toBeInTheDocument();
+  // Explicit entry still works after a previous exit.
+  fireEvent.click(screen.getByRole('button', { name: 'Start focus' }));
+  expect(screen.getByRole('button', { name: 'Exit focus' })).toBeInTheDocument();
 });
