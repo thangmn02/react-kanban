@@ -19,7 +19,7 @@ vi.mock('@tauri-apps/api/window', () => ({ getCurrentWindow: () => nativeWindow,
 vi.mock('../../components/focus/FloatingFocus', () => ({ default: (props: FloatingFocusProps) => <div>
   <button onClick={() => props.onLayoutChange?.('split', false)}>Split</button><button onClick={props.onStart}>Start native timer</button>{props.nativeControls}
 </div> }));
-beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); nativeWindow.isMaximized.mockResolvedValue(false);
+beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); nativeInvoke.mockResolvedValue(undefined); nativeWindow.isMaximized.mockResolvedValue(false);
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} }); });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 const props: FloatingFocusProps = { activeTask: null, focusTasks: [], cycleTotal: 4, remainingSeconds: 1500,
@@ -55,12 +55,13 @@ it('pins only Dock, unpins Tasks, and starts with a normal native window', async
   await waitFor(() => expect(nativeWindow.clearEffects).toHaveBeenCalledOnce());
   view.rerender(surface(true));
   await waitFor(() => expect(nativeWindow.setAlwaysOnTop).toHaveBeenLastCalledWith(true));
-  await waitFor(() => expect(nativeWindow.setEffects).toHaveBeenCalledWith({ effects: ['blur'], color: [245, 241, 255, 20] }));
+  await waitFor(() => expect(nativeWindow.clearEffects).toHaveBeenCalledTimes(2));
+  expect(nativeWindow.setEffects).not.toHaveBeenCalled();
   await waitFor(() => expect(nativeInvoke).toHaveBeenCalledWith('native_dock_shape', { rounded: true }));
   view.rerender(surface(false));
   await waitFor(() => expect(nativeWindow.setAlwaysOnTop).toHaveBeenLastCalledWith(false));
   expect(nativeWindow.setAlwaysOnTop.mock.calls.map(([enabled]) => enabled)).toEqual([false, true, false]);
-  await waitFor(() => expect(nativeWindow.clearEffects).toHaveBeenCalledTimes(2));
+  await waitFor(() => expect(nativeWindow.clearEffects).toHaveBeenCalledTimes(3));
   await waitFor(() => expect(nativeInvoke).toHaveBeenLastCalledWith('native_dock_shape', { rounded: false }));
   expect(nativeCapability.permissions).toContain('core:window:allow-set-effects');
 });
@@ -76,8 +77,8 @@ it('maximizes and restores the workspace with an accessible window control', asy
   await waitFor(() => expect(view.getByRole('button', { name: 'Maximize' })).toBeVisible());
   expect(nativeWindow.toggleMaximize).toHaveBeenCalledTimes(2);
 });
-it('still rounds the dock when blur is unavailable and reapplies its shape on resize', async () => {
-  nativeWindow.setEffects.mockRejectedValueOnce(new Error('Unsupported backdrop'));
+it('still updates native glass when clearing old effects fails and reapplies its shape on resize', async () => {
+  nativeWindow.clearEffects.mockRejectedValueOnce(new Error('Unsupported old effect'));
   render(<I18nProvider><NativeSurface dock focusProps={props}>Workspace</NativeSurface></I18nProvider>);
   await waitFor(() => expect(nativeInvoke).toHaveBeenCalledWith('native_dock_shape', { rounded: true }));
   nativeInvoke.mockClear();
@@ -88,11 +89,11 @@ it('matches compositor corners and removes the opaque backdrop on legacy Windows
   nativeInvoke.mockResolvedValue(8);
   const view = render(<I18nProvider><NativeSurface dock focusProps={props}>Workspace</NativeSurface></I18nProvider>);
   await waitFor(() => expect(document.documentElement.style.getPropertyValue('--native-dock-radius')).toBe('8px'));
-  expect(nativeWindow.clearEffects).not.toHaveBeenCalled();
+  expect(nativeWindow.clearEffects).toHaveBeenCalledOnce();
   nativeInvoke.mockResolvedValue(22);
   act(() => nativeWindow.onResized.mock.calls[0][0]());
   await waitFor(() => expect(document.documentElement.style.getPropertyValue('--native-dock-radius')).toBe('22px'));
-  expect(nativeWindow.clearEffects).toHaveBeenCalledOnce();
+  expect(nativeWindow.clearEffects).toHaveBeenCalledTimes(2);
   view.unmount();
   expect(document.documentElement.style.getPropertyValue('--native-dock-radius')).toBe('');
   nativeInvoke.mockResolvedValue(undefined);

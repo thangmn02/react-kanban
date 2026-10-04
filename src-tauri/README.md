@@ -6,7 +6,7 @@ window dimensions; Tasks does not stay on top. Empty focus lists support a
 standalone timer without creating a task. Musical shapes hold for eight seconds
 and reflash on captured onsets or confident audio-tempo ticks, with no breathing loop.
 Maximize/restore controls are available
-in both surfaces. Dock uses Windows client-area blur with a light translucent tint;
+in both surfaces. Dock uses light Windows compositor glass with a translucent tint;
 Tasks clears the effect and remains opaque. Unsupported effects retain CSS glass.
 On Windows 11, the compositor rounds the native backdrop itself; native CSS
 matches its system corner radius. A custom cut-out region is not combined with
@@ -16,8 +16,9 @@ handler suppresses the OS caption/border before the window first becomes visible
 while retaining resizing, activation and DPI handling. CSS adds a translucent
 milky gradient, a bright rim and soft inset bevel above all panels. The bevel is
 pointer-transparent so the glass does not intercept controls. The web dock keeps
-its existing larger radius. Client blur avoids Acrylic's heavily tinted system
-backdrop; the native panes use lighter alpha instead of opaque stacked fills.
+its existing larger radius. Native glass explicitly uses a light tint independent
+of Windows dark mode. It does not use legacy accent blur, which drops out during
+native dragging; the compositor frost stays active while moving or resizing.
 
 ## Browser music only
 
@@ -51,7 +52,7 @@ restarts recover automatically. This adds the `alarms` extension permission.
 The old web protocol and app origin are retained for compatibility. The app
 identifier `app.kanthangboard.focus` is deliberately unchanged to preserve
 existing native sign-in and preferences. Branding, product/version and the
-executable are now Kora / 0.1.6 / `kora.exe`.
+executable are now Kora / 0.1.7 / `kora.exe`.
 
 ## Development and distribution
 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { invoke } from '@tauri-apps/api/core';
-import { currentMonitor, Effect, getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
+import { currentMonitor, getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
 import FloatingFocus, { type FloatingFocusProps } from '../../components/focus/FloatingFocus';
 import type { DockStyle } from '../../components/focus/useDockPreferences';
 import dockCss from '../../components/focus/floatingFocus.css?inline';
@@ -69,12 +69,13 @@ export default function NativeSurface({ dock, onToggle, focusProps, children }: 
   const [updateOpen, setUpdateOpen] = useState(false);
   const effectQueue = useRef(Promise.resolve());
   useEffect(() => {
-    // Serialize surface changes so an older blur request cannot overwrite
+    // Serialize surface changes so an older backdrop request cannot overwrite
     // the normal Tasks window after a rapid Dock → Tasks switch.
     effectQueue.current = effectQueue.current.then(async () => {
       const window = getCurrentWindow();
-      if (dock) await window.setEffects({ effects: [Effect.Blur], color: [245, 241, 255, 20] }).catch(() => {});
-      else await window.clearEffects().catch(() => {});
+      // The native command owns modern DWM glass and its light tint. Remove
+      // legacy accent effects first: they turn clear during native dragging.
+      await window.clearEffects().catch(() => {});
       await updateNativeShape(dock);
     }).catch(() => {}); // Unsupported effects retain the CSS glass fallback.
   }, [dock]);

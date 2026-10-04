@@ -1,4 +1,4 @@
-/* Windows client blur provides the frost; CSS supplies the milky face and bevel.
+/* Light Windows compositor glass provides frost; CSS supplies the face and bevel.
    Keep the popover readable, without stacking opaque panes over the music. */
 :host { display: block; width: 100%; height:100%; }
 :host > div { height:100%; }

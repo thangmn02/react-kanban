@@ -70,6 +70,16 @@ fn geometry(width: u32, height: u32, scale: f64) -> Result<(i32, i32, i32), Stri
     Ok((width, height, diameter))
 }
 
+#[cfg(windows)]
+fn backdrop_attributes(rounded: bool) -> [(u32, u32); 2] {
+    use windows_sys::Win32::Graphics::Dwm::{DWMWA_SYSTEMBACKDROP_TYPE,
+        DWMWA_USE_IMMERSIVE_DARK_MODE, DWMSBT_NONE, DWMSBT_TRANSIENTWINDOW};
+    // Keep the frost light independently of the Windows dark theme. The
+    // compositor backdrop stays active inside the native move/resize loop.
+    [(DWMWA_USE_IMMERSIVE_DARK_MODE as _, 0),
+        (DWMWA_SYSTEMBACKDROP_TYPE as _, if rounded { DWMSBT_TRANSIENTWINDOW } else { DWMSBT_NONE } as _)]
+}
+
 #[tauri::command]
 pub async fn native_dock_shape(window: WebviewWindow, state: tauri::State<'_, WindowShape>, rounded: bool) -> Result<u32, String> {
     let shape = Arc::clone(&state.0);
@@ -94,7 +104,14 @@ fn apply_shape(window: WebviewWindow, state: Arc<Mutex<Option<(bool, u32, u32, b
         use windows_sys::Win32::Graphics::Dwm::{DwmSetWindowAttribute,
             DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND, DWMWCP_DONOTROUND};
         let preference = if rounded { DWMWCP_ROUND } else { DWMWCP_DONOTROUND };
-        // DWM clips both the webview and Acrylic. A GDI cut-out instead leaves
+        let hwnd = window.hwnd().map_err(|e| e.to_string())?.0;
+        for (attribute, value) in backdrop_attributes(rounded) {
+            // Older systems keep CSS glass when the compositor API is absent;
+            // never fall back to the legacy accent blur that flickers on drag.
+            unsafe { DwmSetWindowAttribute(hwnd as _, attribute,
+                &value as *const _ as _, std::mem::size_of_val(&value) as _); }
+        }
+        // DWM clips both the webview and glass. A GDI cut-out instead leaves
         // opaque corner blocks in the compositor's rectangular backdrop.
         (unsafe { DwmSetWindowAttribute(window.hwnd().map_err(|e| e.to_string())?.0 as _,
             DWMWA_WINDOW_CORNER_PREFERENCE as _, &preference as *const _ as _, std::mem::size_of_val(&preference) as _) }) >= 0
@@ -133,5 +150,11 @@ mod tests {
         assert_eq!(geometry(780, 690, 1.5).unwrap(), (780, 690, 66));
         assert_eq!(geometry(1040, 920, 2.0).unwrap(), (1040, 920, 88));
         assert!(geometry(u32::MAX, 460, 1.0).is_err());
+    }
+    #[cfg(windows)]
+    #[test]
+    fn dock_uses_light_compositor_glass_and_tasks_clear_the_backdrop() {
+        assert_eq!(super::backdrop_attributes(true), [(20, 0), (38, 3)]);
+        assert_eq!(super::backdrop_attributes(false), [(20, 0), (38, 1)]);
     }
 }
