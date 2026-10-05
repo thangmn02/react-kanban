@@ -19,6 +19,53 @@ of these backups outside the repository:
 Never commit production rows, database passwords, access tokens, or data-only
 dumps. The tracked SQL snapshots in this directory are schema-only.
 
+## Manual encrypted backup without Docker
+
+For a Windows machine without Docker, use
+[backup-supabase.ps1](../../scripts/backup-supabase.ps1) with PostgreSQL 17 client
+binaries from the [official Windows download route](https://www.postgresql.org/download/windows/).
+The script uses the linked Supabase CLI's temporary database login, captures a
+full custom-format `pg_dump` archive and separate schema/data/role exports, and
+stores them outside the repository. It never prints connection credentials.
+Role exports omit passwords.
+
+```powershell
+./scripts/backup-supabase.ps1 `
+  -BackupRoot "$env:USERPROFILE/KoraBackups" `
+  -PostgresBin '<directory containing pg_dump.exe and the other PostgreSQL tools>' `
+  -ProjectRef '<the exact linked project reference>'
+```
+
+Output includes `manifest.json`, encrypted `.dpapi` exports and `RECOVERY.txt`.
+Encryption is Windows DPAPI CurrentUser: recovery requires the same Windows
+account/profile on this computer. Copying these files alone does not provide
+portable disaster recovery on a replacement computer; retain Windows recovery
+credentials or arrange separately approved portable encryption. The containing
+directory grants access only to the current user.
+
+The script decrypts its exported artifacts and restores the `public`,
+`app_private`, `auth`, `storage`, and `supabase_migrations` schemas into a private,
+temporary PostgreSQL instance at loopback port 54329. It compares every table's
+row count against the source, then stops that instance and removes plaintext
+staging files. For the local drill it retains the local administrator, changes
+membership grantors to that administrator and supplies schemas/publications and
+standard extensions; the original encrypted exports preserve hosted definitions.
+Supabase-specific platform extensions are included in the archive but are not
+verified through local restore. A failed drill keeps encrypted artifacts and
+encrypted diagnostics, and cannot claim `restore_verified`.
+
+To retry only the local recovery test, use the same arguments with
+`-ExistingBackup '<previous output directory>'`. This uses the encrypted
+snapshot and its recorded counts; it does not recapture newer hosted rows.
+An occupied restore port fails rather than starting another instance.
+
+[Supabase database backups](https://supabase.com/docs/guides/platform/backups)
+contain Storage metadata rather than Storage object files. Copy objects
+separately when recovering deleted files is part of the intended backup scope.
+Edge Function secrets and hosting environment configuration also need their
+own recovery route. This manual backup does not enable PITR or automatic hosted
+backups, and does not repair migration history or authorize a hosted restore.
+
 ## Safety boundary
 
 This branch only reads the linked project and rebuilds disposable local
@@ -26,6 +73,12 @@ databases. Do not run `supabase migration repair`, `supabase db push`,
 `supabase config push`, or otherwise alter the hosted project or its migration
 history. Hosted-history alignment is a separate, reviewed operation after this
 branch is approved.
+
+The owner separately authorized Contact activation on 2026-10-05 after a
+verified encrypted backup. Only the Contact migration was applied in one
+transaction; all 21 hosted pgTAP checks passed and migration history was left
+intact. This exception does not authorize baseline replay or history repair.
+See [Contact setup](../../docs/contact-setup.md) for its operational route.
 
 ## Hosted inspection evidence (2026-07-13)
 
