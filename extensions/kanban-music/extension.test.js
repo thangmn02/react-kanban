@@ -12,6 +12,9 @@ it('allows only exact app origins and known commands', () => {
   expect(allowedRequest({ ...message, action: 'execute' }, { url: 'http://localhost:5173/' })).toBe(false);
   expect(allowedRequest({ ...message, action: 'media.focus', sessionId: 'song' }, { url: 'http://localhost:5173/' })).toBe(true);
   expect(allowedRequest({ ...message, action: 'media.focus', sessionId: 'song' }, { url: 'https://evil.example/' })).toBe(false);
+  expect(allowedRequest({ ...message, action: 'instrument.setup', sessionId: 'song' }, { url: 'http://localhost:5173/' })).toBe(true);
+  expect(allowedRequest({ ...message, action: 'instrument.setup' }, { url: 'http://localhost:5173/' })).toBe(false);
+  expect(allowedRequest({ ...message, action: 'instrument.setup', sessionId: 'song' }, { url: 'https://evil.example/' })).toBe(false);
 });
 
 it('detects every ready audio/video element generically and reads Media Session metadata for protected playback too', async () => {

@@ -66,6 +66,7 @@ export function createBeatSync(api, nativePublish) {
     current.captureId = undefined;
     current.captureReady = false;
     current.audioDetected = false;
+    current.delaySeconds = 0;
     current.mode = 'clock';
     publishState(current);
     if (captureId) void offscreenMessage({ kind: 'stop', captureId }).catch(() => {});
@@ -101,6 +102,7 @@ export function createBeatSync(api, nativePublish) {
           void offscreenMessage({ kind: 'stop', captureId }).catch(() => {}); return;
         }
         if (!response?.ok) throw new Error('Capture unavailable');
+        current.delaySeconds = Number.isFinite(response.delaySeconds) && response.delaySeconds >= 0 && response.delaySeconds <= 5 ? response.delaySeconds : 0;
         current.captureReady = true;
         // An open stream can still be silent/protected. Wait for analyser proof.
         confirmCapture(current);
@@ -202,9 +204,14 @@ export function createBeatSync(api, nativePublish) {
       if (!clock || !Number.isFinite(clock.currentTime) || clock.currentTime < 0 || !Number.isFinite(clock.playbackRate)
         || !Number.isFinite(clock.sampledAt) || typeof clock.playing !== 'boolean' || typeof clock.paused !== 'boolean') return;
       const resumed = (!current.clock?.playing || current.clock?.muted) && clock.playing && !clock.muted;
+      const previous = current.clock;
+      const elapsed = previous ? Math.max(0, (clock.sampledAt - previous.sampledAt) / 1000) : 0;
+      const discontinuity = previous?.playing && clock.playing &&
+        (Math.abs(clock.currentTime - previous.currentTime - elapsed * previous.playbackRate) > .75 || previous.playbackRate !== clock.playbackRate);
       current.clock = clock;
       if (resumed) current.retryAt = 0;
-      publish(current, { kind: 'clock', clock });
+      if (discontinuity) { current.retryAt = 0; cancelCapture(current); }
+      publish(current, { kind: 'clock', clock: { ...clock, currentTime: Math.max(0, clock.currentTime - (clock.playing ? (current.delaySeconds || 0) * clock.playbackRate : 0)) } });
       if (!clock.playing || clock.muted || current.tabMuted) cancelCapture(current);
       else void capture(current);
     },
@@ -225,11 +232,11 @@ export function createBeatSync(api, nativePublish) {
         && (message.tempo.bpm === null || Number.isFinite(message.tempo.bpm) && message.tempo.bpm >= 60 && message.tempo.bpm <= 180)) {
         publish(current, { kind: 'tempo.state', captureId: current.captureId, tempo: message.tempo });
       }
-      if (message.kind === 'melody.state' && current.mode === 'capture' && current.clock?.playing
+      if (message.kind === 'melody.state' && message.detector === 'instrument-v1' && current.mode === 'capture' && current.clock?.playing
         && typeof message.melody?.active === 'boolean' && Number.isFinite(message.melody.level)
         && message.melody.level >= 0 && message.melody.level <= 1
         && Number.isSafeInteger(message.melody.note) && message.melody.note >= 0) {
-        publish(current, { kind: 'melody.state', captureId: current.captureId,
+        publish(current, { kind: 'melody.state', detector: 'instrument-v1', captureId: current.captureId,
           melody: { active: message.melody.active, level: message.melody.level, note: message.melody.note } });
       }
       if (message.kind === 'tempo.tick' && current.mode === 'capture' && current.clock?.playing

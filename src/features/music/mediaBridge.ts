@@ -35,7 +35,7 @@ export type BeatEvent = { kind: 'clock'; clock: MusicClock }
 const channel = 'kanban-music-v1';
 const supportedBands = ['kick', 'clap', 'hat', 'bass', 'melody', 'snare'];
 const canonicalBand = (band: string): BeatBand => band === 'snare' ? 'clap' : band as BeatBand;
-export type MusicAction = 'sessions.get' | 'diagnostics.get' | 'media.play' | 'media.pause' | 'media.focus';
+export type MusicAction = 'sessions.get' | 'diagnostics.get' | 'media.play' | 'media.pause' | 'media.focus' | 'instrument.setup';
 type BeatAction = 'dock.beat.sync.start' | 'dock.beat.sync.stop';
 
 export class MusicBridgeError extends Error {
@@ -119,6 +119,10 @@ export async function sendMusicDiagnostics(): Promise<unknown[]> {
   return response.tabs;
 }
 
+export async function openInstrumentNotesSetup(sessionId: string): Promise<void> {
+  await requestBridge('instrument.setup', sessionId);
+}
+
 export function subscribeBeatEvents(sessionId: string, subscriptionId: string, receive: (event: BeatEvent) => void) {
   const parse = (data: unknown, native = false) => {
     if (!data || typeof data !== 'object') return;
@@ -147,7 +151,7 @@ export function subscribeBeatEvents(sessionId: string, subscriptionId: string, r
       && (message.tempo.bpm === null || typeof message.tempo.bpm === 'number' && Number.isFinite(message.tempo.bpm)
         && message.tempo.bpm >= 60 && message.tempo.bpm <= 180)) receive({ kind: 'tempo.state', captureId: message.captureId,
         tempo: { locked: message.tempo.locked, bpm: message.tempo.bpm, confidence: message.tempo.confidence } });
-    if (message.kind === 'melody.state' && typeof message.captureId === 'string' && message.captureId.length <= 100
+    if (message.kind === 'melody.state' && message.detector === 'instrument-v1' && typeof message.captureId === 'string' && message.captureId.length <= 100
       && typeof message.melody?.active === 'boolean' && Number.isFinite(message.melody.level)
       && message.melody.level >= 0 && message.melody.level <= 1
       && Number.isSafeInteger(message.melody.note) && message.melody.note >= 0) receive({

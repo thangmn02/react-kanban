@@ -38,7 +38,7 @@ It cannot hear Zalo calls, notifications, native music apps or other desktop
 audio. The previous system-audio checkbox and its IPC command are removed;
 saved `native.systemAudio` values are ignored.
 
-Install/reload **Kora Music Companion 0.3.10** in the browser used for music.
+Install/reload **Kora Music Companion 0.3.11** in the browser used for music.
 The companion discovers only the explicitly supported music websites. It
 automatically connects to the running widget and sends metadata and beat
 events, never PCM audio. No web-app tab is needed. Capture can still require
@@ -63,7 +63,20 @@ restarts recover automatically. This adds the `alarms` extension permission.
 The old web protocol and app origin are retained for compatibility. The app
 identifier `app.kanthangboard.focus` is deliberately unchanged to preserve
 existing native sign-in and preferences. Branding, product/version and the
-executable are now Kora / 0.1.11 / `kora.exe`.
+executable are now Kora / 0.1.12 / `kora.exe`.
+
+The fifth row now follows detected instrumental note attacks. Choose **AI
+instrument notes** in Music to open this browser profile's companion options,
+then download/enable the local model once (about 157 MB). The model separates
+vocals/drums/bass first; a retained harmonic profile favors one dominant
+instrumental line. Original audio and all rows share a 3.5-second buffer while
+enabled capture runs; music videos have delayed audio. Pause/seek/source change
+discards it. Disabling AI restores immediate playback and a dark fifth row.
+Failed/slow analysis leaves row five dark; drum/clap/hat/bass detection remains
+independent. Several instruments can remain in a stem, so exact transcription
+or isolation of a named instrument is not guaranteed. No captured PCM crosses
+the native bridge. See the companion's [model notices](../extensions/kanban-music/INSTRUMENT-NOTICES.md)
+and [validation](../extensions/kanban-music/BEAT-VALIDATION.md).
 
 ## Development and distribution
 

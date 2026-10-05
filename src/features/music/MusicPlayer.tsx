@@ -1,5 +1,6 @@
 import { useI18n } from '../../i18n';
-import { getMusicInstallUrl } from './mediaBridge';
+import { getMusicInstallUrl, openInstrumentNotesSetup } from './mediaBridge';
+import { useState } from 'react';
 import type { BrowserMusicController } from './useBrowserMusic';
 import { patternAt } from './beatVisuals';
 import type { BeatColorMode, BeatPalette } from './beatVisuals';
@@ -61,6 +62,7 @@ export function MusicGrid({ music, colorMode = 'random', palette = 'bloom', orie
 
 export function MusicFeedback({ music }: { music: BrowserMusicController }) {
   const { t } = useI18n();
+  const [setupFailed, setSetupFailed] = useState(false);
   const { selected, playing, busy, openMusicTab, error, beat } = music;
   const needsAccess = playing && beat.mode !== 'capture' && beat.reason === 'capture-permission';
   const outdatedCapturePolicy = beat.mode === 'clock' && (beat.reason === 'drm-protected' || selected?.syncState?.reason === 'drm-protected');
@@ -74,6 +76,11 @@ export function MusicFeedback({ music }: { music: BrowserMusicController }) {
     {silentPlayback && <p className="music-status muted" role="status">{t('music.silentCapture')}</p>}
     {outdatedCapturePolicy && <p className="music-status muted" role="status">{t('music.captureUpdate')}</p>}
     {error && <p className="music-status muted" role="status">{error}</p>}
+    {selected && <button type="button" className="text-button" onClick={() => {
+      setSetupFailed(false);
+      void openInstrumentNotesSetup(selected.id).catch(() => setSetupFailed(true));
+    }}>{t('music.instrumentNotesSetup')}</button>}
+    {setupFailed && <p className="music-status muted" role="status">{t('music.instrumentNotesUpdate')}</p>}
   </>;
 }
 

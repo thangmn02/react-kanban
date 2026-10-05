@@ -4,19 +4,35 @@ This is an independent implementation, not a copy of ungive/media-control-extens
 
 Our own Manifest V3 extension connects browser music to Kora's Floating Focus. No extension ID, music login, or API key is required. The inline focus dock stays unchanged; music lives in the detached window.
 
-Version 0.3.10 connects directly to the running **Kora Windows widget**
+Version 0.3.11 connects directly to the running **Kora Windows widget**
 through loopback `127.0.0.1:47635`. No Kora web tab is needed in that mode.
 The widget receives only allowlisted browser music metadata and visual
 events; it does not listen to desktop/system audio. Browser permission can
 still require a toolbar click on the playing music tab. See
 [native setup and security](../../src-tauri/README.md).
 
-The five rows are Kick, Clap, Hi-hat, Bass and Melody. Melody is a tonal-energy
-approximation, not isolated instruments. Its squares hold while a live envelope
-is present and flash on phrase activation, new note sequences or raw hat hits;
-envelope level sets flash intensity. Missing envelopes expire after 700 ms.
-Silence, pause or capture loss clears the held signal. Decorative shapes hold
-for eight seconds before fading.
+The five rows are Kick, Clap, Hi-hat, Bass and Melody. Melody flashes on note
+attacks from one dominant harmonic part in an AI-isolated instrumental stem.
+Repeated pitches can trigger separate flashes; sustain, vocals, raw hats and
+decorative percussion shapes do not trigger the fifth row. It stays dark until
+AI instrument notes are enabled. Missing states expire after 700 ms.
+
+In the dock, choose **AI instrument notes**, or open the companion's
+**Details → Extension options**, then **Download and enable**. This downloads
+about 157 MB of hash-verified Spleeter model data once, cached in this browser
+profile. All inference code and WASM ship in the extension. Audio stays in a
+bounded memory buffer and is never uploaded or saved to disk. Original audio
+and all five rows share a 3.5-second delay while enabled; videos can be out of
+sync. **Turn off** restores immediate playback and leaves the fifth row dark.
+
+Spleeter separates vocals, drums, bass and other instruments; it does not
+separate piano from guitar or name instruments. A harmonic-profile tracker
+retains one prominent part within the instrumental stem. Dense arrangements,
+similar timbres and source leakage can cause missed or extra notes; this is
+not exact transcription. Model setup or missed processing deadlines leave
+the fifth row dark while the first four detectors keep running. A runtime
+failure preserves the existing audio delay until capture restarts, avoiding
+an abrupt skipped section. See [model provenance/licenses](./INSTRUMENT-NOTICES.md).
 
 For sparse captured drums, real kick hits gently correct the locked grid phase
 with a 0.4 gain, accepting errors within 0.35 of an eighth note. Dense drums
@@ -59,7 +75,7 @@ After publication, set `VITE_MUSIC_EXTENSION_STORE_URL` in Netlify to the actual
 - **Live beat sync (v3):** playing sessions on every supported service automatically request capture from the browser. Each real band onset pops that row's active squares to full color and 1.12× scale for 150ms. For sparse, steady transients, v0.3.7 can lock to an estimated 60–180 BPM pulse and drive kick/hat/snare squares on an eighth-note grid. The lock needs a strong six-second autocorrelation peak and releases after more than four seconds of low confidence; irregular music keeps the calmer raw-accent mode. The worker reports `capture` only after both stream confirmation and an audible analyser sample; a silent stream stays in clock mode and is stopped after 2.5 seconds. Denied or silent requests retry after 30 seconds; transient failures retry after 3 seconds. Resume and unmute also retry. No in-memory “clicked” flag blocks retries after app/worker reloads.
 - **Browser permission:** automatic attempts do not grant permission. Chrome, Edge or Brave may require clicking **Kora Music Companion** on the music tab, especially after extension reload/revocation or on a new tab. A click retries immediately, including when done before Floating Focus opens. The app shows a visible **Open music tab** button and instructions on permission denial. Transient failures are not mislabeled as permission denial. Do not promise click-free capture when the browser revokes access.
 - **Developer ground truth:** **Beat debug (dev)** shows the selected session's actual mode/reason, capture ID, kick/snare/bass/hat counters, and per-session mode snapshots from discovery. Each `sync.state` event is tagged with the selected session/subscription. Only one session is captured; others honestly report clock mode (`not-selected`, `not-playing`, or `muted`). Actual failures report `silent`, `capture-permission` or the relevant failure code, not guessed DRM. Older companions reporting `drm-protected` show an update hint. Duplicate/stale onsets cannot add extra pops. Missing state/onset traffic expires capture mode even when clock updates keep arriving.
-- Capture uses `tabCapture`, `activeTab`, and an offscreen `USER_MEDIA` document. The documented audio-plus-video constraints use the same stream ID; video tracks are stopped immediately. Captured audio is routed back to the speakers once because Chrome suppresses the original output during capture. Nothing is recorded or uploaded.
+- Capture uses `tabCapture`, `activeTab`, and an offscreen `USER_MEDIA` document. The documented audio-plus-video constraints use the same stream ID; video tracks are stopped immediately. Captured original audio is routed back to the speakers once because Chrome suppresses the original output during capture, with the disclosed delay only when AI notes are enabled. Nothing is recorded or uploaded.
 - Pause, ended playback, mute, session replacement, tab closure, navigation, and closing Floating Focus release capture. A six-second lease releases tracks if the app disappears without cleanup. The offscreen sampler runs at 60Hz with one reused FFT buffer; background documents do not reliably receive animation frames.
 - To remove access, disable/remove the extension in the browser's extension manager.
 
@@ -67,7 +83,17 @@ Document Picture-in-Picture must be supported by the browser. The browser-owned 
 
 ## Updating an existing installation
 
-Version 0.3.10 adds real-kick phase correction; update Kora too for phrase/hat Melody flashes. Replace the unpacked extension folder with the new ZIP contents (or reload the repo folder), click **Reload** on its card in your browser's extension manager, and refresh Kora and the music tab once. This music-tab refresh is important after upgrading from 0.3.3: the observer must run before the player creates its off-document audio object. No additional permissions are introduced over 0.3.9. Pin the companion once for all listed music services. App refreshes and pause/resume retry capture while browser access remains granted; a new tab or extension reload may need another click. Silent streams stop after 2.5 seconds and back off 30 seconds; resume/unmute or a toolbar click retries immediately. Install separately in each browser/profile. The updated app and extension are both needed; Floating Focus still opens from the timer.
+Use Kora 0.1.12/web release with companion 0.3.11 for isolated instrumental notes.
+The new app rejects legacy broad-tone Melody events, leaving that row dark
+until the companion is updated and AI notes are enabled. Replace the unpacked
+folder with the new ZIP contents, click **Reload** on its card, and refresh
+Kora and the music tab once. Keep the extracted folder. No broad host access
+is added; the CSP permits the bundled WASM runtime. Install separately in
+each browser/profile. Browser permission can still require a toolbar click
+after restarting, opening a new music tab or reloading the extension.
+Silent input stops after 2.5 seconds plus the active audio delay so buffered
+music drains; pause, seek, rate change and source switch discard the buffer
+immediately. Resume/unmute or a toolbar click retries capture.
 
 See [BEAT-VALIDATION.md](./BEAT-VALIDATION.md) for API evidence, detector settings, and the live validation status.
 

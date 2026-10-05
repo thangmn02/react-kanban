@@ -61,6 +61,8 @@ const vi = {
   'music.openTab': "Phát nhạc trên YouTube, YouTube Music, SoundCloud, Spotify, Apple Music, Deezer hoặc Tidal.",
   'music.captureUpdate': "Cập nhật tiện ích nhạc để thử bắt nhịp trực tiếp trên trình phát này.",
   'music.silentCapture': "Chưa có nhịp trực tiếp cho bài này.",
+  'music.instrumentNotesSetup': "Nốt nhạc cụ AI",
+  'music.instrumentNotesUpdate': "Cập nhật Music Companion, rồi mở Tùy chọn tiện ích để thiết lập nốt nhạc cụ AI.",
   'music.requiresExtension': "Thêm điều khiển nhạc một lần. Bài hát sẽ tự kết nối.",
   'music.checking': "Đang kiểm tra tiện ích nhạc…",
   'music.addControls': "Thêm điều khiển nhạc",

@@ -30,6 +30,22 @@ it('automatically asks Chrome for capture and creates a USER_MEDIA offscreen doc
   expect(f.api.runtime.sendMessage).toHaveBeenCalledWith(expect.objectContaining({ kind: 'stop' }));
   await f.sync.stop();
 });
+
+it('discards delayed capture on a seek or playback-rate change and reacquires a fresh stream', async () => {
+  const f = fixture();
+  await f.sync.start(f.session, f.owner, 'subscription');
+  await vi.waitFor(() => expect(f.sync.status(f.session).mode).toBe('capture'));
+  const first = f.api.runtime.sendMessage.mock.calls.find(([message]) => message.kind === 'start')[0].captureId;
+  f.sync.clock({ token: f.token(), valid: true, clock: { ...f.session, currentTime: 45, sampledAt: f.session.sampledAt + 100 } },
+    { tab: { id: 12 }, documentId: 'music-doc' });
+  expect(f.api.runtime.sendMessage).toHaveBeenCalledWith(expect.objectContaining({ kind: 'stop', captureId: first }));
+  await vi.waitFor(() => expect(f.api.tabCapture.getMediaStreamId).toHaveBeenCalledTimes(2));
+  await vi.waitFor(() => expect(f.sync.status(f.session).mode).toBe('capture'));
+  f.sync.clock({ token: f.token(), valid: true, clock: { ...f.session, currentTime: 45.1, sampledAt: f.session.sampledAt + 200, playbackRate: 1.5 } },
+    { tab: { id: 12 }, documentId: 'music-doc' });
+  await vi.waitFor(() => expect(f.api.tabCapture.getMediaStreamId).toHaveBeenCalledTimes(3));
+  await f.sync.stop();
+});
 it('silently keeps clock mode on capture failure and ignores clocks from other documents', async () => {
   const f = fixture();
   f.api.tabCapture.getMediaStreamId.mockRejectedValue(new Error('Denied'));
@@ -166,10 +182,11 @@ it('relays sustained Melody only from the live, playing captured stream', async 
   const captureId = f.sync.status(f.session).captureId;
   const sender = { url: f.api.runtime.getURL('offscreen.html') };
   const melody = { active: true, level: .6, note: 1 };
-  f.sync.offscreen({ kind: 'melody.state', captureId, melody }, sender);
+  f.sync.offscreen({ kind: 'melody.state', detector: 'instrument-v1', captureId, melody }, sender);
   expect(f.api.tabs.sendMessage).toHaveBeenLastCalledWith(24,
-    expect.objectContaining({ kind: 'melody.state', captureId, melody }), expect.anything());
+    expect.objectContaining({ kind: 'melody.state', detector: 'instrument-v1', captureId, melody }), expect.anything());
   const before = f.api.tabs.sendMessage.mock.calls.length;
+  f.sync.offscreen({ kind: 'melody.state', captureId, melody }, sender);
   f.sync.offscreen({ kind: 'melody.state', captureId: 'old', melody }, sender);
   f.sync.offscreen({ kind: 'melody.state', captureId, melody }, { ...sender, tab: { id: 12 } });
   f.sync.offscreen({ kind: 'melody.state', captureId, melody: { ...melody, level: 2 } }, sender);

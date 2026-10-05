@@ -49,6 +49,7 @@ async function handle(message, sender) {
   if (message.action === 'sessions.get') return { ok: true, sessions: publicSessions(await companion.prefer(sessions)) };
   const session = sessions.find((item) => item.id === message.sessionId);
   if (!session) return { ok: false, error: 'unavailable' };
+  if (message.action === 'instrument.setup') { await chrome.runtime.openOptionsPage(); return { ok: true }; }
   if (message.action === 'media.focus') {
     await companion.openMusic(session); return { ok: true, sessions: publicSessions(sessions) };
   }

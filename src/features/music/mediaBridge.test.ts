@@ -1,16 +1,24 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { getMusicInstallUrl, isMusicSession, sendMusicRequest, sendMusicDiagnostics, subscribeBeatEvents } from './mediaBridge';
+import { getMusicInstallUrl, isMusicSession, sendMusicRequest, sendMusicDiagnostics, subscribeBeatEvents, openInstrumentNotesSetup } from './mediaBridge';
 
 afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); vi.unstubAllEnvs(); });
 const session = { id: '1', title: 'Song', artist: 'Artist', source: 'youtube.com', paused: true };
+it('opens instrument setup through a correlated selected-session acknowledgement', async () => {
+  const post = vi.spyOn(window, 'postMessage').mockImplementation(message => reply(message, { ok: true }));
+  await expect(openInstrumentNotesSetup(session.id)).resolves.toBeUndefined();
+  expect(post).toHaveBeenCalledWith(expect.objectContaining({ action: 'instrument.setup', sessionId: session.id }), location.origin);
+  post.mockImplementation(message => reply(message, { ok: false, error: 'unavailable' }));
+  await expect(openInstrumentNotesSetup(session.id)).rejects.toMatchObject({ code: 'unavailable' });
+});
 
-it('validates sustained Melody envelopes and canonicalizes a legacy snare to Clap', () => {
+it('accepts isolated instrument states, rejects legacy tonal states and canonicalizes snare to Clap', () => {
   const receive = vi.fn();
   const stop = subscribeBeatEvents('song', 'subscription', receive);
   const send = (data: object) => window.dispatchEvent(new MessageEvent('message', { source: window, origin: location.origin,
-    data: { channel: 'kanban-music-v1', direction: 'extension-event', event: 'beat', sessionId: 'song', subscriptionId: 'subscription', captureId: 'live', ...data } }));
+    data: { channel: 'kanban-music-v1', direction: 'extension-event', event: 'beat', sessionId: 'song', subscriptionId: 'subscription', captureId: 'live', detector: 'instrument-v1', ...data } }));
   send({ kind: 'melody.state', melody: { active: true, level: NaN, note: 1 } });
   send({ kind: 'melody.state', melody: { active: true, level: 2, note: 1 } });
+  send({ kind: 'melody.state', detector: undefined, melody: { active: true, level: .6, note: 1 } });
   expect(receive).not.toHaveBeenCalled();
   send({ kind: 'melody.state', melody: { active: true, level: .6, note: 1 } });
   expect(receive).toHaveBeenCalledWith({ kind: 'melody.state', captureId: 'live', melody: { active: true, level: .6, note: 1 } });

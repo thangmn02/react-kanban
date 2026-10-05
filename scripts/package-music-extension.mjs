@@ -2,10 +2,23 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { deflateSync } from 'node:zlib';
+import { build } from 'vite';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const extension = join(root, 'extensions', 'kanban-music');
 const output = join(root, 'public', 'downloads');
+
+// The model itself downloads once on opt-in. All executable code/WASM is
+// packaged locally to comply with Manifest V3's remote-code prohibition.
+await mkdir(join(extension, 'vendor'), { recursive: true });
+for (const name of ['ort.wasm.min.mjs', 'ort-wasm-simd-threaded.mjs', 'ort-wasm-simd-threaded.wasm']) {
+  await writeFile(join(extension, 'vendor', name), await readFile(join(root, 'node_modules/onnxruntime-web/dist', name)));
+}
+await build({ configFile: false, logLevel: 'warn', build: {
+  outDir: join(extension, 'generated'), emptyOutDir: true, minify: true,
+  lib: { entry: join(extension, 'instrument-worker.js'), formats: ['es'], fileName: () => 'instrument-worker.js' },
+  rolldownOptions: { external: ['onnxruntime-web/wasm'], output: { paths: { 'onnxruntime-web/wasm': '../vendor/ort.wasm.min.mjs' } } },
+} });
 
 function crc32(bytes) {
   let crc = 0xffffffff;
@@ -74,7 +87,10 @@ function zip(files) {
 
 await mkdir(join(extension, 'icons'), { recursive: true });
 for (const size of [16, 48, 128]) await writeFile(join(extension, 'icons', `${size}.png`), icon(size));
-const names = ['manifest.json', 'background.js', 'widget-bridge.js', 'sites.js', 'companion-action.js', 'media.js', 'media-observer.js', 'discovery-diagnostics.js', 'protocol.js', 'relay.js', 'clock.js', 'beat-sync.js', 'beat-detector.js', 'melody-detector.js', 'tempo-tracker.js', 'capture-engine.js', 'offscreen.html', 'offscreen.js', 'setup.html', 'setup.js', 'setup.css', 'icons/16.png', 'icons/48.png', 'icons/128.png'];
+const names = ['manifest.json', 'background.js', 'widget-bridge.js', 'sites.js', 'companion-action.js', 'media.js', 'media-observer.js', 'discovery-diagnostics.js', 'protocol.js', 'relay.js', 'clock.js', 'beat-sync.js', 'beat-detector.js', 'tempo-tracker.js', 'capture-engine.js', 'offscreen.html', 'offscreen.js', 'setup.html', 'setup.js', 'setup.css', 'icons/16.png', 'icons/48.png', 'icons/128.png'];
+names.push('instrument-runtime.js', 'instrument-models.js', 'instrument-worklet.js', 'INSTRUMENT-NOTICES.md',
+  'generated/instrument-worker.js', 'vendor/ort.wasm.min.mjs', 'vendor/ort-wasm-simd-threaded.mjs', 'vendor/ort-wasm-simd-threaded.wasm',
+  'THIRD-PARTY-LICENSES.txt');
 const files = await Promise.all(names.map(async (name) => ({ name, bytes: await readFile(join(extension, name)) })));
 JSON.parse(files.find((file) => file.name === 'manifest.json').bytes.toString());
 await mkdir(output, { recursive: true });

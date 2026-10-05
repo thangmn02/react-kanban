@@ -25,11 +25,12 @@ interface BeatPatternProps {
 export default function BeatPattern({ session, beat, colorMode = 'random', palette = 'bloom', orientation = 'horizontal' }: BeatPatternProps) {
   const capture = session?.playing === true && !session.paused && beat.mode === 'capture' && beat.sessionId === session.id;
   const captureKey = capture ? `${session.id}:${beat.captureId || 'legacy'}:${beat.tempo?.locked ? 'tempo' : 'accent'}` : '';
+  const melodyCaptureKey = capture ? `${session.id}:${beat.captureId || 'legacy'}` : '';
   const songSeconds = session?.currentTime || 0;
   const epoch = reshuffleEpoch(songSeconds, beat.tempo?.locked ? beat.tempo.bpm : null);
   const pattern = patternAt(songSeconds);
-  // Only percussion moves to the estimated grid. Bass accents and Melody
-  // sustain remain driven by captured audio.
+  // Only percussion moves to the estimated grid. Instrument notes have their
+  // own event sequence and never borrow percussion or tempo ticks.
   const counts = beat.tempo?.locked ? { ...(beat.ticks || {}), bass: beat.onsets.bass, melody: beat.onsets.melody } : beat.onsets;
   const kickCount = counts.kick || 0;
   const clapCount = counts.clap || 0;
@@ -56,42 +57,29 @@ export default function BeatPattern({ session, beat, colorMode = 'random', palet
   }, [capture, audioLive, captureKey, kickCount, clapCount, hatCount, bassCount, melodyCount, onsetTotal, tickTotal]);
   const newOnsets = pulse.captureKey === captureKey ? pulse.active : {};
   const melodyLive = capture && beat.melody?.active === true && beat.melody.level > 0;
-  const rawHatCount = beat.onsets.hat || 0;
   const melodyNote = beat.melody?.note || 0;
-  const melodyGate = useRef({ captureKey: '', active: false, note: 0, hats: 0, sequence: 0 });
-  const [melodyFlash, setMelodyFlash] = useState<{ captureKey: string; id: number; hat: boolean } | null>(null);
+  const melodyGate = useRef({ captureKey: '', active: false, note: 0, sequence: 0 });
+  const [melodyFlash, setMelodyFlash] = useState<{ captureKey: string; id: number } | null>(null);
   useEffect(() => {
     const previous = { ...melodyGate.current };
     const gate = melodyGate.current;
-    Object.assign(gate, { captureKey, active: melodyLive, note: melodyNote, hats: rawHatCount });
-    if (!captureKey || previous.captureKey !== captureKey) {
+    Object.assign(gate, { captureKey: melodyCaptureKey, active: melodyLive, note: melodyNote });
+    if (!melodyCaptureKey || previous.captureKey !== melodyCaptureKey) {
       const reset = setTimeout(() => setMelodyFlash(null), 0);
       return () => clearTimeout(reset);
     }
-    const hat = rawHatCount > previous.hats;
-    if (!hat && !(melodyLive && (!previous.active || melodyNote > previous.note))) return;
+    if (!(melodyLive && melodyNote > previous.note)) return;
     const id = ++gate.sequence;
-    // Real envelope edges and raw hats trigger a short flash. Levels alone do not.
-    const start = setTimeout(() => setMelodyFlash({ captureKey, id, hat }), 0);
+    // A new instrumental note triggers a short flash. Sustain and levels do not.
+    const start = setTimeout(() => setMelodyFlash({ captureKey: melodyCaptureKey, id }), 0);
     return () => clearTimeout(start);
-  }, [captureKey, melodyLive, melodyNote, rawHatCount]);
+  }, [melodyCaptureKey, melodyLive, melodyNote]);
   useEffect(() => {
     if (!melodyFlash) return;
     const end = setTimeout(() => setMelodyFlash(null), 150);
     return () => clearTimeout(end);
   }, [melodyFlash]);
-  const melodyHit = capture && melodyFlash?.captureKey === captureKey && (melodyFlash.hat || melodyLive);
-  const breakdown = melodyLive && (['kick', 'clap', 'hat'] as const).every((band) => !(beat.rates?.[band] || 0));
-  const [melodyMoment, setMelodyMoment] = useState<Moment | null>(null);
-  useEffect(() => {
-    // Hold one complete shape across a drumless phrase, not one short flash
-    // per analyser update. The signal, never a beat timer, owns its lifetime.
-    const timer = setTimeout(() => setMelodyMoment((previous) => breakdown
-      ? previous?.captureKey === captureKey ? previous : { id: Date.now(), captureKey,
-        shape: shapeNames[hashText(captureKey) % shapeNames.length], effect: 'wave' }
-      : null), 0);
-    return () => clearTimeout(timer);
-  }, [breakdown, captureKey]);
+  const melodyHit = capture && melodyFlash?.captureKey === melodyCaptureKey && melodyLive;
 
   const [moment, setMoment] = useState<Moment | null>(null);
   const momentGate = useRef<{ captureKey: string; previousTotal: number; nextAt: number; lastShape?: MomentShape; lastEffect?: MomentEffect }>({
@@ -130,12 +118,11 @@ export default function BeatPattern({ session, beat, colorMode = 'random', palet
       setTimeout(() => setMoment((current) => current?.id === next.id ? null : current), momentDuration(effect, next.id))];
   }, [audioLive, captureKey, moment?.captureKey, onsetTotal, songSeconds]);
   useEffect(() => () => { momentTimers.current.forEach(clearTimeout); }, []);
-  const heldMoment = breakdown && melodyMoment?.captureKey === captureKey ? melodyMoment : null;
-  const liveMoment = heldMoment || (audioLive && moment?.captureKey === captureKey ? moment : null);
+  const liveMoment = audioLive && moment?.captureKey === captureKey ? moment : null;
 
   return <div className={`music-pattern${capture ? ' live' : ''}${capture && colorMode === 'flow' ? ' flow' : ''}${liveMoment ? ' moment' : ''}${palette === 'ultraviolet' ? ' ultraviolet' : ''} ${orientation}`}
     data-pattern={pattern} data-reshuffle={epoch} data-moment={liveMoment?.shape || ''}
-    data-moment-source={heldMoment ? 'melody' : liveMoment ? 'accent' : ''} data-moment-effect={liveMoment?.effect || ''} aria-hidden="true">
+    data-moment-source={liveMoment ? 'accent' : ''} data-moment-effect={liveMoment?.effect || ''} aria-hidden="true">
     {beatBands.map((band, row) => {
       const steps = activeSteps(session?.id || 'empty', epoch, row);
       const colors = channelColors(colorMode, palette, session?.id || 'empty', epoch, row);
@@ -153,17 +140,16 @@ export default function BeatPattern({ session, beat, colorMode = 'random', palet
         {steps.map((active, step) => {
           const delay = pulseDelay(pattern, step, pulseSeed);
           const onset = capture && band !== 'melody' && !liveMoment && active && newOnsets[band] && delay !== null;
-          const momentLit = liveMoment && isShapeCell(liveMoment.shape, row, step);
-          const melodyHeld = (heldMoment && momentLit) || (band === 'melody' && melodyLive && !liveMoment && active);
+          const momentLit = band !== 'melody' && liveMoment && isShapeCell(liveMoment.shape, row, step);
           const cellStyle = { '--melody-level': beat.melody?.level || 0, '--pulse-delay': `${delay || 0}ms`, '--moment-delay': `${liveMoment ? momentDelay(liveMoment.effect, row, step, liveMoment.id) : 0}ms`, '--moment-duration': `${momentFlashMs}ms` } as CSSProperties;
           const shapeHit = momentLit && pulse.captureKey === captureKey && pulse.shapeHit;
           return <span key={`${step}:${onset ? `${captureKey}:${counts[band]}` : 0}:${momentLit ? liveMoment.id : 0}`}
             data-pattern-active={active} style={cellStyle}
-            className={`beat-square${active ? ' active' : ''}${onset ? ' onset' : ''}${momentLit ? ' moment-lit' : ''}${melodyHeld ? ' melody-held' : ''}`}>
+            className={`beat-square${active && (band !== 'melody' || melodyHit) ? ' active' : ''}${onset ? ' onset' : ''}${momentLit ? ' moment-lit' : ''}`}>
             {/* Captured accents or a confident audio tempo lock retrigger the held mask. */}
             {shapeHit && <span key={`${captureKey}:${pulse.rawTotal}:${pulse.tickTotal}`} className="shape-beat-flash"
               style={{ '--shape-hit-delay': `${momentDelay(liveMoment.effect, row, step, pulse.rawTotal) * .18}ms` } as CSSProperties} />}
-            {band === 'melody' && melodyHit && (liveMoment ? momentLit : active) && <span
+            {band === 'melody' && melodyHit && active && <span
               key={`melody:${melodyFlash.id}`} className="melody-beat-flash"
               style={{ '--melody-flash-level': melodyLive ? beat.melody?.level : 1 } as CSSProperties} />}
           </span>;

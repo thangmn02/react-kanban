@@ -138,12 +138,6 @@ h2 { font-size: 15px; line-height: 1.4; margin: 0; overflow-wrap: anywhere; }
 }
 .channel-icon { color: var(--c); opacity: .35; animation: none; transform: none; }
 .music-pattern .beat-square { transition: background-color .4s ease, box-shadow .4s ease; }
-.music-pattern.live .beat-square.melody-held,
-.music-pattern.moment .beat-square.melody-held {
-  background: var(--ci); border-color: transparent;
-  animation: none;
-  box-shadow: 0 0 10px color-mix(in srgb, var(--c) 40%, transparent);
-}
 .shape-beat-flash {
   position: absolute; inset: -1px; border-radius: inherit; pointer-events: none;
   background: color-mix(in srgb, var(--c) 70%, white);
@@ -166,7 +160,6 @@ h2 { font-size: 15px; line-height: 1.4; margin: 0; overflow-wrap: anywhere; }
   10%, 35% { opacity: var(--melody-flash-level, 1); transform: scale(1.12); }
 }
 @media(prefers-reduced-motion:reduce) {
-  .music-pattern.live .beat-square.melody-held, .music-pattern.moment .beat-square.melody-held { animation:none !important; transform:none; }
   .shape-beat-flash { animation: none; display: none; }
   .melody-beat-flash { animation: none; transform: none; opacity: var(--melody-flash-level, 1); }
 }

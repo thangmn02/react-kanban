@@ -40,6 +40,12 @@ it('accepts only bounded music requests from this connection, never arbitrary co
   await f.receive(request);
   expect(f.handle).toHaveBeenCalledWith(request, { native: f.nonce });
   expect(JSON.parse(f.socket.send.mock.calls.at(-1)[0])).toMatchObject({ type: 'response', requestId: 'one', ok: true, nonce: f.nonce });
+  const setup = { ...request, action: 'instrument.setup', sessionId: 'song' };
+  await f.receive({ ...setup, nonce: 'wrong' });
+  await f.receive({ ...setup, sessionId: undefined });
+  expect(f.handle).toHaveBeenCalledTimes(1);
+  await f.receive(setup);
+  expect(f.handle).toHaveBeenCalledWith(setup, { native: f.nonce });
   f.bridge.close();
 });
 it('forwards fresh beat events only to their owning native connection', async () => {

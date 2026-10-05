@@ -1,5 +1,6 @@
 const copy = {
   en: {
+    instrumentTitle: 'Follow instrumental notes', instrumentBody: 'Choose AI instrument notes in the dock, then Download and enable in the companion’s options (version 0.3.11 or later). This downloads about 157 MB once and delays playback 3.5 seconds to align all five rows. Videos can be out of sync. Audio stays on your device. The fifth row follows one prominent instrumental part; crowded songs can cause missed or extra notes. Turn off restores immediate playback and leaves the fifth row dark.',
     back: '← Back to Kora', eyebrow: 'KORA MUSIC COMPANION', title: 'Your music, beside your focus timer.',
     intro: 'Connect browser music to the Kora web dock or Windows widget. Use Chrome, Edge, or Brave.',
     release: 'Early access: the extension is not in the browser store yet. These steps let you try it now. The public version will use an “Add to browser” button.',
@@ -12,6 +13,7 @@ const copy = {
     privacy: 'Music metadata and visual signals stay local. Audio is never recorded or uploaded.', privacyLink: 'Privacy details', copied: 'Address copied. Paste it into your browser’s address bar.', copyFailed: 'Select the address above and copy it manually.',
   },
   vi: {
+    instrumentTitle: 'Nháy theo nốt nhạc cụ', instrumentBody: 'Chọn Nốt nhạc cụ AI trong dock, rồi Download and enable trong tùy chọn tiện ích (phiên bản 0.3.11 trở lên). Tải khoảng 157 MB một lần và phát nhạc trễ 3,5 giây để đồng bộ cả năm hàng. Video có thể lệch tiếng. Âm thanh chỉ xử lý trên thiết bị. Hàng thứ năm theo một phần nhạc cụ nổi bật; bài có nhiều nhạc cụ chồng nhau có thể bỏ sót hoặc nháy dư. Turn off bỏ độ trễ và giữ hàng thứ năm tối.',
     back: '← Quay lại Kora', eyebrow: 'TIỆN ÍCH NHẠC KORA', title: 'Nhạc của bạn, bên cạnh đồng hồ tập trung.',
     intro: 'Kết nối nhạc trình duyệt với dock web hoặc widget Windows của Kora. Dùng Chrome, Edge hoặc Brave.',
     release: 'Bản dùng thử: tiện ích chưa có trên cửa hàng trình duyệt. Làm theo các bước dưới đây để thử ngay. Bản chính thức sẽ chỉ cần nút “Thêm vào trình duyệt”.',

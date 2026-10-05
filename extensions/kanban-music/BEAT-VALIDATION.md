@@ -1,5 +1,77 @@
 # Beat sync validation
 
+## Version 0.3.11 — local instrumental note attacks (2026-10-06)
+
+Kora 0.1.12 removes hat, sustained-envelope and decorative-shape triggers from
+the fifth row. Only incrementing `melody.state` sequences marked
+`detector: instrument-v1` can flash it; old companion tonal states stay dark.
+The first four rows retain their own detectors and tempo phase correction.
+
+Opt-in source analysis uses four real Spleeter ONNX models (vocals, drums,
+bass, other), pinned and SHA-256 verified by
+[instrument-models.js](./instrument-models.js). Executable ONNX Runtime Web
+and FFT code/WASM ship locally in the extension; only model data downloads.
+The fully convolutional exports use 128-frame windows with unchanged weights
+and operators. The protobuf adaptation was compared byte-for-byte with Python
+ONNX serialization for all four models; real browser WASM inference produced
+finite outputs with the expected dimensions. Measured combined inference was
+about 479 ms per window on this machine, below the 1.486-second window stride.
+
+The worker masks competing stems before selecting a dominant harmonic profile.
+Context suppresses bass-tail leakage; a minimum energy threshold rejects
+inaudible residue. Repeated pitches and changed pitches produce attacks;
+decay, sustain and separation-state heartbeats do not restart a flash.
+Multiple instruments can remain in the other stem, so this is not guaranteed
+named-instrument isolation or exact transcription of a mixed song.
+
+Original stereo audio and all five visual streams share a 3.5-second buffer.
+The actual AudioWorklet/DelayNode check produced four events for four piano
+attacks, including repeated pitches, with a worst measured difference of
+31.93 ms from monitored output. This measures the browser audio graph; it
+does not include WebSocket/UI delivery, physical speakers or Bluetooth delay.
+Videos may be out of sync with the delayed sound. Pause, seek, rate change,
+source switch and stop discard pending audio/events. A model deadline failure
+clears instrument events and stops inference while preserving audio output
+and the first four detectors; its existing delay lasts until capture restarts.
+
+Actual model tests on three labeled MUSDB sample excerpts (6.80 seconds each):
+
+| Excerpt | Instrument-only attacks | Mixed attacks | Vocal/drum/bass-only attacks |
+| --- | ---: | ---: | ---: |
+| Cristina Vane — So Easy | 22 | 29 | 0 / 0 / 0 |
+| Mu — Too Bright | 19 | 23 | 0 / 0 / 0 |
+| Clara Berry And Wooldog — Waltz For My Victims | 23 | 22 | 0 / 0 / 0 |
+
+These are source-rejection checks, not ground-truth note counts. They establish
+neither universal leakage rejection nor complete note accuracy on full songs.
+Harmonic-profile retention, brief/repeated attacks, silence, legacy events,
+cache corruption/download limits, timing, cancellation, failed/stalled models,
+worklet sample continuity and web/native option routing have regressions.
+
+Repeat with `pnpm run music:package`, then
+`node scripts/verify-instrument-playback.mjs`. This launches an isolated local
+browser on port 1431, downloads about 157 MB of verified model data if missing,
+and closes its browser/server afterward. Models/results live under ignored
+`scratch/instrument-proof`, or `KORA_TEST_MODEL_DIR`; no audio is uploaded.
+
+For `node scripts/verify-instrument-stems.mjs`, use the authors'
+[MUSDB sample archive](https://github.com/sigsep/sigsep-mus-db/releases/tag/v0.4.0),
+respect its research-data terms, and prepare the three excerpts above in the
+same scratch directory. `fixtures.json` is an array of `{ "index": 0,
+"name": "test/Cristina Vane - So Easy.stem.mp4" }` entries. Decode each audio
+stream with FFmpeg, e.g. `ffmpeg -i input.stem.mp4 -map 0:a:3 -ar 44100 -ac 2
+-f f32le fixture-0-other.f32`; stream indices are mixture=0, drums=1, bass=2,
+other=3, vocals=4. Audio fixtures and model binaries are not committed.
+
+Privacy and licensing: see [INSTRUMENT-NOTICES.md](./INSTRUMENT-NOTICES.md) and
+the packaged third-party licenses. Model setup explicitly discloses download,
+delay and limitations before enabling it. Live service permission, first-time
+options-page download and full-song listening on the user's installed browser
+remain separate acceptance checks.
+
+The older sections below describe their respective releases; their tonal,
+hat-triggered and held-Melody behavior is superseded by 0.3.11.
+
 ## Version 0.3.10 — bounded kick phase correction (2026-10-05)
 
 The locked sparse grid now feeds detected kicks into its anchor. Each accepted

@@ -14,9 +14,19 @@
 <p>All listed music services try the same browser-approved tab capture, including Apple Music, Spotify, Deezer and Tidal. Beats appear only if audible audio reaches the analyser; silence or denial keeps the squares still and music controls available. No DRM or browser capture restriction is bypassed.</p>
 <p lang="vi">Mọi dịch vụ nhạc đã liệt kê đều thử bắt âm thanh thẻ khi trình duyệt cho phép, gồm Apple Music, Spotify, Deezer và Tidal. Chỉ nháy theo nhịp thật khi bộ phân tích nhận được âm thanh; nếu im lặng hoặc bị từ chối, các ô vuông đứng yên và vẫn phát/dừng được. Không vượt cơ chế bảo vệ nội dung hay giới hạn bắt âm thanh của trình duyệt.</p>
 <p>There is no account connection or extension ID to enter. Install the companion separately in each browser/profile you use.</p>
+<section aria-labelledby="instrument-heading">
+<h2 id="instrument-heading">AI instrument notes / Nốt nhạc cụ AI</h2>
+<p>The fifth row follows note attacks in the dominant instrumental line. Vocals, drums and bass are separated first; the other four rows keep their own detectors. Sustained notes and hi-hats do not trigger this row.</p>
+<p>Download once: about 157 MB. Analysis runs locally and adds 3.5 seconds of audio delay while Floating Focus listens, so the lights follow the sound you hear. Pausing, seeking or switching tabs discards the buffer. Music videos will have delayed sound. Turning this off restores immediate playback and leaves the fifth row dark.</p>
+<p lang="vi">Tải một lần khoảng 157 MB. AI chạy trên máy và trễ âm thanh 3,5 giây khi Floating Focus đang nghe để đèn khớp với âm thanh. Tạm dừng, tua hoặc đổi thẻ sẽ xóa bộ đệm. Video nhạc sẽ có âm thanh trễ. Tắt tính năng để phát ngay; hàng thứ năm sẽ đứng yên.</p>
+<p>Several instruments can remain in the separated stem. The tracker favors one dominant harmonic line; every note and complete removal of vocals cannot be guaranteed. If analysis cannot keep up, the fifth row stays dark.</p>
+<button id="enable-instrument" type="button">Download and enable / Tải và bật</button>
+<button id="disable-instrument" type="button">Turn off / Tắt</button>
+<p id="instrument-status" role="status" aria-live="polite"></p>
+</section>
 <h2>Music not appearing?</h2>
 <p>Keep Kora and your playing music tab open in this same browser/profile. Check detection below. The report contains only website names, media counts and status codes—no account data, song URLs or audio. A paused YouTube session can be an old loaded player; it does not mean YouTube is playing music.</p>
 <button id="check-detection" type="button">Check music detection / Kiểm tra nhận nhạc</button>
 <pre id="detection-result" aria-live="polite" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>
-<script src="setup.js"></script>
+<script src="setup.js" type="module"></script>
 </main></body></html>

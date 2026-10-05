@@ -61,6 +61,8 @@ const en = {
   'music.openTab': "Play a track on YouTube, YouTube Music, SoundCloud, Spotify, Apple Music, Deezer, or Tidal.",
   'music.captureUpdate': "Update your music companion to try live beats on this player.",
   'music.silentCapture': "Live beats unavailable for this track.",
+  'music.instrumentNotesSetup': "AI instrument notes",
+  'music.instrumentNotesUpdate': "Update Music Companion, then open its Extension options to set up AI instrument notes.",
   'music.requiresExtension': "Add music controls once. Your songs connect automatically.",
   'music.checking': "Checking for music controls…",
   'music.addControls': "Add music controls",

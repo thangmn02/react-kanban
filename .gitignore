@@ -18,6 +18,8 @@ lerna-debug.log*
 # Dependencies and build outputs
 # =========================================================
 node_modules/
+/extensions/kanban-music/generated/
+/extensions/kanban-music/vendor/
 dist/
 dist-ssr/
 /src-tauri/target/

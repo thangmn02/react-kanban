@@ -324,6 +324,7 @@ pub async fn native_music_request(
         "media.play"
             | "media.pause"
             | "media.focus"
+            | "instrument.setup"
             | "dock.beat.sync.start"
             | "dock.beat.sync.stop"
     ) {

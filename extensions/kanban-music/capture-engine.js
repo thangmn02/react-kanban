@@ -1,6 +1,5 @@
 import { BeatDetector } from './beat-detector.js';
 import { TempoTracker } from './tempo-tracker.js';
-import { MelodyDetector } from './melody-detector.js';
 
 // Chrome's documented offscreen recipe uses both constraints with the same ID.
 // Video tracks are stopped immediately and are never rendered or analyzed.
@@ -11,6 +10,8 @@ export function tabConstraints(streamId) {
 
 export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, onStop, onAudible = () => {},
   onTempo = () => {}, onTempoTick = () => {}, onMelody = () => {},
+  createInstrumentCapture,
+  onInstrumentFailure = () => {},
   now = () => performance.now(), schedule = setInterval, cancel = clearInterval }) {
   let generation = 0;
   let active;
@@ -23,8 +24,9 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
     active = undefined;
     if (!previous) return;
     cancel(previous.interval);
-    previous.stream.getTracks().forEach((track) => track.stop());
+    previous.stream?.getTracks().forEach((track) => track.stop());
     previous.source?.disconnect();
+    previous.instrument?.stop();
     previous.analyser?.disconnect();
     void previous.context?.close().catch(() => {});
     onStop(previous.captureId, reason);
@@ -36,25 +38,64 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
     requestedId = captureId;
     let stream;
     try {
-      stream = await getUserMedia(tabConstraints(streamId));
-      if (request !== generation) { stream.getTracks().forEach((track) => track.stop()); return false; }
-      stream.getVideoTracks().forEach((track) => track.stop());
-      if (!stream.getAudioTracks().length) throw new Error('No audio track');
-      const state = { stream, captureId, leaseUntil: now() + 6000, lastAudio: now(), interval: undefined };
+      const state = { captureId, leaseUntil: now() + 6000, lastAudio: now(), interval: undefined };
       active = state;
       state.context = createAudioContext();
+      state.events = []; state.delaySeconds = 0; state.note = 0;
+      const enqueue = (kind, payload, at = (state.context.currentTime ?? now() / 1000) + state.delaySeconds) => {
+        if (active !== state || state.events.length >= 2048) return;
+        state.events.push({ kind, payload, at: at + (state.context.baseLatency || 0) + (state.context.outputLatency || 0) });
+        state.events.sort((a, b) => a.at - b.at);
+      };
+      const instrumentError = (message = 'Instrument analysis missed its playback deadline') => {
+        if (active !== state) return;
+        state.events = state.events.filter((event) => event.kind !== 'melody');
+        state.instrumentFailed = true;
+        state.instrument?.stopAnalysis();
+        onInstrumentFailure(String(message).slice(0, 160));
+        onMelody(captureId, { active: false, level: 0, note: state.note });
+      };
+      if (createInstrumentCapture) {
+        try {
+          state.instrument = createInstrumentCapture({ context: state.context, onError: instrumentError, onNotes(events) {
+            if (active !== state || state.instrumentFailed) return;
+            if (events.some((event) => event.time + state.delaySeconds < state.context.currentTime - .05)) { instrumentError(); return; }
+            events.forEach((event) => enqueue('melody', event.state, event.time + state.delaySeconds));
+          } });
+          if (state.instrument) {
+            let setupTimeout;
+            try {
+              await Promise.race([state.instrument.ready, new Promise((_, reject) => {
+                setupTimeout = setTimeout(() => reject(new Error('Instrument setup took too long. Retry from AI instrument notes.')), 3000);
+              })]);
+            } finally { clearTimeout(setupTimeout); }
+            if (request !== generation) return false;
+            state.delaySeconds = state.instrument.delaySeconds;
+          }
+        } catch (error) {
+          if (active === state) instrumentError(error.message);
+          state.instrument?.stop(); state.instrument = undefined;
+        }
+      }
+      if (request !== generation) return false;
+      // Load/warm the model before capture suppresses the tab's normal output.
+      stream = await getUserMedia(tabConstraints(streamId));
+      if (request !== generation) { stream.getTracks().forEach((track) => track.stop()); return false; }
+      state.stream = stream;
+      stream.getVideoTracks().forEach((track) => track.stop());
+      if (!stream.getAudioTracks().length) throw new Error('No audio track');
+      state.lastAudio = now(); state.leaseUntil = now() + 6000;
       state.source = state.context.createMediaStreamSource(stream);
       state.analyser = state.context.createAnalyser();
-      state.analyser.fftSize = 2048;
-      state.analyser.smoothingTimeConstant = 0;
+      state.analyser.fftSize = 2048; state.analyser.smoothingTimeConstant = 0;
       state.source.connect(state.analyser);
-      // Capturing suppresses normal tab output. Restore it exactly once.
-      state.source.connect(state.context.destination);
+      // Restore original audio once, delayed only after actual model setup.
+      if (state.instrument) state.instrument.connect(state.source);
+      else state.source.connect(state.context.destination);
       await state.context.resume();
       if (request !== generation) return false;
       if (state.context.state !== 'running') throw new Error('Audio context unavailable');
       const detector = new BeatDetector(state.context.sampleRate);
-      const melody = new MelodyDetector(state.context.sampleRate);
       const tempo = new TempoTracker();
       const drumHits = [];
       const spectrum = new Float32Array(state.analyser.frequencyBinCount);
@@ -69,7 +110,6 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
         if (time > state.leaseUntil || state.context.state !== 'running') { stop('expired'); return; }
         state.analyser.getFloatFrequencyData(spectrum);
         const result = detector.analyze(spectrum, time);
-        const tonal = melody.analyze(spectrum, time);
         const rhythm = tempo.analyze(result.envelope, time);
         if (rhythm.locked && result.hits.includes('kick')) tempo.snapToBeat(time);
         for (const band of result.hits) if (band === 'kick' || band === 'clap' || band === 'hat') drumHits.push(time);
@@ -77,20 +117,26 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
         // Strong, regular drums retain direct onset lighting. Tempo lock is
         // for periodic music whose transient rows are sparse.
         const tempoLocked = rhythm.locked && drumHits.length < 20;
-        // A held midrange note can be outside every percussion band.
-        if (result.audible || tonal.audible) {
+        // Audibility is independent of instrument detection (it can be vocals).
+        const audible = spectrum.some((db) => Number.isFinite(db) && db > -65);
+        if (result.audible || audible) {
           state.lastAudio = time;
           if (!state.audioDetected) { state.audioDetected = true; onAudible(captureId); }
         }
-        if (time - state.lastAudio > 2500) { stop('silent'); return; }
-        if (result.hits.length) onBeat(captureId, result.hits);
-        if (state.lastMelody === undefined || time - state.lastMelody >= 100 || state.melodyActive !== tonal.active) {
-          state.lastMelody = time;
-          state.melodyActive = tonal.active;
-          onMelody(captureId, { active: tonal.active, level: tonal.level, note: tonal.note });
+        if (time - state.lastAudio > 2500 + state.delaySeconds * 1000) { stop('silent'); return; }
+        if (result.hits.length) enqueue('beat', result.hits);
+        if (rhythm.updated) enqueue('tempo', { locked: tempoLocked, bpm: tempoLocked ? rhythm.bpm : null, confidence: rhythm.confidence });
+        if (tempoLocked && rhythm.tick) enqueue('tick', rhythm.tick);
+        if (state.lastMelody === undefined) { state.lastMelody = time; onMelody(captureId, { active: false, level: 0, note: 0 }); }
+        const audioTime = state.context.currentTime ?? time / 1000;
+        while (state.events[0]?.at <= audioTime) {
+          const event = state.events.shift();
+          if (audioTime - event.at > .6) continue;
+          if (event.kind === 'beat') onBeat(captureId, event.payload);
+          if (event.kind === 'tempo') onTempo(captureId, event.payload);
+          if (event.kind === 'tick') onTempoTick(captureId, event.payload);
+          if (event.kind === 'melody') { state.note = event.payload.note; onMelody(captureId, event.payload); }
         }
-        if (rhythm.updated) onTempo(captureId, { locked: tempoLocked, bpm: tempoLocked ? rhythm.bpm : null, confidence: rhythm.confidence });
-        if (tempoLocked && rhythm.tick) onTempoTick(captureId, rhythm.tick);
       }, 1000 / 60);
       return true;
     } catch {
@@ -102,9 +148,9 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
     }
   }
 
-  return { start, stop, stopCapture(captureId) { if (requestedId === captureId) stop(); }, renew(captureId) {
+  return { start, stop, get delaySeconds() { return active?.delaySeconds || 0; }, stopCapture(captureId) { if (requestedId === captureId) stop(); }, renew(captureId) {
     if (active?.captureId !== captureId || active.context?.state !== 'running'
-      || !active.stream.getAudioTracks().some((track) => track.readyState === 'live')) return false;
+      || !active.stream?.getAudioTracks().some((track) => track.readyState === 'live')) return false;
     active.leaseUntil = now() + 6000;
     return true;
   } };

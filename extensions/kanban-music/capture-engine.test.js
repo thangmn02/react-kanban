@@ -41,7 +41,7 @@ it('confirms audible analysis once, not just an opened stream', async () => {
   f.engine.stop();
 });
 
-it('publishes a held Melody envelope throughout a drumless note and turns it off on silence', async () => {
+it('does not label mixed tonal energy as an instrumental note without AI separation', async () => {
   const f = fixture();
   let tone = true;
   f.analyser.getFloatFrequencyData = (array) => {
@@ -50,13 +50,66 @@ it('publishes a held Melody envelope throughout a drumless note and turns it off
   };
   await f.engine.start('stream', 'melody');
   await vi.advanceTimersByTimeAsync(3000);
-  expect(f.deps.onMelody.mock.calls.filter(([, state]) => state.active).length).toBeGreaterThan(20);
-  expect(f.deps.onMelody).toHaveBeenLastCalledWith('melody', expect.objectContaining({ active: true, note: 1 }));
+  expect(f.deps.onMelody.mock.calls.filter(([, state]) => state.active)).toHaveLength(0);
+  expect(f.deps.onMelody).toHaveBeenLastCalledWith('melody', expect.objectContaining({ active: false, note: 0 }));
   expect(f.deps.onTempoTick).not.toHaveBeenCalled();
   tone = false;
   await vi.advanceTimersByTimeAsync(500);
   expect(f.deps.onMelody).toHaveBeenLastCalledWith('melody', expect.objectContaining({ active: false, level: 0 }));
   f.engine.stop();
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+it('schedules individual model notes on the delayed audio timeline and cancels them on stop', async () => {
+  const f = fixture();
+  const started = Date.now();
+  Object.defineProperty(f.context, 'currentTime', { get: () => (Date.now() - started) / 1000 });
+  let publish;
+  const pipeline = { ready: Promise.resolve(), delaySeconds: 3.5, connect: vi.fn(), stop: vi.fn(), stopAnalysis: vi.fn() };
+  f.deps.createInstrumentCapture = ({ onNotes }) => { publish = onNotes; return pipeline; };
+  const engine = createCaptureEngine(f.deps);
+  await engine.start('stream', 'buffered');
+  expect(f.source.connect.mock.calls.filter(([target]) => target === f.context.destination)).toHaveLength(0);
+  publish([{ time: .1, state: { active: true, level: .7, note: 1 } }, { time: .19, state: { active: true, level: .8, note: 2 } }]);
+  await vi.advanceTimersByTimeAsync(3550);
+  expect(f.deps.onMelody.mock.calls.some(([, state]) => state.active)).toBe(false);
+  await vi.advanceTimersByTimeAsync(160);
+  expect(f.deps.onMelody.mock.calls.filter(([, state]) => state.active).map(([, state]) => state.note)).toEqual([1, 2]);
+  publish([{ time: 1, state: { active: true, level: .8, note: 3 } }]);
+  engine.stop();
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(pipeline.stop).toHaveBeenCalledOnce();
+  expect(f.deps.onMelody.mock.calls.filter(([, state]) => state.active)).toHaveLength(2);
+});
+
+it('leaves original audio connected when AI misses a note deadline', async () => {
+  const f = fixture();
+  f.context.currentTime = 10;
+  let publish;
+  const pipeline = { ready: Promise.resolve(), delaySeconds: 3.5, connect: vi.fn(), stop: vi.fn(), stopAnalysis: vi.fn() };
+  f.deps.createInstrumentCapture = ({ onNotes }) => { publish = onNotes; return pipeline; };
+  const engine = createCaptureEngine(f.deps);
+  await engine.start('stream', 'slow');
+  publish([{ time: 0, state: { active: true, level: .8, note: 1 } }]);
+  expect(pipeline.stopAnalysis).toHaveBeenCalledOnce();
+  expect(pipeline.stop).not.toHaveBeenCalled();
+  expect(f.deps.onMelody).toHaveBeenLastCalledWith('slow', { active: false, level: 0, note: 0 });
+  engine.stop();
+});
+
+it('continues ordinary capture without AI delay if model setup stalls', async () => {
+  const f = fixture();
+  const pipeline = { ready: new Promise(() => {}), stop: vi.fn(), stopAnalysis: vi.fn() };
+  f.deps.createInstrumentCapture = () => pipeline;
+  const engine = createCaptureEngine(f.deps);
+  const started = engine.start('stream', 'stalled');
+  expect(f.deps.getUserMedia).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(3010);
+  expect(await started).toBe(true);
+  expect(engine.delaySeconds).toBe(0);
+  expect(f.source.connect).toHaveBeenCalledWith(f.context.destination);
+  expect(pipeline.stop).toHaveBeenCalledOnce();
+  engine.stop();
   expect(vi.getTimerCount()).toBe(0);
 });
 
@@ -140,7 +193,7 @@ it('falls back cleanly on capture rejection and releases streams that arrive aft
   const failed = fixture();
   failed.deps.getUserMedia.mockRejectedValue(new Error('NotAllowedError'));
   expect(await failed.engine.start('id', 'denied')).toBe(false);
-  expect(failed.deps.createAudioContext).not.toHaveBeenCalled();
+  expect(failed.context.close).toHaveBeenCalledOnce();
   const late = fixture();
   let resolve;
   late.deps.getUserMedia.mockReturnValue(new Promise((done) => { resolve = done; }));
