@@ -8,7 +8,7 @@ mode does not simulate sending: real backend configuration is required.
 ## Live release
 
 Contact is active at [kanthangboard.netlify.app/contact](https://kanthangboard.netlify.app/contact)
-and included in the signed Kora 0.1.8 update. In an existing native installation,
+and included in the signed Kora 0.1.9 update. In an existing native installation,
 choose **Update**, then **Update and restart**, to load its Contact navigation.
 Web publication uses the existing GitHub-to-Netlify integration. The public
 Turnstile build variable is configured in Netlify and GitHub Actions; local

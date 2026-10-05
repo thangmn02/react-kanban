@@ -74,7 +74,7 @@ export function useAppRoutingController({
   } = board;
   const { activeView, activeInviteToken, routeWorkspaceId, routeBoardId } = deriveAppRouteState(location.pathname);
 
-  const goToView = useCallback((nextView: AppView, options?: { inviteToken?: string | null }) => {
+  const goToView = useCallback(async (nextView: AppView, options?: { inviteToken?: string | null }) => {
     if (nextView === 'invite') {
       const token = options?.inviteToken || activeInviteToken;
       if (token) navigate(`/invite/${token}`);
@@ -88,11 +88,20 @@ export function useAppRoutingController({
     if (nextView === 'arcana') return navigate('/arcana');
     if (nextView === 'members' && activeWorkspaceId) return navigate(`/workspaces/${activeWorkspaceId}/members`);
     if (nextView === 'not-found') return;
-    if (activeWorkspaceId && activeBoardId) {
-      const suffix = nextView === 'calendar' ? '/calendar' : nextView === 'table' ? '/table' : '';
-      navigate(`/workspaces/${activeWorkspaceId}/boards/${activeBoardId}${suffix}`);
+    if (authMode === 'supabase' && !user) return navigate('/auth/sign-in');
+    if (!activeWorkspaceId) return navigate('/onboarding');
+    let boardId = activeBoardId;
+    // A direct public Contact visit deliberately has no loaded board yet.
+    if (!boardId) {
+      try {
+        const boards = await refreshBoardList();
+        boardId = boards.find(candidate => candidate.id === initialBoardId)?.id || boards[0]?.id || null;
+      } catch { return navigate('/home'); }
     }
-  }, [activeBoardId, activeInviteToken, activeWorkspaceId, navigate]);
+    if (!boardId) return navigate('/home');
+    const suffix = nextView === 'calendar' ? '/calendar' : nextView === 'table' ? '/table' : '';
+    return navigate(`/workspaces/${activeWorkspaceId}/boards/${boardId}${suffix}`);
+  }, [activeBoardId, activeInviteToken, activeWorkspaceId, authMode, initialBoardId, navigate, refreshBoardList, user]);
 
   useEffect(() => {
     // Contact is public and does not need a workspace or board fetch.

@@ -1,6 +1,46 @@
-import { describe, expect, it } from 'vitest';
+import { act, cleanup, renderHook } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { deriveAppRouteState } from './useAppRoutingController';
+import { deriveAppRouteState, useAppRoutingController } from './useAppRoutingController';
+
+const routing = vi.hoisted(() => ({ navigate: vi.fn() }));
+vi.mock('react-router-dom', async original => ({
+  ...await original<typeof import('react-router-dom')>(),
+  useNavigate: () => routing.navigate,
+  useLocation: () => ({ pathname: '/contact' }),
+}));
+afterEach(() => { cleanup(); vi.clearAllMocks(); });
+
+describe('navigation from a direct Contact visit', () => {
+  function setup(signedIn = true, initialBoardId: string | null = null) {
+    const refreshBoardList = vi.fn().mockResolvedValue([{ id: 'first-board' }, { id: 'saved-board' }]);
+    const board = { activeBoardId: null, initialBoardId, refreshBoardList,
+      refreshBoardData: vi.fn(), setIsBoardLoading: vi.fn() } as unknown as Parameters<typeof useAppRoutingController>[0]['board'];
+    const { result } = renderHook(() => useAppRoutingController({ authMode: 'supabase',
+      user: signedIn ? { id: 'user', name: 'Reader', email: null, avatarUrl: '', isMock: false } : null,
+      isAuthLoading: false, isWorkspaceLoading: false, activeWorkspaceId: 'workspace',
+      workspaces: [], setActiveWorkspaceId: vi.fn(), board }));
+    return { result, refreshBoardList, board };
+  }
+  it('opens a real board without needing an intermediate Home visit', async () => {
+    const { result, refreshBoardList, board } = setup();
+    expect(board.refreshBoardData).not.toHaveBeenCalled();
+    await act(async () => { await result.current.goToView('board'); });
+    expect(refreshBoardList).toHaveBeenCalledOnce();
+    expect(routing.navigate).toHaveBeenCalledWith('/workspaces/workspace/boards/first-board');
+  });
+  it('uses the remembered board when it still belongs to the workspace', async () => {
+    const { result } = setup(true, 'saved-board');
+    await act(async () => { await result.current.goToView('board'); });
+    expect(routing.navigate).toHaveBeenCalledWith('/workspaces/workspace/boards/saved-board');
+  });
+  it('routes signed-out visitors to sign-in without loading private boards', async () => {
+    const { result, refreshBoardList } = setup(false);
+    await act(async () => { await result.current.goToView('board'); });
+    expect(refreshBoardList).not.toHaveBeenCalled();
+    expect(routing.navigate).toHaveBeenCalledWith('/auth/sign-in');
+  });
+});
 
 describe('deriveAppRouteState', () => {
   it.each([

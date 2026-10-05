@@ -52,7 +52,7 @@ restarts recover automatically. This adds the `alarms` extension permission.
 The old web protocol and app origin are retained for compatibility. The app
 identifier `app.kanthangboard.focus` is deliberately unchanged to preserve
 existing native sign-in and preferences. Branding, product/version and the
-executable are now Kora / 0.1.8 / `kora.exe`.
+executable are now Kora / 0.1.9 / `kora.exe`.
 
 ## Development and distribution
 
