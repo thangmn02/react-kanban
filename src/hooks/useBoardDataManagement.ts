@@ -47,9 +47,14 @@ export function useBoardDataManagement({
     userId: userId ?? 'mock-user',
     workspaceId: activeWorkspaceId,
   }), [userId, activeWorkspaceId]);
-  const cachedBoard = useMemo(() => readBoardCache(storageScope), [storageScope]);
+  const cachedBoard = useMemo(() => (
+    authMode === 'mock' || userId ? readBoardCache(storageScope) : null
+  ), [authMode, storageScope, userId]);
   const initialBoardId = cachedBoard?.boardId || null;
-  const [boardData, setBoardData] = useState<BoardData>(() => cachedBoard?.boardData || data);
+  const [boardData, setBoardData] = useState<BoardData>(() => (
+    cachedBoard?.boardData || (authMode === 'mock' ? data : { columns: [], list: {}, task: {} })
+  ));
+  const [loadedScope, setLoadedScope] = useState<StorageScope | null>(null);
   const [activeBoardId, setActiveBoardId] = useState<string | null>(() => initialBoardId);
   const [boardSummaries, setBoardSummaries] = useState<BoardRow[]>([]);
   const [isBoardLoading, setIsBoardLoading] = useState(true);
@@ -81,7 +86,7 @@ export function useBoardDataManagement({
     showErrorToast?: boolean;
   } = {}) => {
     try {
-      if (authMode === 'supabase' && !activeWorkspaceId) {
+      if (authMode === 'supabase' && (!activeWorkspaceId || !userId)) {
         setIsBoardLoading(false);
         return;
       }
@@ -98,6 +103,7 @@ export function useBoardDataManagement({
       setBoardData(boardSnapshot.boardData);
       syncBoardCache(boardSnapshot.boardId, boardSnapshot.boardData);
       setBoardErrorMessage(null);
+      setLoadedScope(storageScope);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to fetch board data from Supabase.';
 
@@ -109,7 +115,7 @@ export function useBoardDataManagement({
     } finally {
       setIsBoardLoading(false);
     }
-  }, [activeWorkspaceId, authMode, syncBoardCache, userId]);
+  }, [activeWorkspaceId, authMode, storageScope, syncBoardCache, userId]);
 
   useEffect(() => {
     activeBoardIdRef.current = activeBoardId;
@@ -124,7 +130,9 @@ export function useBoardDataManagement({
     setBoardData,
     refreshBoardData,
   });
-  useDueDateReminder(boardData);
+  // Cached or demo tasks must not notify before this user's workspace loads.
+  useDueDateReminder(boardData, loadedScope === storageScope && !isBoardLoading && !boardErrorMessage
+    && (authMode === 'mock' || Boolean(userId && activeWorkspaceId)));
 
   return {
     boardData,

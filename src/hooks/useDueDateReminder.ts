@@ -6,9 +6,9 @@ import type { BoardData } from '../types/task.type';
 
 const reminderStorageKey = 'kanban_due_date_reminder_date';
 
-export function useDueDateReminder(boardData: BoardData) {
+export function useDueDateReminder(boardData: BoardData, enabled = true) {
   useEffect(() => {
-    if (typeof window === 'undefined') {
+    if (!enabled || typeof window === 'undefined') {
       return;
     }
 
@@ -38,5 +38,5 @@ export function useDueDateReminder(boardData: BoardData) {
     notify.info(
       `${todayTasks.length} due today · ${overdueTasks.length} overdue`
     );
-  }, [boardData.task]);
+  }, [boardData.task, enabled]);
 }

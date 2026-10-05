@@ -137,6 +137,102 @@ it('does not let a stale paused YouTube toolbar selection displace playing Sound
   expect(screen.getByRole('heading', { name: paused.title })).toBeInTheDocument();
 });
 
+it.each(['soundcloud.com', 'open.spotify.com', 'music.apple.com', 'www.deezer.com', 'listen.tidal.com'])('automatically follows playback from a toolbar-selected YouTube tab to %s and back', async (source) => {
+  vi.useFakeTimers();
+  const youtube = { ...session, playing: true, selectionToken: 'youtube-click' };
+  const other = { ...session, id: 'other', title: 'Other song', source, playing: false, paused: true };
+  vi.mocked(sendMusicRequest).mockResolvedValueOnce([youtube, other])
+    .mockResolvedValueOnce([{ ...youtube, playing: false, paused: true }, { ...other, playing: true, paused: false }])
+    .mockResolvedValue([youtube, other]);
+  renderPlayer();
+  await act(async () => {});
+  expect(screen.getByRole('heading', { name: youtube.title })).toBeInTheDocument();
+  const oldSubscription = vi.mocked(sendBeatRequest).mock.calls.find(([action]) => action === 'dock.beat.sync.start')?.[2];
+  await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+  expect(screen.getByRole('heading', { name: other.title })).toBeInTheDocument();
+  expect(sendBeatRequest).toHaveBeenCalledWith('dock.beat.sync.stop', youtube.id, oldSubscription);
+  expect(sendBeatRequest).toHaveBeenCalledWith('dock.beat.sync.start', other.id, expect.any(String));
+  expect(sendMusicRequest).not.toHaveBeenCalledWith('media.focus', expect.anything());
+  await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+  expect(screen.getByRole('heading', { name: youtube.title })).toBeInTheDocument();
+});
+
+it('follows a newly playing tab even when the previous tab has not paused yet and stays stable afterward', async () => {
+  vi.useFakeTimers();
+  const other = { ...session, id: 'soundcloud', title: 'SoundCloud song', source: 'soundcloud.com', playing: false, paused: true };
+  vi.mocked(sendMusicRequest).mockResolvedValueOnce([session, other])
+    .mockResolvedValue([session, { ...other, playing: true, paused: false }]);
+  renderPlayer();
+  await act(async () => {});
+  await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+  expect(screen.getByRole('heading', { name: other.title })).toBeInTheDocument();
+  await act(async () => { await vi.advanceTimersByTimeAsync(4000); });
+  expect(screen.getByRole('heading', { name: other.title })).toBeInTheDocument();
+});
+
+it('preserves a manual paused selection across polls until another tab starts playback', async () => {
+  vi.useFakeTimers();
+  const chosen = { ...session, id: 'chosen', title: 'Chosen paused song', playing: false, paused: true };
+  const other = { ...session, id: 'other', title: 'New playing song', source: 'soundcloud.com', playing: false, paused: true };
+  vi.mocked(sendMusicRequest).mockResolvedValue([session, chosen, other]);
+  renderPlayer();
+  await act(async () => {});
+  fireEvent.change(screen.getByRole('combobox', { name: 'Choose a music tab' }), { target: { value: chosen.id } });
+  await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+  expect(screen.getByRole('heading', { name: chosen.title })).toBeInTheDocument();
+  vi.mocked(sendMusicRequest).mockResolvedValue([session, chosen, { ...other, playing: true, paused: false }]);
+  await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+  expect(screen.getByRole('heading', { name: other.title })).toBeInTheDocument();
+});
+
+it('keeps the last automatic source when all tabs pause and replaces it when that tab disappears', async () => {
+  vi.useFakeTimers();
+  const other = { ...session, id: 'other', title: 'Other song', playing: false, paused: true };
+  vi.mocked(sendMusicRequest).mockResolvedValueOnce([session, other])
+    .mockResolvedValueOnce([{ ...session, playing: false, paused: true }, other]).mockResolvedValue([other]);
+  renderPlayer();
+  await act(async () => {});
+  await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+  expect(screen.getByRole('heading', { name: session.title })).toBeInTheDocument();
+  await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+  expect(screen.getByRole('heading', { name: other.title })).toBeInTheDocument();
+});
+
+it('discovers a newly opened playing tab and sends playback controls to it after the handoff', async () => {
+  vi.useFakeTimers();
+  const other = { ...session, id: 'new-tab', title: 'New tab song', source: 'soundcloud.com' };
+  vi.mocked(sendMusicRequest).mockResolvedValueOnce([session]).mockResolvedValue([session, other]);
+  renderPlayer();
+  await act(async () => {});
+  await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+  expect(screen.getByRole('heading', { name: other.title })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Pause music' }));
+  await act(async () => {});
+  expect(sendMusicRequest).toHaveBeenCalledWith('media.pause', other.id);
+});
+
+it('releases the toolbar preference when a live clock pauses the source despite older playing discovery', async () => {
+  vi.useFakeTimers();
+  const youtube = { ...session, playing: true, sampledAt: 100, selectionToken: 'youtube-click' };
+  const other = { ...session, id: 'other', title: 'Other playing song', source: 'soundcloud.com', playing: true, sampledAt: 100 };
+  vi.mocked(sendMusicRequest).mockResolvedValue([youtube, other]);
+  renderPlayer();
+  await act(async () => {});
+  act(() => beatReceiver.receive?.({ kind: 'clock', clock: { playing: false, paused: true, currentTime: 80, playbackRate: 1, sampledAt: 200 } }));
+  await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+  expect(screen.getByRole('heading', { name: other.title })).toBeInTheDocument();
+});
+
+it('does not select an unpaused session explicitly reported as not playing', async () => {
+  vi.useFakeTimers();
+  const unavailable = { ...session, id: 'unavailable', title: 'Not actually playing', playing: false };
+  vi.mocked(sendMusicRequest).mockResolvedValueOnce([session]).mockResolvedValue([session, unavailable]);
+  renderPlayer();
+  await act(async () => {});
+  await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+  expect(screen.getByRole('heading', { name: session.title })).toBeInTheDocument();
+});
+
 it('keeps the dock empty when connected without a music session', async () => {
   vi.mocked(sendMusicRequest).mockResolvedValue([]);
   renderPlayer();
