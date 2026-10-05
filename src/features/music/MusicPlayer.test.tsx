@@ -20,13 +20,17 @@ const focusProps: FloatingFocusProps = {
   timerState: { mode: 'focus', activeTaskId: task.id, isRunning: true, remainingSeconds: 90, endsAt: null, startedAt: 1, plannedSeconds: 1500 },
   remainingSeconds: 90, onStart: vi.fn(), onPause: vi.fn(), onReset: vi.fn(),
 };
-function renderPlayer() { return render(<I18nProvider><FloatingFocus {...focusProps} /></I18nProvider>); }
+function renderPlayer() {
+  const view = render(<I18nProvider><FloatingFocus {...focusProps} /></I18nProvider>);
+  fireEvent.click(screen.getByRole('tab', { name: 'Music' }));
+  return view;
+}
 
 it('offers a guided install without asking for an extension ID', async () => {
   vi.mocked(sendMusicRequest).mockRejectedValue(new MusicBridgeError('not-installed'));
   const view = renderPlayer();
   await screen.findByRole('link', { name: 'Add music controls' });
-  expect(screen.queryByRole('region', { name: 'Music' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: session.title })).not.toBeInTheDocument();
   expect(view.container.querySelector('.music-dot')).toBeNull();
   expect(screen.getByRole('link', { name: 'Add music controls' })).toHaveAttribute('href', '/music-companion.html?lang=en');
   expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
@@ -237,7 +241,7 @@ it('keeps the dock empty when connected without a music session', async () => {
   vi.mocked(sendMusicRequest).mockResolvedValue([]);
   renderPlayer();
   await act(async () => {});
-  expect(screen.queryByRole('region', { name: 'Music' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: session.title })).not.toBeInTheDocument();
   expect(screen.queryByText(/debug|detection \(dev\)/i)).not.toBeInTheDocument();
 });
 
@@ -245,7 +249,7 @@ it('explains how to reconnect when an installed extension becomes unavailable', 
   vi.mocked(sendMusicRequest).mockRejectedValue(new MusicBridgeError('unavailable'));
   renderPlayer();
   await screen.findByText('Refresh your Kora tab to reconnect music controls.');
-  expect(screen.queryByRole('region', { name: 'Music' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: session.title })).not.toBeInTheDocument();
 });
 
 it('detects the companion when the user checks again after installation', async () => {
@@ -272,26 +276,26 @@ it('shows the heartbeat dot only while playing, keeps the paused panel, and hide
   const view = renderPlayer();
   const dot = () => view.container.querySelector('.music-dot');
   expect(dot()).toBeNull();
-  expect(screen.queryByRole('region', { name: 'Music' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: session.title })).not.toBeInTheDocument();
   await act(async () => {});
   expect(dot()).toBeNull();
-  expect(screen.queryByRole('region', { name: 'Music' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: session.title })).not.toBeInTheDocument();
   await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
   expect(dot()).toHaveClass('music-dot', 'playing');
-  expect(screen.getByRole('region', { name: 'Music' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: session.title })).toBeInTheDocument();
   expect(view.container.querySelectorAll('.channel-icon')).toHaveLength(5);
   expect(view.container.querySelectorAll('.channel-icon.lit')).toHaveLength(0);
   expect(view.container.querySelectorAll('.beat-square.lit, .beat-square.onset')).toHaveLength(0);
   await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
   expect(dot()).toBeNull();
-  expect(screen.getByRole('region', { name: 'Music' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: session.title })).toBeInTheDocument();
   expect(view.container.querySelectorAll('.channel-icon')).toHaveLength(5);
   expect(view.container.querySelectorAll('.channel-icon.lit')).toHaveLength(0);
   expect(view.container.querySelectorAll('.beat-square.hit')).toHaveLength(0);
   expect(view.container.querySelectorAll('.beat-square.lit, .beat-square.onset')).toHaveLength(0);
   await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
   expect(dot()).toBeNull();
-  expect(screen.queryByRole('region', { name: 'Music' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: session.title })).not.toBeInTheDocument();
   expect(view.container.querySelectorAll('.beat-square')).toHaveLength(0);
   expect(screen.getByText('01:30')).toBeInTheDocument();
 });
@@ -303,35 +307,29 @@ it('uses the selected track playback state, independently of the focus timer', a
   expect(view.container.querySelector('.music-dot')).toHaveClass('music-dot', 'playing');
   fireEvent.change(screen.getByRole('combobox', { name: 'Choose a music tab' }), { target: { value: 'paused' } });
   expect(view.container.querySelector('.music-dot')).toBeNull();
-  expect(screen.getByRole('region', { name: 'Music' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Paused track' })).toBeInTheDocument();
   fireEvent.change(screen.getByRole('combobox', { name: 'Choose a music tab' }), { target: { value: session.id } });
   view.rerender(<I18nProvider><FloatingFocus {...focusProps} timerState={{ ...focusProps.timerState, isRunning: false }} /></I18nProvider>);
   expect(view.container.querySelector('.music-dot')).toHaveClass('music-dot', 'playing');
 });
 
-it('cycles glass layouts without remounting shared elements or losing the chosen style', async () => {
+it('changes glass tabs without remounting the live music, grid or timer', async () => {
   vi.mocked(sendMusicRequest).mockResolvedValue([{ ...session, playing: true }]);
   const view = renderPlayer();
   await screen.findByRole('heading', { name: session.title });
   const shared = ['.dock-ring', '.music-pattern', '.dock-session-row', '.timer-island'].map((selector) => view.container.querySelector(selector));
   expect(view.container.querySelector('.floating-focus.glass')).toBeInTheDocument();
   expect(screen.queryByRole('combobox', { name: 'Dock style' })).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Switch dock style' }));
-  expect(view.container.querySelector('.dock-mixer')).toBeInTheDocument();
-  expect(view.container.querySelector('.music-pattern.vertical')).toBeInTheDocument();
-  expect(localStorage.getItem('floatingDock.style')).toBe('mixer');
-  fireEvent.click(screen.getByRole('button', { name: 'Switch dock style' }));
-  expect(view.container.querySelector('.dock-split')).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Switch dock style' }));
+  expect(screen.queryByRole('button', { name: 'Switch dock style' })).toBeNull();
+  expect(localStorage.getItem('floatingDock.style')).toBeNull();
   fireEvent.click(screen.getByRole('tab', { name: 'Beat grid' }));
   expect(screen.getByRole('tabpanel', { name: 'Beat grid' })).not.toHaveAttribute('aria-hidden', 'true');
-  fireEvent.click(screen.getByRole('button', { name: 'Switch dock style' }));
-  expect(view.container.querySelector('.dock-deck')).toHaveAttribute('data-state', 'stacked');
-  fireEvent.click(screen.getByRole('button', { name: 'Fan out cards' }));
-  expect(view.container.querySelector('.dock-deck')).toHaveAttribute('data-state', 'fanned');
+  fireEvent.click(screen.getByRole('tab', { name: 'Tasks' }));
+  expect(screen.getByRole('tabpanel', { name: 'Tasks' })).toBeInTheDocument();
   ['.dock-ring', '.music-pattern', '.dock-session-row', '.timer-island'].forEach((selector, index) => expect(view.container.querySelector(selector)).toBe(shared[index]));
-  fireEvent.click(screen.getByRole('button', { name: 'Switch dock style' }));
-  expect(view.container.querySelector('.dock-island')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('tab', { name: 'Music' }));
+  expect(screen.getByRole('heading', { name: session.title })).toBeInTheDocument();
+  expect(view.container.querySelector('.floating-focus')).toHaveAttribute('data-style', 'tabs');
 });
 
 it('keeps color and palette pickers in an accessible settings popover', async () => {

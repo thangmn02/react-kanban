@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom';
 import { invoke } from '@tauri-apps/api/core';
 import { currentMonitor, getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
 import FloatingFocus, { type FloatingFocusProps } from '../../components/focus/FloatingFocus';
-import type { DockStyle } from '../../components/focus/useDockPreferences';
 import dockCss from '../../components/focus/floatingFocus.css?inline';
 import nativeDockCss from './nativeDock.css?inline';
 import { useI18n } from '../../i18n';
@@ -20,16 +19,6 @@ async function updateNativeShape(rounded: boolean) {
 
 function NativeDock({ props }: { props: FloatingFocusProps }) {
   const [target, setTarget] = useState<HTMLDivElement | null>(null);
-  const maxSize = useRef({ width: 1100, height: 900 });
-  const [layout, setLayout] = useState({ style: 'island' as DockStyle, expanded: false, hasMusic: false });
-  const layoutChanged = useCallback((style: DockStyle, expanded: boolean, hasMusic = false) => setLayout((current) =>
-    current.style === style && current.expanded === expanded && current.hasMusic === hasMusic ? current : { style, expanded, hasMusic }), []);
-  useEffect(() => {
-    void currentMonitor().then((monitor) => {
-      if (monitor) maxSize.current = { width: monitor.workArea.size.width / monitor.scaleFactor,
-        height: monitor.workArea.size.height / monitor.scaleFactor };
-    }).catch(() => {});
-  }, []);
   const attach = useCallback((node: HTMLDivElement | null) => {
     if (!node) return;
     const shadow = node.shadowRoot || node.attachShadow({ mode: 'open' });
@@ -41,22 +30,23 @@ function NativeDock({ props }: { props: FloatingFocusProps }) {
     return () => { shadow.replaceChildren(); };
   }, []);
   useEffect(() => {
-    // Size changes do not remount FloatingFocus or its shared motion elements.
-    const width = layout.style === 'split' ? 760 : layout.style === 'mixer' ? 640
-      : layout.style === 'deck' && layout.expanded ? 820 : 520;
-    const height = layout.style === 'tabs' ? 560 : !layout.hasMusic ? 240 : 460;
+    // Fit Tabs once when opening; tab changes preserve the user's resized window.
     let active = true;
     const fit = async () => {
       const nativeWindow = getCurrentWindow();
-      await nativeWindow.setMinSize(new LogicalSize(360, layout.style === 'tabs' ? 440 : layout.hasMusic ? 320 : 200));
+      const monitor = await currentMonitor().catch(() => null);
+      const maxWidth = monitor ? monitor.workArea.size.width / monitor.scaleFactor : 1100;
+      const maxHeight = monitor ? monitor.workArea.size.height / monitor.scaleFactor : 900;
+      if (!active) return;
+      await nativeWindow.setMinSize(new LogicalSize(Math.min(360, maxWidth), Math.min(540, maxHeight)));
       if (await nativeWindow.isMaximized() || !active) return;
-      await nativeWindow.setSize(new LogicalSize(Math.min(width, maxSize.current.width), Math.min(height, maxSize.current.height)));
+      await nativeWindow.setSize(new LogicalSize(Math.min(520, maxWidth), Math.min(680, maxHeight)));
     };
     void fit().catch(() => {});
     return () => { active = false; };
-  }, [layout]);
+  }, []);
   return <div ref={attach} className="native-dock-host">{target && createPortal(<FloatingFocus {...props}
-    isWidget onLayoutChange={layoutChanged} />, target)}</div>;
+    isWidget />, target)}</div>;
 }
 
 export default function NativeSurface({ dock, onToggle, focusProps, children }: {

@@ -49,7 +49,7 @@ export function useDocumentPictureInPicture(props: FloatingFocusProps) {
     if (!host) return;
     document.body.appendChild(host);
     host.hidden = false;
-    host.style.cssText = 'position:fixed;right:16px;bottom:16px;width:min(520px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;z-index:1000;border-radius:22px;';
+    host.style.cssText = 'position:fixed;right:16px;bottom:16px;width:min(520px,calc(100vw - 32px));height:min(680px,calc(100dvh - 32px));z-index:1000;border-radius:22px;';
     pipWindowRef.current = null;
     if (mountedRef.current) setPipWindow(null);
   }, []);
@@ -61,7 +61,7 @@ export function useDocumentPictureInPicture(props: FloatingFocusProps) {
     if (openingRef.current) return;
     openingRef.current = true;
     try {
-      const nextWindow = await window.documentPictureInPicture.requestWindow({ width: 520, height: 560 });
+      const nextWindow = await window.documentPictureInPicture.requestWindow({ width: 520, height: 680 });
       if (!mountedRef.current) { nextWindow.close(); return; }
       setWidgetError('');
       let host = hostRef.current;
@@ -80,7 +80,7 @@ export function useDocumentPictureInPicture(props: FloatingFocusProps) {
       copyPictureInPictureStyles(document, nextWindow.document);
       nextWindow.document.title = 'Floating Focus';
       host.hidden = false;
-      host.style.cssText = 'display:block;width:100%;';
+      host.style.cssText = 'display:block;width:100%;height:100dvh;';
       nextWindow.document.body.appendChild(host);
       pipWindowRef.current = nextWindow;
       setActivated(true);

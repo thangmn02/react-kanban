@@ -16,24 +16,28 @@ const nativeInvoke = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: nativeInvoke }));
 vi.mock('@tauri-apps/api/window', () => ({ getCurrentWindow: () => nativeWindow, currentMonitor: async () => null, Effect: { Blur: 'blur' },
   LogicalSize: class { width: number; height: number; constructor(width: number, height: number) { this.width = width; this.height = height; } } }));
-vi.mock('../../components/focus/FloatingFocus', () => ({ default: (props: FloatingFocusProps) => <div>
-  <button onClick={() => props.onLayoutChange?.('split', false)}>Split</button><button onClick={props.onStart}>Start native timer</button>{props.nativeControls}
-</div> }));
+vi.mock('../music/useBrowserMusic', () => ({ useBrowserMusic: () => ({ sessions: [], connected: true, checking: false }) }));
 beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); nativeInvoke.mockResolvedValue(undefined); nativeWindow.isMaximized.mockResolvedValue(false);
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} }); });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 const props: FloatingFocusProps = { activeTask: null, focusTasks: [], cycleTotal: 4, remainingSeconds: 1500,
   timerState: { mode: 'focus', activeTaskId: null, isRunning: false, remainingSeconds: 1500, startedAt: null, endsAt: null, plannedSeconds: null },
   onStart: vi.fn(), onPause: vi.fn(), onReset: vi.fn() };
-it('has no system-audio switch and keeps the dock tree across layout changes', async () => {
+it('opens Tabs at its ring size once and keeps the timer and user resizing across tab changes', async () => {
   const view = render(<I18nProvider><NativeSurface dock focusProps={props}>Workspace</NativeSurface></I18nProvider>);
   expect(view.queryByRole('checkbox')).toBeNull();
   expect(view.queryByText('System audio beats')).toBeNull();
   const shadow = view.container.querySelector('.native-dock-host')!.shadowRoot!;
-  const start = shadow.querySelectorAll('button')[1];
-  act(() => fireEvent.click(shadow.querySelector('button')!));
-  expect(shadow.querySelectorAll('button')[1]).toBe(start);
-  await waitFor(() => expect(nativeWindow.setSize).toHaveBeenCalledWith(expect.objectContaining({ width: 760 })));
+  const start = shadow.querySelector('.dock-start')!;
+  const ring = shadow.querySelector('.dock-ring')!;
+  await waitFor(() => expect(nativeWindow.setSize).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ width: 520, height: 680 })));
+  expect(nativeWindow.setMinSize).toHaveBeenCalledWith(expect.objectContaining({ width: 360, height: 540 }));
+  fireEvent.click(shadow.querySelectorAll('[role="tab"]')[2]);
+  expect(shadow.querySelector('.dock-start')).toBe(start);
+  expect(shadow.querySelector('.dock-ring')).toBe(ring);
+  expect(nativeWindow.setSize).toHaveBeenCalledOnce();
+  fireEvent.pointerDown(shadow.querySelector('.dock-toolbar')!, { button: 0 });
+  expect(nativeWindow.startDragging).toHaveBeenCalledOnce();
   fireEvent.click(start); expect(props.onStart).toHaveBeenCalledOnce();
   fireEvent.click(shadow.querySelector('[aria-label="Minimize"]')!); expect(nativeWindow.minimize).toHaveBeenCalledOnce();
   fireEvent.click(shadow.querySelector('[aria-label="Close app"]')!); expect(nativeWindow.close).toHaveBeenCalledOnce();

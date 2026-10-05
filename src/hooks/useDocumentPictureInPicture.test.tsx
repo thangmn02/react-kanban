@@ -42,23 +42,25 @@ it('renders timer and music together in the detached document, with shared timer
   const root = host.shadowRoot!.getElementById('floating-focus-root') as HTMLElement;
   const popup = within(root);
   expect(popup.getByText('01:30')).toBeInTheDocument();
-  expect(popup.getByRole('region', { name: 'Music' })).toBeInTheDocument();
-  expect(screen.queryByRole('region', { name: 'Music' })).not.toBeInTheDocument();
+  expect(requestWindow).toHaveBeenCalledWith({ width: 520, height: 680 });
+  fireEvent.click(popup.getByRole('tab', { name: 'Music' }));
+  expect(popup.getByRole('tabpanel', { name: 'Music' })).toBeInTheDocument();
+  expect(screen.queryByRole('tabpanel', { name: 'Music' })).not.toBeInTheDocument();
   expect(popupDocument.querySelector('img')).toBeNull();
   fireEvent.click(popup.getByRole('button', { name: 'Pause' }));
   expect(onPause).toHaveBeenCalledOnce();
-  const musicPanel = popup.getByRole('region', { name: 'Music' });
+  const musicPanel = popup.getByRole('tabpanel', { name: 'Music' });
   view.rerender(<I18nProvider><Harness seconds={89} /></I18nProvider>);
   expect(popup.getByText('01:29')).toBeInTheDocument();
-  expect(popup.getByRole('region', { name: 'Music' })).toBe(musicPanel);
+  expect(popup.getByRole('tabpanel', { name: 'Music' })).toBe(musicPanel);
   act(() => hide());
   expect(host.ownerDocument).toBe(document);
-  expect(popup.getByRole('region', { name: 'Music' })).toBe(musicPanel);
+  expect(popup.getByRole('tabpanel', { name: 'Music' })).toBe(musicPanel);
   expect(popup.getByRole('button', { name: 'Pop out dock' }).hasAttribute('disabled')).toBe(false);
   expect(popupDocument.getElementById('floating-focus-widget')).toBeNull();
 });
 
-it('preserves layout and live DOM when returning to the tab and popping out again', async () => {
+it('keeps only Tabs and preserves the selected panel and live DOM when returning and popping out again', async () => {
   render(<I18nProvider><Harness /></I18nProvider>);
   await act(async () => { fireEvent.click(screen.getByText('Open popup')); });
   const host = popupDocument.getElementById('floating-focus-widget')!;
@@ -66,10 +68,11 @@ it('preserves layout and live DOM when returning to the tab and popping out agai
   const dock = within(root);
   const ring = root.querySelector('.dock-ring');
   const grid = root.querySelector('.music-pattern');
-  fireEvent.click(dock.getByRole('button', { name: 'Switch dock style' }));
+  fireEvent.click(dock.getByRole('tab', { name: 'Beat grid' }));
   fireEvent.click(dock.getByRole('button', { name: 'Return dock to tab' }));
   expect(close).toHaveBeenCalledOnce();
-  expect(root.querySelector('.dock-mixer')).not.toBeNull();
+  expect(root.querySelector('.floating-focus')?.getAttribute('data-style')).toBe('tabs');
+  expect(dock.getByRole('tab', { name: 'Beat grid' }).getAttribute('aria-selected')).toBe('true');
   expect(root.querySelector('.dock-ring')).toBe(ring);
   await act(async () => { fireEvent.click(dock.getByRole('button', { name: 'Pop out dock' })); });
   expect(requestWindow).toHaveBeenCalledTimes(2);

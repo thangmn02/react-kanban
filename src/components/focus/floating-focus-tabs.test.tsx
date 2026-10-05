@@ -60,10 +60,10 @@ it('keeps one timer/grid and music control when changing tabs, including keyboar
   expect(work).toHaveFocus();
 });
 
-it('preserves saved layouts and completed task state without allowing a second completion', () => {
+it('migrates old layouts to Tabs and preserves completed task state without allowing a second completion', () => {
   localStorage.setItem('floatingDock.style', 'island');
   const view = renderDock({ ...props, focusTasks: [task, { ...other, isDone: true }] });
-  expect(view.container.querySelector('.floating-focus')).toHaveAttribute('data-style', 'island');
-  for (let index = 0; index < 3; index++) fireEvent.click(screen.getByRole('button', { name: 'Switch dock style' }));
+  expect(view.container.querySelector('.floating-focus')).toHaveAttribute('data-style', 'tabs');
+  expect(screen.queryByRole('button', { name: 'Switch dock style' })).toBeNull();
   expect(screen.getByRole('button', { name: 'Mark done: Next task' })).toBeDisabled();
 });
