@@ -1,6 +1,6 @@
 import { useI18n } from '../../i18n';
 
-export type NavigationView = 'home' | 'today' | 'board';
+export type NavigationView = 'home' | 'today' | 'board' | 'contact';
 
 interface AppNavigationProps {
   activeView: string;
@@ -12,6 +12,7 @@ const paths: Record<NavigationView, string> = {
   home: 'M3 10 12 3l9 7v11h-6v-7H9v7H3Z',
   today: 'M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2Z',
   board: 'M3 4h4v16H3ZM10 4h4v10h-4ZM17 4h4v13h-4Z',
+  contact: 'M4 4h16v12H8l-4 4ZM8 8h8M8 12h5',
 };
 
 export default function AppNavigation({ activeView, onNavigate, mobile = false }: AppNavigationProps) {
@@ -20,6 +21,7 @@ export default function AppNavigation({ activeView, onNavigate, mobile = false }
     { view: 'home' as const, label: t('navigation.home') },
     { view: 'today' as const, label: t('app.today') },
     { view: 'board' as const, label: t('navigation.board') },
+    { view: 'contact' as const, label: t('navigation.contact') },
   ];
   const selected = ['board', 'calendar', 'table'].includes(activeView) ? 'board' : activeView;
 

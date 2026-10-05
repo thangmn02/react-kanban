@@ -6,6 +6,9 @@ describe('deriveAppRouteState', () => {
   it.each([
     ['/home', 'home'],
     ['/today', 'today'],
+    ['/contact', 'contact'],
+    ['/contact/', 'contact'],
+    ['/contact/unknown', 'not-found'],
     ['/arcana', 'arcana'],
     ['/auth/sign-in', 'auth'],
     ['/onboarding', 'onboarding'],

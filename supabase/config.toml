@@ -45,7 +45,9 @@ enable_confirmations = false
 [analytics]
 enabled = false
 
-# This repository has no Edge Functions. Keeping the runtime disabled avoids a
-# network-only JSR dependency during database reproducibility checks.
+# Database-only checks do not need the runtime. Serve/deploy contact explicitly.
 [edge_runtime]
 enabled = false
+
+[functions.contact]
+verify_jwt = false

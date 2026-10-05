@@ -9,7 +9,7 @@ export default defineConfig({
     // Discover both `.ts` and `.tsx` test/spec files. Previously this only
     // matched `*.test.ts`, so component/route tests written in TSX were
     // silently ignored by Vitest.
-    include: ['src/**/*.{test,spec}.{ts,tsx,js}', 'extensions/**/*.test.js'],
+    include: ['src/**/*.{test,spec}.{ts,tsx,js}', 'extensions/**/*.test.js', 'supabase/functions/**/*.test.ts'],
     setupFiles: ['./src/test/setup.ts'],
     coverage: {
       provider: 'v8',

@@ -7,6 +7,7 @@ import RequireAuth from './app/RequireAuth';
 import { ARCANA_ENABLED } from './constants/features';
 
 const AuthRoute = lazy(() => import('./pages/auth/AuthRoute'));
+const ContactRoute = lazy(() => import('./pages/contact/ContactRoute'));
 const OnboardingRoute = lazy(() => import('./pages/onboarding/OnboardingRoute'));
 const InviteRoute = lazy(() => import('./pages/invite/InviteRoute'));
 const HomeRoute = lazy(() => import('./pages/home/HomeRoute'));
@@ -30,6 +31,7 @@ export default function App() {
             <Route index element={<Navigate to="/home" replace />} />
             <Route path="auth/sign-in" element={<AuthRoute />} />
             <Route path="invite/:token" element={<InviteRoute />} />
+            <Route path="contact" element={<ContactRoute />} />
             <Route element={<RequireAuth />}>
               <Route path="onboarding" element={<OnboardingRoute />} />
               <Route path="home" element={<HomeRoute />} />

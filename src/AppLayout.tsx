@@ -380,7 +380,7 @@ function AppLayout() {
     onOpenProgressReport: () => setIsProgressReportOpen(true),
   });
 
-  if (isAuthLoading || (authMode === 'supabase' && user && isWorkspaceLoading)) {
+  if (activeView !== 'contact' && (isAuthLoading || (authMode === 'supabase' && user && isWorkspaceLoading))) {
     return <div className="flex min-h-screen items-center justify-center bg-canvas text-sm font-medium text-slate-500">Preparing secure workspace...</div>;
   }
 

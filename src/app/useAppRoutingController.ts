@@ -5,13 +5,15 @@ import type { AppUser, AuthMode, WorkspaceSummary } from '../types/auth.type';
 import type { BoardViewMode } from '../hooks/useViewRouting';
 import type { useBoardPageController } from '../features/board/hooks/useBoardPageController';
 
-type AppView = BoardViewMode | 'table' | 'arcana' | 'members';
+type AppView = BoardViewMode | 'table' | 'arcana' | 'members' | 'contact';
 
 export function deriveAppRouteState(pathname: string) {
   const boardMatch = matchPath('/workspaces/:workspaceId/boards/:boardId/*', pathname);
   const membersMatch = matchPath('/workspaces/:workspaceId/members', pathname);
   const inviteMatch = matchPath('/invite/:token', pathname);
-  const activeView: AppView = pathname.startsWith('/auth')
+  const activeView: AppView = matchPath('/contact', pathname)
+    ? 'contact'
+    : pathname.startsWith('/auth')
     ? 'auth'
     : pathname.startsWith('/onboarding')
       ? 'onboarding'
@@ -82,6 +84,7 @@ export function useAppRoutingController({
     if (nextView === 'onboarding') return navigate('/onboarding');
     if (nextView === 'home') return navigate('/home');
     if (nextView === 'today') return navigate('/today');
+    if (nextView === 'contact') return navigate('/contact');
     if (nextView === 'arcana') return navigate('/arcana');
     if (nextView === 'members' && activeWorkspaceId) return navigate(`/workspaces/${activeWorkspaceId}/members`);
     if (nextView === 'not-found') return;
@@ -92,6 +95,8 @@ export function useAppRoutingController({
   }, [activeBoardId, activeInviteToken, activeWorkspaceId, navigate]);
 
   useEffect(() => {
+    // Contact is public and does not need a workspace or board fetch.
+    if (activeView === 'contact') return;
     if (isAuthLoading || isWorkspaceLoading) return;
     if (activeView === 'not-found') {
       setIsBoardLoading(false);
