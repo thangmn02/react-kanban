@@ -52,7 +52,7 @@ restarts recover automatically. This adds the `alarms` extension permission.
 The old web protocol and app origin are retained for compatibility. The app
 identifier `app.kanthangboard.focus` is deliberately unchanged to preserve
 existing native sign-in and preferences. Branding, product/version and the
-executable are now Kora / 0.1.7 / `kora.exe`.
+executable are now Kora / 0.1.8 / `kora.exe`.
 
 ## Development and distribution
 
@@ -83,7 +83,8 @@ sign-in is separate from browser sign-in; cookies are not copied.
 
 The **Windows widget** GitHub Actions workflow produces update-signed installer
 and executable artifacts, not a public release. Repository Actions variables
-are `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. An explicitly selected
+are `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` and
+`VITE_TURNSTILE_SITE_KEY` for the Contact form. An explicitly selected
 mock-auth demo is labeled separately. Artifacts expire after 14 days.
 The encrypted Actions secret `TAURI_SIGNING_PRIVATE_KEY` must contain the same
 private key whose public half is configured in `tauri.conf.json`; optionally

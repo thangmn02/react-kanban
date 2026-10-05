@@ -71,6 +71,12 @@ updates. See [Windows setup and updates](src-tauri/README.md).
 Local mode is the easiest way to try the product end-to-end; Supabase mode is the
 collaborative, multi-user configuration.
 
+In Supabase mode, web and desktop must select the same workspace to show the
+same boards, cards and completed focus-session history. The workspace selector
+numbers duplicate names consistently so separate workspaces are distinguishable.
+The selected workspace, pinned focus tasks, timer settings and current Pomodoro
+cycle remain local to each browser or desktop app; they are not cloud-synced.
+
 ---
 
 ## Quick start — local mode
@@ -295,6 +301,7 @@ Navigation is URL-addressable. The browser URL is the single source of truth
 | `/board` | Kora board (default sub-view) |
 | `/calendar` | Calendar view of the current board |
 | `/auth` | Sign-in / sign-up |
+| `/contact` | Public private-message contact form |
 | `/onboarding` | First-run workspace + board setup |
 | `/invite/:token` | Accept a workspace invite |
 | anything else | Not-found page |
@@ -328,6 +335,14 @@ Tests run in jsdom via Vitest. Coverage is collected through
 ---
 
 ## Deployment
+
+### Contact form
+
+The Contact tab uses a Supabase Edge Function, private message storage, Cloudflare
+Turnstile, a honeypot and a persistent three-message-per-IP hourly limit. Resend
+sends notifications to a server-configured owner inbox. Setup, sender verification,
+backups and activation are documented in [Contact setup](docs/contact-setup.md).
+The frontend also needs `VITE_TURNSTILE_SITE_KEY` at build time.
 
 ### AI task planning (Gemini)
 
