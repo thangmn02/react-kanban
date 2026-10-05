@@ -17,9 +17,9 @@ dotenv files remain separate from hosted configuration.
 The Contact-only migration was applied transactionally after a full encrypted
 backup restored all 49 existing tables. Hosted 21-case security/rate-limit tests,
 CI database reset/lint/tests, frontend tests and Windows build passed. A real
-production form submission was stored and Resend accepted its notification.
-Final inbox receipt still needs owner confirmation: the sending-only key cannot
-retrieve delivery events. The configured test sender delivers only to the
+production form submission was stored, Resend accepted its notification, and
+the owner confirmed inbox receipt. The sending-only key cannot retrieve
+delivery events. The configured test sender delivers only to the
 Resend account's owner; a dedicated verified sender remains the path for
 changing that recipient or using your own sender branding.
 
