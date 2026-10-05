@@ -5,6 +5,28 @@ It accepts a name, reply email, subject and message in English or Vietnamese.
 The owner's notification address is configured only on the server. Local mock
 mode does not simulate sending: real backend configuration is required.
 
+## Live release
+
+Contact is active at [kanthangboard.netlify.app/contact](https://kanthangboard.netlify.app/contact)
+and included in the signed Kora 0.1.8 update. In an existing native installation,
+choose **Update**, then **Update and restart**, to load its Contact navigation.
+Web publication uses the existing GitHub-to-Netlify integration. The public
+Turnstile build variable is configured in Netlify and GitHub Actions; local
+dotenv files remain separate from hosted configuration.
+
+The Contact-only migration was applied transactionally after a full encrypted
+backup restored all 49 existing tables. Hosted 21-case security/rate-limit tests,
+CI database reset/lint/tests, frontend tests and Windows build passed. A real
+production form submission was stored and Resend accepted its notification.
+Final inbox receipt still needs owner confirmation: the sending-only key cannot
+retrieve delivery events. The configured test sender delivers only to the
+Resend account's owner; a dedicated verified sender remains the path for
+changing that recipient or using your own sender branding.
+
+The signed installer and update feed were published together. For website
+rollback, republish the prior Netlify deploy `6ac27a7b4f03ec00081681e3` in the
+dashboard. Keep received private messages when withdrawing Contact.
+
 ## Configuration
 
 The web/native build needs `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and
