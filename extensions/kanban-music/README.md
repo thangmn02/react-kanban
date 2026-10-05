@@ -4,17 +4,27 @@ This is an independent implementation, not a copy of ungive/media-control-extens
 
 Our own Manifest V3 extension connects browser music to Kora's Floating Focus. No extension ID, music login, or API key is required. The inline focus dock stays unchanged; music lives in the detached window.
 
-Version 0.3.9 also connects directly to the running **Kora Windows widget**
+Version 0.3.10 connects directly to the running **Kora Windows widget**
 through loopback `127.0.0.1:47635`. No Kora web tab is needed in that mode.
 The widget receives only allowlisted browser music metadata and visual
 events; it does not listen to desktop/system audio. Browser permission can
 still require a toolbar click on the playing music tab. See
 [native setup and security](../../src-tauri/README.md).
 
-The five rows are Kick, Clap, Hi-hat, Bass and Melody. Melody is a sustained
-tonal-energy approximation, not isolated instruments: its squares breathe
-only while a live envelope is present and go dark on silence, pause or
-capture loss. Decorative shapes now hold for 2.8 seconds before fading.
+The five rows are Kick, Clap, Hi-hat, Bass and Melody. Melody is a tonal-energy
+approximation, not isolated instruments. Its squares hold while a live envelope
+is present and flash on phrase activation, new note sequences or raw hat hits;
+envelope level sets flash intensity. Missing envelopes expire after 700 ms.
+Silence, pause or capture loss clears the held signal. Decorative shapes hold
+for eight seconds before fading.
+
+For sparse captured drums, real kick hits gently correct the locked grid phase
+with a 0.4 gain, accepting errors within 0.35 of an eighth note. Dense drums
+retain direct onset lighting. The gate rejects distant accents; it cannot
+identify every syncopation or repair an arbitrary initial phase offset. Long
+silence still releases capture after 2.5 seconds, and low tempo confidence
+releases the lock after four seconds. Capture/tempo then reacquire automatically;
+this is distinct from preserving a running phase during an audible section.
 
 ## Test now in Chrome, Edge, or Brave (desktop)
 
@@ -57,7 +67,7 @@ Document Picture-in-Picture must be supported by the browser. The browser-owned 
 
 ## Updating an existing installation
 
-Version 0.3.7 adds local tempo estimation and beat visuals; 0.3.6 removed the remaining host/media-keys capture blocks for all listed services, 0.3.5 enabled Spotify, and 0.3.4 added detached HTML audio discovery. Replace the unpacked extension folder with the new ZIP contents (or reload the repo folder), click **Reload** on its card in your browser's extension manager, and refresh Kora and the music tab once. This music-tab refresh is important after upgrading from 0.3.3: the observer must run before the player creates its off-document audio object. No additional permissions are introduced over 0.3.3. Pin the companion once for all listed music services. App refreshes and pause/resume retry capture while browser access remains granted; a new tab or extension reload may need another click. Silent streams stop after 2.5 seconds and back off 30 seconds; resume/unmute or a toolbar click retries immediately. Install separately in each browser/profile. The updated app and extension are both needed; Floating Focus still opens from the timer.
+Version 0.3.10 adds real-kick phase correction; update Kora too for phrase/hat Melody flashes. Replace the unpacked extension folder with the new ZIP contents (or reload the repo folder), click **Reload** on its card in your browser's extension manager, and refresh Kora and the music tab once. This music-tab refresh is important after upgrading from 0.3.3: the observer must run before the player creates its off-document audio object. No additional permissions are introduced over 0.3.9. Pin the companion once for all listed music services. App refreshes and pause/resume retry capture while browser access remains granted; a new tab or extension reload may need another click. Silent streams stop after 2.5 seconds and back off 30 seconds; resume/unmute or a toolbar click retries immediately. Install separately in each browser/profile. The updated app and extension are both needed; Floating Focus still opens from the timer.
 
 See [BEAT-VALIDATION.md](./BEAT-VALIDATION.md) for API evidence, detector settings, and the live validation status.
 

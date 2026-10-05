@@ -6,6 +6,62 @@ import { effectNames, isShapeCell, momentDuration, shapeNames } from './beatVisu
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.useRealTimers(); });
 const session = { id: 'song', title: 'Song', artist: '', source: '', paused: false, playing: true, currentTime: 0, sampledAt: 1000, playbackRate: 1 };
 const clock = { sessionId: 'song', mode: 'clock' as const, onsets: {} };
+
+it('flashes Melody on phrase edges and real hats, without replaying on envelope updates or tempo hats', async () => {
+  vi.useFakeTimers();
+  const live = { ...clock, mode: 'capture' as const, captureId: 'melody-flash',
+    tempo: { locked: true, bpm: 128, confidence: .8 }, rates: { kick: 1 }, ticks: {} };
+  const view = render(<BeatPattern session={session} beat={live} />);
+  const flashes = () => [...view.container.querySelectorAll('[data-channel="melody"] .melody-beat-flash')];
+  await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+  const phrase = { ...live, melody: { active: true, level: .72, note: 14 } };
+  view.rerender(<BeatPattern session={session} beat={phrase} />);
+  await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+  expect(flashes().length).toBeGreaterThan(0);
+  const first = flashes()[0];
+  expect(first.closest('.beat-square')).toHaveStyle({ '--melody-level': '0.72' });
+  view.rerender(<BeatPattern session={session} beat={{ ...phrase, melody: { ...phrase.melody, level: .8 } }} />);
+  await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+  expect(flashes()[0]).toBe(first);
+  view.rerender(<BeatPattern session={session} beat={{ ...phrase, ticks: { hat: 1 } }} />);
+  await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+  expect(flashes()[0]).toBe(first);
+  view.rerender(<BeatPattern session={session} beat={{ ...phrase, onsets: { hat: 1 } }} />);
+  await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+  expect(flashes()[0]).not.toBe(first);
+  expect(flashes().length).toBeGreaterThan(0);
+  const hat = flashes()[0];
+  view.rerender(<BeatPattern session={session} beat={{ ...phrase, onsets: { hat: 1 }, melody: { ...phrase.melody, note: 15 } }} />);
+  await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+  expect(flashes()[0]).not.toBe(hat);
+  await act(async () => { await vi.advanceTimersByTimeAsync(150); });
+  expect(flashes()).toHaveLength(0);
+  view.rerender(<BeatPattern session={session} beat={{ ...phrase, melody: undefined }} />);
+  expect(flashes()).toHaveLength(0);
+  view.rerender(<BeatPattern session={session} beat={{ ...phrase, mode: 'clock' }} />);
+  expect(flashes()).toHaveLength(0);
+});
+
+it('flashes real hats without a held Melody envelope and stays dark on capture replacement or pause', async () => {
+  vi.useFakeTimers();
+  const live = { ...clock, mode: 'capture' as const, captureId: 'hat-flash', rates: { hat: 1 } };
+  const view = render(<BeatPattern session={session} beat={live} />);
+  await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+  view.rerender(<BeatPattern session={session} beat={{ ...live, onsets: { hat: 1 } }} />);
+  await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+  expect(view.container.querySelector('[data-channel="melody"] .melody-beat-flash')).not.toBeNull();
+  view.rerender(<BeatPattern session={session} beat={{ ...live, onsets: { hat: 1 }, melody: { active: true, level: .6, note: 1 } }} />);
+  await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+  view.rerender(<BeatPattern session={session} beat={{ ...live, onsets: { hat: 1 }, melody: { active: false, level: 0, note: 1 } }} />);
+  await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+  await act(async () => { await vi.advanceTimersByTimeAsync(150); });
+  expect(view.container.querySelector('.melody-beat-flash')).toBeNull();
+  view.rerender(<BeatPattern session={session} beat={{ ...live, captureId: 'replacement', onsets: { hat: 20 } }} />);
+  await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+  expect(view.container.querySelector('.melody-beat-flash')).toBeNull();
+  view.rerender(<BeatPattern session={{ ...session, playing: false, paused: true }} beat={{ ...live, onsets: { hat: 2 } }} />);
+  expect(view.container.querySelector('.melody-beat-flash')).toBeNull();
+});
 it('never invents beats from the clock and flashes only a band’s active squares on capture onsets', async () => {
   vi.spyOn(Date, 'now').mockReturnValue(1000);
   const view = render(<BeatPattern session={session} beat={clock} />);

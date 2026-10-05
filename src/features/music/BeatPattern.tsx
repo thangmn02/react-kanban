@@ -56,6 +56,31 @@ export default function BeatPattern({ session, beat, colorMode = 'random', palet
   }, [capture, audioLive, captureKey, kickCount, clapCount, hatCount, bassCount, melodyCount, onsetTotal, tickTotal]);
   const newOnsets = pulse.captureKey === captureKey ? pulse.active : {};
   const melodyLive = capture && beat.melody?.active === true && beat.melody.level > 0;
+  const rawHatCount = beat.onsets.hat || 0;
+  const melodyNote = beat.melody?.note || 0;
+  const melodyGate = useRef({ captureKey: '', active: false, note: 0, hats: 0, sequence: 0 });
+  const [melodyFlash, setMelodyFlash] = useState<{ captureKey: string; id: number; hat: boolean } | null>(null);
+  useEffect(() => {
+    const previous = { ...melodyGate.current };
+    const gate = melodyGate.current;
+    Object.assign(gate, { captureKey, active: melodyLive, note: melodyNote, hats: rawHatCount });
+    if (!captureKey || previous.captureKey !== captureKey) {
+      const reset = setTimeout(() => setMelodyFlash(null), 0);
+      return () => clearTimeout(reset);
+    }
+    const hat = rawHatCount > previous.hats;
+    if (!hat && !(melodyLive && (!previous.active || melodyNote > previous.note))) return;
+    const id = ++gate.sequence;
+    // Real envelope edges and raw hats trigger a short flash. Levels alone do not.
+    const start = setTimeout(() => setMelodyFlash({ captureKey, id, hat }), 0);
+    return () => clearTimeout(start);
+  }, [captureKey, melodyLive, melodyNote, rawHatCount]);
+  useEffect(() => {
+    if (!melodyFlash) return;
+    const end = setTimeout(() => setMelodyFlash(null), 150);
+    return () => clearTimeout(end);
+  }, [melodyFlash]);
+  const melodyHit = capture && melodyFlash?.captureKey === captureKey && (melodyFlash.hat || melodyLive);
   const breakdown = melodyLive && (['kick', 'clap', 'hat'] as const).every((band) => !(beat.rates?.[band] || 0));
   const [melodyMoment, setMelodyMoment] = useState<Moment | null>(null);
   useEffect(() => {
@@ -138,6 +163,9 @@ export default function BeatPattern({ session, beat, colorMode = 'random', palet
             {/* Captured accents or a confident audio tempo lock retrigger the held mask. */}
             {shapeHit && <span key={`${captureKey}:${pulse.rawTotal}:${pulse.tickTotal}`} className="shape-beat-flash"
               style={{ '--shape-hit-delay': `${momentDelay(liveMoment.effect, row, step, pulse.rawTotal) * .18}ms` } as CSSProperties} />}
+            {band === 'melody' && melodyHit && (liveMoment ? momentLit : active) && <span
+              key={`melody:${melodyFlash.id}`} className="melody-beat-flash"
+              style={{ '--melody-flash-level': melodyLive ? beat.melody?.level : 1 } as CSSProperties} />}
           </span>;
         })}
       </div>;

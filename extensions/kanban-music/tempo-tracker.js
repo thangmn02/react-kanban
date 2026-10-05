@@ -36,6 +36,16 @@ export class TempoTracker {
     return { updated, locked: this.locked, bpm: this.bpm, confidence: this.confidence, tick };
   }
 
+  snapToBeat(now) {
+    if (!this.locked || !this.bpm || this.anchor === null || !Number.isFinite(now)) return;
+    const eighthMs = 30000 / this.bpm;
+    const nearest = Math.round((now - this.anchor) / eighthMs);
+    const error = now - (this.anchor + nearest * eighthMs);
+    // Correct small clock drift gradually; a distant accent is not phase evidence.
+    if (Math.abs(error) > eighthMs * 0.35) return;
+    this.anchor += error * 0.4;
+  }
+
   estimate(now) {
     const samples = this.samples;
     if (samples.length < 240 || now - samples[0].time < 4800) return;

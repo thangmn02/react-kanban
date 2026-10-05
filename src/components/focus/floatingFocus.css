@@ -155,9 +155,19 @@ h2 { font-size: 15px; line-height: 1.4; margin: 0; overflow-wrap: anywhere; }
   8%, 35% { opacity: 1; transform: scale(1.08); }
   100% { opacity: 0; transform: scale(1); }
 }
+.melody-beat-flash {
+  position: absolute; inset: -1px; border-radius: inherit; pointer-events: none;
+  background: var(--c); box-shadow: 0 0 14px color-mix(in srgb, var(--c) 55%, transparent);
+  animation: melody-beat-flash 150ms ease-out both;
+}
+@keyframes melody-beat-flash {
+  0%, 100% { opacity: 0; transform: scale(1); }
+  10%, 35% { opacity: var(--melody-flash-level, 1); transform: scale(1.12); }
+}
 @media(prefers-reduced-motion:reduce) {
   .music-pattern.live .beat-square.melody-held, .music-pattern.moment .beat-square.melody-held { animation:none !important; transform:none; }
   .shape-beat-flash { animation: none; display: none; }
+  .melody-beat-flash { animation: none; transform: none; opacity: var(--melody-flash-level, 1); }
 }
 .dock-panel.ultraviolet { background: rgba(13,12,26,.86); color: #f9f8ff; border-color: rgba(255,255,255,.12); }
 .dock-panel.ultraviolet .muted, .dock-panel.ultraviolet .eyebrow { color: #b9b6cc; }

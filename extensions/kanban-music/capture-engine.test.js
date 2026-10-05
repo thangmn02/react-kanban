@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createCaptureEngine, tabConstraints } from './capture-engine.js';
+import { TempoTracker } from './tempo-tracker.js';
 
 beforeEach(() => vi.useFakeTimers());
-afterEach(() => vi.useRealTimers());
+afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 function fixture() {
   const audio = { stop: vi.fn(), addEventListener: vi.fn(), readyState: 'live' };
   const video = { stop: vi.fn() };
@@ -108,6 +109,32 @@ it('keeps dense multi-band drums in raw-accent mode', async () => {
   expect(f.deps.onTempo.mock.calls.every(([, state]) => !state.locked)).toBe(true);
   expect(f.deps.onTempoTick).not.toHaveBeenCalled();
   f.engine.stop();
+});
+it('feeds real kick onsets back into the locked tracker and never uses hats as phase evidence', async () => {
+  const f = fixture();
+  const snap = vi.spyOn(TempoTracker.prototype, 'snapToBeat');
+  let time = 0;
+  let sample;
+  f.deps.now = () => time;
+  f.deps.schedule = (callback) => { sample = callback; return 1; };
+  f.deps.cancel = vi.fn();
+  f.analyser.getFloatFrequencyData = (array) => {
+    array.fill(-60);
+    // Sparse true FFT kick/bass transients, with independent off-beat hats.
+    if (Math.round(time / (1000 / 60)) % 30 === 0) array.fill(-25, 2, 7);
+    if (Math.round(time / (1000 / 60)) % 30 === 15) array.fill(-25, 256, 512);
+  };
+  const engine = createCaptureEngine(f.deps);
+  await engine.start('stream', 'feedback');
+  for (let frame = 0; frame < 1200; frame++) {
+    time = frame * 1000 / 60;
+    engine.renew('feedback');
+    sample();
+  }
+  expect(snap.mock.calls.length).toBeGreaterThan(20);
+  expect(snap.mock.calls.every(([now]) => Math.round(now / (1000 / 60)) % 30 === 0)).toBe(true);
+  expect(f.deps.onTempoTick).toHaveBeenCalled();
+  engine.stop();
 });
 it('falls back cleanly on capture rejection and releases streams that arrive after cancellation', async () => {
   const failed = fixture();

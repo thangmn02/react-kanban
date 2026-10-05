@@ -71,6 +71,7 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
         const result = detector.analyze(spectrum, time);
         const tonal = melody.analyze(spectrum, time);
         const rhythm = tempo.analyze(result.envelope, time);
+        if (rhythm.locked && result.hits.includes('kick')) tempo.snapToBeat(time);
         for (const band of result.hits) if (band === 'kick' || band === 'clap' || band === 'hat') drumHits.push(time);
         while (drumHits.length && drumHits[0] < time - 4000) drumHits.shift();
         // Strong, regular drums retain direct onset lighting. Tempo lock is

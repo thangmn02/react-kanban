@@ -1,6 +1,73 @@
 import { expect, it } from 'vitest';
 import { TempoTracker } from './tempo-tracker.js';
 
+it.each([70, -70])('converges an accepted %s ms phase offset within four kicks without replaying ticks', (offset) => {
+  const tracker = new TempoTracker();
+  Object.assign(tracker, { locked: true, bpm: 120, anchor: offset });
+  const emitted = [];
+  for (let now = 0; now <= 2000; now += 10) {
+    const result = tracker.analyze(0, now);
+    if (now > 0 && now % 500 === 0) tracker.snapToBeat(now);
+    if (result.tick) emitted.push(tracker.lastTick);
+  }
+  expect(Math.abs(tracker.anchor)).toBeLessThan(11);
+  expect(emitted.every((tick, index) => index === 0 || tick === emitted[index - 1] + 1)).toBe(true);
+});
+
+it('ignores unlocked, invalid and out-of-gate kicks without moving phase', () => {
+  const tracker = new TempoTracker();
+  tracker.snapToBeat(500);
+  expect(tracker.anchor).toBeNull();
+  Object.assign(tracker, { locked: true, bpm: 120, anchor: 0 });
+  for (const now of [110, NaN, Infinity]) tracker.snapToBeat(now);
+  expect(tracker.anchor).toBe(0);
+  tracker.snapToBeat(520);
+  expect(tracker.anchor).toBeCloseTo(8);
+});
+
+it('keeps phase through a short breakdown and gently follows the next four drop kicks', () => {
+  const tracker = new TempoTracker();
+  Object.assign(tracker, { locked: true, bpm: 120, anchor: 0 });
+  for (let now = 0; now < 1500; now += 10) tracker.analyze(0, now);
+  expect(tracker.locked).toBe(true);
+  expect(tracker.anchor).toBe(0);
+  for (const now of [1570, 2070, 2570, 3070]) {
+    const previousAnchor = tracker.anchor;
+    tracker.analyze(3, now);
+    tracker.snapToBeat(now);
+    expect(Math.abs(tracker.anchor - previousAnchor)).toBeLessThanOrEqual(28);
+  }
+  expect(70 - tracker.anchor).toBeLessThan(10);
+});
+
+it.each([90, 128, 150])('bounds phase over ten minutes of %s BPM kicks with sample jitter and estimator updates', (bpm) => {
+  const tracker = new TempoTracker();
+  const beatMs = 60000 / bpm;
+  Object.assign(tracker, { locked: true, bpm: bpm * 1.005, anchor: 50 });
+  let previousBeat = -1;
+  let kicks = 0;
+  let worstError = 0;
+  const ticks = [];
+  for (let now = 0, frame = 0; now < 600000; now += 1000 / 60 + [0, 2, -3, 1][frame++ % 4]) {
+    const currentBeat = Math.floor(now / beatMs);
+    const kick = currentBeat > previousBeat;
+    previousBeat = currentBeat;
+    const result = tracker.analyze(kick ? 3 : 0, now);
+    if (kick && result.locked) {
+      tracker.snapToBeat(now);
+      kicks++;
+      const eighthMs = 30000 / tracker.bpm;
+      const error = Math.abs(now - (tracker.anchor + Math.round((now - tracker.anchor) / eighthMs) * eighthMs));
+      if (now > 10000) worstError = Math.max(worstError, error);
+    }
+    if (result.tick) ticks.push(tracker.lastTick);
+  }
+  expect(tracker.locked).toBe(true);
+  expect(kicks).toBeGreaterThan(bpm * 9);
+  expect(worstError).toBeLessThan(40);
+  expect(ticks.every((tick, index) => index === 0 || tick > ticks[index - 1])).toBe(true);
+});
+
 it('locks to regular 120 BPM accents and emits eighth-note drum rows', () => {
   const tracker = new TempoTracker();
   const ticks = [];

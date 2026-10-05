@@ -52,7 +52,9 @@ it('holds the native Melody squares from the companion envelope and clears them 
   act(() => emit({ kind: 'sync.state', mode: 'capture', captureId: 'melody-capture' }));
   act(() => emit({ kind: 'melody.state', captureId: 'melody-capture', melody: { active: true, level: .6, note: 1 } }));
   await waitFor(() => expect(view.container.querySelector('[data-channel="melody"] .melody-held')).not.toBeNull());
+  await waitFor(() => expect(view.container.querySelector('[data-channel="melody"] .melody-beat-flash')).not.toBeNull());
   expect(view.container.querySelectorAll('.channel-icon.onset, .channel-icon.melody-held')).toHaveLength(0);
   act(() => emit({ kind: 'melody.state', captureId: 'melody-capture', melody: { active: false, level: 0, note: 1 } }));
   expect(view.container.querySelectorAll('.melody-held')).toHaveLength(0);
+  expect(view.container.querySelectorAll('.melody-beat-flash')).toHaveLength(0);
 });

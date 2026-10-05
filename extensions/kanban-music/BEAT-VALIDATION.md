@@ -1,5 +1,44 @@
 # Beat sync validation
 
+## Version 0.3.10 — bounded kick phase correction (2026-10-05)
+
+The locked sparse grid now feeds detected kicks into its anchor. Each accepted
+kick applies 40% of the nearest eighth-note phase error, bounded by a 35% gate.
+Phase-preserving BPM updates and the monotonic tick guard stay in place. Dense
+drums still use direct onsets. No detector sensitivity defaults change, and no
+octave tie-break change is included without evidence of a separate octave bug.
+
+The shared native/web grid flashes Melody on envelope activation/new note
+sequences, OR raw hat accents. Estimated hat ticks do not trigger it. Level
+updates change intensity without restarting the flash. The 150 ms flash expires
+independently of envelope updates; the existing 700 ms envelope lease, pause,
+capture identities and reduced-motion behavior remain enforced.
+
+Automated regressions cover four-kick convergence from accepted positive and
+negative offsets, out-of-gate rejection, monotonic tick emission and ten minutes
+of 90/128/150 BPM synthetic pulses with jitter and continuous estimator updates.
+Real FFT fixtures prove kicks engage the feedback, while hats do not. Native
+event tests verify the fifth-row flash and silence clearing. These are synthetic
+and transport/rendering checks, not five-minute EDM/pop/lo-fi or ten-minute
+playlist listening acceptance.
+
+Boundaries: the gate does not distinguish every syncopated kick or correct large
+initial offsets. Low confidence still releases tempo after four seconds; actual
+silence releases capture after 2.5 seconds and retries on the existing schedule.
+The two-line feedback fix does not remove those relock/restart boundaries or
+establish jump-free recovery across a long silent break.
+
+Measured ten-minute worst phase errors after warmup with feedback: 10.78 ms at
+90 BPM, 11.37 ms at 128 BPM and 10.42 ms at 150 BPM. The 128 BPM control run
+without feedback reached 116.30 ms; feedback made 1,280 corrections averaging
+2.08 ms. These errors are relative to the synthetic detected kick times and do
+not include audio capture or transport latency. All 523 tests across 71 files,
+TypeScript, scoped lint and production/native builds passed. An isolated browser
+rendered the actual component/CSS: peak Melody opacity 0.72, scale 1.12, no
+motion under reduced motion, silence cleared, and zero page errors. The temporary
+rendering fixture/server were removed. The signed Kora 0.1.10 installer verifies
+with the existing key; altered bytes are rejected. Companion ZIPs contain 0.3.10.
+
 ## Version 0.3.9 — five rows and sustained Melody (2026-10-04)
 
 Current tracks are Kick, Clap, Hi-hat, Bass and Melody. The former snare

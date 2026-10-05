@@ -27,7 +27,7 @@ It cannot hear Zalo calls, notifications, native music apps or other desktop
 audio. The previous system-audio checkbox and its IPC command are removed;
 saved `native.systemAudio` values are ignored.
 
-Install/reload **Kora Music Companion 0.3.9** in the browser used for music.
+Install/reload **Kora Music Companion 0.3.10** in the browser used for music.
 The companion discovers only the explicitly supported music websites. It
 automatically connects to the running widget and sends metadata and beat
 events, never PCM audio. No web-app tab is needed. Capture can still require
@@ -52,7 +52,7 @@ restarts recover automatically. This adds the `alarms` extension permission.
 The old web protocol and app origin are retained for compatibility. The app
 identifier `app.kanthangboard.focus` is deliberately unchanged to preserve
 existing native sign-in and preferences. Branding, product/version and the
-executable are now Kora / 0.1.9 / `kora.exe`.
+executable are now Kora / 0.1.10 / `kora.exe`.
 
 ## Development and distribution
 
@@ -115,7 +115,7 @@ Do not publish a mock-auth demo feed as a connected-app update.
 ## Validation
 
 - Frontend/native/companion regression tests and Rust bridge-origin tests.
-- Live: load 0.3.9, play supported browser music, open the native Dock without
+- Live: load 0.3.10, play supported browser music, open the native Dock without
   a web-app tab, verify actual capture mode and increasing onset counts in
   dev, with matching square pops and static icons.
 - Pause/close the music tab, disconnect the browser, restart/reload the
@@ -134,7 +134,12 @@ The matrix has Kick, Clap, Hi-hat, Bass and Melody rows. Melody uses a
 transcription. Sustained tonal audio holds a steady pattern; silence,
 pause, stale envelopes and capture loss clear it. Percussion remains
 transient-driven (or an explicitly confident tempo lock). Clock fallback
-never invents flashes. Shapes hold for eight seconds and reflash within their
+never invents flashes. Real kick onsets gently correct the locked eighth-note
+phase within its error gate. Melody adds a 150 ms level-scaled flash on phrase
+activation/new note sequences or real hat accents; estimated hat ticks do not
+trigger it, and its envelope still expires after 700 ms. Long silence/capture
+restart and low-confidence tempo reacquisition retain their existing behavior.
+Shapes hold for eight seconds and reflash within their
 mask on captured onsets or confident audio-tempo ticks. Each hit brightens and
 pops against the softer held cells; there is no breathing loop or clock-mode flash.
 The arrow button is the only layout selector; color/palette controls remain in
