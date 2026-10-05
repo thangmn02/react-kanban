@@ -1,8 +1,10 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
+import nativeConfig from './src-tauri/tauri.conf.json' with { type: 'json' };
 
 // https://vite.dev/config/
 export default defineConfig({
+  define: { __KORA_VERSION__: JSON.stringify(nativeConfig.version) },
   plugins: [react()],
   test: {
     environment: 'jsdom',

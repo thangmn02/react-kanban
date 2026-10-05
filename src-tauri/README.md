@@ -25,10 +25,14 @@ timer above Tasks, Music and Beat Grid, a now-playing strip outside Music, real
 focus task rows and a blue-violet glass player card. Start/pause, task selection,
 completion and music control use the existing shared controllers. Arrow keys,
 Home and End navigate the tabs. Empty music/task states remain usable.
-Fresh installations default to Tabs; existing saved layouts are preserved.
-Use the layout-arrow control to select Tabs. Its native window opens at 520×560
-and can shrink to 360×440; the lower panel scrolls at small sizes while the timer
-and tabs stay visible. The same composition is used in browser PiP, where CSS
+Tabs is the only dock layout, including installations with old saved layouts.
+The circular timer stays visible above all three tabs with Start/Pause, Reset
+and Complete & next. Drag the native dock from any empty header area or its
+Tabs label; buttons and settings stay interactive. Color and palette settings
+are retained. Native and browser PiP open at 520×680; native can shrink to
+360×540. The lower panels support wheel, touch and keyboard scrolling without
+visible scrollbar bars. Tab changes preserve the native window's resized size.
+The same composition is used in browser PiP, where CSS
 glass blurs page content rather than the desktop behind the browser window.
 
 ## Browser music only
@@ -63,7 +67,7 @@ restarts recover automatically. This adds the `alarms` extension permission.
 The old web protocol and app origin are retained for compatibility. The app
 identifier `app.kanthangboard.focus` is deliberately unchanged to preserve
 existing native sign-in and preferences. Branding, product/version and the
-executable are now Kora / 0.1.12 / `kora.exe`.
+executable are now Kora / 0.1.13 / `kora.exe`.
 
 The fifth row now follows detected instrumental note attacks. Choose **AI
 instrument notes** in Music to open this browser profile's companion options,
@@ -145,7 +149,7 @@ Do not publish a mock-auth demo feed as a connected-app update.
 - Pause/close the music tab, disconnect the browser, restart/reload the
   companion/widget: expired captures never flash and reconnection recovers.
 - Play Zalo/desktop audio while browser music is paused: no squares flash.
-- Resize all five layouts, maximize/restore and Tasks/Dock; no scrollbars,
+- Resize Tabs, switch all three panels, maximize/restore and Tasks/Dock; no scrollbars,
   clipped controls, duplicate timer or duplicate completion log.
 
 The former system-audio version was confirmed working by the user. The new
@@ -166,8 +170,7 @@ restart and low-confidence tempo reacquisition retain their existing behavior.
 Shapes hold for eight seconds and reflash within their
 mask on captured onsets or confident audio-tempo ticks. Each hit brightens and
 pops against the softer held cells; there is no breathing loop or clock-mode flash.
-The arrow button is the only layout selector; color/palette controls remain in
-the settings popover.
+Tabs is the only layout; color/palette controls remain in the settings popover.
 
 Tasks retains its Focus Dock even with an empty focus list. Click its time
 to expand timer controls. Click the native music dock's time to open the

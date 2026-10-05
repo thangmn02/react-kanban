@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { I18nProvider } from '../../i18n';
 import { ContactError, submitContact } from './contact-service';
 import ContactForm from './contact-form';
+import nativeConfig from '../../../src-tauri/tauri.conf.json';
 
 vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ user: { name: 'Reader', email: 'reader@example.test' } }) }));
 vi.mock('./contact-service', async original => ({ ...await original<typeof import('./contact-service')>(), submitContact: vi.fn() }));
@@ -73,6 +74,7 @@ it('does not report fake delivery or load Turnstile when contact is unconfigured
   vi.stubEnv('VITE_TURNSTILE_SITE_KEY', '');
   render(<I18nProvider><ContactForm /></I18nProvider>);
   expect(screen.getByText(/Contact is temporarily unavailable/)).toBeInTheDocument();
+  expect(screen.getByText(`Kora v${nativeConfig.version}`)).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Send message' })).toBeDisabled();
   expect(window.turnstile?.render).not.toHaveBeenCalled();
   expect(submitContact).not.toHaveBeenCalled();

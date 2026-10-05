@@ -175,6 +175,13 @@ the already-provisioned authoritative project: its migration-history alignment
 is intentionally deferred to a separately reviewed operation with verified
 backups. See `supabase/schema/README.md`.
 
+Signup confirmation links explicitly return to `https://koraspace.online/home`,
+including signup from Windows. In the hosted Supabase Auth URL Configuration,
+set Site URL to `https://koraspace.online` and allow that exact `/home` URL.
+Keep local development entries separate; `supabase/config.toml` configures the
+local stack and must not be pushed wholesale over production auth settings.
+Existing confirmed accounts can sign in normally without registering again.
+
 ---
 
 ---
@@ -343,6 +350,8 @@ Turnstile, a honeypot and a persistent three-message-per-IP hourly limit. Resend
 sends notifications to a server-configured owner inbox. Setup, sender verification,
 backups and activation are documented in [Contact setup](docs/contact-setup.md).
 The frontend also needs `VITE_TURNSTILE_SITE_KEY` at build time.
+Contact shows the running Kora version in its small footer, sourced at build
+time from `src-tauri/tauri.conf.json` for both web and Windows.
 
 ### AI task planning (Gemini)
 

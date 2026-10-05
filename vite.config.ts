@@ -4,9 +4,11 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { rm } from 'node:fs/promises'
 import { resolve } from 'node:path'
+import nativeConfig from './src-tauri/tauri.conf.json' with { type: 'json' }
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
+  define: { __KORA_VERSION__: JSON.stringify(nativeConfig.version) },
   plugins: [
     react(),
     tailwindcss(),

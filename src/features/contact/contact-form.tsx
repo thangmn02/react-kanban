@@ -73,5 +73,6 @@ export default function ContactForm() {
         {t(busy ? 'contact.sending' : 'contact.send')}
       </button>
     </form>
+    <footer className="mt-6 text-center text-xs text-slate-400">Kora v{__KORA_VERSION__}</footer>
   </section>;
 }
