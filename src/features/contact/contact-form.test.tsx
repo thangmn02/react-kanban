@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { I18nProvider } from '../../i18n';
 import { ContactError, submitContact } from './contact-service';
@@ -33,7 +33,7 @@ it('submits the verified form once, clears its message on success, and renews th
   expect(screen.getByLabelText('Message')).toHaveValue('');
   expect(screen.getByLabelText('Email for a reply')).toHaveValue('reader@example.test');
   expect(screen.getByRole('button', { name: 'Send message' })).toBeDisabled();
-  expect(window.turnstile?.remove).toHaveBeenCalledWith('widget-1');
+  await waitFor(() => expect(window.turnstile?.remove).toHaveBeenCalledWith('widget-1'));
 });
 
 it.each(['rate-limit', 'verification', 'unavailable'] as const)('keeps the message and gives useful feedback for %s', async code => {
