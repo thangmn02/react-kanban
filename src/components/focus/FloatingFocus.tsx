@@ -3,7 +3,7 @@ import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'framer-m
 import type { FocusTask, PomodoroTimerState, PomodoroTimerSettings, PomodoroMode } from '../../types/focus.type';
 import { formatPomodoroTime } from '../../utils/pomodoroTime';
 import { useI18n } from '../../i18n';
-import { MusicFeedback, MusicGrid, MusicSetup, MusicTrack } from '../../features/music/MusicPlayer';
+import { MusicFeedback, MusicGrid, MusicSetup, MusicTrack, MusicNowPlaying } from '../../features/music/MusicPlayer';
 import { useBrowserMusic } from '../../features/music/useBrowserMusic';
 import { useDockPreferences, dockStyles, beatColorModes, beatPalettes } from './useDockPreferences';
 
@@ -98,8 +98,9 @@ export default function FloatingFocus(props: FloatingFocusProps) {
   const cycle = Math.min((timerState.completedCycleFocus || 0) + 1, cycleTotal);
   const progress = Math.max(0, Math.min(1, remainingSeconds / Math.max(1, timerState.plannedSeconds || remainingSeconds || 1500)));
   const layoutTransition = reducedMotion ? { duration: 0 } : style === 'deck' ? deckSpring : glide;
-  const activeTab = hasMusic ? tab : 'focus';
-  const hidden = (card: Card) => style === 'tabs' ? card !== activeTab
+  const activeTab = tab;
+  const cards: Card[] = ['focus', 'music', 'beat'];
+  const hidden = (card: Card) => style === 'tabs' ? card !== 'focus' && card !== activeTab
     : style === 'deck' && hasMusic ? deck === 'stacked' ? card !== 'focus' : deck === 'solo' && card !== soloCard : false;
   const pose = (card: Card) => {
     if (style !== 'deck' || !hasMusic || deck === 'solo') return { x: 0, rotate: 0 };
@@ -161,11 +162,18 @@ export default function FloatingFocus(props: FloatingFocusProps) {
             transition={reducedMotion ? { duration: 0 } : glide} />
         </AnimatePresence>
         <div className="dock-tabbar" role="tablist" aria-label={t('dock.style.tabs')} hidden={style !== 'tabs'}>
-          {(['focus', ...(hasMusic ? ['beat', 'music'] : [])] as Card[]).map((card) => <button key={card} type="button" role="tab"
+          <span className="dock-tab-pill" aria-hidden="true" style={{ transform: `translateX(${cards.indexOf(activeTab) * 100}%)` }} />
+          {cards.map((card, index) => <button key={card} id={`${groupId}-${card}-tab`} type="button" role="tab" tabIndex={activeTab === card ? 0 : -1}
             aria-selected={activeTab === card} aria-controls={`${groupId}-${card}`} className={activeTab === card ? 'active' : ''}
-            onClick={() => setTab(card)}>{card === 'focus' ? t('focus.timer.pomodoro') : card === 'beat' ? t('dock.beat') : t('focus.island.music')}</button>)}
+            onClick={() => setTab(card)} onKeyDown={(event) => {
+              const next = event.key === 'ArrowRight' ? (index + 1) % cards.length : event.key === 'ArrowLeft' ? (index + cards.length - 1) % cards.length
+                : event.key === 'Home' ? 0 : event.key === 'End' ? cards.length - 1 : null;
+              if (next === null) return;
+              event.preventDefault(); setTab(cards[next]);
+              event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus();
+            }}>{card === 'focus' ? t('dock.tasks') : card === 'beat' ? t('dock.beatGrid') : t('focus.island.music')}</button>)}
         </div>
-        <motion.section id={`${groupId}-focus`} layout layoutId="island-bar" className="dock-panel dock-focus-pane timer-island"
+        <motion.section id={`${groupId}-timer`} layout layoutId="island-bar" className="dock-panel dock-focus-pane timer-island"
           data-card="focus" aria-label={t('focus.timer.pomodoro')} aria-hidden={hidden('focus')} inert={hidden('focus')}
           animate={{ ...pose('focus'), opacity: hidden('focus') ? 0 : 1 }} transition={{ ...layoutTransition, layout: layoutTransition }} onClick={(event) => selectCard('focus', event)}>
           <motion.div layout layoutId="session-row" className="dock-session-row" transition={{ layout: layoutTransition }}>
@@ -194,15 +202,35 @@ export default function FloatingFocus(props: FloatingFocusProps) {
             <button className="dock-next" type="button" disabled={!taskId || !onMarkDoneAndNext || activeTask?.isDone} onClick={() => onMarkDoneAndNext?.(taskId)}>{t('floating.completeNext')}</button>
           </div>
         </motion.section>
-        {hasMusic && <motion.section id={`${groupId}-beat`} layout layoutId="beat-grid" className={`dock-panel dock-beat-pane${preferences.palette === 'ultraviolet' ? ' ultraviolet' : ''}`}
+        <div className="dock-now-playing" hidden={style !== 'tabs' || activeTab === 'music' || !hasMusic}>
+          {hasMusic && <MusicNowPlaying music={music} />}
+        </div>
+        <section id={`${groupId}-focus`} className="dock-panel dock-work-pane" role="tabpanel" aria-labelledby={`${groupId}-focus-tab`}
+          hidden={style !== 'tabs' || activeTab !== 'focus'}>
+          <p className="eyebrow">{t('dock.focusTasks')}</p>
+          {tasks.length ? <ul className="dock-work-list">{tasks.map((task) => <li key={task.id} className={`dock-work-row${task.isDone ? ' done' : ''}`}>
+            <button type="button" className="dock-work-check" aria-label={`${t('common.markDone')}: ${task.title}`}
+              disabled={task.isDone || !onMarkDoneAndNext} onClick={() => onMarkDoneAndNext?.(task.id)}>
+              {task.isDone && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg>}
+            </button>
+            <button type="button" className="dock-work-task" disabled={!onActiveTaskChange} aria-pressed={task.id === taskId}
+              onClick={() => onActiveTaskChange?.(task.id)}><span>{task.title}</span><small>{[task.boardTitle, task.listTitle].filter(Boolean).join(' · ')}</small></button>
+            {task.id === taskId && !task.isDone && <span className="dock-work-current">{t('dock.currentTask')}</span>}
+          </li>)}</ul> : <p className="dock-empty muted">{t('home.focusEmptyTitle')}</p>}
+          {props.onReturnToTab && <button type="button" className="dock-plan-link" onClick={props.onReturnToTab}>{props.returnLabel || t('dock.openKora')} <span aria-hidden="true">→</span></button>}
+        </section>
+        {(hasMusic || style === 'tabs') && <motion.section id={`${groupId}-beat`} layout layoutId="beat-grid" className={`dock-panel dock-beat-pane${preferences.palette === 'ultraviolet' ? ' ultraviolet' : ''}`}
           data-card="beat" aria-label={t('dock.beat')} aria-hidden={hidden('beat')} inert={hidden('beat')}
+          role={style === 'tabs' ? 'tabpanel' : undefined} aria-labelledby={style === 'tabs' ? `${groupId}-beat-tab` : undefined}
           animate={{ ...pose('beat'), opacity: hidden('beat') ? 0 : 1 }} transition={{ ...layoutTransition, layout: layoutTransition }} onClick={(event) => selectCard('beat', event)}>
-          <MusicGrid music={music} colorMode={preferences.colorMode} palette={preferences.palette} orientation={style === 'mixer' ? 'vertical' : 'horizontal'} />
+          {hasMusic ? <MusicGrid music={music} colorMode={preferences.colorMode} palette={preferences.palette} orientation={style === 'mixer' ? 'vertical' : 'horizontal'} />
+            : <p className="dock-empty muted">{t('music.nothingPlaying')}</p>}
         </motion.section>}
-        {hasMusic && <motion.section id={`${groupId}-music`} layout layoutId="music-row" className={`dock-panel dock-track-pane${preferences.palette === 'ultraviolet' ? ' ultraviolet' : ''}`}
+        {(hasMusic || style === 'tabs') && <motion.section id={`${groupId}-music`} layout layoutId="music-row" className={`dock-panel dock-track-pane${preferences.palette === 'ultraviolet' ? ' ultraviolet' : ''}`}
           data-card="music" aria-label={t('focus.island.music')} aria-hidden={hidden('music')} inert={hidden('music')}
+          role={style === 'tabs' ? 'tabpanel' : undefined} aria-labelledby={style === 'tabs' ? `${groupId}-music-tab` : undefined}
           animate={{ ...pose('music'), opacity: hidden('music') ? 0 : 1 }} transition={{ ...layoutTransition, layout: layoutTransition }} onClick={(event) => selectCard('music', event)}>
-          <MusicTrack music={music} /><MusicFeedback music={music} />
+          {hasMusic ? <><MusicTrack music={music} /><MusicFeedback music={music} /></> : <p className="dock-empty muted">{t('music.nothingPlaying')}</p>}
         </motion.section>}
         <div className="dock-deck-controls" hidden={style !== 'deck' || !hasMusic}>
           <button type="button" aria-label={t('dock.deck.toggle')} onClick={() => setDeckState((current) => current === 'stacked' ? 'fanned' : current === 'fanned' ? 'stacked' : 'fanned')}>⋯</button>

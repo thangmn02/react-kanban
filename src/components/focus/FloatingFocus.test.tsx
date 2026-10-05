@@ -7,6 +7,7 @@ import { DEFAULT_POMODORO_TIMER_SETTINGS } from '../../utils/pomodoroTime';
 vi.mock('../../features/music/useBrowserMusic', () => ({ useBrowserMusic: () => ({ sessions: [], connected: true, checking: false }) }));
 afterEach(() => { cleanup(); localStorage.clear(); });
 it('cycles all styles using the arrow only, keeping color and palette settings', () => {
+  localStorage.setItem('floatingDock.style', 'island');
   const view = render(<I18nProvider><FloatingFocus activeTask={null} focusTasks={[]} cycleTotal={4} remainingSeconds={1500}
     timerState={{ mode: 'focus', activeTaskId: null, isRunning: false, remainingSeconds: 1500, startedAt: null, endsAt: null, plannedSeconds: null }}
     onStart={vi.fn()} onPause={vi.fn()} onReset={vi.fn()} /></I18nProvider>);

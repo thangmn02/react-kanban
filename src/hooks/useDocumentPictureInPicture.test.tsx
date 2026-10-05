@@ -25,6 +25,7 @@ function Harness({ seconds = 90 }: { seconds?: number }) {
 }
 beforeEach(() => {
   vi.clearAllMocks(); localStorage.clear();
+  localStorage.setItem('floatingDock.style', 'island');
   vi.mocked(sendMusicRequest).mockResolvedValue([{ id: 'track', title: 'Song', artist: '', source: 'youtube.com', paused: false }]);
   popupFrame = document.createElement('iframe');
   document.body.appendChild(popupFrame);

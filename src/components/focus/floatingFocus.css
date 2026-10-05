@@ -97,6 +97,7 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .solid { background: #1a1a1a; color: white; border-color: #1a1a1a; }
 .text-button { background: transparent; border: 0; padding: 4px 0; font-size: 11px; }
 .music-heading { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+.music-art { display:none; }
 .track-copy { flex: 1; min-width: 0; }
 .eyebrow { margin: 0 0 5px; font: 600 10px/1.5 ui-monospace, monospace; letter-spacing: .2em; text-transform: uppercase; color: #73737d; }
 h2 { font-size: 15px; line-height: 1.4; margin: 0; overflow-wrap: anywhere; }
@@ -202,3 +203,74 @@ h2 { font-size: 15px; line-height: 1.4; margin: 0; overflow-wrap: anywhere; }
   .music-pattern.horizontal > .beat-channel { gap: 4px; }
 }
 @media(prefers-reduced-motion:reduce) { .music-dot.playing, .music-pattern .beat-square, .music-pattern .beat-square.onset, .music-pattern.flow .beat-square.onset, .music-pattern.moment .beat-square.moment-lit { animation: none !important; } .beat-square, .dock-ring-progress { transition: none; } .music-pattern.live .beat-square.onset, .music-pattern.moment .beat-square.moment-lit { background: var(--c); border-color: transparent; } }
+
+/* The tabbed glass composition keeps the same live timer and music elements. */
+.floating-focus[data-style='tabs'] {
+  --dock-ink:#16181d; --dock-dim:#5c6270; --dock-line:rgba(22,24,29,.09);
+  --dock-space:20px; --dock-gap:12px; --dock-control:44px; --dock-hero-play:52px;
+  --dock-radius:18px; --dock-pill:999px; --dock-player-radius:22px;
+  --dock-spring:cubic-bezier(.32,.72,0,1); --dock-duration:250ms;
+  --dock-glass-face:linear-gradient(165deg,rgba(242,247,255,.78),rgba(255,255,255,.46) 55%,rgba(249,251,255,.66));
+  --dock-player-face:radial-gradient(120% 90% at 15% 0%,rgba(74,112,244,.48),transparent 65%),radial-gradient(100% 110% at 100% 100%,rgba(133,84,209,.38),transparent 65%),linear-gradient(155deg,rgba(31,45,82,.84),rgba(18,22,44,.86));
+  max-width:560px; color:var(--dock-ink); background:var(--dock-glass-face);
+  backdrop-filter:blur(30px) saturate(1.45); -webkit-backdrop-filter:blur(30px) saturate(1.45);
+  border-color:rgba(255,255,255,.86); border-radius:var(--dock-radius);
+  box-shadow:0 18px 48px rgba(23,32,56,.18),inset 0 1px 1px rgba(255,255,255,.95),inset 0 0 24px rgba(255,255,255,.24);
+}
+.floating-focus[data-style='tabs'] .dock-toolbar { padding:4px 8px; gap:0; border-color:var(--dock-line); }
+.floating-focus[data-style='tabs'] .dock-style-name { min-width:0; overflow:hidden; color:var(--dock-dim); letter-spacing:.18em; }
+.floating-focus[data-style='tabs'] .dock-icon-button { width:var(--dock-control); height:var(--dock-control); flex-shrink:0; }
+.floating-focus[data-style='tabs'] .dock-tabs { grid-template-areas:"focus" "strip" "tabbar" "content"; grid-template-columns:minmax(0,1fr); grid-template-rows:auto auto auto minmax(0,1fr); }
+.floating-focus[data-style='tabs'] .dock-focus-pane { grid-area:focus; min-height:0; display:grid; grid-template-columns:minmax(0,1fr) auto; grid-template-rows:auto auto auto; align-content:start; justify-items:stretch; gap:6px var(--dock-gap); padding:16px var(--dock-space); border-bottom:1px solid var(--dock-line); }
+.floating-focus[data-style='tabs'] .dock-session-row { grid-column:1 / -1; grid-row:1; }
+.floating-focus[data-style='tabs'] .dock-task-select { color:var(--dock-ink); font-size:16px; padding:4px 0; min-height:var(--dock-control); }
+.floating-focus[data-style='tabs'] .cycle { color:var(--dock-dim); font-size:13px; }
+.floating-focus[data-style='tabs'] .dock-ring { grid-column:1; grid-row:2; width:auto; height:var(--dock-control); justify-items:start; }
+.floating-focus[data-style='tabs'] .dock-ring > svg { display:none; }
+.floating-focus[data-style='tabs'] .dock-ring .time { font-family:inherit; font-size:34px; font-weight:700; letter-spacing:-.04em; }
+.floating-focus[data-style='tabs'] .dock-cycle { grid-column:1; grid-row:3; align-self:center; color:var(--dock-dim); font-size:12px; }
+.floating-focus[data-style='tabs'] .dock-focus-actions { grid-column:2; grid-row:3; align-items:center; gap:var(--dock-gap); }
+.floating-focus[data-style='tabs'] .dock-start { position:absolute; right:var(--dock-space); top:54px; width:var(--dock-hero-play); height:var(--dock-hero-play); padding:0; border-radius:var(--dock-pill); background:var(--dock-ink); }
+.floating-focus[data-style='tabs'] .dock-start svg { width:20px; height:20px; }
+.floating-focus[data-style='tabs'] .dock-start span { display:none; }
+.floating-focus[data-style='tabs'] .dock-reset,.floating-focus[data-style='tabs'] .dock-next { border:0; background:transparent; color:var(--dock-dim); padding:4px 0; min-width:var(--dock-control); min-height:var(--dock-control); font-size:12px; }
+.dock-now-playing { grid-area:strip; padding:var(--dock-gap) var(--dock-space) 0; }
+.music-now-playing-strip { display:flex; align-items:center; gap:8px; min-width:0; padding:2px 8px 2px var(--dock-gap); border-radius:12px; background:rgba(22,24,29,.045); border:1px solid rgba(255,255,255,.6); }
+.music-now-playing-strip > svg { width:18px; height:18px; flex-shrink:0; color:var(--dock-dim); }
+.music-now-playing-label { color:var(--dock-dim); font-size:10px; letter-spacing:.08em; text-transform:uppercase; white-space:nowrap; }
+.music-now-playing-title { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; font-weight:600; }
+.music-strip-play { width:var(--dock-control); height:var(--dock-control); background:transparent; border:0; }
+.floating-focus[data-style='tabs'] .dock-tabbar { position:relative; margin:14px var(--dock-space) 0; padding:4px; gap:0; border:0; border-radius:var(--dock-pill); background:rgba(22,24,29,.07); }
+.floating-focus[data-style='tabs'] .dock-tabbar button { position:relative; z-index:1; min-height:var(--dock-control); color:var(--dock-dim); font-size:13px; background:transparent; border-radius:var(--dock-pill); }
+.floating-focus[data-style='tabs'] .dock-tabbar button.active { color:var(--dock-ink); }
+.dock-tab-pill { position:absolute; left:4px; top:4px; bottom:4px; width:calc((100% - 8px) / 3); border-radius:var(--dock-pill); background:rgba(255,255,255,.8); box-shadow:0 2px 8px rgba(22,24,29,.1),inset 0 1px 0 #fff; transition:transform var(--dock-duration) var(--dock-spring); }
+.floating-focus[data-style='tabs'] .dock-tabs > .dock-panel:not(.dock-focus-pane) { grid-area:content; min-height:240px; padding:var(--dock-space); overflow-y:auto; }
+.floating-focus[data-style='tabs'] .dock-track-pane { display:flex; flex-direction:column; justify-content:center; margin:var(--dock-space); padding:var(--dock-space); min-height:220px; border-radius:var(--dock-player-radius); background:var(--dock-player-face); color:#fff; border:1px solid rgba(255,255,255,.3); box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 12px 28px rgba(29,39,78,.18); backdrop-filter:blur(24px) saturate(1.3); -webkit-backdrop-filter:blur(24px) saturate(1.3); }
+.floating-focus[data-style='tabs'] .dock-track-pane .music-heading { display:grid; grid-template-columns:72px minmax(0,1fr); gap:var(--dock-gap); margin:0; }
+.floating-focus[data-style='tabs'] .music-art { display:grid; place-items:center; width:72px; height:72px; border-radius:16px; background:linear-gradient(140deg,rgba(94,156,255,.6),rgba(157,106,234,.48)); box-shadow:inset 0 1px 0 rgba(255,255,255,.4); }
+.floating-focus[data-style='tabs'] .music-art svg { width:36px; height:36px; }
+.floating-focus[data-style='tabs'] .dock-track-pane h2 { font-size:16px; color:#fff; }
+.floating-focus[data-style='tabs'] .dock-track-pane .muted,.floating-focus[data-style='tabs'] .dock-track-pane .eyebrow { color:rgba(255,255,255,.78); }
+.floating-focus[data-style='tabs'] .music-play { grid-column:1 / -1; justify-self:center; margin-top:var(--dock-gap); width:var(--dock-hero-play); height:var(--dock-hero-play); background:rgba(255,255,255,.92); color:#18213b; border:0; }
+.floating-focus[data-style='tabs'] .music-sessions { margin-top:16px; color:#fff; background:rgba(255,255,255,.12); border-color:rgba(255,255,255,.28); }
+.floating-focus[data-style='tabs'] .music-sessions option { color:var(--dock-ink); background:#fff; }
+.floating-focus[data-style='tabs'] .music-access { background:rgba(255,255,255,.09); border-color:rgba(255,255,255,.18); }
+.dock-work-list { list-style:none; padding:0; margin:8px 0 0; }
+.dock-work-row { display:flex; align-items:center; gap:var(--dock-gap); padding:8px 0; border-bottom:1px solid var(--dock-line); }
+.dock-work-check { display:grid; place-items:center; width:var(--dock-control); height:var(--dock-control); flex-shrink:0; padding:10px; border:0; background:transparent; }
+.dock-work-check::before { content:''; width:22px; height:22px; border:2px solid #929aaa; border-radius:var(--dock-pill); grid-area:1 / 1; }
+.dock-work-check svg { grid-area:1 / 1; width:18px; height:18px; color:#fff; z-index:1; }
+.dock-work-row.done .dock-work-check::before { background:#168653; border-color:#168653; }
+.dock-work-row.done .dock-work-check:disabled { opacity:1; }
+.dock-work-task { display:grid; gap:4px; flex:1; min-width:0; min-height:var(--dock-control); text-align:left; border:0; background:transparent; padding:4px 0; }
+.dock-work-task:disabled { opacity:1; color:var(--dock-ink); cursor:default; }
+.dock-work-task > span { font-size:14px; font-weight:600; overflow-wrap:anywhere; }
+.dock-work-task > small { color:var(--dock-dim); font-size:12px; font-weight:400; overflow-wrap:anywhere; }
+.dock-work-row.done .dock-work-task > span { color:var(--dock-dim); text-decoration:line-through; }
+.dock-work-current { color:#13794c; font-size:10px; font-weight:700; text-transform:uppercase; white-space:nowrap; }
+.dock-plan-link { display:block; width:100%; min-height:var(--dock-control); margin-top:16px; background:rgba(22,24,29,.045); border:1px solid rgba(255,255,255,.55); color:var(--dock-ink); }
+.dock-empty { padding:var(--dock-space); text-align:center; }
+.floating-focus[data-style='tabs'] .dock-settings { background:rgba(251,253,255,.95); }
+.floating-focus[data-style='tabs'] .dock-settings input,.floating-focus[data-style='tabs'] .dock-settings select,.floating-focus[data-style='tabs'] .dock-mode-switch button { min-height:var(--dock-control); }
+@media(max-width:400px) { .floating-focus[data-style='tabs'] { --dock-space:14px; --dock-gap:8px; } .music-now-playing-label { display:none; } .dock-work-current { max-width:50px; white-space:normal; text-align:right; } }
+@media(prefers-reduced-motion:reduce) { .dock-tab-pill { transition:none; } }

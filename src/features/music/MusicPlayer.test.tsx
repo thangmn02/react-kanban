@@ -12,7 +12,7 @@ vi.mock('./mediaBridge', async (importOriginal) => ({ ...await importOriginal<ty
   },
 }));
 const session = { id: 'tab:doc:0', title: 'Real track title', artist: 'Artist', source: 'www.youtube.com', paused: false };
-beforeEach(() => { vi.resetAllMocks(); beatReceiver.receive = undefined; vi.mocked(sendBeatRequest).mockResolvedValue(undefined); localStorage.clear(); vi.stubEnv('VITE_MUSIC_EXTENSION_STORE_URL', ''); });
+beforeEach(() => { vi.resetAllMocks(); beatReceiver.receive = undefined; vi.mocked(sendBeatRequest).mockResolvedValue(undefined); localStorage.clear(); localStorage.setItem('floatingDock.style', 'island'); vi.stubEnv('VITE_MUSIC_EXTENSION_STORE_URL', ''); });
 afterEach(() => { cleanup(); vi.unstubAllEnvs(); vi.useRealTimers(); });
 const task = { id: 'task', title: 'Focus task', boardId: 'board', boardTitle: 'Board' };
 const focusProps: FloatingFocusProps = {
@@ -323,8 +323,8 @@ it('cycles glass layouts without remounting shared elements or losing the chosen
   fireEvent.click(screen.getByRole('button', { name: 'Switch dock style' }));
   expect(view.container.querySelector('.dock-split')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Switch dock style' }));
-  fireEvent.click(screen.getByRole('tab', { name: 'Beat' }));
-  expect(screen.getByRole('region', { name: 'Beat' })).not.toHaveAttribute('aria-hidden', 'true');
+  fireEvent.click(screen.getByRole('tab', { name: 'Beat grid' }));
+  expect(screen.getByRole('tabpanel', { name: 'Beat grid' })).not.toHaveAttribute('aria-hidden', 'true');
   fireEvent.click(screen.getByRole('button', { name: 'Switch dock style' }));
   expect(view.container.querySelector('.dock-deck')).toHaveAttribute('data-state', 'stacked');
   fireEvent.click(screen.getByRole('button', { name: 'Fan out cards' }));

@@ -17,7 +17,12 @@
 .music-pattern.vertical > .beat-channel { display:grid; grid-template-rows:18px repeat(8,minmax(0,1fr)); gap:clamp(3px,1vmin,7px); }
 .dock-mixer { grid-template-rows:minmax(0,1fr) auto; }
 .dock-split { grid-template-rows:minmax(0,1fr) auto; }
-.dock-tabs { grid-template-rows:auto minmax(0,1fr); }
+.floating-focus[data-style='tabs'] { max-width:none; height:100%; border-radius:var(--native-dock-radius,8px); box-shadow:var(--dock-inner-glow); }
+.floating-focus[data-style='tabs'] .dock-tabs { grid-template-rows:auto auto auto minmax(0,1fr); }
+.floating-focus[data-style='tabs'] .dock-tabs > .dock-panel:not(.dock-focus-pane) { min-height:0; }
+.floating-focus[data-style='tabs'] .dock-track-pane { justify-content:flex-start; }
+.floating-focus[data-style='tabs'] .dock-beat-pane { display:block; }
+.floating-focus[data-style='tabs'] .dock-beat-pane .music-pattern { min-height:170px; }
 .dock-tabs .dock-panel, .dock-deck .dock-panel { min-height:0; }
 .dock-deck { grid-template-rows:minmax(0,1fr) auto; }
 .dock-ring { width:clamp(64px,22vh,124px); height:clamp(64px,22vh,124px); }

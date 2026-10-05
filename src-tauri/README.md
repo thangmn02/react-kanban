@@ -20,6 +20,17 @@ its existing larger radius. Native glass explicitly uses a light tint independen
 of Windows dark mode. It does not use legacy accent blur, which drops out during
 native dragging; the compositor frost stays active while moving or resizing.
 
+The Tabs layout matches the compact tabbed dock composition: a persistent focus
+timer above Tasks, Music and Beat Grid, a now-playing strip outside Music, real
+focus task rows and a blue-violet glass player card. Start/pause, task selection,
+completion and music control use the existing shared controllers. Arrow keys,
+Home and End navigate the tabs. Empty music/task states remain usable.
+Fresh installations default to Tabs; existing saved layouts are preserved.
+Use the layout-arrow control to select Tabs. Its native window opens at 520×560
+and can shrink to 360×440; the lower panel scrolls at small sizes while the timer
+and tabs stay visible. The same composition is used in browser PiP, where CSS
+glass blurs page content rather than the desktop behind the browser window.
+
 ## Browser music only
 
 Kora no longer starts WASAPI system loopback or reads Windows media sessions.
@@ -52,7 +63,7 @@ restarts recover automatically. This adds the `alarms` extension permission.
 The old web protocol and app origin are retained for compatibility. The app
 identifier `app.kanthangboard.focus` is deliberately unchanged to preserve
 existing native sign-in and preferences. Branding, product/version and the
-executable are now Kora / 0.1.10 / `kora.exe`.
+executable are now Kora / 0.1.11 / `kora.exe`.
 
 ## Development and distribution
 

@@ -44,11 +44,11 @@ function NativeDock({ props }: { props: FloatingFocusProps }) {
     // Size changes do not remount FloatingFocus or its shared motion elements.
     const width = layout.style === 'split' ? 760 : layout.style === 'mixer' ? 640
       : layout.style === 'deck' && layout.expanded ? 820 : 520;
-    const height = !layout.hasMusic ? 240 : layout.style === 'island' ? 460 : layout.style === 'tabs' ? 380 : 460;
+    const height = layout.style === 'tabs' ? 560 : !layout.hasMusic ? 240 : 460;
     let active = true;
     const fit = async () => {
       const nativeWindow = getCurrentWindow();
-      await nativeWindow.setMinSize(new LogicalSize(360, layout.hasMusic ? 320 : 200));
+      await nativeWindow.setMinSize(new LogicalSize(360, layout.style === 'tabs' ? 440 : layout.hasMusic ? 320 : 200));
       if (await nativeWindow.isMaximized() || !active) return;
       await nativeWindow.setSize(new LogicalSize(Math.min(width, maxSize.current.width), Math.min(height, maxSize.current.height)));
     };

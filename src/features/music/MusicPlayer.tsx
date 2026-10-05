@@ -13,12 +13,27 @@ export interface MusicVisualOptions {
   orientation?: 'horizontal' | 'vertical';
 }
 
+export function MusicNowPlaying({ music }: { music: BrowserMusicController }) {
+  const { t } = useI18n();
+  if (!music.selected) return null;
+  return <div className="music-now-playing-strip">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true"><path d="M9 18V5l11-2v13M9 8l11-2" /><ellipse cx="6" cy="18" rx="3" ry="2" /><ellipse cx="17" cy="16" rx="3" ry="2" /></svg>
+    <span className="music-now-playing-label">{t(music.playing ? 'dock.nowPlaying' : 'focus.island.music')}</span>
+    <span className="music-now-playing-title" title={music.selected.title}>{music.selected.title}</span>
+    <button type="button" className="round music-strip-play" disabled={music.selected.canControl === false || music.busy}
+      onClick={() => void music.toggle()} aria-label={t(music.selected.paused ? 'music.play' : 'music.pause')}>
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">{music.selected.paused ? <path d="m8 5 11 7-11 7z" /> : <path d="M7 5h4v14H7zm6 0h4v14h-4z" />}</svg>
+    </button>
+  </div>;
+}
+
 export function MusicTrack({ music }: { music: BrowserMusicController }) {
   const { t } = useI18n();
   const { sessions, selected, setSelectedId, busy, toggle } = music;
   if (!sessions.length) return null;
   return <>
     <div className="music-heading">
+      <div className="music-art" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 18V5l11-2v13M9 8l11-2" /><ellipse cx="6" cy="18" rx="3" ry="2" /><ellipse cx="17" cy="16" rx="3" ry="2" /></svg></div>
       <div className="track-copy">
         <p className="eyebrow">{t('focus.island.music')}</p>
         <h2 title={selected?.title}>{selected?.title || t('music.nothingPlaying')}</h2>
