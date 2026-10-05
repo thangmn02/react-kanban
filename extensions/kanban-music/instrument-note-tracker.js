@@ -7,7 +7,7 @@ const cosine = (a, b) => a.reduce((sum, value, i) => sum + value * b[i], 0)
 // Sequence counts attacks (including repeated pitches), never sustain frames.
 export class InstrumentNoteTracker {
   constructor() {
-    this.note = 0; this.active = false; this.lastNoteAt = -Infinity;
+    this.note = 0; this.active = false; this.lastNoteAt = -Infinity; this.lastAttackEnergy = 0;
     this.lastSeen = -Infinity; this.lastPublish = -Infinity; this.previousEnergy = 0;
     this.profile = null; this.pitch = null; this.candidatePitch = null; this.candidateFrames = 0;
   }
@@ -47,8 +47,16 @@ export class InstrumentNoteTracker {
       else { this.candidatePitch = best.midi; this.candidateFrames = 1; }
       const changedPitch = this.candidateFrames >= 2 && this.pitch !== best.midi;
       const rising = energy > Math.max(.02, this.previousEnergy * 1.45);
-      if (time - this.lastNoteAt >= 55 && (changedPitch || rising || !this.active)) {
-        this.note++; this.lastNoteAt = time; attack = true; this.pitch = best.midi;
+      // Separation can expose a faint tail or subharmonic just before the
+      // full attack. Refine that attack's pitch as it grows, without flashing
+      // again. Later pitch changes and repeated attacks remain independent.
+      const refinement = changedPitch && time - this.lastNoteAt < 100 && energy > this.lastAttackEnergy * 4;
+      if (refinement) this.pitch = best.midi;
+      // A faint leading FFT window can favor a subharmonic before the attack
+      // settles. Confirm its pitch before publishing so refinement is not
+      // counted as another note.
+      if (!refinement && this.candidateFrames >= 2 && time - this.lastNoteAt >= 55 && (changedPitch || rising || !this.active)) {
+        this.note++; this.lastNoteAt = time; this.lastAttackEnergy = energy; attack = true; this.pitch = best.midi;
       }
       this.active = true; this.lastSeen = time;
       const norm = Math.max(1e-8, Math.hypot(...best.harmonics));

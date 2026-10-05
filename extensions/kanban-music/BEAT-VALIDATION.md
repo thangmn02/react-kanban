@@ -1,5 +1,24 @@
 # Beat sync validation
 
+## Version 0.3.12 — attack confirmation (2026-10-06)
+
+Live-release verification exposed an intermittent extra piano flash: a faint
+leading tail or subharmonic was counted before the full attack settled. The
+tracker now confirms two consecutive pitch frames and refines a faint leading
+attack's pitch without emitting another sequence. Comparable-strength fast
+notes and repeated attacks remain independent. This adds about one 23 ms frame
+of confirmation rather than changing the existing 3.5-second audio buffer.
+
+The real-model onset check produced four attacks at all eight AudioWorklet
+alignments, including both previously failing alignments. Run
+`node scripts/verify-instrument-onsets.mjs` after `npm run music:package`.
+Buffered playback again produced four flashes for four audible piano attacks,
+with a worst browser audio/event difference of 31.93 ms. The three labeled
+excerpts produced instrumental/mixed counts of 23/23, 19/14 and 21/23;
+all nine vocal-only, drum-only and bass-only checks produced zero attacks.
+The original 0.3.11 observations below are historical; model output can still
+miss or add notes in arbitrary dense mixtures.
+
 ## Version 0.3.11 — local instrumental note attacks (2026-10-06)
 
 Kora 0.1.12 removes hat, sustained-envelope and decorative-shape triggers from

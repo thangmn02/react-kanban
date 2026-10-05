@@ -38,3 +38,32 @@ it('retains a dominant harmonic profile across a quieter accompaniment', () => {
   expect(tracker.pitch).toBe(selected);
   expect(tracker.note).toBe(1);
 });
+
+it('confirms a leading subharmonic before counting a piano attack', () => {
+  const tracker = new InstrumentNoteTracker();
+  tracker.analyze(tone(53, .5), 0);
+  expect(tracker.note).toBe(0);
+  for (let time = 23; time <= 230; time += 23) tracker.analyze(tone(60, 30), time);
+  expect(tracker.pitch).toBe(60);
+  expect(tracker.note).toBe(1);
+});
+
+it('refines a faint leading tail into the full attack without flashing twice', () => {
+  const tracker = new InstrumentNoteTracker();
+  tracker.analyze(tone(64, .4), 0);
+  tracker.analyze(tone(64, .4), 23);
+  expect(tracker.note).toBe(1);
+  for (let time = 46; time <= 230; time += 23) tracker.analyze(tone(67, 30), time);
+  expect(tracker.pitch).toBe(67);
+  expect(tracker.note).toBe(1);
+  for (let time = 253; time <= 345; time += 23) tracker.analyze(tone(72, 30), time);
+  expect(tracker.note).toBe(2);
+});
+
+it('still counts distinct fast notes at comparable attack strength', () => {
+  const tracker = new InstrumentNoteTracker();
+  for (const time of [0, 23, 46]) tracker.analyze(tone(60), time);
+  for (const time of [69, 92, 115]) tracker.analyze(tone(64), time);
+  expect(tracker.pitch).toBe(64);
+  expect(tracker.note).toBe(2);
+});

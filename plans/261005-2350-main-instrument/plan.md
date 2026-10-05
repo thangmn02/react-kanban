@@ -61,25 +61,37 @@ Actual browser WASM tests on three labeled MUSDB sample excerpts produce
 instrument/mix note events and zero vocal-only, drum-only or bass-only attacks.
 Actual AudioWorklet/DelayNode playback produces four note events for four
 repeated/changing piano attacks. The final run under the extension's script
-policy measured a worst audio/event offset of 29.03 ms with no runtime errors.
+policy measured a worst audio/event offset of 31.93 ms with no runtime errors.
+Publication verification exposed a leading-tail/subharmonic double flash.
+Companion 0.3.12 confirms pitch and refines the growing attack without a
+second sequence. Four piano attacks produce four events at all eight tested
+AudioWorklet alignments, including both previously failing cases.
 This measures the browser graph, not end-to-end speakers/native rendering.
 Multiple instruments remain in Spleeter's other stem, so perfect instrument
 isolation and every-note accuracy remain outside the claim.
 
-The complete pnpm run quality gate passed: 540 tests across 75 files, coverage,
+The complete pnpm run quality gate passed; the final full suite passed 543
+tests across 75 files. Coverage,
 TypeScript, lint, production build and bundle budget. Lint has zero errors and
-23 existing warnings. Coverage is 71.94% statements, 66.51% branches, 66.19%
-functions and 74.21% lines. The main entry is 617.6 KiB within its 976.6 KiB
-budget. Signed Kora 0.1.12 and companion 0.3.11 are packaged;
+23 existing warnings. Coverage is 71.96% statements, 66.55% branches, 66.19%
+functions and 74.22% lines. The main entry is 617.6 KiB within its 976.6 KiB
+budget. Signed Kora 0.1.12 and companion 0.3.12 are packaged;
 the updater signature verifies and altered installer bytes are rejected.
 The final installer SHA-256 is
-ab329a80a77c009db4ce1ec30f8f279d8db6280efc2c823a1d91f336796dd6a5.
+3357301f3f68930413d0c9a00e865716928c291cdf56df54b4e43d428209e26d.
 The final web build includes the signed installer and matching update feed.
 Both extension ZIP aliases match; the 32-entry package contains bundled
 runtime, worklet and licenses, without model weights or private configuration.
 The production artifact scan found no private configuration matches.
-Implementation, review and local release verification are complete.
+Implementation, review and local release verification are complete. Real
+instrumental/mixed counts on the three excerpts are 23/23, 19/14 and 21/23;
+all vocal-only, drum-only and bass-only checks still produce zero attacks.
 The user approved publishing Kora 0.1.12 and Companion 0.3.11 to main.
+The first release was verified on both production domains; its Windows CI
+needed an asynchronous Contact-test cleanup wait. That test correction passed
+CI and the Windows build. Companion 0.3.12 corrects the double flash found
+during live verification; the signed app installer was refreshed to include
+the corrected companion package. The app's native behavior/version is unchanged.
 First-time options-page downloading
 and live installed-browser/full-song listening remain unverified; the model
 runtime and buffered playback were exercised in the browser verification tools.
@@ -93,4 +105,4 @@ account usage limit (reported reset 02:51). The rejected command was not run.
 After the user requested continuing, a fresh packaging/signature-check approval
 succeeded. A subsequent approved quality run passed all gates, including the
 previously blocked bundle-budget check. There is no remaining approval-review
-blocker; publication still requires the user's release authorization.
+blocker; release publication has been authorized.

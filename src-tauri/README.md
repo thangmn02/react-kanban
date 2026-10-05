@@ -38,7 +38,7 @@ It cannot hear Zalo calls, notifications, native music apps or other desktop
 audio. The previous system-audio checkbox and its IPC command are removed;
 saved `native.systemAudio` values are ignored.
 
-Install/reload **Kora Music Companion 0.3.11** in the browser used for music.
+Install/reload **Kora Music Companion 0.3.12** in the browser used for music.
 The companion discovers only the explicitly supported music websites. It
 automatically connects to the running widget and sends metadata and beat
 events, never PCM audio. No web-app tab is needed. Capture can still require

@@ -4,7 +4,7 @@ This is an independent implementation, not a copy of ungive/media-control-extens
 
 Our own Manifest V3 extension connects browser music to Kora's Floating Focus. No extension ID, music login, or API key is required. The inline focus dock stays unchanged; music lives in the detached window.
 
-Version 0.3.11 connects directly to the running **Kora Windows widget**
+Version 0.3.12 connects directly to the running **Kora Windows widget**
 through loopback `127.0.0.1:47635`. No Kora web tab is needed in that mode.
 The widget receives only allowlisted browser music metadata and visual
 events; it does not listen to desktop/system audio. Browser permission can
@@ -83,7 +83,9 @@ Document Picture-in-Picture must be supported by the browser. The browser-owned 
 
 ## Updating an existing installation
 
-Use Kora 0.1.12/web release with companion 0.3.11 for isolated instrumental notes.
+Use Kora 0.1.12/web release with companion 0.3.12 for isolated instrumental notes.
+This companion patch confirms attack pitch and groups faint leading tails with
+the full attack, preventing double flashes at different audio-frame alignments.
 The new app rejects legacy broad-tone Melody events, leaving that row dark
 until the companion is updated and AI notes are enabled. Replace the unpacked
 folder with the new ZIP contents, click **Reload** on its card, and refresh

@@ -1,6 +1,7 @@
 # Instrument note release verification
 
-Release: Kora 0.1.12 and Music Companion 0.3.11, approved for publication.
+Release: Kora 0.1.12 and Music Companion 0.3.12, approved publication with an
+instrumental-attack correction discovered during live verification.
 Scope and accepted trade-offs: [active plan](../261005-2350-main-instrument/plan.md).
 The confirmation redirect and default Tabs changes remain queued separately.
 
@@ -11,7 +12,7 @@ source findings remain. Failed or late inference keeps the fifth row dark.
 
 Validation completed on 2026-10-06:
 
-- Focused checks: 78 tests passed; full quality gate: 540 tests in 75 files,
+- Focused checks: 78 tests passed; full quality gate passed, final suite 543 tests in 75 files,
   coverage, TypeScript, lint, production build and bundle budget passed.
   Lint retains 23 existing warnings and zero errors.
 - Real ONNX inference on three labeled MUSDB excerpts: instrumental and mixed
@@ -20,12 +21,13 @@ Validation completed on 2026-10-06:
   ground-truth transcription counts or a guarantee across all music.
 - Actual AudioWorklet/DelayNode playback under the extension's script policy:
   four piano attacks produced four audible attacks and four flashes; worst
-  browser audio/event offset 29.03 ms, no runtime errors. This excludes physical
+  browser audio/event offset 31.93 ms, no runtime errors. The eight real-model
+  onset-alignment cases each produced four attacks. This excludes physical
   speakers, Bluetooth and native bridge/rendering latency.
 - Signed native build and final web build passed. Updater signature verifies;
   altered installer bytes fail verification. Installer SHA-256:
-  `ab329a80a77c009db4ce1ec30f8f279d8db6280efc2c823a1d91f336796dd6a5`.
-- Both companion ZIP aliases are identical: 32 entries, 14,433,469 bytes,
+  `3357301f3f68930413d0c9a00e865716928c291cdf56df54b4e43d428209e26d`.
+- Both companion ZIP aliases are identical: 32 entries,
   including local worker/WASM/worklet and license notices. Package inspection
   found no model weights, tests or private configuration.
 - Whitespace check and release source scan passed. All verification browsers
@@ -37,6 +39,17 @@ the dominant harmonic tracker cannot guarantee exact note-for-note isolation
 in arbitrary mixed songs. First-time options-page downloads and live installed
 browser/full-song listening remain unverified. Captured audio stays local and
 is not retained on disk. Repeatable verification tools are
-`scripts/verify-instrument-playback.mjs` and `scripts/verify-instrument-stems.mjs`.
+`scripts/verify-instrument-playback.mjs`, `scripts/verify-instrument-stems.mjs`
+and `scripts/verify-instrument-onsets.mjs`.
 
-Publication, deployment and installation have not been performed for this release.
+The initial release was published at commit dbff255; the Contact-test wait fix
+at c559cf0 passed CI and Windows build. Both production domains served the
+matching installer/feed, 32-entry companion package and AI setup UI. Netlify
+uses the npm-locked bundler, so its generated worker differs from the local
+pnpm build. Live worker playback exposed the faint-leading-attack double count;
+stable pitch confirmation and growing-attack refinement fix that cause.
+All three excluded stems stayed dark on all three excerpts after the fix.
+
+Companion 0.3.12 and the refreshed signed installer are ready for publishing
+and live verification. No installation was performed. Rollback: republish
+the last stable Kora 0.1.11 deploy for commit af69745 through Netlify's dashboard.
