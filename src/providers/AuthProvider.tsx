@@ -125,6 +125,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       email,
       password,
       options: {
+        // Email links must also work when signup starts inside the desktop app.
+        emailRedirectTo: 'https://koraspace.online/home',
         data: {
           full_name: fullName || email,
         },
