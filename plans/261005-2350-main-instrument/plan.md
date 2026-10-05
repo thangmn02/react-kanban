@@ -1,5 +1,5 @@
 ---
-status: publishing
+status: complete
 ---
 
 # Main instrumental note row
@@ -61,7 +61,9 @@ Actual browser WASM tests on three labeled MUSDB sample excerpts produce
 instrument/mix note events and zero vocal-only, drum-only or bass-only attacks.
 Actual AudioWorklet/DelayNode playback produces four note events for four
 repeated/changing piano attacks. The final run under the extension's script
-policy measured a worst audio/event offset of 31.93 ms with no runtime errors.
+policy measured a worst local audio/event offset of 31.93 ms. The actual
+Netlify-built worker passed the same check with a worst offset of 60.96 ms;
+both runs produced exactly four attacks and no runtime errors.
 Publication verification exposed a leading-tail/subharmonic double flash.
 Companion 0.3.12 confirms pitch and refines the growing attack without a
 second sequence. Four piano attacks produce four events at all eight tested
@@ -96,8 +98,14 @@ First-time options-page downloading
 and live installed-browser/full-song listening remain unverified; the model
 runtime and buffered playback were exercised in the browser verification tools.
 User requested finishing this work before Tabs/confirmation changes; those
-are queued separately and are not included. Commit/push and live verification
-are the remaining release steps.
+are queued separately and are not included. Correction commit a605a6b is live
+on koraspace.online and kanthangboard.netlify.app. Both domains serve the
+matching feed and signed installer, Companion 0.3.12 and the AI setup UI.
+The actual deployed worker passes all eight onset alignments and playback.
+Final CI passed quality, database isolation and end-to-end checks;
+the Windows workflow passed native tests and the signed installer build.
+Release implementation and publication are complete. No installation was
+performed on the user's device.
 All local audio-test browsers/servers closed.
 
 The automatic approval reviewer failed a bundle-budget command because of an

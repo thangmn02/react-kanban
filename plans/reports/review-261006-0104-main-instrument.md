@@ -21,13 +21,14 @@ Validation completed on 2026-10-06:
   ground-truth transcription counts or a guarantee across all music.
 - Actual AudioWorklet/DelayNode playback under the extension's script policy:
   four piano attacks produced four audible attacks and four flashes; worst
-  browser audio/event offset 31.93 ms, no runtime errors. The eight real-model
+  local browser audio/event offset 31.93 ms; the actual deployed worker's
+  offset was 60.96 ms, with no runtime errors in either run. The eight real-model
   onset-alignment cases each produced four attacks. This excludes physical
   speakers, Bluetooth and native bridge/rendering latency.
 - Signed native build and final web build passed. Updater signature verifies;
   altered installer bytes fail verification. Installer SHA-256:
   `3357301f3f68930413d0c9a00e865716928c291cdf56df54b4e43d428209e26d`.
-- Both companion ZIP aliases are identical: 32 entries,
+- Both local companion ZIP aliases are identical: 32 entries, 14,433,653 bytes,
   including local worker/WASM/worklet and license notices. Package inspection
   found no model weights, tests or private configuration.
 - Whitespace check and release source scan passed. All verification browsers
@@ -50,6 +51,13 @@ pnpm build. Live worker playback exposed the faint-leading-attack double count;
 stable pitch confirmation and growing-attack refinement fix that cause.
 All three excluded stems stayed dark on all three excerpts after the fix.
 
-Companion 0.3.12 and the refreshed signed installer are ready for publishing
-and live verification. No installation was performed. Rollback: republish
+Companion 0.3.12 and the refreshed signed installer are published at a605a6b.
+Both production domains serve the matching feed/installer and companion sources
+and runtime assets. Live companion SHA-256 is
+`8d1cb1ee3cdf2befed611078602915926270b2655a40109d4412d6bce3c6d0e1`;
+the actual deployed worker passed all eight onset alignments and playback.
+Final checks passed for release commit a605a6b:
+[quality, database and E2E CI](https://github.com/thangmn02/react-kanban/actions/runs/37358575214)
+and [Windows tests/signed build](https://github.com/thangmn02/react-kanban/actions/runs/37358575227).
+Publication and verification are complete. No installation was performed. Rollback: republish
 the last stable Kora 0.1.11 deploy for commit af69745 through Netlify's dashboard.
