@@ -11,6 +11,7 @@ export function tabConstraints(streamId) {
 export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, onStop, onAudible = () => {},
   onTempo = () => {}, onTempoTick = () => {}, onMelody = () => {},
   createInstrumentCapture,
+  monitorOnly = false,
   onInstrumentFailure = () => {},
   now = () => performance.now(), schedule = setInterval, cancel = clearInterval }) {
   let generation = 0;
@@ -28,6 +29,7 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
     previous.source?.disconnect();
     previous.instrument?.stop();
     previous.analyser?.disconnect();
+    previous.monitor?.disconnect();
     void previous.context?.close().catch(() => {});
     onStop(previous.captureId, reason);
   }
@@ -44,7 +46,7 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
       state.events = []; state.delaySeconds = 0; state.note = 0;
       const enqueue = (kind, payload, at = (state.context.currentTime ?? now() / 1000) + state.delaySeconds) => {
         if (active !== state || state.events.length >= 2048) return;
-        state.events.push({ kind, payload, at: at + (state.context.baseLatency || 0) + (state.context.outputLatency || 0) });
+        state.events.push({ kind, payload, at: at + (monitorOnly ? 0 : (state.context.baseLatency || 0) + (state.context.outputLatency || 0)) });
         state.events.sort((a, b) => a.at - b.at);
       };
       const instrumentError = (message = 'Instrument analysis missed its playback deadline') => {
@@ -70,7 +72,7 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
               })]);
             } finally { clearTimeout(setupTimeout); }
             if (request !== generation) return false;
-            state.delaySeconds = state.instrument.delaySeconds;
+            state.delaySeconds = monitorOnly ? 0 : state.instrument.delaySeconds;
           }
         } catch (error) {
           if (active === state) instrumentError(error.message);
@@ -91,7 +93,10 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
       state.source.connect(state.analyser);
       // Restore original audio once, delayed only after actual model setup.
       if (state.instrument) state.instrument.connect(state.source);
-      else state.source.connect(state.context.destination);
+      else if (monitorOnly) {
+        state.monitor = state.context.createGain(); state.monitor.gain.value = 0;
+        state.source.connect(state.monitor); state.monitor.connect(state.context.destination);
+      } else state.source.connect(state.context.destination);
       await state.context.resume();
       if (request !== generation) return false;
       if (state.context.state !== 'running') throw new Error('Audio context unavailable');

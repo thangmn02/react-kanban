@@ -1,6 +1,7 @@
 import { useI18n } from '../../i18n';
 import { getMusicInstallUrl, openInstrumentNotesSetup } from './mediaBridge';
-import { useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
+import { getNativeInstrumentStatus, subscribeNativeInstrument, setNativeInstrumentEnabled } from '../../../extensions/kanban-music/native-instrument.js';
 import type { BrowserMusicController } from './useBrowserMusic';
 import { patternAt } from './beatVisuals';
 import type { BeatColorMode, BeatPalette } from './beatVisuals';
@@ -63,25 +64,32 @@ export function MusicGrid({ music, colorMode = 'random', palette = 'bloom', orie
 export function MusicFeedback({ music }: { music: BrowserMusicController }) {
   const { t } = useI18n();
   const [setupFailed, setSetupFailed] = useState(false);
+  const instrumentStatus = useSyncExternalStore(subscribeNativeInstrument, getNativeInstrumentStatus);
+  const native = isNativeWidget();
   const { selected, playing, busy, openMusicTab, error, beat } = music;
   const needsAccess = playing && beat.mode !== 'capture' && beat.reason === 'capture-permission';
   const outdatedCapturePolicy = beat.mode === 'clock' && (beat.reason === 'drm-protected' || selected?.syncState?.reason === 'drm-protected');
   const silentPlayback = playing && beat.mode === 'clock' && beat.reason === 'silent';
-  return <>
+  return <div className="music-feedback">
     {needsAccess && <div className="music-access" role="status">
       <p className="music-access-title">{t('music.beatAccessTitle')}</p>
       <p className="muted">{t('music.beatAccessHelp')}</p>
-      <button type="button" className="solid" disabled={busy} onClick={() => void openMusicTab()}>{t('music.enableBeats')}</button>
+      <button type="button" className="solid" title={t('music.beatAccessHelp')} disabled={busy} onClick={() => void openMusicTab()}>{t('music.enableBeats')}</button>
     </div>}
     {silentPlayback && <p className="music-status muted" role="status">{t('music.silentCapture')}</p>}
     {outdatedCapturePolicy && <p className="music-status muted" role="status">{t('music.captureUpdate')}</p>}
-    {error && <p className="music-status muted" role="status">{error}</p>}
+    {error && <p className="music-status muted" role="status" title={error}>{error}</p>}
     {selected && <button type="button" className="text-button" onClick={() => {
       setSetupFailed(false);
-      void openInstrumentNotesSetup(selected.id).catch(() => setSetupFailed(true));
-    }}>{t('music.instrumentNotesSetup')}</button>}
+      if (native) setNativeInstrumentEnabled(instrumentStatus === 'off' || instrumentStatus === 'failed');
+      else void openInstrumentNotesSetup(selected.id).catch(() => setSetupFailed(true));
+    }} title={native ? t('music.nativeInstrumentHelp') : undefined}>{native && instrumentStatus !== 'off' && instrumentStatus !== 'failed' ? t('music.nativeInstrumentDisable') : t('music.instrumentNotesSetup')}</button>}
+    {native && instrumentStatus !== 'off' && <p className="music-status muted" role="status" title={t('music.nativeInstrumentHelp')}>
+      {t(instrumentStatus === 'failed' ? 'music.nativeInstrumentFailed' : instrumentStatus === 'ready' ? 'music.nativeInstrumentReady' : instrumentStatus === 'waiting' ? 'music.nativeInstrumentWaiting' : 'music.nativeInstrumentLoading')}
+      {instrumentStatus.startsWith('loading:') ? ` ${instrumentStatus.split(':')[1]}%` : ''}
+    </p>}
     {setupFailed && <p className="music-status muted" role="status">{t('music.instrumentNotesUpdate')}</p>}
-  </>;
+  </div>;
 }
 
 export default function MusicPlayer({ music, colorMode = 'random', palette = 'bloom', orientation = 'horizontal' }: { music: BrowserMusicController } & MusicVisualOptions) {

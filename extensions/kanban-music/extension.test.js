@@ -6,6 +6,8 @@ afterEach(() => { document.body.replaceChildren(); vi.restoreAllMocks(); vi.unst
 it('allows only exact app origins and known commands', () => {
   const message = { protocol: 'kanban-music-v1', action: 'sessions.get' };
   expect(allowedRequest(message, { url: 'https://kanthangboard.netlify.app/home' })).toBe(true);
+  expect(allowedRequest(message, { url: 'https://koraspace.online/home' })).toBe(true);
+  expect(allowedRequest(message, { url: 'https://koraspace.online.evil.com/home' })).toBe(false);
   expect(allowedRequest(message, { url: 'https://evil.netlify.app/' })).toBe(false);
   expect(allowedRequest(message, { url: 'https://kanthangboard.netlify.app.evil.com/' })).toBe(false);
   expect(allowedRequest(message, { url: 'http://localhost:9999/' })).toBe(false);

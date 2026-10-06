@@ -3,6 +3,11 @@
 #[cfg(test)]
 mod beat;
 mod browser_music;
+mod browser_audio;
+#[cfg(windows)]
+mod browser_audio_windows;
+#[cfg(windows)]
+mod browser_process;
 mod window_chrome;
 #[cfg(test)]
 mod tempo;
@@ -18,6 +23,7 @@ fn main() {
                 window.show()?;
             }
             app.manage(window_chrome::WindowShape::default());
+            app.manage(browser_audio::BrowserAudio::default());
             let music = browser_music::BrowserMusic::new(app.handle().clone());
             app.manage(music.clone());
             music.start();
@@ -26,6 +32,9 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             browser_music::native_music_request,
             browser_music::native_music_setup,
+            browser_audio::native_audio_start,
+            browser_audio::native_audio_renew,
+            browser_audio::native_audio_stop,
             window_chrome::native_dock_shape
         ])
         .run(tauri::generate_context!())

@@ -4,11 +4,13 @@ This is an independent implementation, not a copy of ungive/media-control-extens
 
 Our own Manifest V3 extension connects browser music to Kora's Floating Focus. No extension ID, music login, or API key is required. The inline focus dock stays unchanged; music lives in the detached window.
 
-Version 0.3.12 connects directly to the running **Kora Windows widget**
+Version 0.3.13 connects directly to the running **Kora Windows widget**
 through loopback `127.0.0.1:47635`. No Kora web tab is needed in that mode.
 The widget receives only allowlisted browser music metadata and visual
-events; it does not listen to desktop/system audio. Browser permission can
-still require a toolbar click on the playing music tab. See
+events. Kora 0.1.14 automatically captures that browser's process audio on
+Windows, without repeat extension clicks. Overlapping audio in the same browser
+can affect beats; the picker does not isolate tab audio. Other desktop apps are
+excluded. Web/PiP tab capture can still require a toolbar permission click. See
 [native setup and security](../../src-tauri/README.md).
 
 The five rows are Kick, Clap, Hi-hat, Bass and Melody. Melody flashes on note
@@ -17,7 +19,10 @@ Repeated pitches can trigger separate flashes; sustain, vocals, raw hats and
 decorative percussion shapes do not trigger the fifth row. It stays dark until
 AI instrument notes are enabled. Missing states expire after 700 ms.
 
-In the dock, choose **AI instrument notes**, or open the companion's
+In native Kora Music, **AI instrument notes** enables its own local model cache;
+instrument flashes follow with processing delay while sound/percussion remain
+immediate. All code/WASM ships with the installer. Native pause/seek/handoff clears
+pending flashes. In web/PiP, choose **AI instrument notes**, or open the companion's
 **Details → Extension options**, then **Download and enable**. This downloads
 about 157 MB of hash-verified Spleeter model data once, cached in this browser
 profile. All inference code and WASM ship in the extension. Audio stays in a

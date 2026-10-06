@@ -8,13 +8,11 @@ import nativeDockCss from './nativeDock.css?inline';
 import { useI18n } from '../../i18n';
 import './nativeSurface.css';
 import NativeUpdateDialog from './NativeUpdateDialog';
+import { openNativeMusicSetup } from './nativeMusic';
 
 async function updateNativeShape(rounded: boolean) {
   const radius = await invoke<number>('native_dock_shape', { rounded });
   if (Number.isFinite(radius)) document.documentElement.style.setProperty('--native-dock-radius', `${radius}px`);
-  // Older Windows versions do not expose compositor corner clipping.
-  // Keep their rounded transparent CSS surface instead of a square backdrop.
-  if (rounded && radius === 22) await getCurrentWindow().clearEffects();
 }
 
 function NativeDock({ props }: { props: FloatingFocusProps }) {
@@ -62,10 +60,8 @@ export default function NativeSurface({ dock, onToggle, focusProps, children }: 
     // Serialize surface changes so an older backdrop request cannot overwrite
     // the normal Tasks window after a rapid Dock → Tasks switch.
     effectQueue.current = effectQueue.current.then(async () => {
-      const window = getCurrentWindow();
-      // The native command owns modern DWM glass and its light tint. Remove
-      // legacy accent effects first: they turn clear during native dragging.
-      await window.clearEffects().catch(() => {});
+      // The native command owns both enabling and clearing the material. A
+      // webview remount must not clear frost while its shape remains cached.
       await updateNativeShape(dock);
     }).catch(() => {}); // Unsupported effects retain the CSS glass fallback.
   }, [dock]);
@@ -126,6 +122,7 @@ export default function NativeSurface({ dock, onToggle, focusProps, children }: 
       <div className="native-dock-scroll"><NativeDock props={{ ...focusProps, onReturnToTab: onToggle ? switchSurface : undefined,
         returnLabel: vi ? 'Công việc' : 'Tasks',
         onDragStart: () => action(() => getCurrentWindow().startDragging()),
+        onMusicSetup: () => action(openNativeMusicSetup),
         nativeControls: <>
           <button className="dock-icon-button" type="button" aria-label={vi ? 'Cập nhật Kora' : 'Update Kora'} title={vi ? 'Cập nhật Kora' : 'Update Kora'} onClick={() => setUpdateOpen(true)}>↓</button>
           <button className="dock-icon-button" type="button" aria-label={vi ? 'Thu nhỏ' : 'Minimize'} onClick={() => action(() => getCurrentWindow().minimize())}>−</button>

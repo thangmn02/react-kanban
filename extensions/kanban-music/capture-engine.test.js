@@ -40,6 +40,18 @@ it('confirms audible analysis once, not just an opened stream', async () => {
   expect(f.deps.onAudible).toHaveBeenCalledExactlyOnceWith('capture');
   f.engine.stop();
 });
+it('analyses native PCM without replaying or doubling browser audio', async () => {
+  const f = fixture(), gain = { gain:{value:1}, connect:vi.fn(), disconnect:vi.fn() };
+  f.context.createGain = () => gain;
+  const engine = createCaptureEngine({...f.deps,monitorOnly:true});
+  expect(await engine.start('native-stream','native')).toBe(true);
+  expect(gain.gain.value).toBe(0);
+  expect(f.source.connect).not.toHaveBeenCalledWith(f.context.destination);
+  expect(gain.connect).toHaveBeenCalledWith(f.context.destination);
+  await vi.advanceTimersByTimeAsync(100);
+  expect(f.deps.onAudible).toHaveBeenCalledWith('native');
+  engine.stop(); expect(gain.disconnect).toHaveBeenCalledOnce();
+});
 
 it('does not label mixed tonal energy as an instrumental note without AI separation', async () => {
   const f = fixture();

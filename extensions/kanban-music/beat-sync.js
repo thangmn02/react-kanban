@@ -73,6 +73,7 @@ export function createBeatSync(api, nativePublish) {
   }
 
   async function capture(current, force = false) {
+    if (current.owner.nativeAudio) { current.fallbackReason = 'native-audio'; publishState(current); return; }
     if (state !== current) return;
     // Every allowlisted service uses the same browser-approved tab stream.
     // A host name or mediaKeys flag is not evidence that output is silent.
@@ -164,7 +165,8 @@ export function createBeatSync(api, nativePublish) {
     },
     start(session, owner, subscriptionId) {
       return serialize(async () => {
-        if (state && sameOwner(state.owner, owner) && state.subscriptionId === subscriptionId && state.session.id === session.id) {
+        if (state && sameOwner(state.owner, owner) && state.owner.nativeAudio === owner.nativeAudio
+          && state.subscriptionId === subscriptionId && state.session.id === session.id) {
           const current = state;
           current.tabMuted = session.tabMuted;
           const lease = await api.tabs.sendMessage(session.tabId, { target: 'beat-clock', kind: 'lease', token: current.token },

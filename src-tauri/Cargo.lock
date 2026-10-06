@@ -1828,7 +1828,7 @@ dependencies = [
 
 [[package]]
 name = "kora"
-version = "0.1.13"
+version = "0.1.14"
 dependencies = [
  "futures-util",
  "rustfft",
@@ -1840,6 +1840,8 @@ dependencies = [
  "tokio",
  "tokio-tungstenite",
  "uuid",
+ "windows",
+ "windows-core",
  "windows-sys 0.61.2",
 ]
 

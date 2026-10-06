@@ -28,6 +28,7 @@ export interface FloatingFocusProps {
   canPopOut?: boolean;
   widgetError?: string;
   onDragStart?: () => void;
+  onMusicSetup?: () => void;
   nativeControls?: ReactNode;
   returnLabel?: string;
 }
@@ -118,6 +119,7 @@ export default function FloatingFocus(props: FloatingFocusProps) {
               {beatColorModes.map((value) => <option key={value} value={value}>{t(`dock.colors.${value}`)}</option>)}</select></label>
             <label>{t('dock.palette')}<select value={preferences.palette} onChange={(event) => preferences.setPalette(event.target.value as typeof preferences.palette)}>
               {beatPalettes.map((value) => <option key={value} value={value}>{t(`dock.palette.${value}`)}</option>)}</select></label>
+            {props.onMusicSetup && <button type="button" onClick={props.onMusicSetup}>{t('music.installCompanion')}</button>}
           </motion.div>}
         </AnimatePresence>
       </div>

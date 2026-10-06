@@ -6,7 +6,7 @@ pub struct WindowShape(Arc<Mutex<Option<(bool, u32, u32, bool)>>>);
 
 pub fn initialize(window: &WebviewWindow) -> Result<(), String> {
     #[cfg(windows)]
-    frameless::attach(window.hwnd().map_err(|e| e.to_string())?.0 as _)?;
+    frameless::attach(window.hwnd().map_err(|e| e.to_string())?.0 as _, false)?;
     #[cfg(not(windows))]
     let _ = window;
     Ok(())
@@ -16,7 +16,7 @@ pub fn initialize(window: &WebviewWindow) -> Result<(), String> {
 mod frameless {
     use windows_sys::Win32::{Foundation::{HWND, LPARAM, LRESULT, WPARAM},
         UI::{Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass},
-            WindowsAndMessaging::{WM_NCACTIVATE, WM_NCDESTROY, WM_NCPAINT}}};
+            WindowsAndMessaging::{WM_NCACTIVATE, WM_NCDESTROY, WM_NCPAINT, WM_EXITSIZEMOVE}}};
 
     const FRAME_SUBCLASS: usize = 0x4b4f5241;
 
@@ -29,7 +29,7 @@ mod frameless {
     }
 
     unsafe extern "system" fn window_proc(hwnd: HWND, message: u32, wparam: WPARAM,
-        lparam: LPARAM, id: usize, _: usize) -> LRESULT {
+        lparam: LPARAM, id: usize, glass: usize) -> LRESULT {
         // The webview paints the entire frameless surface. DefWindowProc's
         // non-client painting otherwise leaks a caption and border through it.
         if let Some(result) = paint_result(message) { return result; }
@@ -37,12 +37,16 @@ mod frameless {
             RemoveWindowSubclass(hwnd, Some(window_proc), id);
         }
         // Preserve Tauri's resize hit testing, activation, DPI and close handling.
-        DefSubclassProc(hwnd, message, wparam, lparam)
+        let result = DefSubclassProc(hwnd, message, wparam, lparam);
+        if message == WM_EXITSIZEMOVE && glass != 0 {
+            let _ = super::accent::apply(hwnd, true);
+        }
+        result
     }
 
-    pub fn attach(hwnd: HWND) -> Result<(), String> {
+    pub fn attach(hwnd: HWND, glass: bool) -> Result<(), String> {
         // SetWindowSubclass must run on the thread that owns the window.
-        if unsafe { SetWindowSubclass(hwnd, Some(window_proc), FRAME_SUBCLASS, 0) } == 0 {
+        if unsafe { SetWindowSubclass(hwnd, Some(window_proc), FRAME_SUBCLASS, glass as usize) } == 0 {
             return Err("Could not disable native frame painting".into());
         }
         Ok(())
@@ -62,6 +66,36 @@ mod frameless {
     }
 }
 
+#[cfg(windows)]
+mod accent {
+    use std::{ffi::c_void, mem::size_of};
+    use windows_sys::Win32::{Foundation::HWND,
+        System::LibraryLoader::{GetModuleHandleW, GetProcAddress}};
+
+    #[repr(C)]
+    struct Policy { state: u32, flags: u32, tint: u32, animation: u32 }
+    #[repr(C)]
+    struct Composition { attribute: u32, data: *mut c_void, size: usize }
+
+    pub fn apply(hwnd: HWND, enabled: bool) -> Result<(), String> {
+        // The system backdrop chooses an opaque inactive tint. An acrylic
+        // accent lets the dock keep its translucent frost while working in
+        // another window. Resolve dynamically for older Windows versions.
+        let mut policy = Policy { state: if enabled { 4 } else { 0 }, flags: 0,
+            tint: 0x20fff1f5, animation: 0 };
+        let mut composition = Composition { attribute: 19,
+            data: &mut policy as *mut _ as _, size: size_of::<Policy>() };
+        unsafe {
+            let library = GetModuleHandleW(windows_sys::w!("user32.dll"));
+            let function = GetProcAddress(library, windows_sys::s!("SetWindowCompositionAttribute"))
+                .ok_or("Native frost is unavailable on this Windows version")?;
+            let apply: unsafe extern "system" fn(HWND, *mut Composition) -> i32 = std::mem::transmute(function);
+            if apply(hwnd, &mut composition) == 0 { return Err("Could not apply native frost".into()); }
+        }
+        Ok(())
+    }
+}
+
 fn geometry(width: u32, height: u32, scale: f64) -> Result<(i32, i32, i32), String> {
     let width = i32::try_from(width).map_err(|_| "Window width is too large")?;
     let height = i32::try_from(height).map_err(|_| "Window height is too large")?;
@@ -73,11 +107,11 @@ fn geometry(width: u32, height: u32, scale: f64) -> Result<(i32, i32, i32), Stri
 #[cfg(windows)]
 fn backdrop_attributes(rounded: bool) -> [(u32, u32); 2] {
     use windows_sys::Win32::Graphics::Dwm::{DWMWA_SYSTEMBACKDROP_TYPE,
-        DWMWA_USE_IMMERSIVE_DARK_MODE, DWMSBT_NONE, DWMSBT_TRANSIENTWINDOW};
-    // Keep the frost light independently of the Windows dark theme. The
-    // compositor backdrop stays active inside the native move/resize loop.
+        DWMWA_USE_IMMERSIVE_DARK_MODE, DWMSBT_NONE};
+    let _ = rounded;
+    // Clear the opaque system material before applying the translucent accent.
     [(DWMWA_USE_IMMERSIVE_DARK_MODE as _, 0),
-        (DWMWA_SYSTEMBACKDROP_TYPE as _, if rounded { DWMSBT_TRANSIENTWINDOW } else { DWMSBT_NONE } as _)]
+        (DWMWA_SYSTEMBACKDROP_TYPE as _, DWMSBT_NONE as _)]
 }
 
 #[tauri::command]
@@ -94,7 +128,7 @@ pub async fn native_dock_shape(window: WebviewWindow, state: tauri::State<'_, Wi
 fn apply_shape(window: WebviewWindow, state: Arc<Mutex<Option<(bool, u32, u32, bool)>>>, rounded: bool) -> Result<u32, String> {
     if window.label() != "main" { return Err("Unknown window".into()); }
     #[cfg(windows)]
-    frameless::attach(window.hwnd().map_err(|e| e.to_string())?.0 as _)?;
+    frameless::attach(window.hwnd().map_err(|e| e.to_string())?.0 as _, rounded)?;
     let size = window.outer_size().map_err(|e| e.to_string())?;
     if size.width == 0 || size.height == 0 { return Ok(8); }
     #[cfg(not(windows))]
@@ -106,8 +140,7 @@ fn apply_shape(window: WebviewWindow, state: Arc<Mutex<Option<(bool, u32, u32, b
         let preference = if rounded { DWMWCP_ROUND } else { DWMWCP_DONOTROUND };
         let hwnd = window.hwnd().map_err(|e| e.to_string())?.0;
         for (attribute, value) in backdrop_attributes(rounded) {
-            // Older systems keep CSS glass when the compositor API is absent;
-            // never fall back to the legacy accent blur that flickers on drag.
+            // Compositor corners still own clipping; the accent owns frost.
             unsafe { DwmSetWindowAttribute(hwnd as _, attribute,
                 &value as *const _ as _, std::mem::size_of_val(&value) as _); }
         }
@@ -118,6 +151,11 @@ fn apply_shape(window: WebviewWindow, state: Arc<Mutex<Option<(bool, u32, u32, b
     };
     let radius = if compositor_corners { 8 } else { 22 };
     let mut previous = state.lock().map_err(|_| "Window shape unavailable")?;
+    #[cfg(windows)]
+    if previous.as_ref().is_none_or(|old| old.0 != rounded) {
+        // An unavailable material must not prevent rounded CSS/region fallback.
+        let _ = accent::apply(window.hwnd().map_err(|e| e.to_string())?.0 as _, rounded);
+    }
     let key = (rounded, size.width, size.height, compositor_corners);
     if *previous == Some(key) { return Ok(radius); }
     #[cfg(windows)]
@@ -154,7 +192,7 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn dock_uses_light_compositor_glass_and_tasks_clear_the_backdrop() {
-        assert_eq!(super::backdrop_attributes(true), [(20, 0), (38, 3)]);
+        assert_eq!(super::backdrop_attributes(true), [(20, 0), (38, 1)]);
         assert_eq!(super::backdrop_attributes(false), [(20, 0), (38, 1)]);
     }
 }

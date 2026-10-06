@@ -56,16 +56,16 @@ it('pins only Dock, unpins Tasks, and starts with a normal native window', async
   const surface = (dock: boolean) => <I18nProvider><NativeSurface dock={dock} focusProps={props}>Workspace</NativeSurface></I18nProvider>;
   const view = render(surface(false));
   await waitFor(() => expect(nativeWindow.setAlwaysOnTop).toHaveBeenLastCalledWith(false));
-  await waitFor(() => expect(nativeWindow.clearEffects).toHaveBeenCalledOnce());
+  expect(nativeWindow.clearEffects).not.toHaveBeenCalled();
   view.rerender(surface(true));
   await waitFor(() => expect(nativeWindow.setAlwaysOnTop).toHaveBeenLastCalledWith(true));
-  await waitFor(() => expect(nativeWindow.clearEffects).toHaveBeenCalledTimes(2));
+  expect(nativeWindow.clearEffects).not.toHaveBeenCalled();
   expect(nativeWindow.setEffects).not.toHaveBeenCalled();
   await waitFor(() => expect(nativeInvoke).toHaveBeenCalledWith('native_dock_shape', { rounded: true }));
   view.rerender(surface(false));
   await waitFor(() => expect(nativeWindow.setAlwaysOnTop).toHaveBeenLastCalledWith(false));
   expect(nativeWindow.setAlwaysOnTop.mock.calls.map(([enabled]) => enabled)).toEqual([false, true, false]);
-  await waitFor(() => expect(nativeWindow.clearEffects).toHaveBeenCalledTimes(3));
+  expect(nativeWindow.clearEffects).not.toHaveBeenCalled();
   await waitFor(() => expect(nativeInvoke).toHaveBeenLastCalledWith('native_dock_shape', { rounded: false }));
   expect(nativeCapability.permissions).toContain('core:window:allow-set-effects');
 });
@@ -81,26 +81,36 @@ it('maximizes and restores the workspace with an accessible window control', asy
   await waitFor(() => expect(view.getByRole('button', { name: 'Maximize' })).toBeVisible());
   expect(nativeWindow.toggleMaximize).toHaveBeenCalledTimes(2);
 });
-it('still updates native glass when clearing old effects fails and reapplies its shape on resize', async () => {
-  nativeWindow.clearEffects.mockRejectedValueOnce(new Error('Unsupported old effect'));
+it('leaves material ownership with the native command and reapplies its shape on resize', async () => {
   render(<I18nProvider><NativeSurface dock focusProps={props}>Workspace</NativeSurface></I18nProvider>);
   await waitFor(() => expect(nativeInvoke).toHaveBeenCalledWith('native_dock_shape', { rounded: true }));
+  expect(nativeWindow.clearEffects).not.toHaveBeenCalled();
   nativeInvoke.mockClear();
   act(() => nativeWindow.onResized.mock.calls[0][0]());
   await waitFor(() => expect(nativeInvoke).toHaveBeenCalledWith('native_dock_shape', { rounded: true }));
 });
-it('matches compositor corners and removes the opaque backdrop on legacy Windows', async () => {
+it('matches compositor corners without clearing the native frost on legacy Windows', async () => {
   nativeInvoke.mockResolvedValue(8);
   const view = render(<I18nProvider><NativeSurface dock focusProps={props}>Workspace</NativeSurface></I18nProvider>);
   await waitFor(() => expect(document.documentElement.style.getPropertyValue('--native-dock-radius')).toBe('8px'));
-  expect(nativeWindow.clearEffects).toHaveBeenCalledOnce();
+  expect(nativeWindow.clearEffects).not.toHaveBeenCalled();
   nativeInvoke.mockResolvedValue(22);
   act(() => nativeWindow.onResized.mock.calls[0][0]());
   await waitFor(() => expect(document.documentElement.style.getPropertyValue('--native-dock-radius')).toBe('22px'));
-  expect(nativeWindow.clearEffects).toHaveBeenCalledTimes(2);
+  expect(nativeWindow.clearEffects).not.toHaveBeenCalled();
   view.unmount();
   expect(document.documentElement.style.getPropertyValue('--native-dock-radius')).toBe('');
   nativeInvoke.mockResolvedValue(undefined);
+});
+it('opens the included Companion from dock settings even while already connected', async () => {
+  const view = render(<I18nProvider><NativeSurface dock focusProps={props}>Workspace</NativeSurface></I18nProvider>);
+  await act(async () => {});
+  const shadow = view.container.querySelector('.native-dock-host')!.shadowRoot!;
+  fireEvent.click(shadow.querySelector('[aria-haspopup="dialog"]')!);
+  const setup = [...shadow.querySelectorAll('button')].find((button) => button.textContent === 'Install or update Companion');
+  expect(setup).toBeDefined();
+  fireEvent.click(setup!);
+  await waitFor(() => expect(nativeInvoke).toHaveBeenCalledWith('native_music_setup'));
 });
 it('does not let dock auto-sizing undo maximize, and restores before swapping surfaces', async () => {
   const swap = vi.fn();

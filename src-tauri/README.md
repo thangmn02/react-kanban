@@ -10,15 +10,16 @@ in both surfaces. Dock uses light Windows compositor glass with a translucent ti
 Tasks clears the effect and remains opaque. Unsupported effects retain CSS glass.
 On Windows 11, the compositor rounds the native backdrop itself; native CSS
 matches its system corner radius. A custom cut-out region is not combined with
-native blur because that leaves opaque corner blocks. Earlier Windows versions use
-rounded CSS transparency without native backdrop blur. The native frame paint
+native blur because that leaves opaque corner blocks. Older systems retain the
+rounded CSS/region fallback when compositor corners are unavailable. The native frame paint
 handler suppresses the OS caption/border before the window first becomes visible,
 while retaining resizing, activation and DPI handling. CSS adds a translucent
 milky gradient, a bright rim and soft inset bevel above all panels. The bevel is
 pointer-transparent so the glass does not intercept controls. The web dock keeps
-its existing larger radius. Native glass explicitly uses a light tint independent
-of Windows dark mode. It does not use legacy accent blur, which drops out during
-native dragging; the compositor frost stays active while moving or resizing.
+its existing larger radius. Native glass uses a light translucent acrylic accent
+independent of Windows dark mode, so an inactive dock keeps its frost. The opaque
+system backdrop is cleared. The native command owns material changes and reapplies
+the accent after moving or resizing; a webview remount does not clear cached frost.
 
 The Tabs layout matches the compact tabbed dock composition: a persistent focus
 timer above Tasks, Music and Beat Grid, a now-playing strip outside Music, real
@@ -30,26 +31,26 @@ The circular timer stays visible above all three tabs with Start/Pause, Reset
 and Complete & next. Drag the native dock from any empty header area or its
 Tabs label; buttons and settings stay interactive. Color and palette settings
 are retained. Native and browser PiP open at 520×680; native can shrink to
-360×540. The lower panels support wheel, touch and keyboard scrolling without
-visible scrollbar bars. Tab changes preserve the native window's resized size.
+360×540. Music fits its allotted panel with no scrolling, including the source
+picker, permission action and error message. Tasks can scroll without visible
+scrollbar bars. Tab changes preserve the native window's resized size.
 The same composition is used in browser PiP, where CSS
 glass blurs page content rather than the desktop behind the browser window.
 
-## Browser music only
+## Automatic browser audio
 
-Kora no longer starts WASAPI system loopback or reads Windows media sessions.
-It cannot hear Zalo calls, notifications, native music apps or other desktop
-audio. The previous system-audio checkbox and its IPC command are removed;
-saved `native.systemAudio` values are ignored.
-
-Install/reload **Kora Music Companion 0.3.12** in the browser used for music.
-The companion discovers only the explicitly supported music websites. It
-automatically connects to the running widget and sends metadata and beat
-events, never PCM audio. No web-app tab is needed. Capture can still require
-one browser-toolbar invocation on the playing music tab; the native app
-cannot grant or bypass that browser permission. Silent/denied capture means
-still squares, never a clock-driven imitation. Close the music tab/browser
-and its music feed stops; the native timer remains independent.
+Install/reload **Kora Music Companion 0.3.13** in the browser used for music.
+It discovers supported music sites, connects to Kora, and supplies metadata,
+source selection, controls and fresh playback clocks. No Kora web tab is needed.
+On supported Windows builds, Kora captures the process tree of the browser
+owning that local connection automatically, including new tabs and browser
+restarts. No repeated extension capture click is required in the native app.
+The picker selects metadata and controls, not isolated tab audio: other music,
+calls or notifications in that same browser can affect all five rows. Other
+desktop processes are excluded. Browser output and volume remain unchanged.
+Silent, unavailable or disconnected capture leaves the grid still. Native PCM
+travels through a bounded local IPC Channel, never WebSocket/network or disk.
+The web/PiP version retains browser tabCapture and its permission requirements.
 
 The Rust WebSocket bridge binds only `127.0.0.1:47635`, path `/kora-music`.
 It rejects web/null/missing origins, non-extension origins, incorrect hosts
@@ -67,19 +68,21 @@ restarts recover automatically. This adds the `alarms` extension permission.
 The old web protocol and app origin are retained for compatibility. The app
 identifier `app.kanthangboard.focus` is deliberately unchanged to preserve
 existing native sign-in and preferences. Branding, product/version and the
-executable are now Kora / 0.1.13 / `kora.exe`.
+executable are now Kora / 0.1.14 / `kora.exe`.
 
-The fifth row now follows detected instrumental note attacks. Choose **AI
-instrument notes** in Music to open this browser profile's companion options,
-then download/enable the local model once (about 157 MB). The model separates
-vocals/drums/bass first; a retained harmonic profile favors one dominant
-instrumental line. Original audio and all rows share a 3.5-second buffer while
-enabled capture runs; music videos have delayed audio. Pause/seek/source change
-discards it. Disabling AI restores immediate playback and a dark fifth row.
-Failed/slow analysis leaves row five dark; drum/clap/hat/bass detection remains
-independent. Several instruments can remain in a stem, so exact transcription
-or isolation of a named instrument is not guaranteed. No captured PCM crosses
-the native bridge. See the companion's [model notices](../extensions/kanban-music/INSTRUMENT-NOTICES.md)
+The fifth row follows AI-separated instrumental note attacks. Choose **AI
+instrument notes** in native Music to download/enable about 157 MB of hash-verified
+model data once, cached locally. All executable code/WASM ships with Kora.
+The model separates vocals/drums/bass first; a retained harmonic profile favors
+one dominant instrumental line. Native AI flashes follow with processing delay,
+preserving attack spacing; browser sound and the first four rows stay immediate.
+Pause/seek/source change clears pending flashes. The native app cannot retain
+the previous 32 ms buffered alignment without delaying the original browser audio.
+Web/PiP AI still uses Companion options and its existing 3.5-second audio buffer.
+Disable AI to keep row five dark. Failed/slow analysis leaves it dark while the
+four percussion detectors continue. Several instruments can remain in a stem;
+exact transcription or named-instrument isolation is not guaranteed.
+See the companion's [model notices](../extensions/kanban-music/INSTRUMENT-NOTICES.md)
 and [validation](../extensions/kanban-music/BEAT-VALIDATION.md).
 
 ## Development and distribution
@@ -87,7 +90,18 @@ and [validation](../extensions/kanban-music/BEAT-VALIDATION.md).
 Requires Rust MSVC, Visual Studio C++ Build Tools with Windows SDK, Node.js
 and WebView2. Use `npm run tauri dev` (Vite port 1420), or
 `npm run tauri build`. Installer output is `target/release/bundle/nsis/`.
-Use the installer for the WebView2 prerequisite bootstrap.
+Use the installer for the WebView2 prerequisite bootstrap. It includes the
+matching unpacked Music Companion and an offline installation guide. In dock
+settings choose **Install or update Companion** to open its resource folder,
+then use the browser's **Load unpacked** action for its `extension` folder.
+Browser installation remains a one-time user action.
+
+`music:package` generates the current and legacy public Companion ZIP URLs and
+the native resource tree under `generated/music-companion/`, plus executable
+AI assets under `../public/music-analysis/`. Generated archives
+and resources are ignored by Git; `prebuild` regenerates them from the tracked
+runtime inventory. Native frontend builds omit the ZIP copies because the
+installer already includes the unpacked resource.
 
 Set `TAURI_SIGNING_PRIVATE_KEY` to the path of your protected signing key before
 building. Locally this key lives outside the repository, under local AppData.
@@ -143,7 +157,7 @@ Do not publish a mock-auth demo feed as a connected-app update.
 ## Validation
 
 - Frontend/native/companion regression tests and Rust bridge-origin tests.
-- Live: load 0.3.10, play supported browser music, open the native Dock without
+- Live: load 0.3.13, play supported browser music, open the native Dock without
   a web-app tab, verify actual capture mode and increasing onset counts in
   dev, with matching square pops and static icons.
 - Pause/close the music tab, disconnect the browser, restart/reload the
@@ -152,20 +166,19 @@ Do not publish a mock-auth demo feed as a connected-app update.
 - Resize Tabs, switch all three panels, maximize/restore and Tasks/Dock; no scrollbars,
   clipped controls, duplicate timer or duplicate completion log.
 
-The former system-audio version was confirmed working by the user. The new
-browser-only native bridge needs live acceptance after a successful build.
+Actual Windows PCM, process isolation and native detector routing were verified
+with task-owned audio. Full-song listening and browser-platform handoff remain
+user acceptance checks after installation.
 
 ## Matrix and timer controls
 
-The matrix has Kick, Clap, Hi-hat, Bass and Melody rows. Melody uses a
-250–4000Hz tonal-energy envelope, not isolated instruments or note
-transcription. Sustained tonal audio holds a steady pattern; silence,
-pause, stale envelopes and capture loss clear it. Percussion remains
-transient-driven (or an explicitly confident tempo lock). Clock fallback
-never invents flashes. Real kick onsets gently correct the locked eighth-note
-phase within its error gate. Melody adds a 150 ms level-scaled flash on phrase
-activation/new note sequences or real hat accents; estimated hat ticks do not
-trigger it, and its envelope still expires after 700 ms. Long silence/capture
+The matrix has Kick, Clap, Hi-hat, Bass and Melody rows. Melody flashes for
+incrementing instrument-v1 note sequences, never raw hats, sustain or a tonal
+energy envelope. Its brief level-scaled flash and 700 ms state expiry remain.
+Silence, pause and capture loss clear the grid. Percussion remains transient-driven
+(or an explicitly confident tempo lock). Clock fallback never invents flashes.
+Real kick onsets gently correct the locked eighth-note phase within its error gate.
+Long silence/capture
 restart and low-confidence tempo reacquisition retain their existing behavior.
 Shapes hold for eight seconds and reflash within their
 mask on captured onsets or confident audio-tempo ticks. Each hit brightens and

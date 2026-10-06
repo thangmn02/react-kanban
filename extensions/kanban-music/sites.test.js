@@ -8,7 +8,7 @@ it('keeps registration, host permissions and discovery on the same explicit host
   const script = manifest.content_scripts.find((entry) => entry.js.includes('clock.js'));
   expect(script.matches).toEqual(mediaSites);
   expect(manifest.content_scripts.find((entry) => entry.js.includes('media-observer.js'))).toMatchObject({ matches: mediaSites, world: 'MAIN', run_at: 'document_start' });
-  expect(manifest.host_permissions).toEqual(['https://kanthangboard.netlify.app/*', ...mediaSites]);
+  expect(manifest.host_permissions).toEqual(['https://kanthangboard.netlify.app/*', 'https://koraspace.online/*', ...mediaSites]);
   expect(JSON.stringify(manifest)).not.toContain('<all_urls>');
   expect(mediaSites.every((pattern) => !pattern.includes('://*'))).toBe(true);
   expect(musicHosts).toEqual(expect.arrayContaining(['youtube.com', 'music.youtube.com', 'soundcloud.com', 'open.spotify.com', 'music.apple.com', 'deezer.com', 'tidal.com', 'listen.tidal.com']));

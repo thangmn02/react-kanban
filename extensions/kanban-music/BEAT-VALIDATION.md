@@ -1,5 +1,21 @@
 # Beat sync validation
 
+## Version 0.3.13 / Kora 0.1.14 — automatic native capture
+
+Windows captures only the browser process tree owning the accepted Companion
+connection. Actual local PCM → binary Channel → existing detector analysis
+produced 798 valid packets, zero rejected packets and 15 kick/bass attacks in
+eight seconds. A separate process's tone was excluded. Same-browser overlap
+remains an accepted limitation; the picker does not isolate tab audio.
+
+Native AI uses the same hash-verified four-stem worker and dominant instrument
+tracker with locally packaged code/WASM. Its flashes arrive after inference,
+preserving note spacing; sound and percussion stay immediate. The previous
+32 ms aligned buffered result below applies only to web/tab capture. Native
+model readiness, bounded PCM blocks, late batch spacing and stale-note cleanup
+have focused regressions. Full-song and installed-browser listening remain
+acceptance checks.
+
 ## Version 0.3.12 — attack confirmation (2026-10-06)
 
 Live-release verification exposed an intermittent extra piano flash: a faint

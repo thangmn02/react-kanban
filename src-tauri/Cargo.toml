@@ -1,6 +1,6 @@
 [package]
 name = "kora"
-version = "0.1.13"
+version = "0.1.14"
 edition = "2021"
 
 [build-dependencies]
@@ -17,7 +17,9 @@ tokio-tungstenite = "0.30"
 tauri-plugin-updater = "2"
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Graphics_Dwm", "Win32_UI_WindowsAndMessaging", "Win32_UI_Shell"] }
+windows-core = "0.62"
+windows = { version = "0.62", features = ["Win32_Media_Audio", "Win32_Media_KernelStreaming", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_System_Variant", "Win32_System_Threading", "Win32_System_Diagnostics_ToolHelp", "Win32_NetworkManagement_IpHelper", "Win32_Networking_WinSock", "Win32_Security"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Graphics_Dwm", "Win32_System_LibraryLoader", "Win32_UI_WindowsAndMessaging", "Win32_UI_Shell"] }
 
 [dev-dependencies]
 rustfft = "6"

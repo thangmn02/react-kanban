@@ -1,4 +1,4 @@
-//! Browser metadata/onsets only. No WASAPI, SMTC, microphone or PCM input.
+//! Companion metadata/onsets only. Native PCM never crosses this WebSocket.
 use futures_util::{
     future::{join_all, select, Either},
     SinkExt, StreamExt,
@@ -9,7 +9,7 @@ use std::{
     sync::{Arc, Mutex},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::{
     net::TcpListener,
     sync::{mpsc, oneshot},
@@ -35,6 +35,7 @@ pub struct BrowserMusic {
     app: AppHandle,
     peers: Arc<Mutex<HashMap<String, mpsc::Sender<Value>>>>,
     pending: Arc<Mutex<HashMap<String, Pending>>>,
+    connections: Arc<Mutex<HashMap<String, u16>>>,
 }
 
 fn now() -> u64 {
@@ -99,6 +100,7 @@ impl BrowserMusic {
             app,
             peers: Arc::default(),
             pending: Arc::default(),
+            connections: Arc::default(),
         }
     }
     pub fn start(&self) {
@@ -162,6 +164,7 @@ impl BrowserMusic {
                     let id = Uuid::new_v4().to_string();
                     let (send, mut receive) = mpsc::channel::<Value>(64);
                     bridge.peers.lock().unwrap().insert(id.clone(), send);
+                    bridge.connections.lock().unwrap().insert(id.clone(), address.port());
                     loop {
                         let next = select(
                             Box::pin(receive.recv()),
@@ -240,6 +243,7 @@ impl BrowserMusic {
                         }
                     }
                     bridge.peers.lock().unwrap().remove(&id);
+                    bridge.connections.lock().unwrap().remove(&id);
                     bridge
                         .pending
                         .lock()
@@ -278,6 +282,17 @@ impl BrowserMusic {
         self.pending.lock().unwrap().remove(&request_id);
         result
     }
+    pub async fn audio_browser_port(&self, session_id: &str) -> Result<u16, String> {
+        if session_id.len() > 300 { return Err("Invalid music session".into()); }
+        let (peer, session) = session_id.split_once(':').ok_or("Invalid music session")?;
+        let response = self.ask(peer, json!({"action":"sessions.get"})).await?;
+        let valid = response["sessions"].as_array().is_some_and(|sessions| sessions.iter().take(64).any(|item|
+            item["id"].as_str() == Some(session) && item["paused"] == false && item["playing"] == true
+                && item["source"].as_str().is_some_and(allowed_source)));
+        if !valid { return Err("The selected music is not playing".into()); }
+        self.connections.lock().map_err(|_| "Music connection unavailable")?
+            .get(peer).copied().ok_or_else(|| "Companion disconnected".into())
+    }
 }
 
 #[tauri::command]
@@ -286,6 +301,7 @@ pub async fn native_music_request(
     action: String,
     session_id: Option<String>,
     subscription_id: Option<String>,
+    native_audio: Option<bool>,
 ) -> Result<Value, String> {
     if action == "sessions.get" {
         let peers: Vec<_> = music.peers.lock().unwrap().keys().cloned().collect();
@@ -344,7 +360,7 @@ pub async fn native_music_request(
     let mut result = music
         .ask(
             peer,
-            json!({"action":action,"sessionId":session,"subscriptionId":subscription_id}),
+            json!({"action":action,"sessionId":session,"subscriptionId":subscription_id,"nativeAudio":native_audio.unwrap_or(false)}),
         )
         .await?;
     if let Some(sessions) = result["sessions"].as_array_mut() {
@@ -358,12 +374,17 @@ pub async fn native_music_request(
 }
 
 #[tauri::command]
-pub fn native_music_setup() -> Result<(), String> {
+pub fn native_music_setup(app: AppHandle) -> Result<(), String> {
+    let folder = app.path().resolve("music-companion", tauri::path::BaseDirectory::Resource)
+        .map_err(|_| "Could not locate the included Companion".to_owned())?;
+    if !folder.join("extension/manifest.json").is_file() {
+        return Err("The included Companion is missing. Reinstall Kora to restore it.".into());
+    }
     #[cfg(windows)]
     std::process::Command::new("explorer.exe")
-        .arg("https://kanthangboard.netlify.app/music-companion.html")
+        .arg(folder)
         .spawn()
-        .map_err(|_| "Could not open browser".to_owned())?;
+        .map_err(|_| "Could not open the Companion folder".to_owned())?;
     Ok(())
 }
 

@@ -1,7 +1,7 @@
 import { instrumentDelay, instrumentSampleRate } from './instrument-models.js';
 
-export function createInstrumentWorker({ progress = () => {}, notes = () => {}, error = () => {} } = {}) {
-  const worker = new Worker(new URL('./generated/instrument-worker.js', import.meta.url), { type: 'module' });
+export function createInstrumentWorker({ progress = () => {}, notes = () => {}, error = () => {}, workerUrl } = {}) {
+  const worker = new Worker(workerUrl || new URL('./generated/instrument-worker.js', import.meta.url), { type: 'module' });
   let closed = false, pending = 0, resolve, reject;
   const ready = new Promise((ok, fail) => { resolve = ok; reject = fail; });
   const fail = (message) => {

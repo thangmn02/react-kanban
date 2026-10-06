@@ -41,7 +41,8 @@ const publicSessions = (items) => items.map((session) => {
 
 async function handle(message, sender) {
   if (!sender.native) await companion.rememberApp(sender).catch(() => {});
-  const owner = { tabId: sender.tab?.id, documentId: sender.documentId, native: sender.native };
+  const owner = { tabId: sender.tab?.id, documentId: sender.documentId, native: sender.native,
+    nativeAudio: Boolean(sender.native && message.nativeAudio === true) };
   if (message.action === 'dock.beat.sync.stop') {
     await beats.stop(owner, message.subscriptionId); return { ok: true };
   }

@@ -14,7 +14,7 @@ await mkdir(join(extension, 'vendor'), { recursive: true });
 for (const name of ['ort.wasm.min.mjs', 'ort-wasm-simd-threaded.mjs', 'ort-wasm-simd-threaded.wasm']) {
   await writeFile(join(extension, 'vendor', name), await readFile(join(root, 'node_modules/onnxruntime-web/dist', name)));
 }
-await build({ configFile: false, logLevel: 'warn', build: {
+await build({ configFile: false, publicDir: false, logLevel: 'warn', build: {
   outDir: join(extension, 'generated'), emptyOutDir: true, minify: true,
   lib: { entry: join(extension, 'instrument-worker.js'), formats: ['es'], fileName: () => 'instrument-worker.js' },
   rolldownOptions: { external: ['onnxruntime-web/wasm'], output: { paths: { 'onnxruntime-web/wasm': '../vendor/ort.wasm.min.mjs' } } },
@@ -92,8 +92,25 @@ names.push('instrument-runtime.js', 'instrument-models.js', 'instrument-worklet.
   'generated/instrument-worker.js', 'vendor/ort.wasm.min.mjs', 'vendor/ort-wasm-simd-threaded.mjs', 'vendor/ort-wasm-simd-threaded.wasm',
   'THIRD-PARTY-LICENSES.txt');
 const files = await Promise.all(names.map(async (name) => ({ name, bytes: await readFile(join(extension, name)) })));
+for (const { name, bytes } of files.filter((file) => /^(generated\/|vendor\/)|NOTICES|LICENSES/.test(file.name))) {
+  const target = join(root, 'public', 'music-analysis', name);
+  await mkdir(join(target, '..'), { recursive: true });
+  await writeFile(target, bytes);
+}
 JSON.parse(files.find((file) => file.name === 'manifest.json').bytes.toString());
 await mkdir(output, { recursive: true });
-await writeFile(join(output, 'kanban-music-companion.zip'), zip(files));
-await writeFile(join(output, 'kora-music-companion.zip'), zip(files));
+const archive = zip(files);
+await writeFile(join(output, 'kanban-music-companion.zip'), archive);
+await writeFile(join(output, 'kora-music-companion.zip'), archive);
+
+// Ship only runtime files with Windows, already unpacked for Load unpacked.
+const bundledCompanion = join(root, 'src-tauri', 'generated', 'music-companion');
+for (const { name, bytes } of files) {
+  const target = join(bundledCompanion, 'extension', name);
+  await mkdir(join(target, '..'), { recursive: true });
+  await writeFile(target, bytes);
+}
+const manifest = JSON.parse(files.find((file) => file.name === 'manifest.json').bytes.toString());
+const setup = await readFile(join(root, 'src-tauri', 'companion-setup.html'), 'utf8');
+await writeFile(join(bundledCompanion, 'Install Music Companion.html'), setup.replaceAll('__COMPANION_VERSION__', manifest.version));
 console.log(`Music companion packaged: ${files.length} files → public/downloads/kanban-music-companion.zip`);

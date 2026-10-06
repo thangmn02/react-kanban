@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Kora Music Companion",
   "description": "Let your Kora Floating Focus window show and pause or play supported music tabs.",
-  "version": "0.3.12",
+  "version": "0.3.13",
   "icons": { "16": "icons/16.png", "48": "icons/48.png", "128": "icons/128.png" },
   "minimum_chrome_version": "120",
   "content_security_policy": { "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'" },
@@ -10,6 +10,7 @@
   "action": { "default_title": "Enable live beats for this music tab" },
   "host_permissions": [
     "https://kanthangboard.netlify.app/*",
+    "https://koraspace.online/*",
     "https://youtube.com/*",
     "https://www.youtube.com/*",
     "https://m.youtube.com/*",
@@ -29,7 +30,7 @@
   ],
   "background": { "service_worker": "background.js", "type": "module" },
   "content_scripts": [{
-    "matches": ["https://kanthangboard.netlify.app/*", "http://localhost/*", "http://127.0.0.1/*"],
+    "matches": ["https://kanthangboard.netlify.app/*", "https://koraspace.online/*", "http://localhost/*", "http://127.0.0.1/*"],
     "js": ["relay.js"],
     "run_at": "document_start"
   }, {

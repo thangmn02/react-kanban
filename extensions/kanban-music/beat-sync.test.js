@@ -30,6 +30,23 @@ it('automatically asks Chrome for capture and creates a USER_MEDIA offscreen doc
   expect(f.api.runtime.sendMessage).toHaveBeenCalledWith(expect.objectContaining({ kind: 'stop' }));
   await f.sync.stop();
 });
+it('keeps clocks and controls for native process capture without invoking tabCapture after resume or restart', async () => {
+  const f = fixture();
+  const owner = { native: 'widget', nativeAudio: true };
+  await f.sync.start(f.session, owner, 'subscription');
+  expect(f.api.tabCapture.getMediaStreamId).not.toHaveBeenCalled();
+  expect(f.api.offscreen.createDocument).not.toHaveBeenCalled();
+  expect(f.sync.status(f.session)).toEqual({mode:'clock',reason:'native-audio'});
+  f.sync.clock({token:f.token(),valid:true,clock:{...f.session,playing:false,paused:true}}, {tab:{id:12},documentId:'music-doc'});
+  f.sync.clock({token:f.token(),valid:true,clock:{...f.session,playing:true,paused:false}}, {tab:{id:12},documentId:'music-doc'});
+  await f.sync.start(f.session, owner, 'subscription');
+  f.sync.invoke(12);
+  expect(f.api.tabCapture.getMediaStreamId).not.toHaveBeenCalled();
+  await f.sync.stop();
+  await f.sync.start({...f.session,id:'new-tab',tabId:14,documentId:'new-doc'}, owner, 'new-subscription');
+  expect(f.api.tabCapture.getMediaStreamId).not.toHaveBeenCalled();
+  await f.sync.stop();
+});
 
 it('discards delayed capture on a seek or playback-rate change and reacquires a fresh stream', async () => {
   const f = fixture();

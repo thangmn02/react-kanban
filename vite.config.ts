@@ -20,6 +20,9 @@ export default defineConfig(({ mode }) => ({
         if (process.env.TAURI_ENV_PLATFORM && options.dir) {
           await rm(resolve(options.dir, 'downloads/Kora-setup.exe'), { force: true });
           await rm(resolve(options.dir, 'downloads/latest.json'), { force: true });
+          // Native installers include the unpacked Companion as a resource.
+          await rm(resolve(options.dir, 'downloads/kora-music-companion.zip'), { force: true });
+          await rm(resolve(options.dir, 'downloads/kanban-music-companion.zip'), { force: true });
         }
       },
     },
