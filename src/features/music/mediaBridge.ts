@@ -2,6 +2,8 @@ import { isNativeWidget } from '../native/runtime';
 import { requestNativeMusic, subscribeNativeMusic } from '../native/nativeMusic';
 import { beatTelemetry, parseBeatTraces, type BeatTrace } from '../../../extensions/kanban-music/beat-telemetry.js';
 import { parsePlaybackTiming, parsePlaybackClock, playbackDeadline, type PlaybackTiming, type PlaybackClock } from '../../../extensions/kanban-music/beat-timing.js';
+import { parseMediaAsset, type MediaAsset } from '../../../extensions/kanban-music/media-asset.js';
+import type { BeatEventPath } from './beat-event-engine';
 const telemetry = beatTelemetry.at('media-bridge');
 
 export interface BrowserMusicSession {
@@ -12,6 +14,8 @@ export interface BrowserMusicSession {
   paused: boolean;
   playing?: boolean;
   canControl?: boolean;
+  canAnalyze?: boolean;
+  asset?: MediaAsset;
   currentTime?: number;
   duration?: number;
   volume?: number;
@@ -30,11 +34,11 @@ export type BeatBand = 'kick' | 'clap' | 'hat' | 'bass' | 'melody';
 export interface MelodyState { active: boolean; level: number; note: number }
 export type BeatEvent = ({ kind: 'clock'; clock: MusicClock }
   | { kind: 'sync.recover' }
-  | { kind: 'sync.state'; mode: 'clock' | 'capture'; reason?: string; captureId?: string }
+  | { kind: 'sync.state'; mode: 'clock' | 'capture'; reason?: string; captureId?: string; eventPath?: BeatEventPath }
   | { kind: 'onset'; bands: BeatBand[]; captureId?: string; sequence?: number }
   | { kind: 'melody.state'; captureId: string; melody: MelodyState }
   | { kind: 'tempo.state'; captureId: string; tempo: { locked: boolean; bpm: number | null; confidence: number } }
-  | { kind: 'tempo.tick'; captureId: string; tick: { step: number; phase: number; beatPosition: number; subdivision: 2 } }) & { telemetry?: BeatTrace[] } & Partial<PlaybackTiming>;
+  | { kind: 'tempo.tick'; captureId: string; tick: { step: number; phase: number; beatPosition: number; subdivision: 2 } }) & { telemetry?: BeatTrace[]; eventSource?: BeatEventPath; semanticKey?: string } & Partial<PlaybackTiming>;
 
 const channel = 'kanban-music-v1';
 const supportedBands = ['kick', 'clap', 'hat', 'bass', 'melody', 'snare'];
@@ -68,6 +72,8 @@ export function isMusicSession(value: unknown): value is BrowserMusicSession {
     && typeof item.paused === 'boolean'
     && (item.playing === undefined || typeof item.playing === 'boolean')
     && (item.canControl === undefined || typeof item.canControl === 'boolean')
+    && (item.canAnalyze === undefined || typeof item.canAnalyze === 'boolean')
+    && (item.asset === undefined || Boolean(parseMediaAsset(item.asset)))
     && ['muted', 'canSeek', 'canPrevious', 'canNext'].every(key => item[key] === undefined || typeof item[key] === 'boolean')
     && (item.duration === undefined || typeof item.duration === 'number' && Number.isFinite(item.duration) && item.duration >= 0)
     && (item.volume === undefined || typeof item.volume === 'number' && Number.isFinite(item.volume) && item.volume >= 0 && item.volume <= 1)

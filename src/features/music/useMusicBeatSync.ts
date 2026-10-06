@@ -3,6 +3,7 @@ import { sendBeatRequest, subscribeBeatEvents, type BeatBand, type BeatEvent, ty
 import { beatTelemetry, type BeatTrace } from '../../../extensions/kanban-music/beat-telemetry.js';
 import { createBeatScheduler } from './beat-scheduler';
 import { clockAdvancing } from '../../../extensions/kanban-music/beat-timing.js';
+import { createBeatEventEngine, type BeatEventOptions, type BeatEventPath } from './beat-event-engine';
 const telemetry = beatTelemetry.at('beat-controller');
 
 export interface MusicBeatState {
@@ -15,10 +16,11 @@ export interface MusicBeatState {
   reason?: string;
   captureId?: string;
   melody?: MelodyState;
+  eventPath?: BeatEventPath;
   telemetry?: Record<string, BeatTrace>;
 }
 
-export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessionId: string, clock: MusicClock) => void): MusicBeatState {
+export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessionId: string, clock: MusicClock) => void, eventOptions?: BeatEventOptions): MusicBeatState {
   const [state, setState] = useState<MusicBeatState>({ sessionId: '', mode: 'clock', onsets: {} });
   const committed = useRef(new Set<string>());
   useEffect(() => {
@@ -153,6 +155,7 @@ export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessio
         const current: MusicBeatState = previous.sessionId === selectedSessionId ? previous : { sessionId: selectedSessionId, mode: 'clock', onsets: {} };
         if (event.kind === 'sync.state') return {
           ...current, mode: event.mode, reason: event.reason, captureId: event.captureId,
+          eventPath: event.eventPath,
           onsets: current.mode === event.mode && current.captureId === event.captureId ? current.onsets : {},
           rates: event.mode === 'capture' ? rates(Date.now()) : {},
           tempo: current.mode === event.mode && current.captureId === event.captureId ? current.tempo : undefined,
@@ -168,7 +171,10 @@ export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessio
         return { ...current, onsets, rates: rates(Date.now()), ...acceptedTraces };
       });
     }
+    const engine = eventOptions && createBeatEventEngine(eventOptions, receive, () => { void renew(); });
+    if (engine && eventOptions?.initialClock) engine.accept({ kind: 'clock', clock: eventOptions.initialClock });
     const unsubscribe = subscribeBeatEvents(sessionId, subscriptionId, (event) => {
+      if (engine) { engine.accept(event); return; }
       if (event.kind === 'clock') { receive(event); return; }
       if (event.kind === 'sync.state') {
         if (event.mode === 'capture' && event.captureId && retired.has(event.captureId)) {
@@ -203,6 +209,7 @@ export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessio
     const stop = () => {
       cancelled = true;
       scheduler.reset('stopped', true);
+      engine?.stop();
       clearTimeout(melodyLease);
       clearInterval(interval);
       clearInterval(watchdog);
@@ -222,6 +229,6 @@ export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessio
     window.addEventListener('pagehide', stop);
     void renew();
     return () => { unsubscribe(); window.removeEventListener('pagehide', stop); stop(); };
-  }, [sessionId, onClock]);
+  }, [sessionId, onClock, eventOptions]);
   return state.sessionId === sessionId ? state : { sessionId: sessionId || '', mode: 'clock', onsets: {} };
 }

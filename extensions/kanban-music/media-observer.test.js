@@ -26,6 +26,27 @@ const ready = (media, src = 'blob:detached-track') => {
   return media;
 };
 
+it('identifies the playing Spotify asset instead of the page being browsed', () => {
+  ready(new Audio());
+  document.body.innerHTML = '<a data-testid="nowplaying-track-link" href="https://open.spotify.com/track/0123456789012345678901">Playing</a>';
+  expect(readMedia()[0].assetUrl).toBe('https://open.spotify.com/track/0123456789012345678901');
+  document.body.replaceChildren();
+  expect(readMedia()[0].assetUrl).toBeUndefined();
+});
+
+it('identifies the canonical YouTube player without assigning its asset to retained previews or advertisements', () => {
+  vi.stubGlobal('location', { hostname: 'www.youtube.com', href: 'https://www.youtube.com/watch?v=abcdefghijk' });
+  document.body.innerHTML = '<div id="movie_player"><video></video></div><video id="preview"></video>';
+  const main = ready(document.querySelector('#movie_player video'), 'blob:main');
+  ready(document.querySelector('#preview'), 'blob:preview');
+  ready(new Audio(), 'blob:detached');
+  const sessions = readMedia();
+  expect(sessions.find(s => s.src === main.currentSrc).assetUrl).toBe(location.href);
+  expect(sessions.filter(s => s.src !== main.currentSrc).every(s => s.assetUrl === undefined)).toBe(true);
+  document.querySelector('#movie_player').classList.add('ad-showing');
+  expect(readMedia().every(s => s.assetUrl === undefined)).toBe(true);
+});
+
 it('discovers new Audio() outside the DOM with metadata and controls that same object', async () => {
   const media = ready(new Audio());
   expect(media).toBeInstanceOf(HTMLAudioElement);

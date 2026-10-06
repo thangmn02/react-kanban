@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useI18n } from '../../i18n';
 import { MusicBridgeError, sendMusicRequest, type BrowserMusicSession, type MusicClock, type MusicAction } from './mediaBridge';
 import { useMusicBeatSync } from './useMusicBeatSync';
 import { mergeMusicSessions } from './mergeMusicSessions';
-import { getBeatSource } from '../native/runtime';
+import { getBeatSource, isNativeWidget } from '../native/runtime';
+import { beatCapabilities } from './beat-capabilities';
 
 interface MusicSelection {
   sessions: BrowserMusicSession[];
@@ -75,7 +76,12 @@ export function useBrowserMusic() {
         sessions: current.sessions.map(item => item.id === sessionId ? { ...item, ...clock } : item) };
     });
   }, []);
-  const beat = useMusicBeatSync(selected?.id, updateClock);
+  const provider = selected?.asset?.provider, mediaId = selected?.asset?.id;
+  const canAnalyze = selected?.canAnalyze, duration = selected?.duration;
+  const eventOptions = useMemo(() => ({ asset: provider && mediaId ? { provider, id: mediaId } : undefined,
+    duration, capabilities: beatCapabilities(isNativeWidget(), canAnalyze !== false),
+  }), [provider, mediaId, duration, canAnalyze]);
+  const beat = useMusicBeatSync(selected?.id, updateClock, eventOptions);
   async function toggle() {
     if (!selected || busy) return;
     setBusy(true);

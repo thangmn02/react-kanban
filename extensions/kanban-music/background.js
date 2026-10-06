@@ -6,6 +6,7 @@ import { mediaSites } from './sites.js';
 import { diagnoseDiscovery } from './discovery-diagnostics.js';
 import { createWidgetBridge } from './widget-bridge.js';
 import { beatTelemetry } from './beat-telemetry.js';
+import { mediaAssetFromUrl } from './media-asset.js';
 
 void chrome.storage.local.get('beatTelemetryEnabled').then((data) => beatTelemetry.enable(data.beatTelemetryEnabled === true)).catch(() => {});
 chrome.storage.onChanged.addListener((changes, area) => {
@@ -28,7 +29,7 @@ async function scan() {
         await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'MAIN', files: ['media-observer.js'] });
         const frames = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'MAIN', func: readMedia });
         return frames.flatMap((frame) => (frame.result || []).map((media) => ({
-          ...media, tabId: tab.id, tabMuted: Boolean(tab.mutedInfo?.muted), documentId: frame.documentId,
+          ...media, asset: mediaAssetFromUrl(media.assetUrl), tabId: tab.id, tabMuted: Boolean(tab.mutedInfo?.muted), documentId: frame.documentId,
           id: `${tab.id}:${frame.documentId}:${media.index}`,
         })));
       } catch { return []; } // Closed, restricted, or permission-blocked tabs are unavailable.
@@ -40,9 +41,10 @@ async function scan() {
 
 const publicSessions = (items) => items.map((session) => {
   const { id, title, artist, source, paused, playing, currentTime, playbackRate, sampledAt, selectionToken,
-    duration, volume, muted, canSeek, canPrevious, canNext } = session;
+    duration, volume, muted, canSeek, canPrevious, canNext, asset } = session;
   return { id, title, artist, source, paused, playing, currentTime, playbackRate, sampledAt,
-    duration, volume, muted, canSeek, canPrevious, canNext, syncState: beats.status(session),
+    duration, volume, muted, canSeek, canPrevious, canNext, asset,
+    canAnalyze: Boolean(chrome.offscreen && chrome.tabCapture?.getMediaStreamId && chrome.runtime.getContexts), syncState: beats.status(session),
   ...(selectionToken ? { selectionToken } : {}),
   };
 });

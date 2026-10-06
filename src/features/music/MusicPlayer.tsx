@@ -59,6 +59,7 @@ export function MusicGrid({ music, colorMode = 'random', palette = 'bloom', orie
       source: music.source, mode: music.beat.mode, reason: music.beat.reason, onsets: music.beat.onsets, rates: music.beat.rates,
       tempo: music.beat.tempo, tickCount: music.beat.tickCount, pattern: patternAt(music.selected?.currentTime || 0), captureId: music.beat.captureId,
       melody: music.beat.melody,
+      eventPath: music.beat.eventPath, assetProvider: music.selected?.asset?.provider,
     }, null, 2)}</pre></details>}
   </>;
 }
@@ -69,10 +70,11 @@ export function MusicFeedback({ music }: { music: BrowserMusicController }) {
   const instrumentStatus = useSyncExternalStore(subscribeNativeInstrument, getNativeInstrumentStatus);
   const native = isNativeWidget();
   const { selected, playing, busy, openMusicTab, error, beat } = music;
-  const needsAccess = playing && beat.mode !== 'capture' && beat.reason === 'capture-permission';
+  const needsAccess = playing && (beat.mode !== 'capture' || beat.eventPath === 'degraded') && beat.reason === 'capture-permission';
   const outdatedCapturePolicy = beat.mode === 'clock' && (beat.reason === 'drm-protected' || selected?.syncState?.reason === 'drm-protected');
   const silentPlayback = playing && beat.mode === 'clock' && beat.reason === 'silent';
   return <div className="music-feedback">
+    {playing && beat.eventPath && <p className="music-status muted" role="status">{t(`music.beatPath.${beat.eventPath}`)}</p>}
     {needsAccess && <div className="music-access" role="status">
       <p className="music-access-title">{t('music.beatAccessTitle')}</p>
       <p className="muted">{t('music.beatAccessHelp')}</p>

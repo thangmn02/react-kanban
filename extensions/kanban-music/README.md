@@ -310,3 +310,14 @@ onsets, envelope/lifecycle messages and decorative shapes stay distinct. The
 five-row/eight-cell renderer and its intentional masks/CSS delays are unchanged,
 so scheduler release, DOM commit and delayed animation start are separate
 measurements. Physical speaker/display latency is not inferred from DOM time.
+
+### Cached Beat events and capability fallbacks
+
+The app can merge validated, timestamped EventTrack cache data with the existing
+local capture feed. Stable provider identity, fixed chunks and priority dedupe
+avoid re-flashing a local note when its cached replacement arrives. Missing or
+unavailable analysis never blocks local playback; audio-unavailable sessions
+show explicit generic decorative timing. Detected silence stays dark.
+The source/decorative distinction and existing target/DOM/animation diagnostics
+are preserved. See [cache setup and protocol](../../docs/beat-event-cache.md)
+for the optional server services, bounded contracts and validation limits.

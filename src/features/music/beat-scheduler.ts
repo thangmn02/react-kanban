@@ -93,6 +93,14 @@ export function createBeatScheduler(deliver: (event: BeatEvent) => void, recover
 
   return {
     reset,
+    cancelSemantic(key: string) {
+      for (let i = queue.length - 1; i >= 0; i--) if (queue[i].event.semanticKey === key) drop(queue.splice(i, 1)[0].event, 'priority');
+      arm();
+    },
+    cancelSource(source: BeatEvent['eventSource']) {
+      for (let i = queue.length - 1; i >= 0; i--) if (queue[i].event.eventSource === source) drop(queue.splice(i, 1)[0].event, 'schedule-reset');
+      arm();
+    },
     cancelKind(kind: BeatEvent['kind']) {
       for (let i = queue.length - 1; i >= 0; i--) {
         if (queue[i].event.kind === kind) {

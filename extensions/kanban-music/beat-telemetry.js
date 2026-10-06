@@ -4,12 +4,14 @@ const stages = new Set(['CAPTURE_START', 'CAPTURE_STOP', 'AUDIO_DETECTED', 'LOW_
   'EVENT_SENT', 'EVENT_RECEIVED', 'EVENT_LATE', 'EVENT_DROPPED', 'EVENT_ACCEPTED',
   'EVENT_STATE_COMMITTED', 'EVENT_COMMITTED', 'EVENT_RENDERED', 'EVENT_SCHEDULED', 'ANALYSIS_FRAME', 'WORKER_BATCH']);
 const sources = new Set(['onset', 'tempo', 'random', 'lifecycle']);
+['CACHE_HIT', 'CACHE_MISS', 'ANALYSIS_REQUESTED', 'EVENT_PATH', 'EVENT_REPLACED'].forEach(stage => stages.add(stage));
 const types = new Set(['kick', 'snare', 'hat', 'bass', 'melodic', 'generic']);
 const components = new Set(['capture-engine', 'offscreen', 'beat-sync', 'widget-bridge',
   'instrument-worker', 'instrument-runtime', 'native-instrument', 'native-audio-engine',
   'native-audio-feed', 'media-bridge', 'beat-controller', 'beat-renderer']);
 components.add('native-capture'); components.add('native-widget-bridge');
 components.add('beat-scheduler');
+components.add('beat-event-engine');
 const reasons = new Set(['replaced', 'stopped', 'failed', 'expired', 'silent', 'ended',
   'reconfigured', 'queue-full', 'late', 'owner', 'sequence', 'debounce', 'invalid',
   'not-playing', 'sync-stale', 'clock-disconnected', 'audio-backlog', 'transport',
@@ -20,6 +22,7 @@ reasons.add('delivery-late'); reasons.add('delivery-coalesced');
 reasons.add('schedule-reset'); reasons.add('schedule-late'); reasons.add('clock-stale');
 reasons.add('buffering');
 reasons.add('tempo-selected');
+reasons.add('semantic-duplicate'); reasons.add('priority');
 const finite = (n) => typeof n === 'number' && Number.isFinite(n);
 const opaque = (s) => typeof s === 'string' && /^[a-zA-Z0-9:_-]{1,160}$/.test(s);
 const canonical = (band) => ({ clap: 'snare', melody: 'melodic' })[band] || band;
@@ -38,6 +41,7 @@ export function parseBeatTraces(value) {
         ...(typeof t.active === 'boolean' ? { active: t.active } : {}),
         ...(Number.isSafeInteger(t.noteSequence) && t.noteSequence >= 0 ? { noteSequence: t.noteSequence } : {}),
         ...(finite(t.targetPlaybackTime) && t.targetPlaybackTime >= 0 ? { targetPlaybackTime: t.targetPlaybackTime } : {}),
+        ...(['cache', 'local', 'degraded'].includes(t.eventSource) ? { eventSource: t.eventSource } : {}),
         ...(opaque(t.captureId) ? { captureId: t.captureId } : {}) });
     }
     return result;
@@ -67,6 +71,7 @@ export function createBeatTelemetry({ now = Date.now, limit = 2048 } = {}) {
         if (opaque(details.captureId)) entry.captureId = details.captureId;
         if (opaque(details.parentId)) entry.parentId = details.parentId;
         if (reasons.has(details.reason)) entry.reason = details.reason;
+        if (['cache', 'local', 'degraded'].includes(details.eventSource)) entry.eventSource = details.eventSource;
         if (stage === 'EVENT_SENT') entry.emittedAt = time;
         if (stage === 'EVENT_COMMITTED' || stage === 'EVENT_STATE_COMMITTED') entry.committedAt = time;
         if (stage === 'EVENT_RENDERED') entry.renderedAt = time;

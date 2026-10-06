@@ -6,9 +6,17 @@ export function readMedia() {
   const previous = navigation('.ytp-prev-button, ytmusic-player-bar .previous-button, [data-testid="control-button-skip-back"], .skipControl__previous, .player-previous');
   const next = navigation('.ytp-next-button, ytmusic-player-bar .next-button, [data-testid="control-button-skip-forward"], .skipControl__next, .player-next');
   const entries = globalThis.__kanbanMusicMedia?.entries() || Array.from(document.querySelectorAll('audio,video'), (media, index) => ({ media, index }));
+  // A browsing page is not necessarily the currently playing asset. Only
+  // publish identity from the player, or an unambiguous YouTube video page.
+  const playerLink = document.querySelector('[data-testid="nowplaying-track-link"], .playbackSoundBadge__titleLink');
+  const youtubeUrl = /(^|\.)youtube\.com$/.test(location.hostname)
+    && !document.querySelector('.ad-showing') ? location.href : undefined;
   return entries.flatMap(({ media, index }) => {
     const src = media.currentSrc || (typeof media.srcObject?.id === 'string' ? `stream:${media.srcObject.id}` : '');
     if (!src || media.readyState === 0 || media.ended) return [];
+    // SPA navigation can leave preview/detached players in the observer. The
+    // canonical player still owns the watch URL; previews never inherit it.
+    const assetUrl = playerLink?.href || (media.closest('#movie_player, ytmusic-player') || entries.length === 1 ? youtubeUrl : undefined);
     return [{ index, src, title: (metadata?.title || document.title || 'Untitled media').slice(0, 500), artist: (metadata?.artist || '').slice(0, 500), source: location.hostname, paused: media.paused,
       playing: !media.paused && !media.seeking && media.readyState >= 3,
       currentTime: Number.isFinite(media.currentTime) ? media.currentTime : 0,
@@ -16,7 +24,7 @@ export function readMedia() {
       duration: Number.isFinite(media.duration) && media.duration > 0 ? media.duration : undefined,
       volume: media.volume, canSeek: Number.isFinite(media.duration) && media.duration > 0 && media.seekable.length > 0,
       canPrevious: Boolean(previous), canNext: Boolean(next),
-      protectedMedia: Boolean(media.mediaKeys), observed: Boolean(globalThis.__kanbanMusicMedia) }];
+      assetUrl: assetUrl?.slice(0, 2048), protectedMedia: Boolean(media.mediaKeys), observed: Boolean(globalThis.__kanbanMusicMedia) }];
   });
 }
 

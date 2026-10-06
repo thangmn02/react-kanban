@@ -2,6 +2,15 @@
   directory = "netlify/functions"
   node_bundler = "esbuild"
 
+[functions."beat-event-cache"]
+  included_files = ["public/beat-tracks/**"]
+
+[[redirects]]
+  from = "/api/beat-events"
+  to = "/.netlify/functions/beat-event-cache"
+  status = 200
+  force = true
+
 [[headers]]
   for = "/downloads/latest.json"
   [headers.values]

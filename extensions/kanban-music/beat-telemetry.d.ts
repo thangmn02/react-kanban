@@ -5,6 +5,7 @@ export interface BeatTrace {
   targetClock: 'epoch-ms' | 'audio-seconds'; captureId?: string;
   active?: boolean; noteSequence?: number;
   targetPlaybackTime?: number;
+  eventSource?: 'cache' | 'local' | 'degraded';
 }
 export interface BeatTelemetry {
   enable(value?: boolean): void; readonly enabled: boolean; clear(): void;

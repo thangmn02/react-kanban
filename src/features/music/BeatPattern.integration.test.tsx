@@ -8,6 +8,28 @@ afterEach(() => { cleanup(); beatTelemetry.enable(false); beatTelemetry.clear();
 const session = { id: 'song', title: 'Song', artist: '', source: '', paused: false, playing: true, currentTime: 0, sampledAt: 1000, playbackRate: 1 };
 const clock = { sessionId: 'song', mode: 'clock' as const, onsets: {} };
 
+it('animates degraded timing as decorative traces without inventing instrument counters', async () => {
+  vi.useFakeTimers(); beatTelemetry.enable();
+  const live = { ...clock, mode: 'capture' as const, eventPath: 'degraded' as const, captureId: 'fallback',
+    tempo: { locked: true, bpm: 120, confidence: 0 }, tickCount: 0, rates: {} };
+  const view = render(<BeatPattern session={session} beat={live} />);
+  await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+  const tick = (count: number) => ({ ...live, tickCount: count, telemetry: { 'tempo:generic': beatTelemetry.events('tempo', ['generic'])![0] } });
+  view.rerender(<BeatPattern session={session} beat={tick(1)} />);
+  await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+  expect(view.container.querySelectorAll('.beat-square')).toHaveLength(40);
+  const first = view.container.querySelector('.beat-square.onset'); expect(first).not.toBeNull();
+  view.rerender(<BeatPattern session={session} beat={tick(2)} />);
+  await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+  expect(view.container.querySelector('.beat-square.onset')).not.toBe(first);
+  expect(live.onsets).toEqual({});
+  const committed = beatTelemetry.snapshot().records.filter(r => r.stage === 'EVENT_COMMITTED');
+  expect(committed.some(r => r.source === 'random' && r.type === 'generic')).toBe(true);
+  expect(committed.some(r => r.source === 'onset')).toBe(false);
+  view.rerender(<BeatPattern session={{ ...session, playing: false, paused: true }} beat={tick(3)} />);
+  expect(view.container.querySelector('.beat-square.onset')).toBeNull();
+});
+
 it('keeps percussion and note flashes intact when only diagnostic metadata changes', async () => {
   vi.useFakeTimers(); beatTelemetry.enable();
   const live = { ...clock, mode: 'capture' as const, captureId: 'trace-only', rates: { kick: 1 } };

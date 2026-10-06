@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from 'vite'
 import { aiDevelopmentPlugin } from './server/viteAiPlugin'
+import { beatCacheDevelopmentPlugin } from './server/vite-beat-cache-plugin'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { rm } from 'node:fs/promises'
@@ -26,7 +27,8 @@ export default defineConfig(({ mode }) => ({
         }
       },
     },
-    aiDevelopmentPlugin({ ...loadEnv(mode, process.cwd(), ''), ...process.env } as Record<string, string>)
+    aiDevelopmentPlugin({ ...loadEnv(mode, process.cwd(), ''), ...process.env } as Record<string, string>),
+    beatCacheDevelopmentPlugin({ ...loadEnv(mode, process.cwd(), ''), ...process.env } as Record<string, string>)
   ],
   server: {
     // Cargo locks build helpers on Windows; frontend HMR must not watch them.

@@ -48,16 +48,19 @@ export default function BeatPattern({ session, beat, colorMode = 'random', palet
   const melodyCount = counts.melody || 0;
   const onsetTotal = beatBands.reduce((sum, band) => sum + (beat.onsets[band] || 0), 0);
   const tickTotal = beat.tempo?.locked ? beat.tickCount || 0 : 0;
+  const degraded = capture && beat.eventPath === 'degraded';
   const audioLive = capture && (!beat.rates || beatBands.some((band) => (beat.rates?.[band] || 0) > 0)
-    || (beat.melody?.active === true && beat.melody.level > 0));
+    || (beat.melody?.active === true && beat.melody.level > 0) || degraded && tickTotal > 0);
   const [pulse, setPulse] = useState<{ captureKey: string; counts: Partial<Record<BeatBand, number>>; active: Partial<Record<BeatBand, boolean>>; rawTotal: number; tickTotal: number; shapeHit: boolean; telemetry?: Record<string, BeatTrace> }>({
     captureKey, counts, active: {}, rawTotal: onsetTotal, tickTotal, shapeHit: false,
   });
   useEffect(() => {
     const nextCounts = { kick: kickCount, clap: clapCount, hat: hatCount, bass: bassCount, melody: melodyCount };
     const traces = diagnostics.current.traces;
+    const decoration = degraded ? telemetry.events('random', ['generic'], { captureId: beat.captureId })?.[0] : undefined;
+    if (decoration) telemetry.record('EVENT_DETECTED', decoration, { parentId: traces?.['tempo:generic']?.id });
     const timer = setTimeout(() => setPulse((previous) => ({ captureKey, counts: nextCounts, rawTotal: onsetTotal, tickTotal,
-      ...(traces ? { telemetry: traces } : {}),
+      ...(traces || decoration ? { telemetry: { ...traces, ...(decoration ? { 'random:generic': decoration } : {}) } } : {}),
       shapeHit: audioLive && captureKey === previous.captureKey
         && (onsetTotal > previous.rawTotal || tickTotal > previous.tickTotal),
       active: Object.fromEntries(beatBands.map((band) => [band,
@@ -65,7 +68,7 @@ export default function BeatPattern({ session, beat, colorMode = 'random', palet
       ])) as Partial<Record<BeatBand, boolean>>,
     })), 0);
     return () => clearTimeout(timer);
-  }, [capture, audioLive, captureKey, kickCount, clapCount, hatCount, bassCount, melodyCount, onsetTotal, tickTotal]);
+  }, [capture, audioLive, captureKey, kickCount, clapCount, hatCount, bassCount, melodyCount, onsetTotal, tickTotal, degraded, beat.captureId]);
   const newOnsets = pulse.captureKey === captureKey ? pulse.active : {};
   const melodyLive = capture && beat.melody?.active === true && beat.melody.level > 0;
   const melodyNote = beat.melody?.note || 0;
@@ -140,6 +143,7 @@ export default function BeatPattern({ session, beat, colorMode = 'random', palet
   useEffect(() => {
     if (!beatTelemetry.enabled || !root.current) return;
     const available = Object.values(pulse.telemetry || {}).filter((t) => t.type !== 'generic' && t.type !== 'melodic');
+    if (degraded && pulse.telemetry?.['random:generic']) available.push(pulse.telemetry['random:generic']);
     if (melodyFlash?.telemetry) available.push(melodyFlash.telemetry);
     if (liveMoment?.telemetry) available.push(liveMoment.telemetry);
     const current = new Set(available.map((trace) => trace.id));
@@ -155,14 +159,14 @@ export default function BeatPattern({ session, beat, colorMode = 'random', palet
       telemetry.record('EVENT_COMMITTED', trace, { parentId: liveMoment?.parentId });
       if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) telemetry.record('EVENT_RENDERED', trace);
     }
-  }, [beat.telemetry, beat.tempo?.locked, pulse, melodyFlash, liveMoment]);
+  }, [beat.telemetry, beat.tempo?.locked, pulse, melodyFlash, liveMoment, degraded]);
 
   const rendered = (trace?: BeatTrace, delayMs = 0, parentId?: string) => {
     if (trace) telemetry.record('EVENT_RENDERED', trace, { delayMs, parentId });
   };
 
   return <div ref={root} className={`music-pattern${capture ? ' live' : ''}${capture && colorMode === 'flow' ? ' flow' : ''}${liveMoment ? ' moment' : ''}${palette === 'ultraviolet' ? ' ultraviolet' : ''} ${orientation}`}
-    data-pattern={pattern} data-reshuffle={epoch} data-moment={liveMoment?.shape || ''}
+    data-pattern={pattern} data-event-path={beat.eventPath || 'local'} data-reshuffle={epoch} data-moment={liveMoment?.shape || ''}
     data-moment-source={liveMoment ? 'accent' : ''} data-moment-effect={liveMoment?.effect || ''} aria-hidden="true">
     {beatBands.map((band, row) => {
       const steps = activeSteps(session?.id || 'empty', epoch, row);
@@ -180,14 +184,15 @@ export default function BeatPattern({ session, beat, colorMode = 'random', palet
         </svg>
         {steps.map((active, step) => {
           const delay = pulseDelay(pattern, step, pulseSeed);
-          const onset = capture && band !== 'melody' && !liveMoment && active && newOnsets[band] && delay !== null;
+          const fallbackFlash = degraded && pulse.shapeHit && active && delay !== null;
+          const onset = fallbackFlash || capture && band !== 'melody' && !liveMoment && active && newOnsets[band] && delay !== null;
           const momentLit = band !== 'melody' && liveMoment && isShapeCell(liveMoment.shape, row, step);
           const cellStyle = { '--melody-level': beat.melody?.level || 0, '--pulse-delay': `${delay || 0}ms`, '--moment-delay': `${liveMoment ? momentDelay(liveMoment.effect, row, step, liveMoment.id) : 0}ms`, '--moment-duration': `${momentFlashMs}ms` } as CSSProperties;
           const shapeHit = momentLit && pulse.captureKey === captureKey && pulse.shapeHit;
           const type = band === 'clap' ? 'snare' : band === 'melody' ? 'melodic' : band;
           const origin = band === 'melody' ? melodyFlash?.telemetry : pulse.telemetry?.[`onset:${type}`];
-          const cellTrace = onset ? origin : momentLit ? liveMoment.telemetry : undefined;
-          return <span key={`${step}:${onset ? `${captureKey}:${counts[band]}` : 0}:${momentLit ? liveMoment.id : 0}`}
+          const cellTrace = fallbackFlash ? pulse.telemetry?.['random:generic'] : onset ? origin : momentLit ? liveMoment.telemetry : undefined;
+          return <span key={`${step}:${onset ? `${captureKey}:${fallbackFlash ? pulse.tickTotal : counts[band]}` : 0}:${momentLit ? liveMoment.id : 0}`}
             data-beat-trace={cellTrace?.id}
             onAnimationStart={(event) => { if (event.target === event.currentTarget && event.animationName !== 'hue-cycle') rendered(cellTrace, onset ? delay || 0 : liveMoment ? momentDelay(liveMoment.effect, row, step, liveMoment.id) : 0, liveMoment?.parentId); }}
             data-pattern-active={active} style={cellStyle}
