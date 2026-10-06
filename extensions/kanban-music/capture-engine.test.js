@@ -17,7 +17,8 @@ it('retains a fresh detected onset when future instrument work saturates the que
   f.analyser.getFloatFrequencyData = (array) => array.fill(-20);
   await vi.advanceTimersByTimeAsync(20);
   f.context.currentTime = 4; await vi.advanceTimersByTimeAsync(20);
-  expect(f.deps.onBeat).toHaveBeenCalledWith('saturated', expect.arrayContaining(['kick']));
+  expect(f.deps.onBeat).toHaveBeenCalledWith('saturated', expect.arrayContaining(['kick']), undefined,
+    expect.objectContaining({ targetOutputTime: expect.any(Number) }));
   engine.stop(); expect(vi.getTimerCount()).toBe(0);
 });
 it('keeps actual detection delivering through thirty minutes with long quiet sections', async () => {
@@ -78,7 +79,7 @@ it('traces lifecycle and detector delivery without changing the detected bands',
   for (const stage of ['CAPTURE_START', 'AUDIO_DETECTED', 'LOW_ENERGY', 'CAPTURE_RECOVERED', 'LEASE_RENEW', 'CAPTURE_STOP']) expect(log.counts[stage]).toBeGreaterThan(0);
   expect(log.records.filter((r) => r.id === traces[0].id).map((r) => r.stage)).toEqual(['EVENT_DETECTED', 'EVENT_QUEUED', 'EVENT_SENT']);
 });
-it('reports existing late-event drops and capture lease expiry', async () => {
+it('emits ahead of delayed playback while reporting expired queued work and capture leases', async () => {
   beatTelemetry.enable();
   const f = fixture(); let audioTime = 0;
   Object.defineProperty(f.context, 'currentTime', { get: () => audioTime });
@@ -87,10 +88,18 @@ it('reports existing late-event drops and capture lease expiry', async () => {
   await engine.start('stream', 'late'); await vi.advanceTimersByTimeAsync(450);
   f.analyser.getFloatFrequencyData = (array) => array.fill(-20);
   await vi.advanceTimersByTimeAsync(20);
-  expect(f.deps.onBeat).not.toHaveBeenCalled();
+  expect(f.deps.onBeat).toHaveBeenCalledOnce();
+  expect(f.deps.onBeat.mock.calls[0][3].targetOutputTime).toBeGreaterThan(Date.now() + 3000);
+  let notes;
+  const queued = createCaptureEngine({ ...f.deps, createInstrumentCapture: ({ onNotes }) => {
+    notes = onNotes; return instrument;
+  } });
+  await queued.start('stream', 'queued');
+  notes([{ time: 1, state: { active: true, level: .7, note: 1 } }]);
+  audioTime = 6; await vi.advanceTimersByTimeAsync(20);
+  queued.stop();
   audioTime = 4.2; await vi.advanceTimersByTimeAsync(20);
   expect(beatTelemetry.snapshot().records.some((r) => r.stage === 'EVENT_DROPPED' && r.reason === 'late')).toBe(true);
-  expect(f.deps.onBeat).not.toHaveBeenCalled();
   await vi.advanceTimersByTimeAsync(5600);
   expect(f.deps.onStop).toHaveBeenCalledWith('late', 'expired');
   expect(beatTelemetry.snapshot().counts.LEASE_EXPIRED).toBe(1);
@@ -168,7 +177,7 @@ it('does not label mixed tonal energy as an instrumental note without AI separat
   expect(vi.getTimerCount()).toBe(0);
 });
 
-it('schedules individual model notes on the delayed audio timeline and cancels them on stop', async () => {
+it('sends individual model notes ahead with preserved delayed deadlines and cancels queued work on stop', async () => {
   const f = fixture();
   const started = Date.now();
   Object.defineProperty(f.context, 'currentTime', { get: () => (Date.now() - started) / 1000 });
@@ -179,10 +188,10 @@ it('schedules individual model notes on the delayed audio timeline and cancels t
   await engine.start('stream', 'buffered');
   expect(f.source.connect.mock.calls.filter(([target]) => target === f.context.destination)).toHaveLength(0);
   publish([{ time: .1, state: { active: true, level: .7, note: 1 } }, { time: .19, state: { active: true, level: .8, note: 2 } }]);
-  await vi.advanceTimersByTimeAsync(3550);
-  expect(f.deps.onMelody.mock.calls.some(([, state]) => state.active)).toBe(false);
-  await vi.advanceTimersByTimeAsync(160);
-  expect(f.deps.onMelody.mock.calls.filter(([, state]) => state.active).map(([, state]) => state.note)).toEqual([1, 2]);
+  await vi.advanceTimersByTimeAsync(20);
+  const attacks = f.deps.onMelody.mock.calls.filter(([, state]) => state.active);
+  expect(attacks.map(([, state]) => state.note)).toEqual([1, 2]);
+  expect(attacks.map(([, , , timing]) => Math.round(timing.targetOutputTime - started))).toEqual([3600, 3690]);
   publish([{ time: 1, state: { active: true, level: .8, note: 3 } }]);
   engine.stop();
   await vi.advanceTimersByTimeAsync(1000);
@@ -204,7 +213,8 @@ it('leaves original audio connected when AI misses a note deadline', async () =>
   publish([{ time: 7, state: { active: true, level: .8, note: 2 } }]);
   f.context.currentTime = 10.5;
   await vi.advanceTimersByTimeAsync(20);
-  expect(f.deps.onMelody).toHaveBeenLastCalledWith('slow', { active: true, level: .8, note: 2 });
+  expect(f.deps.onMelody).toHaveBeenLastCalledWith('slow', { active: true, level: .8, note: 2 }, undefined,
+    expect.objectContaining({ targetOutputTime: expect.any(Number) }));
   engine.stop();
 });
 

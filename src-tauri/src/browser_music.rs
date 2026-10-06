@@ -50,6 +50,19 @@ fn beat_age(emitted_at: &Value, timestamp: u64) -> Option<u64> {
     (emitted_at <= timestamp + 100).then(|| timestamp.saturating_sub(emitted_at))
 }
 
+fn has_pending_target(value: &Value, timestamp: u64) -> bool {
+    let clock = &value["playbackClock"];
+    let Some(target) = value["targetPlaybackTime"].as_f64() else { return false; };
+    let (Some(position), Some(rate), Some(sampled)) =
+        (clock["currentTime"].as_f64(), clock["playbackRate"].as_f64(), clock["sampledAt"].as_f64())
+        else { return false; };
+    if clock["playing"] != true || clock["paused"] != false
+        || clock["buffering"] == true || clock["seeking"] == true || target < 0.0 || position < 0.0
+        || rate <= 0.0 || rate > 16.0 || sampled < 0.0 { return false; }
+    let deadline = sampled + (target - position) / rate * 1000.0;
+    deadline.is_finite() && deadline >= timestamp as f64 && deadline <= timestamp as f64 + 8000.0
+}
+
 fn allowed_origin(origin: &str) -> bool {
     origin
         .strip_prefix("chrome-extension://")
@@ -236,7 +249,7 @@ impl BrowserMusic {
                                             }
                                             // Bounded late delivery is coalesced in the UI. Older work
                                             // expires, with a renewal signal instead of silent starvation.
-                                            if age > 2000 {
+                                            if age > 2000 && !has_pending_target(&value, timestamp) {
                                                 if value["telemetry"].as_array().is_some_and(|traces| traces.len() <= 5) {
                                                     let _ = bridge.app.emit("native-beat-telemetry", json!({"stage":"EVENT_DROPPED","component":"native-widget-bridge","reason":"late","telemetry":value["telemetry"]}));
                                                 }
@@ -423,6 +436,21 @@ pub fn native_music_setup(app: AppHandle) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn accepts_early_targets_only_with_a_bounded_advancing_playback_clock() {
+        let mut event = json!({"targetPlaybackTime":11.0,"playbackClock":{
+            "currentTime":10.0,"sampledAt":10000,"playbackRate":1.0,"playing":true,"paused":false}});
+        assert!(has_pending_target(&event, 10_500));
+        assert!(!has_pending_target(&event, 11_001));
+        event["targetPlaybackTime"] = json!(19.0);
+        assert!(!has_pending_target(&event, 10_000));
+        event["targetPlaybackTime"] = json!(11.0);
+        event["playbackClock"]["buffering"] = json!(true);
+        assert!(!has_pending_target(&event, 10_500));
+        event["playbackClock"]["buffering"] = json!(false);
+        event["playbackClock"]["playbackRate"] = json!(0.0);
+        assert!(!has_pending_target(&event, 10_500));
+    }
     #[test]
     fn preserves_bounded_late_age_and_rejects_invalid_emission_times() {
         assert_eq!(beat_age(&json!(10_000), 10_000), Some(0));

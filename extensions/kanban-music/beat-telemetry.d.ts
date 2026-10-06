@@ -4,6 +4,7 @@ export interface BeatTrace {
   confidence: number | null; detectedAt: number; targetTime: number;
   targetClock: 'epoch-ms' | 'audio-seconds'; captureId?: string;
   active?: boolean; noteSequence?: number;
+  targetPlaybackTime?: number;
 }
 export interface BeatTelemetry {
   enable(value?: boolean): void; readonly enabled: boolean; clear(): void;

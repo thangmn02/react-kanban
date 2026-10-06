@@ -269,3 +269,44 @@ fabricated.
 
 See the [recovery report](../../plans/reports/diagnosis-261006-1659-beat-recovery.md)
 for tests and browser-validation limits.
+
+### Playback-clock scheduling
+
+New producers publish before their existing output deadlines. Events carry
+`targetPlaybackTime` in song seconds and a `playbackClock` anchor with actual
+`currentTime`, `playbackRate`, `sampledAt`, `playing` and `paused` values. Media
+watchers also report `seeking`, `buffering` and a seek `generation`. The same
+clock contract serves browser tab capture and native Windows monitoring;
+source ownership still comes from the selected subscription/capture IDs.
+
+`beat-timing.js` owns the normalization boundary: AudioContext output deadlines
+become epoch deadlines, then song timestamps using the selected media clock.
+If supported, browser output timestamps supply the output-clock mapping.
+Absent/invalid/throwing capabilities use sampled context time. Native monitor
+audio is not speaker output; its mapping is an estimate, with the existing
+capture buffering and optional AI offset retained. Future capture timestamps
+can improve this boundary without changing the UI scheduler or event schema.
+No new capture timestamp or mandatory model is introduced.
+
+The UI scheduler uses one timer, at most 2,048 events and an eight-second
+look-ahead horizon. It re-arms from fresh clock samples and rate changes.
+Pause, buffering, seeks, source/capture replacement and recovery flush pending
+work. Resumption rebuilds from fresh events; old anchors/generations do not
+replay. A clock missing for 3.5 seconds expires the queue and requests renewal.
+Transport retains its bounded recovery policy, but timely future targets can
+survive an older emission timestamp instead of being incorrectly coalesced.
+
+Events more than 600 ms past the media target drop and request throttled
+renewal; lesser lateness remains observable. Legacy companions without target
+timestamps retain arrival-based behavior; companions without explicit lifecycle
+flags use sampled-clock discontinuity detection. Malformed timestamps do not
+silently become immediate flashes. These are capability fallbacks, not new
+semantic detection sources.
+
+`EVENT_SCHEDULED` records target, projected playback position and queue depth.
+Existing event IDs survive scheduling. DOM and animation offsets use the latest
+clock mapping; earlier producer mappings remain in transport records. Tempo,
+onsets, envelope/lifecycle messages and decorative shapes stay distinct. The
+five-row/eight-cell renderer and its intentional masks/CSS delays are unchanged,
+so scheduler release, DOM commit and delayed animation start are separate
+measurements. Physical speaker/display latency is not inferred from DOM time.

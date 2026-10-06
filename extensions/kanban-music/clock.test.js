@@ -30,6 +30,17 @@ const command = (message) => {
   return reply;
 };
 
+it('marks small seeks explicitly and reports buffering independently of paused state', () => {
+  command({ kind: 'watch', index: 0, token: 'one' });
+  video.currentTime += .05; video.seeking = true; video.dispatchEvent(new Event('seeking'));
+  expect(send).toHaveBeenLastCalledWith(expect.objectContaining({ clock: expect.objectContaining({ generation: 1, seeking: true, playing: false }) }));
+  video.seeking = false; video.dispatchEvent(new Event('seeked'));
+  video.dispatchEvent(new Event('waiting'));
+  expect(send).toHaveBeenLastCalledWith(expect.objectContaining({ clock: expect.objectContaining({ buffering: true, paused: false, playing: false }) }));
+  video.playbackRate = 2; video.dispatchEvent(new Event('playing'));
+  expect(send).toHaveBeenLastCalledWith(expect.objectContaining({ clock: expect.objectContaining({ buffering: false, playing: true, playbackRate: 2 }) }));
+});
+
 it('reports the actual media clock, pauses immediately, and follows seeks', () => {
   command({ kind: 'watch', index: 0, token: 'one' });
   expect(send).toHaveBeenLastCalledWith(expect.objectContaining({ clock: expect.objectContaining({ currentTime: 12, playing: true }) }));

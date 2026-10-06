@@ -22,12 +22,14 @@ it('feeds real stereo PCM in bounded continuous blocks after model readiness', a
   expect(test.send.mock.calls[0][0].right[0]).toBeCloseTo(.3);
   expect(getNativeInstrumentStatus()).toBe('ready');
 });
-it('preserves attack spacing when a batch arrives late and clears pending notes on pause', async () => {
+it('sends a late batch ahead with preserved attack spacing and cancels its reserve on pause', async () => {
   vi.useFakeTimers(); setNativeInstrumentEnabled(true);
   const test = setup(); await Promise.resolve(); test.output.mockClear();
   test.callbacks.notes([0, .5, 1, 1.5].map((time, note) => ({time, state:{active:true,level:.8,note:note+1}})));
-  await vi.advanceTimersByTimeAsync(500); expect(test.output).toHaveBeenCalledTimes(1);
-  await vi.advanceTimersByTimeAsync(1000); expect(test.output).toHaveBeenCalledTimes(3);
+  expect(test.output).toHaveBeenCalledTimes(4);
+  const targets = test.output.mock.calls.map(([, , timing]) => timing.targetOutputTime);
+  expect(targets.map((at) => at - targets[0])).toEqual([0, 500, 1000, 1500]);
+  expect(targets[0]).toBeCloseTo(Date.now() + 500);
   instrument.stop(); test.output.mockClear();
   await vi.advanceTimersByTimeAsync(3000); expect(test.output).not.toHaveBeenCalled();
 });

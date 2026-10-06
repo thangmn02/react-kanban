@@ -13,20 +13,23 @@ vi.hoisted(() => { window.AnimationEvent ??= class extends Event {}; });
 
 afterEach(() => { cleanup(); beatTelemetry.enable(false); beatTelemetry.clear(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
-it('follows an actual detector event through sync, page transport, controller and CSS animation start', async () => {
+it('follows a timestamped detector event through scheduled delivery, DOM and animation start', async () => {
   vi.useFakeTimers(); beatTelemetry.enable();
-  const session = { id: 'song', title: '', artist: '', source: '', playing: true, paused: false, currentTime: 0, tabId: 1, documentId: 'music-doc' };
+  const started = Date.now(); let clockTimer;
+  const session = { id: 'song', title: '', artist: '', source: '', playing: true, paused: false, currentTime: 0,
+    sampledAt: started, playbackRate: 1, tabId: 1, documentId: 'music-doc' };
   const track = { readyState: 'live', stop: vi.fn(), addEventListener: vi.fn() };
   const stream = { getTracks: () => [track], getAudioTracks: () => [track], getVideoTracks: () => [] };
   let energy = -60, sync;
-  const context = { sampleRate: 44100, state: 'running', currentTime: 0, destination: {}, resume: async () => {}, close: async () => {},
+  const context = { sampleRate: 44100, state: 'running', get currentTime() { return (Date.now() - started) / 1000; },
+    baseLatency: .1, destination: {}, resume: async () => {}, close: async () => {},
     createMediaStreamSource: () => ({ connect() {}, disconnect() {} }),
     createAnalyser: () => ({ frequencyBinCount: 1024, disconnect() {}, getFloatFrequencyData: (values) => values.fill(energy) }) };
   const forward = (message) => sync.offscreen(message, { url: 'chrome-extension://companion/offscreen.html' });
   const engine = createCaptureEngine({ getUserMedia: async () => stream, createAudioContext: () => context, now: Date.now,
     onAudible: (captureId) => forward({ kind: 'audible', captureId }),
     onStop: (captureId, reason) => forward({ kind: 'stopped', captureId, reason }),
-    onBeat: (captureId, bands, telemetry) => forward({ kind: 'onset', captureId, bands, telemetry }),
+    onBeat: (captureId, bands, telemetry, timing) => forward({ kind: 'onset', captureId, bands, telemetry, ...timing }),
     onTempo() {}, onTempoTick() {}, onMelody() {} });
   const dispatch = (message) => window.dispatchEvent(new MessageEvent('message', { source: window, origin: location.origin,
     data: { ...message, channel: 'kanban-music-v1', direction: 'extension-event' } }));
@@ -37,7 +40,17 @@ it('follows an actual detector event through sync, page transport, controller an
       if (message.kind === 'stop') engine.stopCapture(message.captureId);
       return { ok: true };
     } },
-    tabs: { sendMessage: async (_, message) => { if (message.event === 'beat') dispatch(message); return { ok: true }; } },
+    tabs: { sendMessage: async (_, message) => {
+      if (message.event === 'beat') dispatch(message);
+      if (message.target === 'beat-clock' && message.kind === 'watch') {
+        clearInterval(clockTimer);
+        clockTimer = setInterval(() => sync.clock({ token: message.token, valid: true,
+          clock: { ...session, currentTime: (Date.now() - started) / 1000, sampledAt: Date.now() } },
+          { tab: { id: 1 }, documentId: 'music-doc' }), 50);
+      }
+      if (message.target === 'beat-clock' && message.kind === 'stop') clearInterval(clockTimer);
+      return { ok: true };
+    } },
     offscreen: { createDocument: async () => {}, closeDocument: async () => {} }, tabCapture: { getMediaStreamId: async () => 'stream' } };
   sync = createBeatSync(api);
   vi.spyOn(window, 'postMessage').mockImplementation((request) => {
@@ -54,6 +67,8 @@ it('follows an actual detector event through sync, page transport, controller an
   await act(async () => { await vi.advanceTimersByTimeAsync(0); });
   energy = -20;
   await act(async () => { await vi.advanceTimersByTimeAsync(20); });
+  expect(view.container.querySelector('[data-channel="drum"] .onset')).toBeNull();
+  await act(async () => { await vi.advanceTimersByTimeAsync(100); });
   await act(async () => { await vi.advanceTimersByTimeAsync(0); });
   const cell = view.container.querySelector('[data-channel="drum"] .onset');
   expect(cell).not.toBeNull();
@@ -61,7 +76,9 @@ it('follows an actual detector event through sync, page transport, controller an
   expect(id).toBeTruthy();
   fireEvent.animationStart(cell, { animationName: 'square-onset' });
   const trace = beatTelemetry.snapshot().records.filter((r) => r.id === id);
-  expect(trace.map((r) => r.stage)).toEqual(expect.arrayContaining(['EVENT_DETECTED', 'EVENT_QUEUED', 'EVENT_SENT', 'EVENT_RECEIVED', 'EVENT_ACCEPTED', 'EVENT_STATE_COMMITTED', 'EVENT_COMMITTED', 'EVENT_RENDERED']));
+  expect(trace.map((r) => r.stage)).toEqual(expect.arrayContaining(['EVENT_DETECTED', 'EVENT_QUEUED', 'EVENT_SENT', 'EVENT_RECEIVED', 'EVENT_SCHEDULED', 'EVENT_ACCEPTED', 'EVENT_STATE_COMMITTED', 'EVENT_COMMITTED', 'EVENT_RENDERED']));
+  expect(trace.find(r => r.stage === 'EVENT_SCHEDULED').targetPlaybackTime).toBeGreaterThan(.45);
+  expect(trace.find(r => r.stage === 'EVENT_STATE_COMMITTED').offsetMs).toBeLessThan(25);
   expect(trace.at(-1)).toMatchObject({ source: 'onset', type: 'kick', component: 'beat-renderer' });
   expect(view.container.querySelectorAll('[data-channel="melody"] .melody-beat-flash')).toHaveLength(0);
   energy = -Infinity;
@@ -69,6 +86,7 @@ it('follows an actual detector event through sync, page transport, controller an
   expect(track.stop).not.toHaveBeenCalled();
   energy = -20;
   await act(async () => { await vi.advanceTimersByTimeAsync(20); });
+  await act(async () => { await vi.advanceTimersByTimeAsync(100); });
   await act(async () => { await vi.advanceTimersByTimeAsync(0); });
   const resumed = view.container.querySelector('[data-channel="drum"] .onset');
   expect(resumed).not.toBeNull();
@@ -77,5 +95,5 @@ it('follows an actual detector event through sync, page transport, controller an
   expect(beatTelemetry.snapshot().records.filter((r) => r.id === resumed.dataset.beatTrace).map((r) => r.stage))
     .toEqual(expect.arrayContaining(['EVENT_DETECTED', 'EVENT_QUEUED', 'EVENT_SENT', 'EVENT_RECEIVED', 'EVENT_ACCEPTED', 'EVENT_STATE_COMMITTED', 'EVENT_COMMITTED', 'EVENT_RENDERED']));
   expect(beatTelemetry.snapshot().counts.CAPTURE_RECOVERED).toBeGreaterThan(0);
-  engine.stop(); await sync.stop();
+  engine.stop(); await sync.stop(); clearInterval(clockTimer);
 });

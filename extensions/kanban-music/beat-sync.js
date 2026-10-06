@@ -1,5 +1,6 @@
 const offscreenPath = 'offscreen.html';
 import { beatTelemetry, parseBeatTraces } from './beat-telemetry.js';
+import { audibleClock, playbackTiming, playbackTraces, parsePlaybackClock, clockDiscontinuity } from './beat-timing.js';
 const telemetry = beatTelemetry.at('beat-sync');
 const validBands = new Set(['kick', 'bass', 'clap', 'hat']);
 const sameOwner = (a, b) => a.native === b.native && a.tabId === b.tabId && a.documentId === b.documentId;
@@ -216,18 +217,16 @@ export function createBeatSync(api, nativePublish) {
       if (!current || sender.tab?.id !== current.session.tabId || sender.documentId !== current.session.documentId || message.token !== current.token) return;
       if (!message.valid) { publish(current, { kind: 'clock', clock: { ...current.clock, playing: false, paused: true } }); void stopIfCurrent(current); return; }
       const clock = message.clock;
-      if (!clock || !Number.isFinite(clock.currentTime) || clock.currentTime < 0 || !Number.isFinite(clock.playbackRate)
-        || !Number.isFinite(clock.sampledAt) || typeof clock.playing !== 'boolean' || typeof clock.paused !== 'boolean') return;
+      if (!parsePlaybackClock(clock) || current.clock && clock.sampledAt < current.clock.sampledAt) return;
       const resumed = (!current.clock?.playing || current.clock?.muted) && clock.playing && !clock.muted;
       const previous = current.clock;
-      const elapsed = previous ? Math.max(0, (clock.sampledAt - previous.sampledAt) / 1000) : 0;
-      const discontinuity = previous?.playing && clock.playing &&
-        (Math.abs(clock.currentTime - previous.currentTime - elapsed * previous.playbackRate) > .75 || previous.playbackRate !== clock.playbackRate);
+      const discontinuity = clockDiscontinuity(previous, clock)
+        || previous?.playing && clock.playing && previous.playbackRate !== clock.playbackRate;
       current.clock = clock;
       telemetry.record('EVENT_RECEIVED', undefined, { captureId: current.captureId });
       if (resumed) current.retryAt = 0;
       if (discontinuity) { current.retryAt = 0; cancelCapture(current); }
-      publish(current, { kind: 'clock', clock: { ...clock, currentTime: Math.max(0, clock.currentTime - (clock.playing ? (current.delaySeconds || 0) * clock.playbackRate : 0)) } });
+      publish(current, { kind: 'clock', clock: audibleClock(clock, clock.playing ? current.delaySeconds || 0 : 0) || clock });
       if (!clock.playing || clock.muted || current.tabMuted) cancelCapture(current);
       else void capture(current);
     },
@@ -238,7 +237,9 @@ export function createBeatSync(api, nativePublish) {
       telemetry.mark('EVENT_RECEIVED', trace);
       // Carry only the allowlisted diagnostic envelope. Beat validation below
       // remains independent of telemetry validity or whether tracing is enabled.
-      const diagnostic = trace ? { telemetry: trace } : {};
+      const timing = playbackTiming(current.clock, message, current.delaySeconds || 0);
+      const mapped = playbackTraces(trace, timing, message.targetOutputTime);
+      const diagnostic = { ...(mapped ? { telemetry: mapped } : {}), ...(timing || {}) };
       let delivered = false;
       if (message.kind === 'audible') {
         current.audioDetected = true;

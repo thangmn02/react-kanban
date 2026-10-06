@@ -2,13 +2,14 @@
 const stages = new Set(['CAPTURE_START', 'CAPTURE_STOP', 'AUDIO_DETECTED', 'LOW_ENERGY',
   'LEASE_RENEW', 'LEASE_EXPIRED', 'CAPTURE_RECOVERED', 'EVENT_DETECTED', 'EVENT_QUEUED',
   'EVENT_SENT', 'EVENT_RECEIVED', 'EVENT_LATE', 'EVENT_DROPPED', 'EVENT_ACCEPTED',
-  'EVENT_STATE_COMMITTED', 'EVENT_COMMITTED', 'EVENT_RENDERED', 'ANALYSIS_FRAME', 'WORKER_BATCH']);
+  'EVENT_STATE_COMMITTED', 'EVENT_COMMITTED', 'EVENT_RENDERED', 'EVENT_SCHEDULED', 'ANALYSIS_FRAME', 'WORKER_BATCH']);
 const sources = new Set(['onset', 'tempo', 'random', 'lifecycle']);
 const types = new Set(['kick', 'snare', 'hat', 'bass', 'melodic', 'generic']);
 const components = new Set(['capture-engine', 'offscreen', 'beat-sync', 'widget-bridge',
   'instrument-worker', 'instrument-runtime', 'native-instrument', 'native-audio-engine',
   'native-audio-feed', 'media-bridge', 'beat-controller', 'beat-renderer']);
 components.add('native-capture'); components.add('native-widget-bridge');
+components.add('beat-scheduler');
 const reasons = new Set(['replaced', 'stopped', 'failed', 'expired', 'silent', 'ended',
   'reconfigured', 'queue-full', 'late', 'owner', 'sequence', 'debounce', 'invalid',
   'not-playing', 'sync-stale', 'clock-disconnected', 'audio-backlog', 'transport',
@@ -16,6 +17,8 @@ const reasons = new Set(['replaced', 'stopped', 'failed', 'expired', 'silent', '
   'renderer-mask', 'capture-disconnected', 'native-capture-unavailable', 'track-changed',
   'muted', 'native-override', 'clock', 'starting', 'audio-context-stalled']);
 reasons.add('delivery-late'); reasons.add('delivery-coalesced');
+reasons.add('schedule-reset'); reasons.add('schedule-late'); reasons.add('clock-stale');
+reasons.add('buffering');
 reasons.add('tempo-selected');
 const finite = (n) => typeof n === 'number' && Number.isFinite(n);
 const opaque = (s) => typeof s === 'string' && /^[a-zA-Z0-9:_-]{1,160}$/.test(s);
@@ -34,6 +37,7 @@ export function parseBeatTraces(value) {
         detectedAt: t.detectedAt, targetTime: t.targetTime, targetClock: t.targetClock,
         ...(typeof t.active === 'boolean' ? { active: t.active } : {}),
         ...(Number.isSafeInteger(t.noteSequence) && t.noteSequence >= 0 ? { noteSequence: t.noteSequence } : {}),
+        ...(finite(t.targetPlaybackTime) && t.targetPlaybackTime >= 0 ? { targetPlaybackTime: t.targetPlaybackTime } : {}),
         ...(opaque(t.captureId) ? { captureId: t.captureId } : {}) });
     }
     return result;
@@ -55,14 +59,16 @@ export function createBeatTelemetry({ now = Date.now, limit = 2048 } = {}) {
         const safe = trace ? parseBeatTraces([trace])?.[0] : undefined;
         const time = now();
         const entry = { stage, at: time, ...safe };
+        if (safe?.targetClock === 'epoch-ms') entry.offsetMs = time - safe.targetTime;
         if (components.has(details.component)) entry.component = details.component;
-        for (const key of ['queueDepth', 'sequence', 'frames', 'audioTime', 'delayMs', 'durationMs']) {
+        for (const key of ['queueDepth', 'sequence', 'frames', 'audioTime', 'delayMs', 'durationMs', 'targetPlaybackTime', 'playbackTime', 'offsetMs']) {
           if (finite(details[key])) entry[key] = details[key];
         }
         if (opaque(details.captureId)) entry.captureId = details.captureId;
         if (opaque(details.parentId)) entry.parentId = details.parentId;
         if (reasons.has(details.reason)) entry.reason = details.reason;
         if (stage === 'EVENT_SENT') entry.emittedAt = time;
+        if (stage === 'EVENT_COMMITTED' || stage === 'EVENT_STATE_COMMITTED') entry.committedAt = time;
         if (stage === 'EVENT_RENDERED') entry.renderedAt = time;
         records[write] = entry; write = (write + 1) % capacity;
         if (size < capacity) size++; else evicted++;

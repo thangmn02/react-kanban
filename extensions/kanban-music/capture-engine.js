@@ -1,6 +1,7 @@
 import { BeatDetector } from './beat-detector.js';
 import { TempoTracker } from './tempo-tracker.js';
 import { beatTelemetry } from './beat-telemetry.js';
+import { outputTiming } from './beat-timing.js';
 const telemetry = beatTelemetry.at('capture-engine');
 
 // Chrome's documented offscreen recipe uses both constraints with the same ID.
@@ -169,7 +170,9 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
         if (tempoLocked && rhythm.tick) enqueue('tick', rhythm.tick);
         if (state.lastMelody === undefined) { state.lastMelody = time; onMelody(captureId, { active: false, level: 0, note: 0 }); }
         const audioTime = state.context.currentTime ?? time / 1000;
-        while (state.events[0]?.at <= audioTime) {
+        // Send ahead of the existing audio deadline. The UI owns timed release;
+        // this bounded queue still protects work awaiting the sampling callback.
+        while (state.events.length) {
           const event = state.events.shift();
           if (audioTime - event.at > .6) { telemetry.mark('EVENT_LATE', event.telemetry, { delayMs: (audioTime - event.at) * 1000 }); telemetry.mark('EVENT_DROPPED', event.telemetry, { reason: 'late' }); state.recoveryReason = 'late'; continue; }
           if (state.recoveryReason) {
@@ -177,7 +180,8 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
             state.recoveryReason = undefined;
           }
           telemetry.mark('EVENT_SENT', event.telemetry, { audioTime, delayMs: (audioTime - event.at) * 1000 });
-          const metadata = event.telemetry ? [event.telemetry] : [];
+          const timing = outputTiming(state.context, event.at, monitorOnly);
+          const metadata = timing ? [event.telemetry, timing] : event.telemetry ? [event.telemetry] : [];
           if (event.kind === 'beat') onBeat(captureId, event.payload, ...metadata);
           if (event.kind === 'tempo') onTempo(captureId, event.payload, ...metadata);
           if (event.kind === 'tick') onTempoTick(captureId, event.payload, ...metadata);

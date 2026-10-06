@@ -15,6 +15,25 @@ vi.mock('./mediaBridge', () => ({
 beforeEach(() => { vi.useFakeTimers(); bridge.send.mockResolvedValue(undefined); });
 afterEach(() => { cleanup(); beatTelemetry.enable(false); beatTelemetry.clear(); vi.useRealTimers(); vi.clearAllMocks(); });
 const emit = (event: BeatEvent) => act(() => { bridge.receive?.(event); });
+it('cancels scheduled flashes on capture expiry and selected-source replacement', async () => {
+  const onClock = vi.fn();
+  const { result, rerender } = renderHook(({ source }) => useMusicBeatSync(source, onClock), { initialProps: { source: 'song' } });
+  const clock = () => ({ currentTime: 10, sampledAt: Date.now(), playbackRate: 1, playing: true, paused: false });
+  const note = (captureId: string): BeatEvent => ({ kind: 'onset', captureId, sequence: 1, bands: ['kick'],
+    targetPlaybackTime: 10.5, playbackClock: clock() });
+  emit({ kind: 'sync.state', mode: 'capture', captureId: 'old' }); emit(note('old'));
+  emit({ kind: 'sync.state', mode: 'clock', reason: 'expired' });
+  emit({ kind: 'sync.state', mode: 'capture', captureId: 'new' }); emit(note('new'));
+  await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+  expect(result.current.onsets).toEqual({ kick: 1 });
+  emit({ kind: 'onset', captureId: 'new', sequence: 2, bands: ['hat'], targetPlaybackTime: 11, playbackClock: clock() });
+  rerender({ source: 'other-song' });
+  await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+  expect(result.current.onsets).toEqual({});
+  emit({ kind: 'sync.state', mode: 'capture', captureId: 'other' }); emit(note('other'));
+  await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+  expect(result.current.onsets).toEqual({ kick: 1 });
+});
 it('uses tempo only as structural timing and renews on explicit delivery recovery', async () => {
   const onClock = vi.fn();
   const { result } = renderHook(() => useMusicBeatSync('song', onClock));

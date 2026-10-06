@@ -61,14 +61,16 @@ export function createNativeInstrument(onMelody, workerFactory = createInstrumen
             events.forEach((event) => telemetry.mark('EVENT_DROPPED', parseBeatTraces(event.telemetry), { reason: 'queue-full', queueDepth: timers.size })); fail(); return;
           }
           for (const event of events) {
+            const targetOutputTime = Date.now() + (event.time + offset - now) * 1000;
             const traces = parseBeatTraces(event.telemetry)?.map((trace) => ({ ...trace,
-              targetTime: Date.now() + (event.time + offset - now) * 1000, targetClock: 'epoch-ms' }));
+              targetTime: targetOutputTime, targetClock: 'epoch-ms' }));
             telemetry.mark('EVENT_QUEUED', traces, { queueDepth: timers.size + 1 });
+            telemetry.mark('EVENT_SENT', traces);
+            onMelody(event.state, traces, { targetOutputTime });
+            // Reserve accounting only; the UI now owns timed visual delivery.
             const timer = setTimeout(() => {
               timers.delete(timer);
               pendingTraces.delete(timer);
-              if (request === generation) { telemetry.mark('EVENT_SENT', traces); onMelody(event.state, ...(traces ? [traces] : [])); }
-              else telemetry.mark('EVENT_DROPPED', traces, { reason: 'owner' });
             }, Math.max(0, (event.time + offset - now) * 1000));
             timers.add(timer);
             if (traces) pendingTraces.set(timer, traces);

@@ -4,6 +4,23 @@ import { beatTelemetry } from '../../../extensions/kanban-music/beat-telemetry.j
 
 afterEach(() => { beatTelemetry.enable(false); beatTelemetry.clear(); vi.restoreAllMocks(); vi.useRealTimers(); vi.unstubAllEnvs(); });
 const session = { id: '1', title: 'Song', artist: 'Artist', source: 'youtube.com', paused: true };
+it('preserves queued future targets despite old transport timestamps and rejects malformed anchors', () => {
+  vi.useFakeTimers(); beatTelemetry.enable();
+  const receive = vi.fn(), stop = subscribeBeatEvents('song', 'subscription', receive);
+  const playbackClock = { currentTime: 10, sampledAt: Date.now(), playbackRate: 1, playing: true, paused: false };
+  const send = (sequence: number, timing: object) => window.dispatchEvent(new MessageEvent('message', { source: window, origin: location.origin,
+    data: { channel: 'kanban-music-v1', direction: 'extension-event', event: 'beat', sessionId: 'song', subscriptionId: 'subscription',
+      kind: 'onset', bands: ['kick'], captureId: 'capture', sequence, emittedAt: Date.now() - 3000,
+      telemetry: beatTelemetry.events('onset', ['kick']), ...timing } }));
+  send(1, { targetPlaybackTime: 11, playbackClock });
+  send(2, { targetPlaybackTime: 11.5, playbackClock });
+  expect(receive.mock.calls.map(([event]) => event.targetPlaybackTime)).toEqual([11, 11.5]);
+  send(3, { targetPlaybackTime: 12, playbackClock: { ...playbackClock, playbackRate: 0 } });
+  expect(receive).toHaveBeenCalledTimes(2);
+  expect(beatTelemetry.snapshot().counts.EVENT_LATE).toBe(2);
+  expect(beatTelemetry.snapshot().records.some(r => r.reason === 'invalid')).toBe(true);
+  stop();
+});
 it('coalesces bounded late bursts, traces rejected work and requests recovery for expired delivery', async () => {
   vi.useFakeTimers(); beatTelemetry.enable();
   const receive = vi.fn(), stop = subscribeBeatEvents('song', 'subscription', receive);

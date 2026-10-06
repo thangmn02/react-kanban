@@ -47,16 +47,22 @@ const receive = (message, sender, respond) => {
   }
   const media = document.querySelectorAll('audio,video')[message.index];
   if (!media) { respond({ ok: false }); return false; }
-  const state = { token: message.token, leaseUntil: Date.now() + 6000,
+  const state = { token: message.token, leaseUntil: Date.now() + 6000, generation: 0, buffering: false,
     events: ['play', 'playing', 'pause', 'waiting', 'seeking', 'seeked', 'ended', 'emptied', 'ratechange', 'volumechange'] };
-  state.report = () => {
+  state.report = (event) => {
     if (watcher !== state) return;
     if (Date.now() > state.leaseUntil) { stopClock(); return; }
+    if (event?.target === media) {
+      if (event.type === 'seeking' || event.type === 'emptied') state.generation++;
+      if (event.type === 'waiting') state.buffering = true;
+      if (event.type === 'playing' || event.type === 'seeked') state.buffering = false;
+    }
     const valid = media.isConnected && document.querySelectorAll('audio,video')[message.index] === media && Boolean(media.currentSrc || media.srcObject?.id) && !media.ended;
     void chrome.runtime.sendMessage({ target: 'beat-worker', kind: 'clock', token: state.token, valid,
       clock: { currentTime: Number.isFinite(media.currentTime) ? media.currentTime : 0,
         playbackRate: media.playbackRate, sampledAt: Date.now(), paused: media.paused,
-        playing: valid && !media.paused && !media.seeking && media.readyState >= 3,
+        playing: valid && !media.paused && !media.seeking && !state.buffering && media.readyState >= 3,
+        seeking: media.seeking, buffering: state.buffering || media.readyState < 3, generation: state.generation,
         muted: media.muted || media.volume === 0, protectedMedia: Boolean(media.mediaKeys) } }).catch(() => { if (watcher === state) stopClock(); });
     if (!valid) stopClock();
   };

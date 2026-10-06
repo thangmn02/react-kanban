@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { sendBeatRequest, subscribeBeatEvents, type BeatBand, type MusicClock, type MelodyState } from './mediaBridge';
+import { sendBeatRequest, subscribeBeatEvents, type BeatBand, type BeatEvent, type MusicClock, type MelodyState } from './mediaBridge';
 import { beatTelemetry, type BeatTrace } from '../../../extensions/kanban-music/beat-telemetry.js';
+import { createBeatScheduler } from './beat-scheduler';
+import { clockAdvancing } from '../../../extensions/kanban-music/beat-timing.js';
 const telemetry = beatTelemetry.at('beat-controller');
 
 export interface MusicBeatState {
@@ -51,7 +53,13 @@ export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessio
       });
       return result;
     };
-    const unsubscribe = subscribeBeatEvents(sessionId, subscriptionId, (event) => {
+    const retired = new Set<string>();
+    const retireCapture = () => {
+      if (captureId) retired.add(captureId);
+      if (retired.size > 16) retired.delete(retired.values().next().value!);
+    };
+    const scheduler = createBeatScheduler(receive, () => { void renew(); });
+    function receive(event: BeatEvent) {
       const drop = (reason: string) => telemetry.mark('EVENT_DROPPED', event.telemetry, { reason });
       const accepted = (bands?: BeatBand[]) => telemetry.mark('EVENT_ACCEPTED', event.telemetry?.filter((t) => !bands || bands.some((b) => (b === 'clap' ? 'snare' : b === 'melody' ? 'melodic' : b) === t.type)));
       const diagnostic = (current: MusicBeatState, bands?: BeatBand[]) => {
@@ -70,11 +78,14 @@ export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessio
       if (cancelled) { drop('owner'); return; }
       if (event.kind === 'sync.recover') { void renew(); return; }
       if (event.kind === 'clock') {
-        onClock(sessionId, event.clock);
-        if (!event.clock.playing) {
+        const discontinuity = scheduler.clock(event.clock);
+        onClock(selectedSessionId, event.clock);
+        if (!clockAdvancing(event.clock) || discontinuity) {
+          retireCapture();
           liveMode = 'clock';
           clearRates();
-          setState({ sessionId, mode: 'clock', reason: 'not-playing', onsets: {} });
+          clearTimeout(melodyLease);
+          setState({ sessionId: selectedSessionId, mode: 'clock', reason: discontinuity ? 'track-changed' : 'not-playing', onsets: {} });
         }
         return;
       }
@@ -139,7 +150,7 @@ export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessio
       // Clock messages alone cannot keep a dead capture looking live.
       lastLiveState = Date.now();
       setState((previous) => {
-        const current = previous.sessionId === sessionId ? previous : { sessionId, mode: 'clock' as const, onsets: {} };
+        const current: MusicBeatState = previous.sessionId === selectedSessionId ? previous : { sessionId: selectedSessionId, mode: 'clock', onsets: {} };
         if (event.kind === 'sync.state') return {
           ...current, mode: event.mode, reason: event.reason, captureId: event.captureId,
           onsets: current.mode === event.mode && current.captureId === event.captureId ? current.onsets : {},
@@ -156,6 +167,28 @@ export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessio
         const acceptedTraces = diagnostic(current, acceptedBands);
         return { ...current, onsets, rates: rates(Date.now()), ...acceptedTraces };
       });
+    }
+    const unsubscribe = subscribeBeatEvents(sessionId, subscriptionId, (event) => {
+      if (event.kind === 'clock') { receive(event); return; }
+      if (event.kind === 'sync.state') {
+        if (event.mode === 'capture' && event.captureId && retired.has(event.captureId)) {
+          telemetry.mark('EVENT_DROPPED', event.telemetry, { reason: 'owner' }); return;
+        }
+        if (event.captureId !== captureId || event.mode !== liveMode) {
+          retireCapture(); scheduler.reset('schedule-reset', true);
+        }
+        receive(event); return;
+      }
+      if (event.kind === 'sync.recover') { scheduler.reset('schedule-reset'); receive(event); return; }
+      if (liveMode !== 'capture' || event.captureId !== captureId) {
+        telemetry.mark('EVENT_DROPPED', event.telemetry, { reason: 'owner' }); return;
+      }
+      lastLiveState = Date.now();
+      if (event.kind === 'melody.state' && event.melody.note === 0 && !event.melody.active && event.targetPlaybackTime === undefined) {
+        // Model disable/restart cancels its pending notes, never the drum rows.
+        scheduler.cancelKind('melody.state');
+      }
+      scheduler.enqueue(event);
     });
     async function renew() {
       if (renewing || cancelled) return;
@@ -169,6 +202,7 @@ export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessio
     }
     const stop = () => {
       cancelled = true;
+      scheduler.reset('stopped', true);
       clearTimeout(melodyLease);
       clearInterval(interval);
       clearInterval(watchdog);
@@ -178,6 +212,7 @@ export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessio
     const watchdog = setInterval(() => {
       if (Date.now() - lastLiveState <= 3500) return;
       telemetry.record('LEASE_EXPIRED', undefined, { captureId, reason: 'sync-stale' });
+      scheduler.reset('sync-stale', true);
       liveMode = 'clock';
       clearRates();
       setState((current) => current.mode === 'clock' && current.reason === 'sync-stale' ? current

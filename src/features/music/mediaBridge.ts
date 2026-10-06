@@ -1,6 +1,7 @@
 import { isNativeWidget } from '../native/runtime';
 import { requestNativeMusic, subscribeNativeMusic } from '../native/nativeMusic';
 import { beatTelemetry, parseBeatTraces, type BeatTrace } from '../../../extensions/kanban-music/beat-telemetry.js';
+import { parsePlaybackTiming, parsePlaybackClock, playbackDeadline, type PlaybackTiming, type PlaybackClock } from '../../../extensions/kanban-music/beat-timing.js';
 const telemetry = beatTelemetry.at('media-bridge');
 
 export interface BrowserMusicSession {
@@ -24,13 +25,7 @@ export interface BrowserMusicSession {
   syncState?: { mode: 'clock' | 'capture'; reason?: string; captureId?: string };
 }
 
-export interface MusicClock {
-  playing: boolean;
-  paused: boolean;
-  currentTime: number;
-  playbackRate: number;
-  sampledAt: number;
-}
+export type MusicClock = PlaybackClock;
 export type BeatBand = 'kick' | 'clap' | 'hat' | 'bass' | 'melody';
 export interface MelodyState { active: boolean; level: number; note: number }
 export type BeatEvent = ({ kind: 'clock'; clock: MusicClock }
@@ -39,7 +34,7 @@ export type BeatEvent = ({ kind: 'clock'; clock: MusicClock }
   | { kind: 'onset'; bands: BeatBand[]; captureId?: string; sequence?: number }
   | { kind: 'melody.state'; captureId: string; melody: MelodyState }
   | { kind: 'tempo.state'; captureId: string; tempo: { locked: boolean; bpm: number | null; confidence: number } }
-  | { kind: 'tempo.tick'; captureId: string; tick: { step: number; phase: number; beatPosition: number; subdivision: 2 } }) & { telemetry?: BeatTrace[] };
+  | { kind: 'tempo.tick'; captureId: string; tick: { step: number; phase: number; beatPosition: number; subdivision: 2 } }) & { telemetry?: BeatTrace[] } & Partial<PlaybackTiming>;
 
 const channel = 'kanban-music-v1';
 const supportedBands = ['kick', 'clap', 'hat', 'bass', 'melody', 'snare'];
@@ -178,23 +173,29 @@ export function subscribeBeatEvents(sessionId: string, subscriptionId: string, c
     if (message.sessionId !== sessionId || message.subscriptionId !== subscriptionId) { telemetry.mark('EVENT_DROPPED', traces, { reason: 'owner' }); return; }
     if (!native && (message.channel !== channel || message.direction !== 'extension-event' || message.event !== 'beat')) return;
     const age = Date.now() - message.emittedAt;
+    const timing = parsePlaybackTiming(message);
+    if ((message.targetPlaybackTime !== undefined || message.playbackClock !== undefined) && !timing) {
+      telemetry.mark('EVENT_DROPPED', traces, { reason: 'invalid' }); return;
+    }
+    const deadline = timing ? playbackDeadline(timing) : undefined;
+    const ahead = deadline !== undefined && deadline >= Date.now() && deadline - Date.now() <= 8000;
     if (native && (typeof message.emittedAt !== 'number' || !Number.isFinite(message.emittedAt)
       || message.emittedAt > Date.now() + 100)) { telemetry.mark('EVENT_DROPPED', traces, { reason: 'invalid' }); return; }
     const late = (native || Number.isFinite(message.emittedAt)) && age > 600;
     if (late) telemetry.mark('EVENT_LATE', traces, { delayMs: age });
-    if (late && age > 2000) { telemetry.mark('EVENT_DROPPED', traces, { reason: 'late' }); recover(); return; }
+    if (late && age > 2000 && !ahead) { telemetry.mark('EVENT_DROPPED', traces, { reason: 'late' }); recover(); return; }
     telemetry.mark('EVENT_RECEIVED', traces);
     let delivered = false;
     const receive = (event: BeatEvent) => {
       delivered = true;
-      const value = { ...event, ...(traces ? { telemetry: traces } : {}) };
+      const value = { ...event, ...(traces ? { telemetry: traces } : {}), ...(timing || {}) };
       const timestamp = Number.isFinite(message.emittedAt) ? message.emittedAt : Date.now();
-      if (timestamp < (latestAt.get(event.kind) ?? -Infinity)) { telemetry.mark('EVENT_DROPPED', traces, { reason: 'delivery-coalesced' }); return; }
+      if (!ahead && timestamp < (latestAt.get(event.kind) ?? -Infinity)) { telemetry.mark('EVENT_DROPPED', traces, { reason: 'delivery-coalesced' }); return; }
       latestAt.set(event.kind, timestamp);
       const previous = delayed.get(event.kind);
       if (previous) telemetry.mark('EVENT_DROPPED', previous.event.telemetry, { reason: 'delivery-coalesced' });
       delayed.delete(event.kind);
-      if (late) {
+      if (late && !ahead) {
         delayed.set(event.kind, { event: value, expiresAt: timestamp + 2000 });
         pending ??= setTimeout(flush, 0);
       } else {
@@ -235,9 +236,8 @@ export function subscribeBeatEvents(sessionId: string, subscriptionId: string, c
         tick: { step: message.tick.step, phase: message.tick.phase, beatPosition: message.tick.beatPosition, subdivision: 2 },
       });
     if (message.kind === 'clock') {
-      const clock = message.clock;
-      if (clock && typeof clock.playing === 'boolean' && typeof clock.paused === 'boolean'
-        && ['currentTime', 'playbackRate', 'sampledAt'].every((key) => typeof clock[key] === 'number' && Number.isFinite(clock[key]) && clock[key] >= 0)) receive({ kind: 'clock', clock });
+      const clock = parsePlaybackClock(message.clock);
+      if (clock) receive({ kind: 'clock', clock });
     }
     if (!delivered) telemetry.mark('EVENT_DROPPED', traces, { reason: 'invalid' });
   };

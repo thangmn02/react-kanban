@@ -82,9 +82,17 @@ it('relays a detached player clock, pause/resume and seek through the isolated w
   media.dispatchEvent(new Event('pause'));
   expect(send).toHaveBeenLastCalledWith(expect.objectContaining({ clock: expect.objectContaining({ playing: false, paused: true }) }));
   media.paused = false;
+  media.seeking = true;
+  media.currentTime += .05;
+  media.dispatchEvent(new Event('seeking'));
+  expect(send).toHaveBeenLastCalledWith(expect.objectContaining({ clock: expect.objectContaining({ generation: 1, seeking: true, playing: false }) }));
+  media.seeking = false;
   media.currentTime = 45;
   media.dispatchEvent(new Event('seeked'));
   expect(send).toHaveBeenLastCalledWith(expect.objectContaining({ clock: expect.objectContaining({ playing: true, currentTime: 45 }) }));
+  media.dispatchEvent(new Event('waiting'));
+  expect(send).toHaveBeenLastCalledWith(expect.objectContaining({ clock: expect.objectContaining({ buffering: true, playing: false, paused: false }) }));
+  media.dispatchEvent(new Event('playing'));
   await vi.advanceTimersByTimeAsync(5000);
   command({ kind: 'lease', token: 'selected' });
   await vi.advanceTimersByTimeAsync(2000);

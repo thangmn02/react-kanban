@@ -29,7 +29,7 @@ export function createNativeAudioEngine(options) {
         await new Promise((resolve) => setTimeout(resolve, 20));
       }
       ready = live && request === generation && context.state === 'running';
-      if (ready) instrument = createNativeInstrument((state, traces) => options.onMelody?.(id, state, ...(traces ? [traces] : [])));
+      if (ready) instrument = createNativeInstrument((state, traces, timing) => options.onMelody?.(id, state, traces, timing));
       return ready;
     },
     push(samples, diagnostic) {

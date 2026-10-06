@@ -8,16 +8,16 @@ beatTelemetry.enable(settings.beatTelemetryEnabled === true);
 let instrumentEnabled = settings.instrumentNotesEnabled === true;
 
 const send = (message) => { telemetry.mark('EVENT_SENT', message.telemetry); void chrome.runtime.sendMessage({ target: 'beat-worker', ...message }).catch(() => { telemetry.mark('EVENT_DROPPED', message.telemetry, { reason: 'transport' }); }); };
-const metadata = (telemetry) => telemetry ? { telemetry } : {};
+const metadata = (telemetry, timing) => ({ ...(telemetry ? { telemetry } : {}), ...(timing || {}) });
 const engine = createCaptureEngine({
   getUserMedia: (constraints) => navigator.mediaDevices.getUserMedia(constraints),
   createAudioContext: () => new AudioContext({ sampleRate: 44100 }),
   createInstrumentCapture: (options) => instrumentEnabled ? prepareInstrumentCapture(options) : null,
   onInstrumentFailure: (message) => { void chrome.storage.local.set({ instrumentNotesError: message }); },
-  onBeat: (captureId, bands, trace) => send({ kind: 'onset', captureId, bands, ...metadata(trace) }),
-  onTempo: (captureId, tempo, trace) => send({ kind: 'tempo.state', captureId, tempo, ...metadata(trace) }),
-  onTempoTick: (captureId, tick, trace) => send({ kind: 'tempo.tick', captureId, tick, ...metadata(trace) }),
-  onMelody: (captureId, melody, trace) => send({ kind: 'melody.state', detector: 'instrument-v1', captureId, melody, ...metadata(trace) }),
+  onBeat: (captureId, bands, trace, timing) => send({ kind: 'onset', captureId, bands, ...metadata(trace, timing) }),
+  onTempo: (captureId, tempo, trace, timing) => send({ kind: 'tempo.state', captureId, tempo, ...metadata(trace, timing) }),
+  onTempoTick: (captureId, tick, trace, timing) => send({ kind: 'tempo.tick', captureId, tick, ...metadata(trace, timing) }),
+  onMelody: (captureId, melody, trace, timing) => send({ kind: 'melody.state', detector: 'instrument-v1', captureId, melody, ...metadata(trace, timing) }),
   onAudible: (captureId) => send({ kind: 'audible', captureId }),
   onStop: (captureId, reason) => send({ kind: 'stopped', captureId, reason }),
 });

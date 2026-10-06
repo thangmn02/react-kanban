@@ -1,6 +1,7 @@
 import { Channel, invoke } from '@tauri-apps/api/core';
 import { createNativeAudioEngine, type NativeAudioEngine } from '../../../extensions/kanban-music/native-audio-engine.js';
 import { beatTelemetry, parseBeatTraces, type BeatTrace } from '../../../extensions/kanban-music/beat-telemetry.js';
+import { playbackTiming, playbackTraces, parsePlaybackTiming, parsePlaybackClock, clockDiscontinuity, clockAdvancing, playbackDeadline, type OutputTiming, type PlaybackClock } from '../../../extensions/kanban-music/beat-timing.js';
 const telemetry = beatTelemetry.at('native-audio-feed');
 
 type Message = Record<string, unknown>;
@@ -8,7 +9,7 @@ interface Subscription {
   sessionId: string; subscriptionId: string; playing: boolean; clockAt: number;
   captureId?: string; engine?: NativeAudioEngine; starting?: boolean; audible?: boolean;
   sequence: number; beatSequence: number; retryAt: number; heartbeat?: ReturnType<typeof setInterval>;
-  previousClock?: { currentTime: number; playbackRate: number; sampledAt: number };
+  previousClock?: PlaybackClock;
   recoveryReason?: string;
 }
 
@@ -48,13 +49,17 @@ export function createNativeAudioFeed(publish: (message: Message) => void) {
     telemetry.record('CAPTURE_START', undefined, { captureId: owner.captureId });
     owner.sequence = 0; owner.beatSequence = 0;
     const id = owner.captureId;
-    const diagnostic = (traces?: BeatTrace[]) => traces ? { telemetry: traces.map((trace) => ({ ...trace, captureId: id })) } : {};
+    const diagnostic = (traces?: BeatTrace[], output?: OutputTiming) => {
+      const timing = owner.previousClock && playbackTiming(owner.previousClock, output);
+      const mapped = playbackTraces(traces, timing || undefined, output?.targetOutputTime);
+      return { ...(mapped ? { telemetry: mapped.map((trace) => ({ ...trace, captureId: id })) } : {}), ...(timing || {}) };
+    };
     emit(owner, { kind: 'sync.state', mode: 'clock', reason: 'starting' });
     const engine = createNativeAudioEngine({
-      onBeat: (_, bands, traces) => { if (owner.captureId === id) emit(owner, { kind: 'onset', bands, sequence: ++owner.beatSequence, ...diagnostic(traces) }); },
-      onTempo: (_, tempo, traces) => { if (owner.captureId === id) emit(owner, { kind: 'tempo.state', tempo, ...diagnostic(traces) }); },
-      onTempoTick: (_, tick, traces) => { if (owner.captureId === id) emit(owner, { kind: 'tempo.tick', tick, ...diagnostic(traces) }); },
-      onMelody: (_, melody, traces) => { if (owner.captureId === id) emit(owner, { kind: 'melody.state', detector: 'instrument-v1', melody, ...diagnostic(traces) }); },
+      onBeat: (_, bands, traces, timing) => { if (owner.captureId === id) emit(owner, { kind: 'onset', bands, sequence: ++owner.beatSequence, ...diagnostic(traces, timing) }); },
+      onTempo: (_, tempo, traces, timing) => { if (owner.captureId === id) emit(owner, { kind: 'tempo.state', tempo, ...diagnostic(traces, timing) }); },
+      onTempoTick: (_, tick, traces, timing) => { if (owner.captureId === id) emit(owner, { kind: 'tempo.tick', tick, ...diagnostic(traces, timing) }); },
+      onMelody: (_, melody, traces, timing) => { if (owner.captureId === id) emit(owner, { kind: 'melody.state', detector: 'instrument-v1', melody, ...diagnostic(traces, timing) }); },
       onAudible: () => { if (owner.captureId === id) {
         owner.audible = true;
         if (owner.recoveryReason) { telemetry.record('CAPTURE_RECOVERED', undefined, { captureId: id, reason: owner.recoveryReason }); owner.recoveryReason = undefined; }
@@ -98,17 +103,17 @@ export function createNativeAudioFeed(publish: (message: Message) => void) {
   }
   function clock(owner: Subscription, message: Message) {
     const data = message.clock as Record<string, unknown>;
-    const currentTime = Number(data.currentTime), playbackRate = Number(data.playbackRate), sampledAt = Number(data.sampledAt);
-    if (![currentTime, playbackRate, sampledAt].every(Number.isFinite) || currentTime < 0 || playbackRate <= 0) return;
+    const normalized = parsePlaybackClock(data);
+    if (!normalized || owner.previousClock && normalized.sampledAt < owner.previousClock.sampledAt) return;
+    const { playbackRate } = normalized;
     const previous = owner.previousClock;
-    if (owner.playing && data.playing === true && previous
-      && (playbackRate !== previous.playbackRate || Math.abs(currentTime - previous.currentTime
-        - Math.max(0, sampledAt - previous.sampledAt) / 1000 * previous.playbackRate) > .75)) {
+    if (clockDiscontinuity(previous, normalized) || owner.playing && data.playing === true && previous
+      && playbackRate !== previous.playbackRate) {
       halt(owner, 'track-changed'); owner.retryAt = 0;
     }
-    owner.previousClock = { currentTime, playbackRate, sampledAt };
+    owner.previousClock = normalized;
     owner.clockAt = Date.now();
-    const playing = data.playing === true && data.paused === false && data.muted !== true;
+    const playing = clockAdvancing(normalized) && data.muted !== true;
     if (playing && !owner.playing) owner.retryAt = 0;
     owner.playing = playing;
     if (!owner.playing) halt(owner, data.muted ? 'muted' : 'not-playing');
@@ -122,7 +127,10 @@ export function createNativeAudioFeed(publish: (message: Message) => void) {
       const stamp = data.emittedAt;
       if (typeof stamp !== 'number' || !Number.isFinite(stamp) || stamp > Date.now() + 100) { telemetry.record('EVENT_DROPPED', undefined, { reason: 'invalid' }); return false; }
       if (Date.now() - stamp > 600) telemetry.record('EVENT_LATE', undefined, { delayMs: Date.now() - stamp });
-      if (Date.now() - stamp > 2000) {
+      const timing = parsePlaybackTiming(data);
+      const deadline = timing && playbackDeadline(timing);
+      const ahead = deadline !== undefined && deadline >= Date.now() && deadline <= Date.now() + 8000;
+      if (Date.now() - stamp > 2000 && !ahead) {
         telemetry.mark('EVENT_DROPPED', parseBeatTraces(data.telemetry), { reason: 'late' });
         telemetry.record('EVENT_DROPPED', undefined, { reason: 'late' });
         if (current?.sessionId === data.sessionId && current.subscriptionId === data.subscriptionId) emit(current, { kind: 'sync.recover' });
