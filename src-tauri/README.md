@@ -46,7 +46,7 @@ glass blurs page content rather than the desktop behind the browser window.
 
 ## Automatic browser audio
 
-Install/reload **Kora Music Companion 0.3.13** in the browser used for music.
+Install/reload **Kora Music Companion 0.3.14** in the browser used for music.
 It discovers supported music sites, connects to Kora, and supplies metadata,
 source selection, controls and fresh playback clocks. No Kora web tab is needed.
 On supported Windows builds, Kora captures the process tree of the browser
@@ -75,7 +75,7 @@ restarts recover automatically. This adds the `alarms` extension permission.
 The old web protocol and app origin are retained for compatibility. The app
 identifier `app.kanthangboard.focus` is deliberately unchanged to preserve
 existing native sign-in and preferences. Branding, product/version and the
-executable are now Kora / 0.1.14 / `kora.exe`.
+executable are now Kora / 0.1.15 / `kora.exe`.
 
 The fifth row follows AI-separated instrumental note attacks. Choose **AI
 instrument notes** in native Music to download/enable about 157 MB of hash-verified
@@ -164,7 +164,7 @@ Do not publish a mock-auth demo feed as a connected-app update.
 ## Validation
 
 - Frontend/native/companion regression tests and Rust bridge-origin tests.
-- Live: load 0.3.13, play supported browser music, open the native Dock without
+- Live: load 0.3.14, play supported browser music, open the native Dock without
   a web-app tab, verify actual capture mode and increasing onset counts in
   dev, with matching square pops and static icons.
 - Pause/close the music tab, disconnect the browser, restart/reload the
@@ -182,14 +182,19 @@ user acceptance checks after installation.
 The matrix has Kick, Clap, Hi-hat, Bass and Melody rows. Melody flashes for
 incrementing instrument-v1 note sequences, never raw hats, sustain or a tonal
 energy envelope. Its brief level-scaled flash and 700 ms state expiry remain.
-Silence, pause and capture loss clear the grid. Percussion remains transient-driven
-(or an explicitly confident tempo lock). Clock fallback never invents flashes.
+Silence and pause clear semantic activity. Percussion remains transient-driven;
+tempo events carry timing without claiming instrument identities. Cached events
+are preferred when available, with existing local capture as fallback. Without
+capture or cached data, the explicitly degraded path uses decorative flashes
+that never claim real instrument detections. See the
+[event cache contract](../docs/beat-event-cache.md) for configuration and bounds.
 Real kick onsets gently correct the locked eighth-note phase within its error gate.
 Long silence/capture
 restart and low-confidence tempo reacquisition retain their existing behavior.
 Shapes hold for eight seconds and reflash within their
 mask on captured onsets or confident audio-tempo ticks. Each hit brightens and
-pops against the softer held cells; there is no breathing loop or clock-mode flash.
+pops against the softer held cells; decorative fallback remains distinguishable
+in telemetry from real onsets, notes and tempo events.
 Tabs is the only layout; color/palette controls remain in the settings popover.
 
 Tasks retains its Focus Dock even with an empty focus list. Click its time

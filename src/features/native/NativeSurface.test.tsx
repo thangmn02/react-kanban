@@ -23,6 +23,14 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 const props: FloatingFocusProps = { activeTask: null, focusTasks: [], cycleTotal: 4, remainingSeconds: 1500,
   timerState: { mode: 'focus', activeTaskId: null, isRunning: false, remainingSeconds: 1500, startedAt: null, endsAt: null, plannedSeconds: null },
   onStart: vi.fn(), onPause: vi.fn(), onReset: vi.fn() };
+it('allows the hosted Beat cache in both native connection policies', () => {
+  for (const policy of [nativeConfig.app.security.csp, nativeConfig.app.security.devCsp]) {
+    const connections = policy.split(';').find((directive) => directive.trim().startsWith('connect-src '))!.trim().split(/\s+/);
+    expect(connections).toContain('https://koraspace.online');
+    expect(connections).toContain('https://kanthangboard.netlify.app');
+    expect(connections).not.toContain('*');
+  }
+});
 it('opens Tabs at its ring size once and keeps the timer and user resizing across tab changes', async () => {
   const view = render(<I18nProvider><NativeSurface dock focusProps={props}>Workspace</NativeSurface></I18nProvider>);
   expect(view.queryByRole('checkbox')).toBeNull();

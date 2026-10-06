@@ -4,10 +4,10 @@ This is an independent implementation, not a copy of ungive/media-control-extens
 
 Our own Manifest V3 extension connects browser music to Kora's Floating Focus. No extension ID, music login, or API key is required. The inline focus dock stays unchanged; music lives in the detached window.
 
-Version 0.3.13 connects directly to the running **Kora Windows widget**
+Version 0.3.14 connects directly to the running **Kora Windows widget**
 through loopback `127.0.0.1:47635`. No Kora web tab is needed in that mode.
 The widget receives only allowlisted browser music metadata and visual
-events. Kora 0.1.14 automatically captures that browser's process audio on
+events. Kora 0.1.15 automatically captures that browser's process audio on
 Windows, without repeat extension clicks. Overlapping audio in the same browser
 can affect beats; the picker does not isolate tab audio. Other desktop apps are
 excluded. Web/PiP tab capture can still require a toolbar permission click. See
