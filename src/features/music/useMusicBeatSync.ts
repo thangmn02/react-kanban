@@ -9,7 +9,7 @@ export interface MusicBeatState {
   onsets: Partial<Record<BeatBand, number>>;
   rates?: Partial<Record<BeatBand, number>>;
   tempo?: { locked: boolean; bpm: number | null; confidence: number };
-  ticks?: Partial<Record<BeatBand, number>>;
+  tickCount?: number;
   reason?: string;
   captureId?: string;
   melody?: MelodyState;
@@ -30,6 +30,7 @@ export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessio
   }, [state.telemetry]);
   useEffect(() => {
     if (!sessionId) return;
+    const selectedSessionId = sessionId;
     const subscriptionId = crypto.randomUUID();
     let cancelled = false;
     let renewing = false;
@@ -67,6 +68,7 @@ export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessio
         return { telemetry: traces };
       };
       if (cancelled) { drop('owner'); return; }
+      if (event.kind === 'sync.recover') { void renew(); return; }
       if (event.kind === 'clock') {
         onClock(sessionId, event.clock);
         if (!event.clock.playing) {
@@ -95,9 +97,7 @@ export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessio
             return current;
           }
           if (!observed) { observed = true; accepted(); }
-          const ticks = { ...current.ticks };
-          event.tick.bands.forEach((band) => { ticks[band] = (ticks[band] || 0) + 1; });
-          return { ...current, ticks, ...diagnostic(current) };
+          return { ...current, tickCount: (current.tickCount || 0) + 1, ...diagnostic(current) };
         });
         return;
       }
@@ -145,7 +145,7 @@ export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessio
           onsets: current.mode === event.mode && current.captureId === event.captureId ? current.onsets : {},
           rates: event.mode === 'capture' ? rates(Date.now()) : {},
           tempo: current.mode === event.mode && current.captureId === event.captureId ? current.tempo : undefined,
-          ticks: current.mode === event.mode && current.captureId === event.captureId ? current.ticks : {},
+          tickCount: current.mode === event.mode && current.captureId === event.captureId ? current.tickCount : 0,
           melody: current.mode === event.mode && current.captureId === event.captureId ? current.melody : undefined,
           ...(current.telemetry ? { telemetry: current.mode === event.mode && current.captureId === event.captureId ? current.telemetry : undefined } : {}),
         };
@@ -157,16 +157,16 @@ export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessio
         return { ...current, onsets, rates: rates(Date.now()), ...acceptedTraces };
       });
     });
-    const renew = async () => {
+    async function renew() {
       if (renewing || cancelled) return;
       renewing = true;
       try {
-        await sendBeatRequest('dock.beat.sync.start', sessionId, subscriptionId);
+        await sendBeatRequest('dock.beat.sync.start', selectedSessionId, subscriptionId);
         telemetry.record('LEASE_RENEW', undefined, { captureId });
       }
       catch { telemetry.record('LEASE_EXPIRED', undefined, { captureId, reason: 'transport' }); /* The watchdog removes stale capture state. */ }
       finally { renewing = false; }
-    };
+    }
     const stop = () => {
       cancelled = true;
       clearTimeout(melodyLease);
@@ -182,6 +182,7 @@ export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessio
       clearRates();
       setState((current) => current.mode === 'clock' && current.reason === 'sync-stale' ? current
         : { sessionId, mode: 'clock', reason: 'sync-stale', onsets: {} });
+      void renew();
     }, 500);
     window.addEventListener('pagehide', stop);
     void renew();

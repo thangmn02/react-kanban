@@ -24,13 +24,19 @@ it('follows an actual detector event through sync, page transport, controller an
     createAnalyser: () => ({ frequencyBinCount: 1024, disconnect() {}, getFloatFrequencyData: (values) => values.fill(energy) }) };
   const forward = (message) => sync.offscreen(message, { url: 'chrome-extension://companion/offscreen.html' });
   const engine = createCaptureEngine({ getUserMedia: async () => stream, createAudioContext: () => context, now: Date.now,
-    onAudible: (captureId) => forward({ kind: 'audible', captureId }), onStop() {},
+    onAudible: (captureId) => forward({ kind: 'audible', captureId }),
+    onStop: (captureId, reason) => forward({ kind: 'stopped', captureId, reason }),
     onBeat: (captureId, bands, telemetry) => forward({ kind: 'onset', captureId, bands, telemetry }),
     onTempo() {}, onTempoTick() {}, onMelody() {} });
   const dispatch = (message) => window.dispatchEvent(new MessageEvent('message', { source: window, origin: location.origin,
     data: { ...message, channel: 'kanban-music-v1', direction: 'extension-event' } }));
   const api = { runtime: { getURL: (name) => `chrome-extension://companion/${name}`, getContexts: async () => [],
-    sendMessage: async (message) => message.kind === 'start' ? { ok: await engine.start(message.streamId, message.captureId) } : { ok: true } },
+    sendMessage: async (message) => {
+      if (message.kind === 'start') return { ok: await engine.start(message.streamId, message.captureId) };
+      if (message.kind === 'lease') return { ok: engine.renew(message.captureId) };
+      if (message.kind === 'stop') engine.stopCapture(message.captureId);
+      return { ok: true };
+    } },
     tabs: { sendMessage: async (_, message) => { if (message.event === 'beat') dispatch(message); return { ok: true }; } },
     offscreen: { createDocument: async () => {}, closeDocument: async () => {} }, tabCapture: { getMediaStreamId: async () => 'stream' } };
   sync = createBeatSync(api);
@@ -58,5 +64,18 @@ it('follows an actual detector event through sync, page transport, controller an
   expect(trace.map((r) => r.stage)).toEqual(expect.arrayContaining(['EVENT_DETECTED', 'EVENT_QUEUED', 'EVENT_SENT', 'EVENT_RECEIVED', 'EVENT_ACCEPTED', 'EVENT_STATE_COMMITTED', 'EVENT_COMMITTED', 'EVENT_RENDERED']));
   expect(trace.at(-1)).toMatchObject({ source: 'onset', type: 'kick', component: 'beat-renderer' });
   expect(view.container.querySelectorAll('[data-channel="melody"] .melody-beat-flash')).toHaveLength(0);
+  energy = -Infinity;
+  await act(async () => { await vi.advanceTimersByTimeAsync(10000); });
+  expect(track.stop).not.toHaveBeenCalled();
+  energy = -20;
+  await act(async () => { await vi.advanceTimersByTimeAsync(20); });
+  await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+  const resumed = view.container.querySelector('[data-channel="drum"] .onset');
+  expect(resumed).not.toBeNull();
+  expect(resumed.dataset.beatTrace).not.toBe(id);
+  fireEvent.animationStart(resumed, { animationName: 'square-onset' });
+  expect(beatTelemetry.snapshot().records.filter((r) => r.id === resumed.dataset.beatTrace).map((r) => r.stage))
+    .toEqual(expect.arrayContaining(['EVENT_DETECTED', 'EVENT_QUEUED', 'EVENT_SENT', 'EVENT_RECEIVED', 'EVENT_ACCEPTED', 'EVENT_STATE_COMMITTED', 'EVENT_COMMITTED', 'EVENT_RENDERED']));
+  expect(beatTelemetry.snapshot().counts.CAPTURE_RECOVERED).toBeGreaterThan(0);
   engine.stop(); await sync.stop();
 });

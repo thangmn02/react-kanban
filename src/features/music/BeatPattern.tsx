@@ -38,16 +38,16 @@ export default function BeatPattern({ session, beat, colorMode = 'random', palet
   const songSeconds = session?.currentTime || 0;
   const epoch = reshuffleEpoch(songSeconds, beat.tempo?.locked ? beat.tempo.bpm : null);
   const pattern = patternAt(songSeconds);
-  // Only percussion moves to the estimated grid. Instrument notes have their
-  // own event sequence and never borrow percussion or tempo ticks.
-  const counts = beat.tempo?.locked ? { ...(beat.ticks || {}), bass: beat.onsets.bass, melody: beat.onsets.melody } : beat.onsets;
+  // Semantic rows always reflect detected onsets. Structural tempo can still
+  // retrigger an intentional decorative shape without claiming an instrument.
+  const counts = beat.onsets;
   const kickCount = counts.kick || 0;
   const clapCount = counts.clap || 0;
   const hatCount = counts.hat || 0;
   const bassCount = counts.bass || 0;
   const melodyCount = counts.melody || 0;
   const onsetTotal = beatBands.reduce((sum, band) => sum + (beat.onsets[band] || 0), 0);
-  const tickTotal = beat.tempo?.locked ? kickCount + clapCount + hatCount : 0;
+  const tickTotal = beat.tempo?.locked ? beat.tickCount || 0 : 0;
   const audioLive = capture && (!beat.rates || beatBands.some((band) => (beat.rates?.[band] || 0) > 0)
     || (beat.melody?.active === true && beat.melody.level > 0));
   const [pulse, setPulse] = useState<{ captureKey: string; counts: Partial<Record<BeatBand, number>>; active: Partial<Record<BeatBand, boolean>>; rawTotal: number; tickTotal: number; shapeHit: boolean; telemetry?: Record<string, BeatTrace> }>({
@@ -149,7 +149,7 @@ export default function BeatPattern({ session, beat, colorMode = 'random', palet
       committed.current.add(trace.id);
       const cells = [...root.current.querySelectorAll<HTMLElement>('[data-beat-trace]')].filter((cell) => cell.dataset.beatTrace === trace.id);
       if (!cells.length) {
-        telemetry.record('EVENT_DROPPED', trace, { reason: beat.tempo?.locked && trace.source === 'onset' && ['kick', 'snare', 'hat'].includes(trace.type) ? 'tempo-selected' : 'renderer-mask' });
+        telemetry.record('EVENT_DROPPED', trace, { reason: 'renderer-mask' });
         continue;
       }
       telemetry.record('EVENT_COMMITTED', trace, { parentId: liveMoment?.parentId });
@@ -185,7 +185,7 @@ export default function BeatPattern({ session, beat, colorMode = 'random', palet
           const cellStyle = { '--melody-level': beat.melody?.level || 0, '--pulse-delay': `${delay || 0}ms`, '--moment-delay': `${liveMoment ? momentDelay(liveMoment.effect, row, step, liveMoment.id) : 0}ms`, '--moment-duration': `${momentFlashMs}ms` } as CSSProperties;
           const shapeHit = momentLit && pulse.captureKey === captureKey && pulse.shapeHit;
           const type = band === 'clap' ? 'snare' : band === 'melody' ? 'melodic' : band;
-          const origin = band === 'melody' ? melodyFlash?.telemetry : pulse.telemetry?.[`${beat.tempo?.locked && ['kick', 'clap', 'hat'].includes(band) ? 'tempo' : 'onset'}:${type}`];
+          const origin = band === 'melody' ? melodyFlash?.telemetry : pulse.telemetry?.[`onset:${type}`];
           const cellTrace = onset ? origin : momentLit ? liveMoment.telemetry : undefined;
           return <span key={`${step}:${onset ? `${captureKey}:${counts[band]}` : 0}:${momentLit ? liveMoment.id : 0}`}
             data-beat-trace={cellTrace?.id}

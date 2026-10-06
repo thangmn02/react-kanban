@@ -55,7 +55,7 @@ export function MusicGrid({ music, colorMode = 'random', palette = 'bloom', orie
     <BeatPattern key={music.selected?.id} session={music.selected} beat={music.beat} colorMode={colorMode} palette={palette} orientation={orientation} />
     {showDebug && <details className="music-debug" open><summary>Beat debug</summary><pre aria-label="Beat sync debug">{JSON.stringify({
       source: music.source, mode: music.beat.mode, reason: music.beat.reason, onsets: music.beat.onsets, rates: music.beat.rates,
-      tempo: music.beat.tempo, ticks: music.beat.ticks, pattern: patternAt(music.selected?.currentTime || 0), captureId: music.beat.captureId,
+      tempo: music.beat.tempo, tickCount: music.beat.tickCount, pattern: patternAt(music.selected?.currentTime || 0), captureId: music.beat.captureId,
       melody: music.beat.melody,
     }, null, 2)}</pre></details>}
   </>;

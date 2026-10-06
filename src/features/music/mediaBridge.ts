@@ -28,11 +28,12 @@ export interface MusicClock {
 export type BeatBand = 'kick' | 'clap' | 'hat' | 'bass' | 'melody';
 export interface MelodyState { active: boolean; level: number; note: number }
 export type BeatEvent = ({ kind: 'clock'; clock: MusicClock }
+  | { kind: 'sync.recover' }
   | { kind: 'sync.state'; mode: 'clock' | 'capture'; reason?: string; captureId?: string }
   | { kind: 'onset'; bands: BeatBand[]; captureId?: string; sequence?: number }
   | { kind: 'melody.state'; captureId: string; melody: MelodyState }
   | { kind: 'tempo.state'; captureId: string; tempo: { locked: boolean; bpm: number | null; confidence: number } }
-  | { kind: 'tempo.tick'; captureId: string; tick: { step: number; bands: BeatBand[] } }) & { telemetry?: BeatTrace[] };
+  | { kind: 'tempo.tick'; captureId: string; tick: { step: number; phase: number; beatPosition: number; subdivision: 2 } }) & { telemetry?: BeatTrace[] };
 
 const channel = 'kanban-music-v1';
 const supportedBands = ['kick', 'clap', 'hat', 'bass', 'melody', 'snare'];
@@ -126,6 +127,36 @@ export async function openInstrumentNotesSetup(sessionId: string): Promise<void>
 }
 
 export function subscribeBeatEvents(sessionId: string, subscriptionId: string, callback: (event: BeatEvent) => void) {
+  const delayed = new Map<string, { event: BeatEvent; expiresAt: number }>();
+  const latestAt = new Map<string, number>();
+  let pending: ReturnType<typeof setTimeout> | undefined;
+  let lastRecovery = -Infinity;
+  let recovering = false;
+  const recover = () => {
+    if (Date.now() - lastRecovery < 1000) return;
+    lastRecovery = Date.now();
+    recovering = true;
+    telemetry.record('EVENT_SENT', undefined, { reason: 'delivery-late' });
+    callback({ kind: 'sync.recover' });
+  };
+  const flush = () => {
+    pending = undefined;
+    // State establishes the capture owner before its latest semantic event.
+    for (const kind of ['clock', 'sync.state', 'tempo.state', 'tempo.tick', 'onset', 'melody.state']) {
+      const queued = delayed.get(kind);
+      if (!queued) continue;
+      if (Date.now() > queued.expiresAt) {
+        telemetry.mark('EVENT_LATE', queued.event.telemetry);
+        telemetry.mark('EVENT_DROPPED', queued.event.telemetry, { reason: 'late' });
+        recover();
+      } else {
+        callback(queued.event);
+        telemetry.record('CAPTURE_RECOVERED', undefined, { reason: 'delivery-late' });
+        recovering = false;
+      }
+    }
+    delayed.clear();
+  };
   const parse = (data: unknown, native = false) => {
     if (!data || typeof data !== 'object') return;
     // Payload fields are checked below before reaching the controller.
@@ -134,12 +165,32 @@ export function subscribeBeatEvents(sessionId: string, subscriptionId: string, c
     const traces = parseBeatTraces(message.telemetry);
     if (message.sessionId !== sessionId || message.subscriptionId !== subscriptionId) { telemetry.mark('EVENT_DROPPED', traces, { reason: 'owner' }); return; }
     if (!native && (message.channel !== channel || message.direction !== 'extension-event' || message.event !== 'beat')) return;
-    // Never replay queued flashes when a minimized webview resumes.
+    const age = Date.now() - message.emittedAt;
     if (native && (typeof message.emittedAt !== 'number' || !Number.isFinite(message.emittedAt)
-      || Date.now() - message.emittedAt > 600 || message.emittedAt > Date.now() + 100)) { telemetry.mark('EVENT_LATE', traces); telemetry.mark('EVENT_DROPPED', traces, { reason: 'late' }); return; }
+      || message.emittedAt > Date.now() + 100)) { telemetry.mark('EVENT_DROPPED', traces, { reason: 'invalid' }); return; }
+    const late = (native || Number.isFinite(message.emittedAt)) && age > 600;
+    if (late) telemetry.mark('EVENT_LATE', traces, { delayMs: age });
+    if (late && age > 2000) { telemetry.mark('EVENT_DROPPED', traces, { reason: 'late' }); recover(); return; }
     telemetry.mark('EVENT_RECEIVED', traces);
     let delivered = false;
-    const receive = (event: BeatEvent) => { delivered = true; callback({ ...event, ...(traces ? { telemetry: traces } : {}) }); };
+    const receive = (event: BeatEvent) => {
+      delivered = true;
+      const value = { ...event, ...(traces ? { telemetry: traces } : {}) };
+      const timestamp = Number.isFinite(message.emittedAt) ? message.emittedAt : Date.now();
+      if (timestamp < (latestAt.get(event.kind) ?? -Infinity)) { telemetry.mark('EVENT_DROPPED', traces, { reason: 'delivery-coalesced' }); return; }
+      latestAt.set(event.kind, timestamp);
+      const previous = delayed.get(event.kind);
+      if (previous) telemetry.mark('EVENT_DROPPED', previous.event.telemetry, { reason: 'delivery-coalesced' });
+      delayed.delete(event.kind);
+      if (late) {
+        delayed.set(event.kind, { event: value, expiresAt: timestamp + 2000 });
+        pending ??= setTimeout(flush, 0);
+      } else {
+        callback(value);
+        if (recovering) { telemetry.record('CAPTURE_RECOVERED', undefined, { reason: 'delivery-late' }); recovering = false; }
+      }
+    };
+    if (message.kind === 'sync.recover') { delivered = true; recover(); }
     if (['sync.state', 'status'].includes(message.kind) && ['clock', 'capture'].includes(message.mode)) receive({
       kind: 'sync.state', mode: message.mode,
       reason: typeof (message.reason ?? message.fallbackReason) === 'string' ? String(message.reason ?? message.fallbackReason).slice(0, 80) : undefined,
@@ -166,10 +217,10 @@ export function subscribeBeatEvents(sessionId: string, subscriptionId: string, c
       });
     if (message.kind === 'tempo.tick' && typeof message.captureId === 'string' && message.captureId.length <= 100
       && Number.isInteger(message.tick?.step) && message.tick.step >= 0 && message.tick.step < 8
-      && Array.isArray(message.tick.bands) && message.tick.bands.length <= 3
-      && message.tick.bands.every((band: unknown) => typeof band === 'string' && ['kick', 'clap', 'snare', 'hat'].includes(band))) receive({
+      && Number.isFinite(message.tick.phase) && message.tick.phase >= 0 && message.tick.phase < 1
+      && Number.isFinite(message.tick.beatPosition) && message.tick.beatPosition >= 0 && message.tick.subdivision === 2) receive({
         kind: 'tempo.tick', captureId: message.captureId,
-        tick: { step: message.tick.step, bands: [...new Set<BeatBand>(message.tick.bands.map(canonicalBand))] },
+        tick: { step: message.tick.step, phase: message.tick.phase, beatPosition: message.tick.beatPosition, subdivision: 2 },
       });
     if (message.kind === 'clock') {
       const clock = message.clock;
@@ -178,10 +229,14 @@ export function subscribeBeatEvents(sessionId: string, subscriptionId: string, c
     }
     if (!delivered) telemetry.mark('EVENT_DROPPED', traces, { reason: 'invalid' });
   };
-  if (isNativeWidget()) return subscribeNativeMusic((payload) => parse(payload, true));
+  const clearPending = () => { clearTimeout(pending); delayed.forEach(({ event }) => telemetry.mark('EVENT_DROPPED', event.telemetry, { reason: 'owner' })); delayed.clear(); };
+  if (isNativeWidget()) {
+    const stop = subscribeNativeMusic((payload) => parse(payload, true));
+    return () => { stop(); clearPending(); };
+  }
   const listener = (event: MessageEvent) => {
     if (event.source === window && event.origin === window.location.origin) parse(event.data);
   };
   window.addEventListener('message', listener);
-  return () => window.removeEventListener('message', listener);
+  return () => { window.removeEventListener('message', listener); clearPending(); };
 }

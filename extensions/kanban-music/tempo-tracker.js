@@ -30,7 +30,7 @@ export class TempoTracker {
       if (current > this.lastTick && current >= 0) {
         this.lastTick = current;
         const step = ((current % 8) + 8) % 8;
-        tick = { step, bands: [...(step % 2 === 0 ? ['kick'] : []), 'hat', ...(step === 2 || step === 6 ? ['clap'] : [])] };
+        tick = { step, phase: (now - this.anchor) / eighthMs - current, beatPosition: current / 2, subdivision: 2 };
       }
     }
     return { updated, locked: this.locked, bpm: this.bpm, confidence: this.confidence, tick };

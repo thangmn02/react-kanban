@@ -1,6 +1,46 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { createBeatSync } from './beat-sync.js';
 afterEach(() => vi.restoreAllMocks());
+it('does not expire a capture while its initial stream setup is still pending', async () => {
+  const f = fixture(); let finish;
+  f.api.runtime.sendMessage.mockImplementation((message) => message.kind === 'start'
+    ? new Promise((resolve) => { finish = resolve; }) : Promise.resolve({ ok: false }));
+  await f.sync.start(f.session, f.owner, 'subscription');
+  await vi.waitFor(() => expect(finish).toBeTypeOf('function'));
+  await f.sync.start(f.session, f.owner, 'subscription');
+  expect(f.api.runtime.sendMessage.mock.calls.some(([message]) => message.kind === 'lease' || message.kind === 'stop')).toBe(false);
+  finish({ ok: true });
+  await vi.waitFor(() => expect(f.sync.status(f.session).reason).toBe('starting'));
+  expect(f.api.tabCapture.getMediaStreamId).toHaveBeenCalledOnce();
+  await f.sync.stop();
+});
+it('reacquires an expired capture under the same live clock owner', async () => {
+  const f = fixture();
+  await f.sync.start(f.session, f.owner, 'subscription');
+  await vi.waitFor(() => expect(f.sync.status(f.session).mode).toBe('capture'));
+  const old = f.sync.status(f.session).captureId, token = f.token();
+  const closes = f.api.offscreen.closeDocument.mock.calls.length;
+  f.sync.offscreen({ kind: 'stopped', captureId: old, reason: 'expired' }, { url: f.api.runtime.getURL('offscreen.html') });
+  await vi.waitFor(() => expect(f.sync.status(f.session).mode).toBe('capture'));
+  expect(f.sync.status(f.session).captureId).not.toBe(old);
+  expect(f.token()).toBe(token);
+  expect(f.api.offscreen.closeDocument).toHaveBeenCalledTimes(closes);
+  expect(f.api.tabCapture.getMediaStreamId).toHaveBeenCalledTimes(2);
+  await f.sync.stop();
+});
+it('renews a quiet pending stream before its first audible frame and immediately recovers a rejected lease', async () => {
+  const f = fixture(); f.api.runtime.sendMessage.mockResolvedValue({ ok: true });
+  await f.sync.start(f.session, f.owner, 'subscription');
+  await vi.waitFor(() => expect(f.api.runtime.sendMessage).toHaveBeenCalledWith(expect.objectContaining({ kind: 'start' })));
+  await f.sync.start(f.session, f.owner, 'subscription');
+  const lease = f.api.runtime.sendMessage.mock.calls.find(([m]) => m.kind === 'lease')[0];
+  expect(lease.captureId).toBeTruthy();
+  f.api.runtime.sendMessage.mockImplementation(async (m) => ({ ok: m.kind !== 'lease' }));
+  await f.sync.start(f.session, f.owner, 'subscription');
+  await vi.waitFor(() => expect(f.api.tabCapture.getMediaStreamId).toHaveBeenCalledTimes(2));
+  expect(f.sync.status(f.session).mode).toBe('clock');
+  await f.sync.stop();
+});
 
 function fixture() {
   const api = {
@@ -225,9 +265,9 @@ it('relays tempo lock and eighth-note ticks only from the live captured stream',
   f.sync.offscreen({ kind: 'tempo.state', captureId, tempo: { locked: true, bpm: 120, confidence: .8 } }, sender);
   expect(f.api.tabs.sendMessage).toHaveBeenLastCalledWith(24,
     expect.objectContaining({ kind: 'tempo.state', tempo: { locked: true, bpm: 120, confidence: .8 } }), expect.anything());
-  f.sync.offscreen({ kind: 'tempo.tick', captureId, tick: { step: 2, bands: ['kick', 'hat', 'clap'] } }, sender);
+  f.sync.offscreen({ kind: 'tempo.tick', captureId, tick: { step: 2, phase: .1, beatPosition: 1, subdivision: 2 } }, sender);
   expect(f.api.tabs.sendMessage).toHaveBeenLastCalledWith(24,
-    expect.objectContaining({ kind: 'tempo.tick', tick: { step: 2, bands: ['kick', 'hat', 'clap'] } }), expect.anything());
+    expect.objectContaining({ kind: 'tempo.tick', tick: { step: 2, phase: .1, beatPosition: 1, subdivision: 2 } }), expect.anything());
   const before = f.api.tabs.sendMessage.mock.calls.length;
   f.sync.offscreen({ kind: 'tempo.tick', captureId: 'old-capture', tick: { step: 4, bands: ['hat'] } }, sender);
   f.sync.offscreen({ kind: 'tempo.tick', captureId, tick: { step: 8, bands: ['hat'] } }, sender);
@@ -255,7 +295,7 @@ it.each(supportedServices)('tries %s and confirms only an audible stream, even w
   await f.sync.stop();
 });
 
-it.each(supportedServices)('backs off silent %s capture honestly, ignores late onsets and retries immediately on resume', async (source) => {
+it.each(supportedServices)('recovers interrupted %s capture, ignores old onsets and retries immediately on resume', async (source) => {
   const f = fixture();
   let now = Date.now();
   vi.spyOn(Date, 'now').mockImplementation(() => now);
@@ -266,14 +306,14 @@ it.each(supportedServices)('backs off silent %s capture honestly, ignores late o
   const captureId = f.api.runtime.sendMessage.mock.calls.find(([message]) => message.kind === 'start')[0].captureId;
   const sender = { url: f.api.runtime.getURL('offscreen.html') };
   f.sync.offscreen({ kind: 'stopped', captureId, reason: 'silent' }, sender);
-  expect(f.sync.status(spotify)).toEqual({ mode: 'clock', reason: 'silent' });
+  expect(f.sync.status(spotify)).toEqual({ mode: 'clock', reason: 'starting' });
   const count = f.api.tabs.sendMessage.mock.calls.length;
   f.sync.offscreen({ kind: 'audible', captureId }, sender);
   f.sync.offscreen({ kind: 'onset', captureId, bands: ['kick'] }, sender);
   expect(f.api.tabs.sendMessage).toHaveBeenCalledTimes(count);
   now += 4000;
   await f.sync.start(spotify, f.owner, 'spotify-sub');
-  expect(f.api.tabCapture.getMediaStreamId).toHaveBeenCalledTimes(1);
+  await vi.waitFor(() => expect(f.api.tabCapture.getMediaStreamId).toHaveBeenCalledTimes(2));
   now += 27000;
   await f.sync.start(spotify, f.owner, 'spotify-sub');
   await vi.waitFor(() => expect(f.api.tabCapture.getMediaStreamId).toHaveBeenCalledTimes(2));
@@ -329,7 +369,7 @@ it('returns to clock on silent capture and never publishes capture without audio
   await vi.waitFor(() => expect(f.api.runtime.sendMessage).toHaveBeenCalledWith(expect.objectContaining({ kind: 'start' })));
   const captureId = f.api.runtime.sendMessage.mock.calls.find(([message]) => message.kind === 'start')[0].captureId;
   f.sync.offscreen({ kind: 'stopped', captureId, reason: 'silent' }, { url: f.api.runtime.getURL('offscreen.html') });
-  expect(f.sync.status(f.session)).toEqual({ mode: 'clock', reason: 'silent' });
+  expect(f.sync.status(f.session)).toEqual({ mode: 'clock', reason: 'starting' });
   expect(f.api.tabs.sendMessage).not.toHaveBeenCalledWith(24, expect.objectContaining({ kind: 'sync.state', mode: 'capture' }), expect.anything());
   await f.sync.stop();
 });

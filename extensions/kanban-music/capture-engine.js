@@ -48,15 +48,21 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
       active = state;
       telemetry.record('CAPTURE_START', undefined, { captureId });
       state.context = createAudioContext();
-      state.events = []; state.delaySeconds = 0; state.note = 0;
+      state.events = []; state.eventOrder = 0; state.delaySeconds = 0; state.note = 0;
       const enqueue = (kind, payload, at = (state.context.currentTime ?? now() / 1000) + state.delaySeconds, producerTrace) => {
         const target = at + (monitorOnly ? 0 : (state.context.baseLatency || 0) + (state.context.outputLatency || 0));
         const traces = producerTrace?.map((trace) => ({ ...trace, captureId, targetTime: target, targetClock: 'audio-seconds' }))
-          || telemetry.events(kind === 'tempo' || kind === 'tick' ? 'tempo' : 'onset', kind === 'beat' ? payload : kind === 'tick' ? payload.bands : [kind === 'melody' ? 'melodic' : 'generic'],
+          || telemetry.events(kind === 'tempo' || kind === 'tick' ? 'tempo' : 'onset', kind === 'beat' ? payload : [kind === 'melody' ? 'melodic' : 'generic'],
             { captureId, targetTime: target, targetClock: 'audio-seconds', confidence: kind === 'tempo' ? payload.confidence : undefined });
         if (!producerTrace) telemetry.mark('EVENT_DETECTED', traces);
-        if (active !== state || state.events.length >= 2048) { telemetry.mark('EVENT_DROPPED', traces, { reason: active !== state ? 'owner' : 'queue-full', queueDepth: state.events.length }); return; }
-        state.events.push({ kind, payload, at: target, ...(traces ? { telemetry: traces } : {}) });
+        if (active !== state) { telemetry.mark('EVENT_DROPPED', traces, { reason: 'owner' }); return; }
+        if (state.events.length >= 2048) {
+          const index = state.events.reduce((oldest, event, i, events) => event.order < events[oldest].order ? i : oldest, 0);
+          const [oldest] = state.events.splice(index, 1);
+          telemetry.mark('EVENT_DROPPED', oldest.telemetry, { reason: 'queue-full', queueDepth: state.events.length });
+          state.recoveryReason = 'queue-full';
+        }
+        state.events.push({ kind, payload, at: target, order: state.eventOrder++, ...(traces ? { telemetry: traces } : {}) });
         telemetry.mark('EVENT_QUEUED', traces, { queueDepth: state.events.length, audioTime: state.context.currentTime });
         state.events.sort((a, b) => a.at - b.at);
       };
@@ -75,10 +81,15 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
         try {
           state.instrument = createInstrumentCapture({ context: state.context, onError: instrumentError, onNotes(events) {
             if (active !== state || state.instrumentFailed) return;
-            if (events.some((event) => event.time + state.delaySeconds < state.context.currentTime - .05)) {
-              events.forEach((event) => telemetry.mark('EVENT_DROPPED', event.telemetry, { reason: 'instrument-deadline' })); instrumentError(); return;
-            }
-            events.forEach((event) => enqueue('melody', event.state, event.time + state.delaySeconds, event.telemetry));
+            // A delayed batch is a delivery miss, not permanent model failure.
+            // Keep the existing analysis/output graph alive for subsequent notes.
+            events.forEach((event) => {
+              if (event.time + state.delaySeconds < state.context.currentTime - .05) {
+                telemetry.mark('EVENT_LATE', event.telemetry, { delayMs: (state.context.currentTime - event.time - state.delaySeconds) * 1000 });
+                telemetry.mark('EVENT_DROPPED', event.telemetry, { reason: 'instrument-deadline' });
+                state.recoveryReason = 'instrument-deadline';
+              } else enqueue('melody', event.state, event.time + state.delaySeconds, event.telemetry);
+            });
           } });
           if (state.instrument) {
             let setupTimeout;
@@ -151,7 +162,8 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
         } else if (!state.lowEnergy) {
           state.lowEnergy = true; telemetry.record('LOW_ENERGY', undefined, { captureId });
         }
-        if (time - state.lastAudio > 2500 + state.delaySeconds * 1000) { stop('silent'); return; }
+        // Quiet audio is not an ended stream. The owner lease still bounds its
+        // lifetime; sampling continues so returning audio needs no new capture.
         if (result.hits.length) enqueue('beat', result.hits);
         if (rhythm.updated) enqueue('tempo', { locked: tempoLocked, bpm: tempoLocked ? rhythm.bpm : null, confidence: rhythm.confidence });
         if (tempoLocked && rhythm.tick) enqueue('tick', rhythm.tick);
@@ -159,7 +171,11 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
         const audioTime = state.context.currentTime ?? time / 1000;
         while (state.events[0]?.at <= audioTime) {
           const event = state.events.shift();
-          if (audioTime - event.at > .6) { telemetry.mark('EVENT_LATE', event.telemetry, { delayMs: (audioTime - event.at) * 1000 }); telemetry.mark('EVENT_DROPPED', event.telemetry, { reason: 'late' }); continue; }
+          if (audioTime - event.at > .6) { telemetry.mark('EVENT_LATE', event.telemetry, { delayMs: (audioTime - event.at) * 1000 }); telemetry.mark('EVENT_DROPPED', event.telemetry, { reason: 'late' }); state.recoveryReason = 'late'; continue; }
+          if (state.recoveryReason) {
+            telemetry.record('CAPTURE_RECOVERED', undefined, { captureId, reason: state.recoveryReason, queueDepth: state.events.length });
+            state.recoveryReason = undefined;
+          }
           telemetry.mark('EVENT_SENT', event.telemetry, { audioTime, delayMs: (audioTime - event.at) * 1000 });
           const metadata = event.telemetry ? [event.telemetry] : [];
           if (event.kind === 'beat') onBeat(captureId, event.payload, ...metadata);

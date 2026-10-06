@@ -10,7 +10,7 @@ export interface NativeAudioCallbacks {
   onStop(id: string, reason: string): void;
   onAudible(id: string): void;
   onTempo(id: string, tempo: { locked: boolean; bpm: number | null; confidence: number }, telemetry?: BeatTrace[]): void;
-  onTempoTick(id: string, tick: { step: number; bands: string[] }, telemetry?: BeatTrace[]): void;
+  onTempoTick(id: string, tick: { step: number; phase: number; beatPosition: number; subdivision: 2 }, telemetry?: BeatTrace[]): void;
   onMelody(id: string, melody: { active: boolean; level: number; note: number }, telemetry?: BeatTrace[]): void;
 }
 export function createNativeAudioEngine(options: NativeAudioCallbacks): NativeAudioEngine;

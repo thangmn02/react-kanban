@@ -4,6 +4,50 @@ import { beatTelemetry } from '../../../extensions/kanban-music/beat-telemetry.j
 
 afterEach(() => { beatTelemetry.enable(false); beatTelemetry.clear(); vi.restoreAllMocks(); vi.useRealTimers(); vi.unstubAllEnvs(); });
 const session = { id: '1', title: 'Song', artist: 'Artist', source: 'youtube.com', paused: true };
+it('coalesces bounded late bursts, traces rejected work and requests recovery for expired delivery', async () => {
+  vi.useFakeTimers(); beatTelemetry.enable();
+  const receive = vi.fn(), stop = subscribeBeatEvents('song', 'subscription', receive);
+  const send = (sequence: number, age: number) => window.dispatchEvent(new MessageEvent('message', { source: window, origin: location.origin,
+    data: { channel: 'kanban-music-v1', direction: 'extension-event', event: 'beat', sessionId: 'song', subscriptionId: 'subscription',
+      kind: 'onset', bands: ['kick'], captureId: 'capture', sequence, emittedAt: Date.now() - age, telemetry: beatTelemetry.events('onset', ['kick']) } }));
+  for (let sequence = 1; sequence <= 100; sequence++) send(sequence, 700);
+  expect(receive).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(0);
+  expect(receive).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ kind: 'onset', sequence: 100 }));
+  for (let sequence = 101; sequence < 150; sequence++) send(sequence, 3000);
+  expect(receive).toHaveBeenLastCalledWith({ kind: 'sync.recover' });
+  expect(receive).toHaveBeenCalledTimes(2);
+  send(150, 0);
+  expect(receive).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'onset', sequence: 150 }));
+  const log = beatTelemetry.snapshot();
+  expect(log.counts.EVENT_LATE).toBe(149);
+  expect(log.records.some((r) => r.reason === 'delivery-coalesced' && r.stage === 'EVENT_DROPPED')).toBe(true);
+  expect(log.records.some((r) => r.reason === 'late' && r.stage === 'EVENT_DROPPED')).toBe(true);
+  expect(log.counts.CAPTURE_RECOVERED).toBeGreaterThan(0);
+  send(151, 800); stop(); await vi.advanceTimersByTimeAsync(0);
+  expect(receive).toHaveBeenCalledTimes(3);
+});
+it('does not replay a pending late event over a fresher event of the same kind', async () => {
+  vi.useFakeTimers(); const receive = vi.fn(), stop = subscribeBeatEvents('song', 'subscription', receive);
+  const send = (sequence: number, age: number) => window.dispatchEvent(new MessageEvent('message', { source: window, origin: location.origin,
+    data: { channel: 'kanban-music-v1', direction: 'extension-event', event: 'beat', sessionId: 'song', subscriptionId: 'subscription', kind: 'onset',
+      bands: ['hat'], sequence, emittedAt: Date.now() - age } }));
+  send(1, 700); send(2, 0); await vi.advanceTimersByTimeAsync(0);
+  expect(receive).toHaveBeenCalledExactlyOnceWith({ kind: 'onset', bands: ['hat'], sequence: 2 });
+  stop();
+});
+it('expires a coalesced event if the UI stays blocked and rejects older delivery after fresh delivery', async () => {
+  vi.useFakeTimers(); const receive = vi.fn(), stop = subscribeBeatEvents('song', 'subscription', receive);
+  const send = (sequence: number, age: number) => window.dispatchEvent(new MessageEvent('message', { source: window, origin: location.origin,
+    data: { channel: 'kanban-music-v1', direction: 'extension-event', event: 'beat', sessionId: 'song', subscriptionId: 'subscription', kind: 'onset',
+      bands: ['hat'], sequence, emittedAt: Date.now() - age } }));
+  send(1, 1800); vi.setSystemTime(Date.now() + 500); await vi.advanceTimersByTimeAsync(0);
+  expect(receive).toHaveBeenCalledExactlyOnceWith({ kind: 'sync.recover' });
+  send(3, 0); send(2, 700); await vi.advanceTimersByTimeAsync(0);
+  expect(receive).toHaveBeenCalledTimes(2);
+  expect(receive).toHaveBeenLastCalledWith({ kind: 'onset', bands: ['hat'], sequence: 3 });
+  stop();
+});
 it('forwards only valid diagnostic sidecars and never rejects an otherwise valid beat because of telemetry', () => {
   beatTelemetry.enable(); const receive = vi.fn();
   const stop = subscribeBeatEvents('song', 'subscription', receive);
@@ -92,7 +136,7 @@ it('validates tempo lock updates and rejects fabricated grid ticks', () => {
   const base = { channel: 'kanban-music-v1', direction: 'extension-event', event: 'beat', sessionId: 'song', subscriptionId: 'subscription', captureId: 'live' };
   const emit = (payload: object) => window.dispatchEvent(new MessageEvent('message', { source: window, origin: window.location.origin, data: { ...base, ...payload } }));
   emit({ kind: 'tempo.state', tempo: { locked: true, bpm: 120, confidence: .8 } });
-  emit({ kind: 'tempo.tick', tick: { step: 2, bands: ['kick', 'hat', 'clap'] } });
+  emit({ kind: 'tempo.tick', tick: { step: 2, phase: .1, beatPosition: 1, subdivision: 2 } });
   expect(receive).toHaveBeenCalledTimes(2);
   emit({ kind: 'tempo.state', tempo: { locked: true, bpm: 200, confidence: .8 } });
   emit({ kind: 'tempo.tick', tick: { step: 8, bands: ['hat'] } });

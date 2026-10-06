@@ -38,6 +38,10 @@ export function createBeatSync(api, nativePublish) {
       || !current.clock?.playing || current.clock.muted || current.tabMuted) return;
     current.mode = 'capture';
     telemetry.record('AUDIO_DETECTED', undefined, { captureId: current.captureId });
+    if (current.recoveryReason) {
+      telemetry.record('CAPTURE_RECOVERED', undefined, { captureId: current.captureId, reason: current.recoveryReason });
+      current.recoveryReason = undefined;
+    }
     current.fallbackReason = undefined;
     publishState(current);
   }
@@ -45,6 +49,7 @@ export function createBeatSync(api, nativePublish) {
   function publish(current, event) {
     if (state !== current) { telemetry.mark('EVENT_DROPPED', event.telemetry, { reason: 'owner' }); return; }
     telemetry.mark('EVENT_SENT', event.telemetry);
+    event = { ...event, emittedAt: Date.now() };
     if (current.owner.native) {
       nativePublish?.(current.owner.native, { sessionId: current.session.id, subscriptionId: current.subscriptionId, ...event });
       return;
@@ -178,13 +183,14 @@ export function createBeatSync(api, nativePublish) {
           const lease = await api.tabs.sendMessage(session.tabId, { target: 'beat-clock', kind: 'lease', token: current.token },
             { documentId: session.documentId }).catch(() => {});
           if (!lease?.ok) await startClock(current).catch(() => {});
-          if (current.captureId && current.mode === 'capture') {
+          if (current.captureId && current.captureReady) {
             const captureId = current.captureId;
             const captureLease = await offscreenMessage({ kind: 'lease', captureId }).catch(() => undefined);
             telemetry.record(captureLease?.ok ? 'LEASE_RENEW' : 'LEASE_EXPIRED', undefined, { captureId });
             if (!captureLease?.ok && current.captureId === captureId) {
-              current.retryAt = Date.now() + 3000;
+              current.retryAt = 0;
               current.fallbackReason = 'capture-disconnected';
+              current.recoveryReason = current.fallbackReason;
               cancelCapture(current);
             }
           }
@@ -260,19 +266,22 @@ export function createBeatSync(api, nativePublish) {
       }
       if (message.kind === 'tempo.tick' && current.mode === 'capture' && current.clock?.playing
         && Number.isInteger(message.tick?.step) && message.tick.step >= 0 && message.tick.step < 8
-        && Array.isArray(message.tick.bands) && message.tick.bands.length <= 3
-        && message.tick.bands.every((band) => validBands.has(band))) {
+        && Number.isFinite(message.tick.phase) && message.tick.phase >= 0 && message.tick.phase < 1
+        && Number.isFinite(message.tick.beatPosition) && message.tick.beatPosition >= 0
+        && message.tick.subdivision === 2) {
         delivered = true;
-        publish(current, { kind: 'tempo.tick', captureId: current.captureId, tick: message.tick, ...diagnostic });
+        const { step, phase, beatPosition, subdivision } = message.tick;
+        publish(current, { kind: 'tempo.tick', captureId: current.captureId, tick: { step, phase, beatPosition, subdivision }, ...diagnostic });
       }
       if (!delivered) telemetry.mark('EVENT_DROPPED', trace, { reason: current.mode !== 'capture' ? 'clock' : !current.clock?.playing ? 'not-playing' : 'invalid' });
       if (message.kind === 'stopped') {
-        // Do not repeatedly suppress a silent/protected tab's output every
-        // three seconds. Resume/unmute or a toolbar click still retries now.
-        current.retryAt = Date.now() + (message.reason === 'silent' ? 30000 : 3000);
+        current.retryAt = Date.now() + (message.reason === 'failed' ? 3000 : 0);
         current.fallbackReason = ['expired', 'silent', 'ended', 'failed'].includes(message.reason) ? message.reason : 'stopped';
         cancelCapture(current);
-        if (message.reason === 'expired') void stopIfCurrent(current);
+        // Retain the clock subscription; the next active clock or renewal
+        // reacquires capture without requiring another toolbar invocation.
+        current.recoveryReason = current.fallbackReason;
+        void capture(current);
       }
     },
     invoke(tabId) {

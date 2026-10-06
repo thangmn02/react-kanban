@@ -181,7 +181,7 @@ without invalidating an otherwise valid beat message.
 | Field | Meaning |
 | --- | --- |
 | `source: onset` | An existing detector's claim, not verified instrument identity. |
-| `source: tempo` | Estimated tempo state or a synthesized subdivision event. |
+| `source: tempo` | Estimated tempo state or timing-only subdivision; never an instrument identity. |
 | `source: random` | An intentional decorative shape, separate from its triggering onset. |
 | `source: lifecycle` | Instrument envelope/idle updates without a new note attack. |
 | `type` | Diagnostic vocabulary: kick, snare, hat, bass, melodic, generic. Existing UI labels are unchanged. |
@@ -222,7 +222,7 @@ CAPTURE_START → AUDIO_DETECTED → ANALYSIS_FRAME → EVENT_DETECTED
 Check `component` at the last observation and any subsequent `EVENT_DROPPED`,
 `EVENT_LATE`, `LOW_ENERGY`, `LEASE_EXPIRED` or `CAPTURE_STOP`. Reasons identify
 existing owner/sequence/debounce gates, queue limits, missed deadlines,
-transport failures, tempo selection, masks and controller state coalescing.
+transport failures, masks and controller state coalescing.
 `CAPTURE_RECOVERED` marks audibility returning within a still-running capture.
 New capture starts identify reacquisition after a stop.
 
@@ -235,3 +235,37 @@ the dock.
 
 The initial map and verified failure points are in the
 [Phase 0 report](../../plans/reports/diagnosis-261006-1534-beat-telemetry.md).
+
+## Beat Grid recovery
+
+Leased capture remains alive through quiet passages. Silence does not claim
+audibility or generate onsets. Unrenewed leases and ended tracks still release
+the stream. Capture expiry retains the selected clock subscription and retries
+automatically; quiet streams receive lease renewals before their first audible
+frame. Native backlog, lease loss and capture interruption retry on the next
+fresh active Companion clock. Startup/permission failures retain their existing
+bounded backoff; pause/resume can retry immediately.
+
+Tempo ticks contain `step`, `phase`, `beatPosition` and `subdivision: 2` instead
+of instrument bands. The controller exposes a structural `tickCount`. Semantic
+rows use detected onsets even during tempo lock. Random patterns, held shapes,
+their tempo retriggers, CSS delays and optional note models remain unchanged.
+
+Late transport events (over 600 ms, up to 2 seconds old) are logged and coalesced
+to the latest event per kind before UI delivery. Older events expire and request
+subscription renewal, at most once per second. Pending work is checked again
+when the UI resumes; newer delivery supersedes older work. The stale-capture
+watchdog retains honest clock fallback and requests renewal. This bounded
+recovery does not promise correct rhythmic timing during a blocked UI.
+
+The analyzer's playback queue still drops events more than 600 ms past their
+audio deadline and continues with fresh detector events. At capacity it evicts
+the oldest enqueued work rather than rejecting new work. A late instrument
+batch drops missed notes without permanently disabling subsequent analysis.
+`EVENT_LATE` and `EVENT_DROPPED` retain provenance; `CAPTURE_RECOVERED` records
+returning audio or resumed delivery after a miss. `delivery-coalesced` and
+`delivery-late` identify transport recovery. No replacement semantic events are
+fabricated.
+
+See the [recovery report](../../plans/reports/diagnosis-261006-1659-beat-recovery.md)
+for tests and browser-validation limits.

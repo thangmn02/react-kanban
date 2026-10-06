@@ -5,6 +5,47 @@ import { beatTelemetry } from './beat-telemetry.js';
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => { beatTelemetry.enable(false); beatTelemetry.clear(); vi.useRealTimers(); vi.restoreAllMocks(); });
+it('retains a fresh detected onset when future instrument work saturates the queue', async () => {
+  const f = fixture(); f.context.currentTime = 0; let notes;
+  const engine = createCaptureEngine({ ...f.deps, createInstrumentCapture: (options) => {
+    notes = options.onNotes;
+    return { ready: Promise.resolve(), delaySeconds: 3.5, connect() {}, stop() {} };
+  } });
+  await engine.start('stream', 'saturated');
+  notes(Array.from({ length: 2048 }, (_, note) => ({ time: 10, state: { active: true, level: .5, note } })));
+  await vi.advanceTimersByTimeAsync(450);
+  f.analyser.getFloatFrequencyData = (array) => array.fill(-20);
+  await vi.advanceTimersByTimeAsync(20);
+  f.context.currentTime = 4; await vi.advanceTimersByTimeAsync(20);
+  expect(f.deps.onBeat).toHaveBeenCalledWith('saturated', expect.arrayContaining(['kick']));
+  engine.stop(); expect(vi.getTimerCount()).toBe(0);
+});
+it('keeps actual detection delivering through thirty minutes with long quiet sections', async () => {
+  const f = fixture(); let time = 0, sample;
+  Object.defineProperty(f.context, 'currentTime', { get: () => time / 1000 });
+  f.analyser.getFloatFrequencyData = (array) => {
+    const frame = Math.round(time / (1000 / 60));
+    const quiet = frame % 18000 >= 12000 && frame % 18000 < 13200;
+    array.fill(quiet ? -Infinity : frame % 30 === 0 ? -20 : -60);
+  };
+  const engine = createCaptureEngine({ ...f.deps, now: () => time,
+    schedule: (callback) => { sample = callback; return 1; }, cancel: vi.fn() });
+  await engine.start('stream', 'continuous');
+  let previousCount = 0;
+  for (let frame = 0; frame <= 108000; frame++) {
+    time = frame * 1000 / 60;
+    if (frame % 120 === 0) expect(engine.renew('continuous')).toBe(true);
+    sample();
+    if (frame > 60 && frame % 60 === 0 && (frame - 60) % 18000 < 12000) {
+      expect(f.deps.onBeat.mock.calls.length).toBeGreaterThan(previousCount);
+    }
+    if (frame % 60 === 0) previousCount = f.deps.onBeat.mock.calls.length;
+    if (frame % 18000 === 13200) expect(f.deps.onBeat.mock.calls.at(-1)[0]).toBe('continuous');
+  }
+  expect(f.deps.onStop).not.toHaveBeenCalled();
+  expect(f.deps.getUserMedia).toHaveBeenCalledOnce();
+  engine.stop();
+}, 60000);
 function fixture() {
   const audio = { stop: vi.fn(), addEventListener: vi.fn(), readyState: 'live' };
   const video = { stop: vi.fn() };
@@ -158,9 +199,12 @@ it('leaves original audio connected when AI misses a note deadline', async () =>
   const engine = createCaptureEngine(f.deps);
   await engine.start('stream', 'slow');
   publish([{ time: 0, state: { active: true, level: .8, note: 1 } }]);
-  expect(pipeline.stopAnalysis).toHaveBeenCalledOnce();
+  expect(pipeline.stopAnalysis).not.toHaveBeenCalled();
   expect(pipeline.stop).not.toHaveBeenCalled();
-  expect(f.deps.onMelody).toHaveBeenLastCalledWith('slow', { active: false, level: 0, note: 0 });
+  publish([{ time: 7, state: { active: true, level: .8, note: 2 } }]);
+  f.context.currentTime = 10.5;
+  await vi.advanceTimersByTimeAsync(20);
+  expect(f.deps.onMelody).toHaveBeenLastCalledWith('slow', { active: true, level: .8, note: 2 });
   engine.stop();
 });
 
@@ -180,14 +224,19 @@ it('continues ordinary capture without AI delay if model setup stalls', async ()
   expect(vi.getTimerCount()).toBe(0);
 });
 
-it('stops a silent or protected stream without announcing live analysis or any onsets', async () => {
+it('keeps leased quiet analysis alive without claiming audible capture and resumes on the next frame', async () => {
   const f = fixture();
   f.analyser.getFloatFrequencyData = (array) => array.fill(-Infinity);
   await f.engine.start('stream', 'silent');
   await vi.advanceTimersByTimeAsync(2600);
   expect(f.deps.onAudible).not.toHaveBeenCalled();
   expect(f.deps.onBeat).not.toHaveBeenCalled();
-  expect(f.deps.onStop).toHaveBeenCalledWith('silent', 'silent');
+  expect(f.deps.onStop).not.toHaveBeenCalled();
+  f.analyser.getFloatFrequencyData = (array) => array.fill(-20);
+  await vi.advanceTimersByTimeAsync(20);
+  expect(f.deps.onAudible).toHaveBeenCalledWith('silent');
+  expect(f.deps.onBeat).toHaveBeenCalledWith('silent', expect.arrayContaining(['kick']));
+  f.engine.stop();
   expect(f.audio.stop).toHaveBeenCalledOnce();
 });
 it('locks sparse periodic captured transients, emits live tempo ticks, and drops the grid when confidence fades', async () => {
@@ -206,7 +255,7 @@ it('locks sparse periodic captured transients, emits live tempo ticks, and drops
   expect(locks.length).toBeGreaterThan(0);
   expect(locks.at(-1).bpm).toBeGreaterThan(118);
   expect(locks.at(-1).bpm).toBeLessThan(124);
-  expect(f.deps.onTempoTick).toHaveBeenCalledWith('tempo', expect.objectContaining({ step: expect.any(Number), bands: expect.arrayContaining(['hat']) }));
+  expect(f.deps.onTempoTick).toHaveBeenCalledWith('tempo', expect.objectContaining({ step: expect.any(Number), phase: expect.any(Number), subdivision: 2 }));
   periodic = false;
   for (let index = 0; index < 3; index++) {
     await vi.advanceTimersByTimeAsync(4000);

@@ -15,6 +15,7 @@ const reasons = new Set(['replaced', 'stopped', 'failed', 'expired', 'silent', '
   'instrument-deadline', 'worker-backlog', 'worker-failed', 'disabled', 'renderer-coalesced',
   'renderer-mask', 'capture-disconnected', 'native-capture-unavailable', 'track-changed',
   'muted', 'native-override', 'clock', 'starting', 'audio-context-stalled']);
+reasons.add('delivery-late'); reasons.add('delivery-coalesced');
 reasons.add('tempo-selected');
 const finite = (n) => typeof n === 'number' && Number.isFinite(n);
 const opaque = (s) => typeof s === 'string' && /^[a-zA-Z0-9:_-]{1,160}$/.test(s);

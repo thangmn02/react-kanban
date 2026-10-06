@@ -19,6 +19,32 @@ function clock(sessionId = 'browser:song', currentTime = 1, playing = true) {
   return { sessionId, subscriptionId:'subscription', kind:'clock', emittedAt:Date.now(),
     clock:{playing,paused:!playing,currentTime,playbackRate:1,sampledAt:Date.now()} };
 }
+it.each(['expired', 'capture-disconnected', 'audio-backlog'])('recovers active %s capture on the next fresh clock', async (reason) => {
+  const feed = createNativeAudioFeed(vi.fn()); feed.companion(clock()); feed.activate('browser:song', 'subscription');
+  await vi.waitFor(() => expect(transport.channels).toHaveLength(1));
+  const id = engine.start.mock.calls[0][0], old = transport.channels[0];
+  feed.ended({ captureId: id, reason });
+  feed.companion(clock());
+  await vi.waitFor(() => expect(transport.channels).toHaveLength(2));
+  expect(engine.start.mock.calls[1][0]).not.toBe(id);
+  old.onmessage(packet()); expect(engine.push).not.toHaveBeenCalled();
+  transport.channels[1].onmessage(packet()); expect(engine.push).toHaveBeenCalledOnce();
+  feed.stop('browser:song', 'subscription');
+});
+it('recovers after pause, backward seek and a missing clock while retaining owner isolation', async () => {
+  vi.useFakeTimers();
+  const feed = createNativeAudioFeed(vi.fn()); feed.companion(clock()); feed.activate('browser:song', 'subscription');
+  await vi.advanceTimersByTimeAsync(10);
+  feed.companion(clock('browser:song', 1, false));
+  feed.companion(clock('browser:song', 20)); await vi.advanceTimersByTimeAsync(10);
+  feed.companion(clock('browser:song', 5)); await vi.advanceTimersByTimeAsync(10);
+  expect(transport.channels).toHaveLength(3);
+  await vi.advanceTimersByTimeAsync(3500);
+  feed.companion(clock('browser:song', 8.5)); await vi.advanceTimersByTimeAsync(10);
+  expect(transport.channels).toHaveLength(4);
+  feed.stop('browser:song', 'subscription');
+  expect(vi.getTimerCount()).toBe(0);
+});
 it('opts into native diagnostics and preserves event IDs and PCM sequence without changing the binary header', async () => {
   beatTelemetry.enable();
   const publish = vi.fn(), feed = createNativeAudioFeed(publish);
@@ -34,6 +60,10 @@ it('opts into native diagnostics and preserves event IDs and PCM sequence withou
   transport.channels[0].onmessage(packet(3));
   expect(beatTelemetry.snapshot().records.some((r) => r.stage === 'EVENT_DROPPED' && r.reason === 'audio-backlog')).toBe(true);
   expect(publish).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'sync.state', mode: 'clock', reason: 'audio-backlog' }));
+  feed.companion(clock());
+  await vi.waitFor(() => expect(transport.channels).toHaveLength(2));
+  transport.channels[1].onmessage(packet());
+  expect(engine.push).toHaveBeenCalledTimes(2);
   feed.stop('browser:song', 'subscription');
 });
 it('validates bounded PCM frames, sample rate, sequence and finite samples', () => {

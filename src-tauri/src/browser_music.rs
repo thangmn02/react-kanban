@@ -45,6 +45,11 @@ fn now() -> u64 {
         .as_millis() as u64
 }
 
+fn beat_age(emitted_at: &Value, timestamp: u64) -> Option<u64> {
+    let emitted_at = emitted_at.as_u64()?;
+    (emitted_at <= timestamp + 100).then(|| timestamp.saturating_sub(emitted_at))
+}
+
 fn allowed_origin(origin: &str) -> bool {
     origin
         .strip_prefix("chrome-extension://")
@@ -165,6 +170,7 @@ impl BrowserMusic {
                     let (send, mut receive) = mpsc::channel::<Value>(64);
                     bridge.peers.lock().unwrap().insert(id.clone(), send);
                     bridge.connections.lock().unwrap().insert(id.clone(), address.port());
+                    let mut last_recovery_at = 0;
                     loop {
                         let next = select(
                             Box::pin(receive.recv()),
@@ -223,13 +229,20 @@ impl BrowserMusic {
                                             else {
                                                 continue;
                                             };
-                                            // Keep original emission time: minimized/queued flashes must expire.
-                                            if !value["emittedAt"]
-                                                .as_u64()
-                                                .is_some_and(|t| now().abs_diff(t) <= 600)
-                                            {
+                                            let timestamp = now();
+                                            let Some(age) = beat_age(&value["emittedAt"], timestamp) else { continue; };
+                                            if age > 600 && value["telemetry"].as_array().is_some_and(|traces| !traces.is_empty() && traces.len() <= 5) {
+                                                let _ = bridge.app.emit("native-beat-telemetry", json!({"stage":"EVENT_LATE","component":"native-widget-bridge","delayMs":age,"telemetry":value["telemetry"]}));
+                                            }
+                                            // Bounded late delivery is coalesced in the UI. Older work
+                                            // expires, with a renewal signal instead of silent starvation.
+                                            if age > 2000 {
                                                 if value["telemetry"].as_array().is_some_and(|traces| traces.len() <= 5) {
                                                     let _ = bridge.app.emit("native-beat-telemetry", json!({"stage":"EVENT_DROPPED","component":"native-widget-bridge","reason":"late","telemetry":value["telemetry"]}));
+                                                }
+                                                if timestamp.saturating_sub(last_recovery_at) >= 1000 {
+                                                    last_recovery_at = timestamp;
+                                                    let _ = bridge.app.emit("native-music-beat", json!({"kind":"sync.recover","sessionId":format!("{id}:{session}"),"subscriptionId":value["subscriptionId"],"emittedAt":timestamp}));
                                                 }
                                                 continue;
                                             }
@@ -400,6 +413,17 @@ pub fn native_music_setup(app: AppHandle) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn preserves_bounded_late_age_and_rejects_invalid_emission_times() {
+        assert_eq!(beat_age(&json!(10_000), 10_000), Some(0));
+        assert_eq!(beat_age(&json!(9_399), 10_000), Some(601));
+        assert_eq!(beat_age(&json!(8_000), 10_000), Some(2000));
+        assert_eq!(beat_age(&json!(7_999), 10_000), Some(2001));
+        assert_eq!(beat_age(&json!(10_100), 10_000), Some(0));
+        assert_eq!(beat_age(&json!(10_101), 10_000), None);
+        assert_eq!(beat_age(&json!("10000"), 10_000), None);
+        assert_eq!(beat_age(&Value::Null, 10_000), None);
+    }
     #[test]
     fn excludes_web_origins_and_non_music_sources() {
         assert!(allowed_origin(

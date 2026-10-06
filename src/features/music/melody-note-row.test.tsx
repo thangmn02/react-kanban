@@ -11,7 +11,7 @@ it('keeps the instrumental row dark on real or estimated hi-hats', async () => {
   vi.useFakeTimers();
   const view = render(<BeatPattern session={session} beat={live} />);
   await settle();
-  view.rerender(<BeatPattern session={session} beat={{ ...live, onsets: { hat: 1 }, tempo: { locked: true, bpm: 120, confidence: .9 }, ticks: { hat: 1 } }} />);
+  view.rerender(<BeatPattern session={session} beat={{ ...live, onsets: { hat: 1 }, tempo: { locked: true, bpm: 120, confidence: .9 }, tickCount: 1 }} />);
   await settle();
   expect(view.container.querySelectorAll('[data-channel="melody"] .melody-beat-flash, [data-channel="melody"] .active')).toHaveLength(0);
 });

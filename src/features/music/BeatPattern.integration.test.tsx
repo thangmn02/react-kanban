@@ -37,7 +37,7 @@ it('keeps percussion and note flashes intact when only diagnostic metadata chang
 it('flashes instrumental notes without replaying on envelope updates, real hats or tempo hats', async () => {
   vi.useFakeTimers();
   const live = { ...clock, mode: 'capture' as const, captureId: 'melody-flash',
-    tempo: { locked: true, bpm: 128, confidence: .8 }, rates: { kick: 1 }, ticks: {} };
+    tempo: { locked: true, bpm: 128, confidence: .8 }, rates: { kick: 1 }, tickCount: 0 };
   const view = render(<BeatPattern session={session} beat={live} />);
   const flashes = () => [...view.container.querySelectorAll('[data-channel="melody"] .melody-beat-flash')];
   await act(async () => { await vi.advanceTimersByTimeAsync(0); });
@@ -50,7 +50,7 @@ it('flashes instrumental notes without replaying on envelope updates, real hats 
   view.rerender(<BeatPattern session={session} beat={{ ...phrase, melody: { ...phrase.melody, level: .8 } }} />);
   await act(async () => { await vi.advanceTimersByTimeAsync(0); });
   expect(flashes()[0]).toBe(first);
-  view.rerender(<BeatPattern session={session} beat={{ ...phrase, ticks: { hat: 1 } }} />);
+  view.rerender(<BeatPattern session={session} beat={{ ...phrase, tickCount: 1 }} />);
   await act(async () => { await vi.advanceTimersByTimeAsync(0); });
   expect(flashes()[0]).toBe(first);
   view.rerender(<BeatPattern session={session} beat={{ ...phrase, onsets: { hat: 1 } }} />);
@@ -150,17 +150,18 @@ it('flashes each row independently, including simultaneous hits, and stops on ca
   expect(view.container.querySelectorAll('.channel-icon')).toHaveLength(5);
 });
 
-it('uses tempo ticks only after a real capture lock, and returns to raw accents after unlock', async () => {
-  const locked = { ...clock, mode: 'capture' as const, captureId: 'live', tempo: { locked: true, bpm: 120, confidence: .8 }, ticks: {} };
+it('keeps semantic rows on detected onsets during tempo lock and unlock', async () => {
+  const locked = { ...clock, mode: 'capture' as const, captureId: 'live', tempo: { locked: true, bpm: 120, confidence: .8 }, tickCount: 0 };
   const view = render(<BeatPattern session={session} beat={locked} />);
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
-  view.rerender(<BeatPattern session={session} beat={{ ...locked, onsets: { kick: 1 } }} />);
+  view.rerender(<BeatPattern session={session} beat={{ ...locked, tickCount: 1 }} />);
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
   expect(view.container.querySelectorAll('.beat-square.onset')).toHaveLength(0);
-  view.rerender(<BeatPattern session={session} beat={{ ...locked, onsets: { kick: 1 }, ticks: { kick: 1, hat: 1 } }} />);
+  view.rerender(<BeatPattern session={session} beat={{ ...locked, onsets: { kick: 1 }, tickCount: 1 }} />);
   await waitFor(() => expect(view.container.querySelectorAll('[data-channel="drum"] .beat-square.onset').length).toBeGreaterThan(0));
-  expect(view.container.querySelectorAll('[data-channel="hat"] .beat-square.onset').length).toBeGreaterThan(0);
+  expect(view.container.querySelectorAll('[data-channel="hat"] .beat-square.onset')).toHaveLength(0);
   expect(view.container.querySelectorAll('[data-channel="bass"] .beat-square.onset')).toHaveLength(0);
-  const accent = { ...locked, tempo: { locked: false, bpm: null, confidence: .1 }, onsets: { bass: 1 }, ticks: {} };
+  const accent = { ...locked, tempo: { locked: false, bpm: null, confidence: .1 }, onsets: { bass: 1 }, tickCount: 0 };
   view.rerender(<BeatPattern session={session} beat={accent} />);
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
   view.rerender(<BeatPattern session={session} beat={{ ...accent, onsets: { bass: 2 } }} />);
@@ -170,7 +171,7 @@ it('uses tempo ticks only after a real capture lock, and returns to raw accents 
 });
 
 it('renders five distinct tracks and flashes instrumental attacks independently of the tempo grid', async () => {
-  const locked = { ...clock, mode: 'capture' as const, captureId: 'five', tempo: { locked: true, bpm: 120, confidence: .8 }, ticks: {} };
+  const locked = { ...clock, mode: 'capture' as const, captureId: 'five', tempo: { locked: true, bpm: 120, confidence: .8 }, tickCount: 0 };
   const view = render(<BeatPattern session={session} beat={locked} colorMode="pastel" />);
   expect([...view.container.querySelectorAll('.beat-channel')].map((row) => row.getAttribute('data-track')))
     .toEqual(['Drum (Kick)', 'Clap', 'Hi-hat', 'Bass', 'Melody']);
@@ -226,7 +227,7 @@ it('reflashes a held shape on confident captured tempo ticks, never on clock tic
   vi.useFakeTimers();
   vi.spyOn(Math, 'random').mockReturnValue(0);
   const live = { ...clock, mode: 'capture' as const, captureId: 'locked-shape', rates: { kick: 1 },
-    tempo: { locked: true, bpm: 120, confidence: .8 }, ticks: {} };
+    tempo: { locked: true, bpm: 120, confidence: .8 }, tickCount: 0 };
   const view = render(<BeatPattern session={session} beat={live} />);
   await act(async () => { await vi.advanceTimersByTimeAsync(0); });
   const playing = { ...session, currentTime: 36 };
@@ -235,14 +236,14 @@ it('reflashes a held shape on confident captured tempo ticks, never on clock tic
   await act(async () => { await vi.advanceTimersByTimeAsync(0); });
   const mask = [...view.container.querySelectorAll('.moment-lit')];
   const flash = view.container.querySelector('.shape-beat-flash');
-  view.rerender(<BeatPattern session={playing} beat={{ ...hit, ticks: { kick: 1, hat: 1 } }} />);
+  view.rerender(<BeatPattern session={playing} beat={{ ...hit, tickCount: 1 }} />);
   await act(async () => { await vi.advanceTimersByTimeAsync(0); });
   expect([...view.container.querySelectorAll('.moment-lit')]).toEqual(mask);
   expect(view.container.querySelector('.shape-beat-flash')).not.toBe(flash);
   expect(view.container.querySelectorAll('.shape-beat-flash')).toHaveLength(mask.length);
-  view.rerender(<BeatPattern session={playing} beat={{ ...hit, ticks: { kick: 2 }, rates: {} }} />);
+  view.rerender(<BeatPattern session={playing} beat={{ ...hit, tickCount: 2, rates: {} }} />);
   expect(view.container.querySelectorAll('.moment-lit, .shape-beat-flash')).toHaveLength(0);
-  view.rerender(<BeatPattern session={playing} beat={{ ...hit, ticks: { kick: 3 }, mode: 'clock' }} />);
+  view.rerender(<BeatPattern session={playing} beat={{ ...hit, tickCount: 3, mode: 'clock' }} />);
   expect(view.container.querySelectorAll('.moment-lit, .shape-beat-flash')).toHaveLength(0);
 });
 

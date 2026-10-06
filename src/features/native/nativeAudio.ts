@@ -9,6 +9,7 @@ interface Subscription {
   captureId?: string; engine?: NativeAudioEngine; starting?: boolean; audible?: boolean;
   sequence: number; beatSequence: number; retryAt: number; heartbeat?: ReturnType<typeof setInterval>;
   previousClock?: { currentTime: number; playbackRate: number; sampledAt: number };
+  recoveryReason?: string;
 }
 
 export function decodeNativeAudio(value: unknown): { sequence: number; samples: Float32Array } | undefined {
@@ -34,6 +35,7 @@ export function createNativeAudioFeed(publish: (message: Message) => void) {
   function halt(owner: Subscription, reason: string) {
     telemetry.record('CAPTURE_STOP', undefined, { captureId: owner.captureId, reason });
     const id = owner.captureId, engine = owner.engine;
+    if (id && owner.playing && !['stopped', 'replaced'].includes(reason)) owner.recoveryReason = reason;
     owner.engine = undefined; owner.captureId = undefined; owner.audible = false; owner.starting = false;
     clearInterval(owner.heartbeat); owner.heartbeat = undefined;
     engine?.stop();
@@ -53,8 +55,12 @@ export function createNativeAudioFeed(publish: (message: Message) => void) {
       onTempo: (_, tempo, traces) => { if (owner.captureId === id) emit(owner, { kind: 'tempo.state', tempo, ...diagnostic(traces) }); },
       onTempoTick: (_, tick, traces) => { if (owner.captureId === id) emit(owner, { kind: 'tempo.tick', tick, ...diagnostic(traces) }); },
       onMelody: (_, melody, traces) => { if (owner.captureId === id) emit(owner, { kind: 'melody.state', detector: 'instrument-v1', melody, ...diagnostic(traces) }); },
-      onAudible: () => { if (owner.captureId === id) { owner.audible = true; emit(owner, { kind: 'sync.state', mode: 'capture' }); } },
-      onStop: (_, reason) => { if (owner.captureId === id) { owner.retryAt = Date.now() + 3000; halt(owner, reason); } },
+      onAudible: () => { if (owner.captureId === id) {
+        owner.audible = true;
+        if (owner.recoveryReason) { telemetry.record('CAPTURE_RECOVERED', undefined, { captureId: id, reason: owner.recoveryReason }); owner.recoveryReason = undefined; }
+        emit(owner, { kind: 'sync.state', mode: 'capture' });
+      } },
+      onStop: (_, reason) => { if (owner.captureId === id) { owner.retryAt = reason === 'failed' ? Date.now() + 3000 : 0; halt(owner, reason); } },
     });
     owner.engine = engine;
     try {
@@ -67,7 +73,7 @@ export function createNativeAudioFeed(publish: (message: Message) => void) {
         telemetry.record('EVENT_RECEIVED', undefined, { captureId: id, sequence: packet?.sequence, frames: packet ? packet.samples.length / 2 : undefined });
         if (!packet || packet.sequence !== owner.sequence + 1 || !engine.push(packet.samples, ...(beatTelemetry.enabled ? [{ sequence: packet.sequence }] : []))) {
           telemetry.record('EVENT_DROPPED', undefined, { captureId: id, reason: !packet ? 'invalid' : 'audio-backlog', sequence: packet?.sequence });
-          owner.retryAt = Date.now() + 3000; halt(owner, 'audio-backlog'); return;
+          owner.retryAt = 0; halt(owner, 'audio-backlog'); return;
         }
         owner.sequence = packet.sequence;
       };
@@ -82,7 +88,7 @@ export function createNativeAudioFeed(publish: (message: Message) => void) {
           telemetry.record('LEASE_RENEW', undefined, { captureId: id, sequence: owner.sequence });
         }).catch(() => {
           telemetry.record('LEASE_EXPIRED', undefined, { captureId: id, reason: 'capture-disconnected' });
-          if (owner.captureId === id) { owner.retryAt = Date.now() + 3000; halt(owner, 'capture-disconnected'); }
+          if (owner.captureId === id) { owner.retryAt = 0; halt(owner, 'capture-disconnected'); }
         });
         if (owner.audible) emit(owner, { kind: 'sync.state', mode: 'capture' });
       }, 500);
@@ -102,7 +108,9 @@ export function createNativeAudioFeed(publish: (message: Message) => void) {
     }
     owner.previousClock = { currentTime, playbackRate, sampledAt };
     owner.clockAt = Date.now();
-    owner.playing = data.playing === true && data.paused === false && data.muted !== true;
+    const playing = data.playing === true && data.paused === false && data.muted !== true;
+    if (playing && !owner.playing) owner.retryAt = 0;
+    owner.playing = playing;
     if (!owner.playing) halt(owner, data.muted ? 'muted' : 'not-playing');
     else void begin(owner);
   }
@@ -112,7 +120,15 @@ export function createNativeAudioFeed(publish: (message: Message) => void) {
       const data = message as Message;
       if (typeof data.sessionId !== 'string' || typeof data.subscriptionId !== 'string') return true;
       const stamp = data.emittedAt;
-      if (typeof stamp !== 'number' || !Number.isFinite(stamp) || Date.now() - stamp > 600 || stamp > Date.now() + 100) { telemetry.mark('EVENT_DROPPED', parseBeatTraces(data.telemetry), { reason: 'late' }); telemetry.record('EVENT_DROPPED', undefined, { reason: 'late' }); return false; }
+      if (typeof stamp !== 'number' || !Number.isFinite(stamp) || stamp > Date.now() + 100) { telemetry.record('EVENT_DROPPED', undefined, { reason: 'invalid' }); return false; }
+      if (Date.now() - stamp > 600) telemetry.record('EVENT_LATE', undefined, { delayMs: Date.now() - stamp });
+      if (Date.now() - stamp > 2000) {
+        telemetry.mark('EVENT_DROPPED', parseBeatTraces(data.telemetry), { reason: 'late' });
+        telemetry.record('EVENT_DROPPED', undefined, { reason: 'late' });
+        if (current?.sessionId === data.sessionId && current.subscriptionId === data.subscriptionId) emit(current, { kind: 'sync.recover' });
+        return false;
+      }
+      if (data.kind === 'sync.recover') return true;
       if (data.kind === 'clock' && data.clock && typeof data.clock === 'object') {
         const state = data.clock as Message;
         if (typeof state.playing !== 'boolean' || typeof state.paused !== 'boolean') return false;
@@ -144,7 +160,7 @@ export function createNativeAudioFeed(publish: (message: Message) => void) {
       if (!value || typeof value !== 'object' || !current) return;
       const event = value as Message;
       if (current.captureId !== event.captureId) return;
-      current.retryAt = Date.now() + 3000;
+      current.retryAt = 0;
       halt(current, typeof event.reason === 'string' ? event.reason : 'capture-failed');
     },
   };

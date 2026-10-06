@@ -15,6 +15,21 @@ vi.mock('./mediaBridge', () => ({
 beforeEach(() => { vi.useFakeTimers(); bridge.send.mockResolvedValue(undefined); });
 afterEach(() => { cleanup(); beatTelemetry.enable(false); beatTelemetry.clear(); vi.useRealTimers(); vi.clearAllMocks(); });
 const emit = (event: BeatEvent) => act(() => { bridge.receive?.(event); });
+it('uses tempo only as structural timing and renews on explicit delivery recovery', async () => {
+  const onClock = vi.fn();
+  const { result } = renderHook(() => useMusicBeatSync('song', onClock));
+  await act(async () => {});
+  emit({ kind: 'sync.state', mode: 'capture', captureId: 'capture' });
+  emit({ kind: 'tempo.state', captureId: 'capture', tempo: { locked: true, bpm: 120, confidence: .8 } });
+  emit({ kind: 'tempo.tick', captureId: 'capture', tick: { step: 2, phase: 0, beatPosition: 1, subdivision: 2 } });
+  expect(result.current.tickCount).toBe(1);
+  expect(result.current.onsets).toEqual({});
+  const requests = bridge.send.mock.calls.length;
+  emit({ kind: 'sync.recover' });
+  expect(bridge.send).toHaveBeenCalledTimes(requests + 1);
+  emit({ kind: 'onset', captureId: 'capture', sequence: 1, bands: ['hat'] });
+  expect(result.current.onsets).toEqual({ hat: 1 });
+});
 it('reports per-row debounce, duplicate sequence and stale owner without changing counters', () => {
   beatTelemetry.enable();
   const onClock = vi.fn();

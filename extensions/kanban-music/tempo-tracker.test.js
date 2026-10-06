@@ -68,7 +68,7 @@ it.each([90, 128, 150])('bounds phase over ten minutes of %s BPM kicks with samp
   expect(ticks.every((tick, index) => index === 0 || tick > ticks[index - 1])).toBe(true);
 });
 
-it('locks to regular 120 BPM accents and emits eighth-note drum rows', () => {
+it('locks to regular 120 BPM accents and emits structural timing without instrument identities', () => {
   const tracker = new TempoTracker();
   const ticks = [];
   for (let frame = 0; frame < 660; frame++) {
@@ -79,9 +79,14 @@ it('locks to regular 120 BPM accents and emits eighth-note drum rows', () => {
   expect(tracker.bpm).toBeGreaterThan(114);
   expect(tracker.bpm).toBeLessThan(126);
   expect(tracker.confidence).toBeGreaterThan(0.42);
-  expect(ticks.some((tick) => tick.step === 0 && tick.bands.includes('kick') && tick.bands.includes('hat'))).toBe(true);
-  expect(ticks.some((tick) => tick.step === 2 && tick.bands.includes('clap'))).toBe(true);
-  expect(ticks.some((tick) => tick.step % 2 === 1 && tick.bands.length === 1 && tick.bands[0] === 'hat')).toBe(true);
+  expect(ticks.some((tick) => tick.step === 2)).toBe(true);
+  ticks.forEach((tick) => {
+    expect(tick).not.toHaveProperty('bands');
+    expect(tick.subdivision).toBe(2);
+    expect(tick.phase).toBeGreaterThanOrEqual(0);
+    expect(tick.phase).toBeLessThan(1);
+    expect(tick.beatPosition).toBeGreaterThanOrEqual(0);
+  });
 });
 
 it('does not invent a tempo from a flat signal and unlocks after four low-confidence seconds', () => {
