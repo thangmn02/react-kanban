@@ -1,8 +1,22 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { getMusicInstallUrl, isMusicSession, sendMusicRequest, sendMusicDiagnostics, subscribeBeatEvents, openInstrumentNotesSetup } from './mediaBridge';
+import { beatTelemetry } from '../../../extensions/kanban-music/beat-telemetry.js';
 
-afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); vi.unstubAllEnvs(); });
+afterEach(() => { beatTelemetry.enable(false); beatTelemetry.clear(); vi.restoreAllMocks(); vi.useRealTimers(); vi.unstubAllEnvs(); });
 const session = { id: '1', title: 'Song', artist: 'Artist', source: 'youtube.com', paused: true };
+it('forwards only valid diagnostic sidecars and never rejects an otherwise valid beat because of telemetry', () => {
+  beatTelemetry.enable(); const receive = vi.fn();
+  const stop = subscribeBeatEvents('song', 'subscription', receive);
+  const traces = beatTelemetry.events('onset', ['kick']);
+  const send = (telemetry: unknown) => window.dispatchEvent(new MessageEvent('message', { source: window, origin: location.origin,
+    data: { channel: 'kanban-music-v1', direction: 'extension-event', event: 'beat', sessionId: 'song', subscriptionId: 'subscription', kind: 'onset', bands: ['kick'], telemetry } }));
+  send(traces?.map((t) => ({ ...t, title: 'private' })));
+  expect(receive).toHaveBeenLastCalledWith({ kind: 'onset', bands: ['kick'], telemetry: traces });
+  send([{ id: 'invalid' }]);
+  expect(receive).toHaveBeenLastCalledWith({ kind: 'onset', bands: ['kick'] });
+  expect(beatTelemetry.snapshot().counts.EVENT_RECEIVED).toBe(1);
+  stop();
+});
 it('opens instrument setup through a correlated selected-session acknowledgement', async () => {
   const post = vi.spyOn(window, 'postMessage').mockImplementation(message => reply(message, { ok: true }));
   await expect(openInstrumentNotesSetup(session.id)).resolves.toBeUndefined();

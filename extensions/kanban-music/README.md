@@ -104,6 +104,9 @@ immediately. Resume/unmute or a toolbar click retries capture.
 
 See [BEAT-VALIDATION.md](./BEAT-VALIDATION.md) for API evidence, detector settings, and the live validation status.
 
+For local event-path diagnostics, see [Beat Grid telemetry](#beat-grid-telemetry).
+Tracing is opt-in, bounded and does not change detection or visual timing.
+
 If a playing site is missing, open this companion's **Details → Extension options** and press **Check music detection**, or use **Music detection (dev)** in the development app. The read-only report distinguishes missing host access/injection failure, DOM/detached media counts, and Media Session-only playback. It reports website names and safe counts/state flags, not track titles, source URLs, account details or audio. The diagnostic command accepts only this extension's own setup page or the existing allowlisted Kora origins. A paused YouTube session can be a previously loaded player and is not proof of playing music. On first discovery, an old paused toolbar selection does not override a playing session; new toolbar clicks and manual picker choices still select that session.
 
 Live Brave validation on 2026-10-03 confirmed SoundCloud discovery, play/pause, real capture onset counters and square pops, and capture recovery after resume and page refresh without another toolbar click. This does not guarantee permission survives extension reloads, nor establish compatibility with every SoundCloud player or with Edge. See the validation report for remaining checks.
@@ -111,3 +114,124 @@ Live Brave validation on 2026-10-03 confirmed SoundCloud discovery, play/pause, 
 Version 0.3.5 also confirmed real Spotify capture in Brave on “Chemical” by Post Malone after browser consent: all four counters climbed, squares animated, icons stayed static, pause cleared motion, and resume/page refresh recovered capture without another click. Other tracks and browsers can still deny or silence capture; the live result does not guarantee universal Spotify support.
 
 Version 0.3.6 additionally confirmed real Apple Music capture on “Waiting For Love” by Avicii and YouTube Music capture in Brave. Live onset counts increased, squares popped and icons stayed static. Apple Music pause cleared all square lighting; resume and app refresh recovered capture without another toolbar click after consent. Deezer and Tidal live testing was skipped at the user's request; shared-path regression coverage remains. These observed results do not guarantee every service/track/browser allows capture.
+
+## Beat Grid telemetry
+
+Phase 0 adds local diagnostics to the existing pipeline. It does not change
+detectors, tempo selection, playback delays, recovery timers or decorative
+visuals. The current optional instrument models remain optional and unchanged.
+
+### Enable and collect
+
+Tracing is off by default. In the app's developer console:
+
+```js
+__koraBeatTelemetry.enable(true);
+__koraBeatTelemetry.clear();
+```
+
+Opening the app with `?musicDebug=1` also enables its recorder. For web/PiP,
+enable the producer as well: open the Companion service worker's developer
+console from the browser extension manager, then run:
+
+```js
+await chrome.storage.local.set({ beatTelemetryEnabled: true });
+```
+
+Pause and resume after enabling. Native capture and instrument workers receive
+the diagnostic setting when they start. Background/offscreen storage changes
+alone do not restart capture or affect playback.
+
+Reproduce the problem, then collect each relevant realm while it is alive:
+
+```js
+const trace = __koraBeatTelemetry.snapshot();
+console.table(trace.records);
+console.log(trace.counts, trace.evicted);
+```
+
+The app, Companion background, offscreen document and instrument worker have
+separate buffers. Native transport observations enter the app's buffer. Closing
+an offscreen document or worker destroys its local buffer. At most 2,048 records
+are retained per realm; frequent analysis frames can evict older events quickly.
+Stage counts survive eviction until `clear()`. Counts include transport hops and
+multiple cells, so they are not counts of unique notes or physical drum hits.
+
+Disable diagnostics after collection, then pause/resume to clear the worker and
+native-capture flags:
+
+```js
+__koraBeatTelemetry.enable(false);
+__koraBeatTelemetry.clear();
+// In the Companion service worker console:
+await chrome.storage.local.set({ beatTelemetryEnabled: false });
+```
+
+Nothing automatically exports telemetry. It contains opaque event/capture IDs,
+timing, row claims, queue counts and allowlisted lifecycle reasons. PCM, spectra,
+song titles, URLs and account information are excluded.
+
+### Event interpretation
+
+Each diagnostic sidecar has `id`, `source`, `type`, `confidence`, `detectedAt`,
+`targetTime` and `targetClock`. The same ID survives the producer, scheduler,
+transport and renderer. Metadata is optional; malformed metadata is ignored
+without invalidating an otherwise valid beat message.
+
+| Field | Meaning |
+| --- | --- |
+| `source: onset` | An existing detector's claim, not verified instrument identity. |
+| `source: tempo` | Estimated tempo state or a synthesized subdivision event. |
+| `source: random` | An intentional decorative shape, separate from its triggering onset. |
+| `source: lifecycle` | Instrument envelope/idle updates without a new note attack. |
+| `type` | Diagnostic vocabulary: kick, snare, hat, bass, melodic, generic. Existing UI labels are unchanged. |
+| `confidence: null` | The producer does not provide a calibrated confidence. Tempo-state messages use their existing confidence. |
+| `active`, `noteSequence` | Instrument state and existing attack sequence; repeated level updates are distinguishable from new attacks. |
+| `parentId` | The onset that initiated a decorative shape. Later shape retriggers retain that shape's ID. |
+
+`detectedAt`, `at`, `emittedAt` and `renderedAt` are epoch milliseconds.
+`targetTime` is explicitly either `audio-seconds` or `epoch-ms`; never subtract
+timestamps from different domains. The native instrument scheduler records its
+existing remapping from worker audio time to the delayed visual timeline. It
+does not imply synchronization to the original audible note.
+
+`EVENT_STATE_COMMITTED` observes controller state. `EVENT_COMMITTED` observes
+the renderer's DOM commit. `EVENT_RENDERED` observes CSS animation start, which
+includes the existing CSS delay; reduced-motion mode records the static DOM
+commit instead. It is not a physical display or speaker-output timestamp.
+Several cells can report the same event ID with different animation delays.
+
+Native PCM retains its 16-byte binary header. Sequence/frame counters correlate
+the native channel and Web Audio buffering; no hardware capture timestamp is
+introduced. `queueDepth` is local to each component: event count in capture,
+pending messages in the runtime, buffered samples in worker batch records,
+scheduled sources in the native engine, and unacknowledged packets in Rust.
+`durationMs` measures analyzer/tempo work or a worker inference batch only when
+tracing is enabled.
+
+### Diagnose a stopped grid
+
+Follow the most recent capture ID and semantic event ID through:
+
+```text
+CAPTURE_START → AUDIO_DETECTED → ANALYSIS_FRAME → EVENT_DETECTED
+→ EVENT_QUEUED → EVENT_SENT → EVENT_RECEIVED → EVENT_ACCEPTED
+→ EVENT_STATE_COMMITTED → EVENT_COMMITTED → EVENT_RENDERED
+```
+
+Check `component` at the last observation and any subsequent `EVENT_DROPPED`,
+`EVENT_LATE`, `LOW_ENERGY`, `LEASE_EXPIRED` or `CAPTURE_STOP`. Reasons identify
+existing owner/sequence/debounce gates, queue limits, missed deadlines,
+transport failures, tempo selection, masks and controller state coalescing.
+`CAPTURE_RECOVERED` marks audibility returning within a still-running capture.
+New capture starts identify reacquisition after a stop.
+
+The classic `relay.js` and browser-owned internal queues have no separate
+recorder; their boundaries are background send and app receive. A missing
+boundary observation narrows the failure to that transport rather than proving
+which browser-internal queue stalled. Evicted records and closed realms cannot
+be reconstructed. Collect during the failure before changing source or closing
+the dock.
+
+The initial map and verified failure points are in the
+[Phase 0 report](../../plans/reports/diagnosis-261006-1534-beat-telemetry.md).

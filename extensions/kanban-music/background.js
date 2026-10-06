@@ -5,6 +5,12 @@ import { createCompanionAction } from './companion-action.js';
 import { mediaSites } from './sites.js';
 import { diagnoseDiscovery } from './discovery-diagnostics.js';
 import { createWidgetBridge } from './widget-bridge.js';
+import { beatTelemetry } from './beat-telemetry.js';
+
+void chrome.storage.local.get('beatTelemetryEnabled').then((data) => beatTelemetry.enable(data.beatTelemetryEnabled === true)).catch(() => {});
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.beatTelemetryEnabled) beatTelemetry.enable(changes.beatTelemetryEnabled.newValue === true);
+});
 
 let widget;
 const beats = createBeatSync(chrome, (owner, event) => widget?.beat(owner, event));

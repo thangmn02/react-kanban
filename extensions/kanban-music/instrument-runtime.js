@@ -1,4 +1,6 @@
 import { instrumentDelay, instrumentSampleRate } from './instrument-models.js';
+import { beatTelemetry, parseBeatTraces } from './beat-telemetry.js';
+const telemetry = beatTelemetry.at('instrument-runtime');
 
 export function createInstrumentWorker({ progress = () => {}, notes = () => {}, error = () => {}, workerUrl } = {}) {
   const worker = new Worker(workerUrl || new URL('./generated/instrument-worker.js', import.meta.url), { type: 'module' });
@@ -7,6 +9,7 @@ export function createInstrumentWorker({ progress = () => {}, notes = () => {}, 
   const fail = (message) => {
     if (closed) return;
     closed = true; clearTimeout(timeout); worker.terminate(); reject(new Error(message)); error(message);
+    telemetry.record('EVENT_DROPPED', undefined, { reason: 'worker-failed', queueDepth: pending });
   };
   const timeout = setTimeout(() => fail('Instrument model setup timed out'), 180000);
   worker.onerror = () => fail('Instrument model could not start');
@@ -16,12 +19,17 @@ export function createInstrumentWorker({ progress = () => {}, notes = () => {}, 
     if (data.kind === 'ready') { clearTimeout(timeout); resolve(); }
     if (data.kind === 'error') fail(data.message);
     if (data.kind === 'ack') pending = Math.max(0, pending - 1);
-    if (data.kind === 'notes') notes(data.events);
+    if (data.kind === 'telemetry') telemetry.record('WORKER_BATCH', undefined, { durationMs: data.durationMs, queueDepth: data.queueDepth });
+    if (data.kind === 'notes') {
+      data.events.forEach((event) => telemetry.mark('EVENT_RECEIVED', parseBeatTraces(event.telemetry), { queueDepth: pending }));
+      notes(data.events);
+    }
   };
-  worker.postMessage({ kind: 'prepare' });
+  worker.postMessage({ kind: 'prepare', ...(beatTelemetry.enabled ? { telemetryEnabled: true } : {}) });
   return { ready, send(data) {
     if (closed) return;
-    if (++pending > 96) { fail('Instrument analysis cannot keep up on this device'); return; }
+    if (++pending > 96) { telemetry.record('EVENT_DROPPED', undefined, { reason: 'worker-backlog', queueDepth: pending }); fail('Instrument analysis cannot keep up on this device'); return; }
+    telemetry.record('EVENT_QUEUED', undefined, { queueDepth: pending, frames: data.left.length });
     worker.postMessage(data, [data.left.buffer, data.right.buffer]);
   }, stop() {
     if (closed) return;

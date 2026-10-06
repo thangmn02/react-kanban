@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createNativeAudioFeed, decodeNativeAudio } from './nativeAudio';
 import { createNativeAudioEngine } from '../../../extensions/kanban-music/native-audio-engine.js';
+import { beatTelemetry } from '../../../extensions/kanban-music/beat-telemetry.js';
 const transport = vi.hoisted(() => ({ invoke: vi.fn().mockResolvedValue(undefined),
   channels: [] as { onmessage: (data: ArrayBuffer) => void }[] }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: transport.invoke,
@@ -8,7 +9,7 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: transport.invoke,
 vi.mock('../../../extensions/kanban-music/native-audio-engine.js', () => ({ createNativeAudioEngine: vi.fn() }));
 const engine = { start: vi.fn().mockResolvedValue(true), push: vi.fn().mockReturnValue(true), renew: vi.fn().mockReturnValue(true), stop: vi.fn() };
 beforeEach(() => { vi.clearAllMocks(); transport.channels.length = 0; vi.mocked(createNativeAudioEngine).mockReturnValue(engine); });
-afterEach(() => vi.useRealTimers());
+afterEach(() => { beatTelemetry.enable(false); beatTelemetry.clear(); vi.useRealTimers(); });
 function packet(sequence = 1) {
   const data = new ArrayBuffer(32), view = new DataView(data);
   view.setBigUint64(0, BigInt(sequence), true); view.setUint32(8, 2, true); view.setUint32(12, 44100, true);
@@ -18,6 +19,23 @@ function clock(sessionId = 'browser:song', currentTime = 1, playing = true) {
   return { sessionId, subscriptionId:'subscription', kind:'clock', emittedAt:Date.now(),
     clock:{playing,paused:!playing,currentTime,playbackRate:1,sampledAt:Date.now()} };
 }
+it('opts into native diagnostics and preserves event IDs and PCM sequence without changing the binary header', async () => {
+  beatTelemetry.enable();
+  const publish = vi.fn(), feed = createNativeAudioFeed(publish);
+  feed.companion(clock()); feed.activate('browser:song', 'subscription');
+  await vi.waitFor(() => expect(transport.channels).toHaveLength(1));
+  expect(transport.invoke).toHaveBeenCalledWith('native_audio_start', expect.objectContaining({ telemetryEnabled: true }));
+  const id = engine.start.mock.calls[0][0];
+  const traces = beatTelemetry.events('onset', ['kick']);
+  vi.mocked(createNativeAudioEngine).mock.calls[0][0].onBeat(id, ['kick'], traces);
+  expect(publish).toHaveBeenLastCalledWith(expect.objectContaining({ telemetry: traces?.map((t) => ({ ...t, captureId: id })) }));
+  transport.channels[0].onmessage(packet());
+  expect(engine.push).toHaveBeenCalledWith(expect.any(Float32Array), { sequence: 1 });
+  transport.channels[0].onmessage(packet(3));
+  expect(beatTelemetry.snapshot().records.some((r) => r.stage === 'EVENT_DROPPED' && r.reason === 'audio-backlog')).toBe(true);
+  expect(publish).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'sync.state', mode: 'clock', reason: 'audio-backlog' }));
+  feed.stop('browser:song', 'subscription');
+});
 it('validates bounded PCM frames, sample rate, sequence and finite samples', () => {
   expect(decodeNativeAudio(packet())?.sequence).toBe(1);
   expect(decodeNativeAudio(packet())?.samples.length).toBe(4);

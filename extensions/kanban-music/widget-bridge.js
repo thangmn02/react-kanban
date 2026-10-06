@@ -1,5 +1,7 @@
 // Only metadata and validated beat events cross this loopback connection.
 // No PCM, microphone, desktop audio or arbitrary page commands.
+import { beatTelemetry } from './beat-telemetry.js';
+const telemetry = beatTelemetry.at('widget-bridge');
 export function createWidgetBridge({ api, handle, disconnected, Socket = WebSocket }) {
   let socket;
   let nonce;
@@ -57,7 +59,11 @@ export function createWidgetBridge({ api, handle, disconnected, Socket = WebSock
   return {
     connect,
     get connected() { return Boolean(nonce && socket?.readyState === 1); },
-    beat(owner, event) { if (owner === nonce) return send({ ...event, type: 'beat', emittedAt: Date.now() }); return false; },
+    beat(owner, event) {
+      const sent = owner === nonce && send({ ...event, type: 'beat', emittedAt: Date.now() });
+      telemetry.mark(sent ? 'EVENT_SENT' : 'EVENT_DROPPED', event.telemetry, sent ? {} : { reason: 'transport' });
+      return sent;
+    },
     close() { stopped = true; clearTimeout(retry); clearInterval(heartbeat); socket?.close(); },
   };
 }

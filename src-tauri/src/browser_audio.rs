@@ -11,6 +11,15 @@ struct Capture {
 #[derive(Clone, Default)]
 pub struct BrowserAudio(Arc<Mutex<Option<Capture>>>);
 
+fn capture_telemetry(enabled: Option<bool>, stage: &str, id: &str, sequence: u64, frames: usize, queue_depth: u64) -> Option<serde_json::Value> {
+    if enabled != Some(true) { return None; }
+    let mut value = serde_json::json!({"stage":stage,"component":"native-capture","captureId":id,
+        "sequence":sequence,"frames":frames,"queueDepth":queue_depth});
+    if stage == "EVENT_DROPPED" { value["reason"] = serde_json::json!("audio-backlog"); }
+    if stage == "LEASE_EXPIRED" { value["reason"] = serde_json::json!("expired"); }
+    Some(value)
+}
+
 impl BrowserAudio {
     fn stop(&self, id: Option<&str>) -> Result<(), String> {
         let mut current = self.0.lock().map_err(|_| "Audio capture unavailable")?;
@@ -23,10 +32,10 @@ impl BrowserAudio {
 
 #[tauri::command]
 pub async fn native_audio_start(window: WebviewWindow, music: State<'_, BrowserMusic>, audio: State<'_, BrowserAudio>,
-    session_id: String, capture_id: String, on_audio: Channel<InvokeResponseBody>) -> Result<(), String> {
+    session_id: String, capture_id: String, on_audio: Channel<InvokeResponseBody>, telemetry_enabled: Option<bool>) -> Result<(), String> {
     if window.label() != "main" || capture_id.is_empty() || capture_id.len() > 100 { return Err("Invalid audio capture".into()); }
     #[cfg(not(windows))]
-    { let _ = (music, audio, session_id, on_audio); Err("Automatic browser beats require Windows".into()) }
+    { let _ = (music, audio, session_id, on_audio, telemetry_enabled); Err("Automatic browser beats require Windows".into()) }
     #[cfg(windows)]
     {
         let capture = Capture { id: capture_id, stopped: Arc::default(),
@@ -44,6 +53,13 @@ pub async fn native_audio_start(window: WebviewWindow, music: State<'_, BrowserM
         let (ready, receive) = tokio::sync::oneshot::channel();
         let owned_audio = audio.inner().clone();
         std::thread::spawn(move || {
+            // Opt-in side-channel only. The PCM binary contract stays unchanged.
+            let trace = |stage: &str, sequence: u64, frames: usize, queue_depth: u64| {
+                if let Some(value) = capture_telemetry(telemetry_enabled, stage, &capture.id, sequence, frames, queue_depth) {
+                    let _ = window.emit("native-beat-telemetry", value);
+                }
+            };
+            trace("CAPTURE_START", 0, 0, 0);
             let mut ready = Some(ready);
             let result = (|| {
                 let _com = crate::browser_audio_windows::ComApartment::new().map_err(|_| "Could not initialize browser audio")?;
@@ -54,28 +70,33 @@ pub async fn native_audio_start(window: WebviewWindow, music: State<'_, BrowserM
                 if let Some(ready) = ready.take() { let _ = ready.send(Ok(())); }
                 while !capture.stopped.load(Ordering::Acquire) {
                     if !browser.alive() { return Err("browser-closed".to_owned()); }
-                    if Instant::now() > *capture.lease.lock().map_err(|_| "capture-expired")? { return Err("expired".to_owned()); }
+                    if Instant::now() > *capture.lease.lock().map_err(|_| "capture-expired")? { trace("LEASE_EXPIRED", capture.sent.load(Ordering::Acquire), 0, 0); return Err("expired".to_owned()); }
                     if capture.sent.load(Ordering::Acquire).saturating_sub(capture.acknowledged.load(Ordering::Acquire)) > 128 {
+                        trace("EVENT_DROPPED", capture.sent.load(Ordering::Acquire), 0, 128);
                         return Err("audio-backlog".to_owned());
                     }
                     while let Some(packet) = input.packet().map_err(|_| "capture-failed")? {
                         if capture.stopped.load(Ordering::Acquire) { break; }
                         if capture.sent.load(Ordering::Acquire).saturating_sub(capture.acknowledged.load(Ordering::Acquire)) >= 128 {
+                            trace("EVENT_DROPPED", capture.sent.load(Ordering::Acquire), packet.len() / 2, 128);
                             return Err("audio-backlog".to_owned());
                         }
                         let sequence = capture.sent.fetch_add(1, Ordering::AcqRel) + 1;
+                        trace("EVENT_QUEUED", sequence, packet.len() / 2, sequence.saturating_sub(capture.acknowledged.load(Ordering::Acquire)));
                         let mut bytes = Vec::with_capacity(16 + packet.len() * 4);
                         bytes.extend_from_slice(&sequence.to_le_bytes());
                         bytes.extend_from_slice(&(packet.len() as u32 / 2).to_le_bytes());
                         bytes.extend_from_slice(&crate::browser_audio_windows::SAMPLE_RATE.to_le_bytes());
                         for sample in packet { bytes.extend_from_slice(&sample.to_le_bytes()); }
                         on_audio.send(InvokeResponseBody::Raw(bytes)).map_err(|_| "audio-disconnected")?;
+                        trace("EVENT_SENT", sequence, 0, 0);
                     }
                     std::thread::sleep(Duration::from_millis(10));
                 }
                 Ok(())
             })();
             if let Some(ready) = ready.take() { let _ = ready.send(result.clone()); }
+            trace("CAPTURE_STOP", capture.sent.load(Ordering::Acquire), 0, 0);
             if let Err(reason) = result {
                 let _ = window.emit("native-audio-ended", serde_json::json!({"captureId":capture.id,"reason":reason}));
             }
@@ -105,6 +126,15 @@ pub fn native_audio_stop(window: WebviewWindow, audio: State<'_, BrowserAudio>, 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn capture_diagnostics_are_opt_in_and_contain_only_transport_metadata() {
+        assert!(capture_telemetry(None, "EVENT_SENT", "capture", 1, 128, 2).is_none());
+        assert!(capture_telemetry(Some(false), "EVENT_SENT", "capture", 1, 128, 2).is_none());
+        let value = capture_telemetry(Some(true), "EVENT_DROPPED", "capture", 129, 128, 128).unwrap();
+        assert_eq!(value, serde_json::json!({"stage":"EVENT_DROPPED","component":"native-capture",
+            "captureId":"capture","sequence":129,"frames":128,"queueDepth":128,"reason":"audio-backlog"}));
+        assert_eq!(capture_telemetry(Some(true), "LEASE_EXPIRED", "capture", 1, 0, 0).unwrap()["reason"], "expired");
+    }
     #[test]
     fn old_capture_cleanup_cannot_stop_its_replacement() {
         let audio = BrowserAudio::default();

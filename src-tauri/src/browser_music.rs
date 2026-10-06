@@ -214,6 +214,9 @@ impl BrowserMusic {
                                                 }
                                             }
                                         } else if value["type"] == "beat" {
+                                            if value["telemetry"].as_array().is_some_and(|traces| !traces.is_empty() && traces.len() <= 5) {
+                                                let _ = bridge.app.emit("native-beat-telemetry", json!({"stage":"EVENT_RECEIVED","component":"native-widget-bridge","telemetry":value["telemetry"]}));
+                                            }
                                             let Some(session) = value["sessionId"]
                                                 .as_str()
                                                 .filter(|s| s.len() <= 250)
@@ -225,9 +228,15 @@ impl BrowserMusic {
                                                 .as_u64()
                                                 .is_some_and(|t| now().abs_diff(t) <= 600)
                                             {
+                                                if value["telemetry"].as_array().is_some_and(|traces| traces.len() <= 5) {
+                                                    let _ = bridge.app.emit("native-beat-telemetry", json!({"stage":"EVENT_DROPPED","component":"native-widget-bridge","reason":"late","telemetry":value["telemetry"]}));
+                                                }
                                                 continue;
                                             }
                                             value["sessionId"] = json!(format!("{id}:{session}"));
+                                            if value["telemetry"].as_array().is_some_and(|traces| !traces.is_empty() && traces.len() <= 5) {
+                                                let _ = bridge.app.emit("native-beat-telemetry", json!({"stage":"EVENT_SENT","component":"native-widget-bridge","telemetry":value["telemetry"]}));
+                                            }
                                             let _ = bridge.app.emit("native-music-beat", value);
                                         }
                                     }

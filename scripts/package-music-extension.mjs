@@ -89,6 +89,7 @@ await mkdir(join(extension, 'icons'), { recursive: true });
 for (const size of [16, 48, 128]) await writeFile(join(extension, 'icons', `${size}.png`), icon(size));
 const names = ['manifest.json', 'background.js', 'widget-bridge.js', 'sites.js', 'companion-action.js', 'media.js', 'media-observer.js', 'discovery-diagnostics.js', 'protocol.js', 'relay.js', 'clock.js', 'beat-sync.js', 'beat-detector.js', 'tempo-tracker.js', 'capture-engine.js', 'offscreen.html', 'offscreen.js', 'setup.html', 'setup.js', 'setup.css', 'icons/16.png', 'icons/48.png', 'icons/128.png'];
 names.push('instrument-runtime.js', 'instrument-models.js', 'instrument-worklet.js', 'INSTRUMENT-NOTICES.md',
+  'beat-telemetry.js',
   'generated/instrument-worker.js', 'vendor/ort.wasm.min.mjs', 'vendor/ort-wasm-simd-threaded.mjs', 'vendor/ort-wasm-simd-threaded.wasm',
   'THIRD-PARTY-LICENSES.txt');
 const files = await Promise.all(names.map(async (name) => ({ name, bytes: await readFile(join(extension, name)) })));

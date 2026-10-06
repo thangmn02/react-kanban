@@ -3,6 +3,8 @@ import FFT from 'fft.js';
 import { models, modelCache, loadModel, instrumentSampleRate, modelFrames, modelBins } from './instrument-models.js';
 import { resizeModelWindow } from './model-window.js';
 import { InstrumentNoteTracker } from './instrument-note-tracker.js';
+import { beatTelemetry } from './beat-telemetry.js';
+const telemetry = beatTelemetry.at('instrument-worker');
 
 ort.env.wasm.numThreads = 1; // Offscreen extension pages are not cross-origin isolated.
 ort.env.wasm.wasmPaths = new URL(/* @vite-ignore */ '../vendor/', import.meta.url).href;
@@ -14,6 +16,7 @@ const window = Float32Array.from({ length: fftSize }, (_, i) => .5 - .5 * Math.c
 const samples = new Float32Array(fftSize);
 const tracker = new InstrumentNoteTracker();
 let sessions, preparing, baseFrame, received = 0, nextFrame = 0, busy = false, failed = false;
+let tracedNote = -1;
 const send = (message) => self.postMessage(message);
 function fail(error) {
   if (failed) return;
@@ -41,6 +44,7 @@ async function pump() {
   busy = true;
   try {
     while (received >= (nextFrame + stride + contextFrames - 1) * hop + fftSize / 2) {
+      const batchAt = beatTelemetry.enabled ? performance.now() : 0;
       if (received - Math.max(0, (nextFrame - contextFrames) * hop - fftSize / 2) >= capacity) throw new Error('Instrument analysis cannot keep up');
       const data = new Float32Array(2 * modelFrames * modelBins);
       for (let channel = 0; channel < 2; channel++) for (let frame = 0; frame < modelFrames; frame++) {
@@ -92,9 +96,16 @@ async function pump() {
           // Bass attack tails must not become a second instrumental voice.
           const state = tracker.analyze(spectra.subarray(frame * modelBins, (frame + 1) * modelBins), frameTime * 1000,
             bass > other * 1.5 ? 0 : otherPowers[frame] / Math.max(1e-10, mixPowers[frame]));
-          if (state) events.push({ time: frameTime, state });
+          if (state) {
+            const traces = telemetry.events(state.active && state.note > tracedNote ? 'onset' : 'lifecycle', ['melodic'], { targetTime: frameTime, targetClock: 'audio-seconds', active: state.active, noteSequence: state.note });
+            tracedNote = state.note;
+            telemetry.mark('EVENT_DETECTED', traces);
+            events.push({ time: frameTime, state, ...(traces ? { telemetry: traces } : {}) });
+          }
         }
+        events.forEach((event) => telemetry.mark('EVENT_SENT', event.telemetry));
         send({ kind: 'notes', events }); nextFrame += stride;
+        if (beatTelemetry.enabled) send({ kind: 'telemetry', durationMs: performance.now() - batchAt, queueDepth: received - nextFrame * hop });
       } finally { x.dispose(); outputs.forEach((output) => output.dispose()); }
     }
   } catch (error) { fail(error); }
@@ -102,6 +113,7 @@ async function pump() {
 }
 self.onmessage = ({ data }) => {
   if (data?.kind === 'prepare') {
+    beatTelemetry.enable(data.telemetryEnabled === true);
     preparing ||= prepare().catch(fail); return;
   }
   if (data?.kind !== 'pcm' || failed || !sessions) return;

@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createCaptureEngine, tabConstraints } from './capture-engine.js';
 import { TempoTracker } from './tempo-tracker.js';
+import { beatTelemetry } from './beat-telemetry.js';
 
 beforeEach(() => vi.useFakeTimers());
-afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
+afterEach(() => { beatTelemetry.enable(false); beatTelemetry.clear(); vi.useRealTimers(); vi.restoreAllMocks(); });
 function fixture() {
   const audio = { stop: vi.fn(), addEventListener: vi.fn(), readyState: 'live' };
   const video = { stop: vi.fn() };
@@ -16,6 +17,60 @@ function fixture() {
     onTempo: vi.fn(), onTempoTick: vi.fn(), onMelody: vi.fn(), now: () => Date.now() };
   return { audio, video, stream, source, analyser, context, deps, engine: createCaptureEngine(deps) };
 }
+it('traces lifecycle and detector delivery without changing the detected bands', async () => {
+  beatTelemetry.enable();
+  const f = fixture(); await f.engine.start('stream', 'traced');
+  await vi.advanceTimersByTimeAsync(450);
+  f.analyser.getFloatFrequencyData = (array) => array.fill(-20);
+  await vi.advanceTimersByTimeAsync(20);
+  expect(f.deps.onBeat).toHaveBeenCalled();
+  const [id, bands, traces] = f.deps.onBeat.mock.calls[0];
+  expect(id).toBe('traced'); expect(bands).toEqual(['kick', 'clap', 'hat', 'bass']);
+  expect(traces.map((t) => t.type)).toEqual(['kick', 'snare', 'hat', 'bass']);
+  expect(f.engine.renew('traced')).toBe(true);
+  f.analyser.getFloatFrequencyData = (array) => array.fill(-Infinity);
+  await vi.advanceTimersByTimeAsync(50);
+  f.analyser.getFloatFrequencyData = (array) => array.fill(-20);
+  await vi.advanceTimersByTimeAsync(20);
+  f.engine.stop();
+  const log = beatTelemetry.snapshot();
+  for (const stage of ['CAPTURE_START', 'AUDIO_DETECTED', 'LOW_ENERGY', 'CAPTURE_RECOVERED', 'LEASE_RENEW', 'CAPTURE_STOP']) expect(log.counts[stage]).toBeGreaterThan(0);
+  expect(log.records.filter((r) => r.id === traces[0].id).map((r) => r.stage)).toEqual(['EVENT_DETECTED', 'EVENT_QUEUED', 'EVENT_SENT']);
+});
+it('reports existing late-event drops and capture lease expiry', async () => {
+  beatTelemetry.enable();
+  const f = fixture(); let audioTime = 0;
+  Object.defineProperty(f.context, 'currentTime', { get: () => audioTime });
+  const instrument = { ready: Promise.resolve(), delaySeconds: 3.5, connect() {}, stop() {} };
+  const engine = createCaptureEngine({ ...f.deps, createInstrumentCapture: () => instrument });
+  await engine.start('stream', 'late'); await vi.advanceTimersByTimeAsync(450);
+  f.analyser.getFloatFrequencyData = (array) => array.fill(-20);
+  await vi.advanceTimersByTimeAsync(20);
+  expect(f.deps.onBeat).not.toHaveBeenCalled();
+  audioTime = 4.2; await vi.advanceTimersByTimeAsync(20);
+  expect(beatTelemetry.snapshot().records.some((r) => r.stage === 'EVENT_DROPPED' && r.reason === 'late')).toBe(true);
+  expect(f.deps.onBeat).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(5600);
+  expect(f.deps.onStop).toHaveBeenCalledWith('late', 'expired');
+  expect(beatTelemetry.snapshot().counts.LEASE_EXPIRED).toBe(1);
+  engine.stop();
+});
+it('reports a full existing queue and cancellation without extending its capacity', async () => {
+  beatTelemetry.enable();
+  const f = fixture(); let notes;
+  f.context.currentTime = 0;
+  const engine = createCaptureEngine({ ...f.deps, createInstrumentCapture: (options) => {
+    notes = options.onNotes;
+    return { ready: Promise.resolve(), delaySeconds: 3.5, connect() {}, stop() {} };
+  } });
+  await engine.start('stream', 'full');
+  notes(Array.from({ length: 2049 }, (_, note) => ({ time: 10, state: { active: true, level: .5, note } })));
+  expect(beatTelemetry.snapshot().records.some((r) => r.stage === 'EVENT_DROPPED' && r.reason === 'queue-full')).toBe(true);
+  expect(f.deps.onMelody).not.toHaveBeenCalled();
+  engine.stop();
+  expect(beatTelemetry.snapshot().counts.EVENT_DROPPED).toBe(2049);
+  expect(vi.getTimerCount()).toBe(0);
+});
 it('uses the documented constraints, discards video, and restores tab audio once', async () => {
   const f = fixture();
   expect(await f.engine.start('stream-id', 'capture')).toBe(true);

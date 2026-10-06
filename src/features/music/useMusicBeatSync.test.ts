@@ -2,6 +2,7 @@ import { act, cleanup, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { BeatEvent } from './mediaBridge';
 import { useMusicBeatSync } from './useMusicBeatSync';
+import { beatTelemetry } from '../../../extensions/kanban-music/beat-telemetry.js';
 
 const bridge = vi.hoisted(() => ({ receive: undefined as undefined | ((event: BeatEvent) => void), send: vi.fn() }));
 vi.mock('./mediaBridge', () => ({
@@ -12,8 +13,44 @@ vi.mock('./mediaBridge', () => ({
   },
 }));
 beforeEach(() => { vi.useFakeTimers(); bridge.send.mockResolvedValue(undefined); });
-afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks(); });
+afterEach(() => { cleanup(); beatTelemetry.enable(false); beatTelemetry.clear(); vi.useRealTimers(); vi.clearAllMocks(); });
 const emit = (event: BeatEvent) => act(() => { bridge.receive?.(event); });
+it('reports per-row debounce, duplicate sequence and stale owner without changing counters', () => {
+  beatTelemetry.enable();
+  const onClock = vi.fn();
+  const { result } = renderHook(() => useMusicBeatSync('song', onClock));
+  emit({ kind: 'sync.state', mode: 'capture', captureId: 'capture' });
+  const traces = () => beatTelemetry.events('onset', ['kick'], { captureId: 'capture' });
+  emit({ kind: 'onset', captureId: 'capture', sequence: 1, bands: ['kick'], telemetry: traces() });
+  const accepted = result.current.telemetry?.['onset:kick'].id;
+  emit({ kind: 'onset', captureId: 'capture', sequence: 2, bands: ['kick'], telemetry: traces() });
+  emit({ kind: 'onset', captureId: 'capture', sequence: 2, bands: ['kick'], telemetry: traces() });
+  emit({ kind: 'onset', captureId: 'old', sequence: 3, bands: ['kick'], telemetry: traces() });
+  expect(result.current.onsets).toEqual({ kick: 1 });
+  expect(result.current.telemetry?.['onset:kick'].id).toBe(accepted);
+  expect(beatTelemetry.snapshot().records.filter((r) => r.stage === 'EVENT_DROPPED').map((r) => r.reason)).toEqual(['debounce', 'sequence', 'owner']);
+});
+
+it('observes state coalescing without losing the existing batched onset counts', () => {
+  beatTelemetry.enable();
+  const onClock = vi.fn();
+  const { result } = renderHook(() => useMusicBeatSync('song', onClock));
+  emit({ kind: 'sync.state', mode: 'capture', captureId: 'capture' });
+  const first = beatTelemetry.events('onset', ['kick'])!;
+  const second = beatTelemetry.events('onset', ['kick'])!;
+  act(() => {
+    bridge.receive?.({ kind: 'onset', captureId: 'capture', sequence: 1, bands: ['kick'], telemetry: first });
+    vi.setSystemTime(Date.now() + 150);
+    bridge.receive?.({ kind: 'onset', captureId: 'capture', sequence: 2, bands: ['kick'], telemetry: second });
+  });
+  expect(result.current.onsets.kick).toBe(2);
+  expect(beatTelemetry.snapshot().records).toEqual(expect.arrayContaining([
+    expect.objectContaining({ id: first[0].id, stage: 'EVENT_DROPPED', reason: 'renderer-coalesced' }),
+    expect.objectContaining({ id: second[0].id, stage: 'EVENT_STATE_COMMITTED' }),
+  ]));
+  emit({ kind: 'sync.state', mode: 'capture', captureId: 'replacement' });
+  expect(result.current.telemetry).toBeUndefined();
+});
 
 it('leases Melody only from the current live capture and clears stalled notes, pause and capture replacement', async () => {
   const onClock = vi.fn();

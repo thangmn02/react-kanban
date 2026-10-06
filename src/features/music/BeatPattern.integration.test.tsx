@@ -2,10 +2,37 @@ import { act, cleanup, render, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import BeatPattern from './BeatPattern';
 import { effectNames, isShapeCell, momentDuration, shapeNames } from './beatVisuals';
+import { beatTelemetry } from '../../../extensions/kanban-music/beat-telemetry.js';
 
-afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.useRealTimers(); });
+afterEach(() => { cleanup(); beatTelemetry.enable(false); beatTelemetry.clear(); vi.restoreAllMocks(); vi.useRealTimers(); });
 const session = { id: 'song', title: 'Song', artist: '', source: '', paused: false, playing: true, currentTime: 0, sampledAt: 1000, playbackRate: 1 };
 const clock = { sessionId: 'song', mode: 'clock' as const, onsets: {} };
+
+it('keeps percussion and note flashes intact when only diagnostic metadata changes', async () => {
+  vi.useFakeTimers(); beatTelemetry.enable();
+  const live = { ...clock, mode: 'capture' as const, captureId: 'trace-only', rates: { kick: 1 } };
+  const view = render(<BeatPattern session={session} beat={live} />);
+  await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+  const kick = beatTelemetry.events('onset', ['kick'])![0];
+  const melodic = beatTelemetry.events('onset', ['melodic'])![0];
+  const hit = { ...live, onsets: { kick: 1 }, melody: { active: true, level: .7, note: 1 }, telemetry: { 'onset:kick': kick, 'onset:melodic': melodic } };
+  view.rerender(<BeatPattern session={session} beat={hit} />);
+  // A level-only message arriving before the existing zero-delay timers
+  // must not cancel those timers or change the originating note ID.
+  const level = beatTelemetry.events('lifecycle', ['melodic'])![0];
+  view.rerender(<BeatPattern session={session} beat={{ ...hit, telemetry: { ...hit.telemetry, 'lifecycle:melodic': level } }} />);
+  await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+  const drum = view.container.querySelector('[data-channel="drum"] .onset');
+  const note = view.container.querySelector('.melody-beat-flash');
+  expect(drum).toHaveAttribute('data-beat-trace', kick.id);
+  expect(note).toHaveAttribute('data-beat-trace', melodic.id);
+  view.rerender(<BeatPattern session={session} beat={{ ...hit, telemetry: { ...hit.telemetry } }} />);
+  await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+  expect(view.container.querySelector('[data-channel="drum"] .onset')).toBe(drum);
+  expect(view.container.querySelector('.melody-beat-flash')).toBe(note);
+  await act(async () => { await vi.advanceTimersByTimeAsync(150); });
+  expect(view.container.querySelector('.melody-beat-flash')).toBeNull();
+});
 
 it('flashes instrumental notes without replaying on envelope updates, real hats or tempo hats', async () => {
   vi.useFakeTimers();

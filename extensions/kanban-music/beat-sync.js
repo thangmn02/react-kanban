@@ -1,4 +1,6 @@
 const offscreenPath = 'offscreen.html';
+import { beatTelemetry, parseBeatTraces } from './beat-telemetry.js';
+const telemetry = beatTelemetry.at('beat-sync');
 const validBands = new Set(['kick', 'bass', 'clap', 'hat']);
 const sameOwner = (a, b) => a.native === b.native && a.tabId === b.tabId && a.documentId === b.documentId;
 function captureFailure(stage, error) {
@@ -35,19 +37,21 @@ export function createBeatSync(api, nativePublish) {
     if (state !== current || !current.captureId || !current.captureReady || !current.audioDetected
       || !current.clock?.playing || current.clock.muted || current.tabMuted) return;
     current.mode = 'capture';
+    telemetry.record('AUDIO_DETECTED', undefined, { captureId: current.captureId });
     current.fallbackReason = undefined;
     publishState(current);
   }
 
   function publish(current, event) {
-    if (state !== current) return;
+    if (state !== current) { telemetry.mark('EVENT_DROPPED', event.telemetry, { reason: 'owner' }); return; }
+    telemetry.mark('EVENT_SENT', event.telemetry);
     if (current.owner.native) {
       nativePublish?.(current.owner.native, { sessionId: current.session.id, subscriptionId: current.subscriptionId, ...event });
       return;
     }
     void api.tabs.sendMessage(current.owner.tabId, { protocol: 'kanban-music-v1', event: 'beat',
       sessionId: current.session.id, subscriptionId: current.subscriptionId, ...event },
-    { documentId: current.owner.documentId }).catch(() => { void stopIfCurrent(current); });
+    { documentId: current.owner.documentId }).catch(() => { telemetry.mark('EVENT_DROPPED', event.telemetry, { reason: 'transport' }); void stopIfCurrent(current); });
   }
 
   async function ensureOffscreen() {
@@ -63,6 +67,7 @@ export function createBeatSync(api, nativePublish) {
   function cancelCapture(current) {
     const captureId = current.captureId;
     if (!captureId && current.mode === 'clock') return;
+    telemetry.record('CAPTURE_STOP', undefined, { captureId, reason: current.fallbackReason || 'stopped' });
     current.captureId = undefined;
     current.captureReady = false;
     current.audioDetected = false;
@@ -84,6 +89,7 @@ export function createBeatSync(api, nativePublish) {
       || (!force && Date.now() < current.retryAt)) return;
     const captureId = crypto.randomUUID();
     current.captureId = captureId;
+    telemetry.record('CAPTURE_START', undefined, { captureId });
     current.captureReady = false;
     current.audioDetected = false;
     current.sequence = 0;
@@ -175,6 +181,7 @@ export function createBeatSync(api, nativePublish) {
           if (current.captureId && current.mode === 'capture') {
             const captureId = current.captureId;
             const captureLease = await offscreenMessage({ kind: 'lease', captureId }).catch(() => undefined);
+            telemetry.record(captureLease?.ok ? 'LEASE_RENEW' : 'LEASE_EXPIRED', undefined, { captureId });
             if (!captureLease?.ok && current.captureId === captureId) {
               current.retryAt = Date.now() + 3000;
               current.fallbackReason = 'capture-disconnected';
@@ -211,6 +218,7 @@ export function createBeatSync(api, nativePublish) {
       const discontinuity = previous?.playing && clock.playing &&
         (Math.abs(clock.currentTime - previous.currentTime - elapsed * previous.playbackRate) > .75 || previous.playbackRate !== clock.playbackRate);
       current.clock = clock;
+      telemetry.record('EVENT_RECEIVED', undefined, { captureId: current.captureId });
       if (resumed) current.retryAt = 0;
       if (discontinuity) { current.retryAt = 0; cancelCapture(current); }
       publish(current, { kind: 'clock', clock: { ...clock, currentTime: Math.max(0, clock.currentTime - (clock.playing ? (current.delaySeconds || 0) * clock.playbackRate : 0)) } });
@@ -219,34 +227,45 @@ export function createBeatSync(api, nativePublish) {
     },
     offscreen(message, sender) {
       const current = state;
-      if (sender.url !== api.runtime.getURL(offscreenPath) || sender.tab || !current || message.captureId !== current.captureId) return;
+      const trace = parseBeatTraces(message.telemetry);
+      if (sender.url !== api.runtime.getURL(offscreenPath) || sender.tab || !current || message.captureId !== current.captureId) { telemetry.mark('EVENT_DROPPED', trace, { reason: 'owner' }); return; }
+      telemetry.mark('EVENT_RECEIVED', trace);
+      // Carry only the allowlisted diagnostic envelope. Beat validation below
+      // remains independent of telemetry validity or whether tracing is enabled.
+      const diagnostic = trace ? { telemetry: trace } : {};
+      let delivered = false;
       if (message.kind === 'audible') {
         current.audioDetected = true;
         confirmCapture(current);
       }
       if (message.kind === 'onset' && current.mode === 'capture' && current.clock?.playing
         && Array.isArray(message.bands) && message.bands.length <= 4 && message.bands.every((band) => validBands.has(band))) {
-        publish(current, { kind: 'onset', captureId: current.captureId, sequence: ++current.sequence, bands: [...new Set(message.bands)] });
+        delivered = true;
+        publish(current, { kind: 'onset', captureId: current.captureId, sequence: ++current.sequence, bands: [...new Set(message.bands)], ...diagnostic });
       }
       if (message.kind === 'tempo.state' && current.mode === 'capture' && current.clock?.playing
         && typeof message.tempo?.locked === 'boolean' && Number.isFinite(message.tempo.confidence)
         && message.tempo.confidence >= 0 && message.tempo.confidence <= 1
         && (message.tempo.bpm === null || Number.isFinite(message.tempo.bpm) && message.tempo.bpm >= 60 && message.tempo.bpm <= 180)) {
-        publish(current, { kind: 'tempo.state', captureId: current.captureId, tempo: message.tempo });
+        delivered = true;
+        publish(current, { kind: 'tempo.state', captureId: current.captureId, tempo: message.tempo, ...diagnostic });
       }
       if (message.kind === 'melody.state' && message.detector === 'instrument-v1' && current.mode === 'capture' && current.clock?.playing
         && typeof message.melody?.active === 'boolean' && Number.isFinite(message.melody.level)
         && message.melody.level >= 0 && message.melody.level <= 1
         && Number.isSafeInteger(message.melody.note) && message.melody.note >= 0) {
+        delivered = true;
         publish(current, { kind: 'melody.state', detector: 'instrument-v1', captureId: current.captureId,
-          melody: { active: message.melody.active, level: message.melody.level, note: message.melody.note } });
+          melody: { active: message.melody.active, level: message.melody.level, note: message.melody.note }, ...diagnostic });
       }
       if (message.kind === 'tempo.tick' && current.mode === 'capture' && current.clock?.playing
         && Number.isInteger(message.tick?.step) && message.tick.step >= 0 && message.tick.step < 8
         && Array.isArray(message.tick.bands) && message.tick.bands.length <= 3
         && message.tick.bands.every((band) => validBands.has(band))) {
-        publish(current, { kind: 'tempo.tick', captureId: current.captureId, tick: message.tick });
+        delivered = true;
+        publish(current, { kind: 'tempo.tick', captureId: current.captureId, tick: message.tick, ...diagnostic });
       }
+      if (!delivered) telemetry.mark('EVENT_DROPPED', trace, { reason: current.mode !== 'capture' ? 'clock' : !current.clock?.playing ? 'not-playing' : 'invalid' });
       if (message.kind === 'stopped') {
         // Do not repeatedly suppress a silent/protected tab's output every
         // three seconds. Resume/unmute or a toolbar click still retries now.

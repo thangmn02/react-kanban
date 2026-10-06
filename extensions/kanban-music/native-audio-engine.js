@@ -1,5 +1,7 @@
 import { createCaptureEngine } from './capture-engine.js';
 import { createNativeInstrument } from './native-instrument.js';
+import { beatTelemetry } from './beat-telemetry.js';
+const telemetry = beatTelemetry.at('native-audio-engine');
 
 // Feed Windows PCM through the same detector graph as tab capture. The browser
 // keeps playing normally: this graph only analyses and never replays its audio.
@@ -27,13 +29,13 @@ export function createNativeAudioEngine(options) {
         await new Promise((resolve) => setTimeout(resolve, 20));
       }
       ready = live && request === generation && context.state === 'running';
-      if (ready) instrument = createNativeInstrument((state) => options.onMelody?.(id, state));
+      if (ready) instrument = createNativeInstrument((state, traces) => options.onMelody?.(id, state, ...(traces ? [traces] : [])));
       return ready;
     },
-    push(samples) {
-      if (!ready || !live || !context || context.state !== 'running' || !samples.length || samples.length % 2) return false;
+    push(samples, diagnostic) {
+      if (!ready || !live || !context || context.state !== 'running' || !samples.length || samples.length % 2) { telemetry.record('EVENT_DROPPED', undefined, { reason: 'invalid' }); return false; }
       const duration = samples.length / 2 / 44100;
-      if (Math.max(nextTime - context.currentTime, .02) + duration > .3) return false;
+      if (Math.max(nextTime - context.currentTime, .02) + duration > .3) { telemetry.record('EVENT_DROPPED', undefined, { reason: 'audio-backlog', delayMs: (nextTime - context.currentTime) * 1000 }); return false; }
       const buffer = context.createBuffer(2, samples.length / 2, 44100);
       const left = buffer.getChannelData(0), right = buffer.getChannelData(1);
       for (let frame = 0; frame < left.length; frame++) { left[frame] = samples[frame * 2]; right[frame] = samples[frame * 2 + 1]; }
@@ -42,6 +44,7 @@ export function createNativeAudioEngine(options) {
       source.onended = () => { source.disconnect(); sources.delete(source); };
       nextTime = Math.max(nextTime, context.currentTime + .02);
       source.start(nextTime); nextTime += buffer.duration;
+      telemetry.record('EVENT_QUEUED', undefined, { audioTime: context.currentTime, delayMs: (nextTime - context.currentTime) * 1000, queueDepth: sources.size, frames: samples.length / 2, sequence: diagnostic?.sequence });
       instrument?.push(left, right);
       return true;
     },

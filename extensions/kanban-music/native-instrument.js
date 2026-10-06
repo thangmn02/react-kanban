@@ -1,4 +1,6 @@
 import { createInstrumentWorker } from './instrument-runtime.js';
+import { beatTelemetry, parseBeatTraces } from './beat-telemetry.js';
+const telemetry = beatTelemetry.at('native-instrument');
 
 const preference = 'kora.native.instrument-notes';
 let enabled = false;
@@ -20,10 +22,13 @@ export function setNativeInstrumentEnabled(value) {
 export function createNativeInstrument(onMelody, workerFactory = createInstrumentWorker) {
   let worker, ready = false, frames = 0, generation = 0, offset;
   const timers = new Set();
+  const pendingTraces = new Map();
   function clear() {
     generation++; ready = false; frames = 0; offset = undefined;
     worker?.stop(); worker = undefined;
     for (const timer of timers) clearTimeout(timer);
+    for (const traces of pendingTraces.values()) telemetry.mark('EVENT_DROPPED', traces, { reason: 'stopped' });
+    pendingTraces.clear();
     timers.clear(); onMelody({ active: false, level: 0, note: 0 });
   }
   function fail() { clear(); update('failed'); }
@@ -38,20 +43,35 @@ export function createNativeInstrument(onMelody, workerFactory = createInstrumen
         progress: (bytes, total) => { if (request === generation) update(`loading:${Math.round(bytes / total * 100)}`); },
         error: () => { if (request === generation) fail(); },
         notes: (events) => {
-          if (request !== generation || !ready || !events.length) return;
+          if (request !== generation || !ready || !events.length) {
+            events.forEach((event) => telemetry.mark('EVENT_DROPPED', parseBeatTraces(event.telemetry), { reason: 'owner' })); return;
+          }
           const now = performance.now() / 1000;
           const first = events[0].time;
-          if (!Number.isFinite(first) || events.some((event) => !Number.isFinite(event.time) || event.time < first || event.time - first > 3)) { fail(); return; }
+          if (!Number.isFinite(first) || events.some((event) => !Number.isFinite(event.time) || event.time < first || event.time - first > 3)) {
+            events.forEach((event) => telemetry.mark('EVENT_DROPPED', parseBeatTraces(event.telemetry), { reason: 'invalid' })); fail(); return;
+          }
           // Retain a small visual reserve across inference batches. Re-anchor
           // only if the worker misses it, rather than jittering every phrase.
-          if (offset === undefined || first + offset < now + .02) offset = now + .5 - first;
-          if (timers.size + events.length > 256) { fail(); return; }
+          if (offset === undefined || first + offset < now + .02) {
+            if (offset !== undefined) events.forEach((event) => telemetry.mark('EVENT_LATE', parseBeatTraces(event.telemetry), { delayMs: (now - first - offset) * 1000 }));
+            offset = now + .5 - first;
+          }
+          if (timers.size + events.length > 256) {
+            events.forEach((event) => telemetry.mark('EVENT_DROPPED', parseBeatTraces(event.telemetry), { reason: 'queue-full', queueDepth: timers.size })); fail(); return;
+          }
           for (const event of events) {
+            const traces = parseBeatTraces(event.telemetry)?.map((trace) => ({ ...trace,
+              targetTime: Date.now() + (event.time + offset - now) * 1000, targetClock: 'epoch-ms' }));
+            telemetry.mark('EVENT_QUEUED', traces, { queueDepth: timers.size + 1 });
             const timer = setTimeout(() => {
               timers.delete(timer);
-              if (request === generation) onMelody(event.state);
+              pendingTraces.delete(timer);
+              if (request === generation) { telemetry.mark('EVENT_SENT', traces); onMelody(event.state, ...(traces ? [traces] : [])); }
+              else telemetry.mark('EVENT_DROPPED', traces, { reason: 'owner' });
             }, Math.max(0, (event.time + offset - now) * 1000));
             timers.add(timer);
+            if (traces) pendingTraces.set(timer, traces);
           }
         },
       });

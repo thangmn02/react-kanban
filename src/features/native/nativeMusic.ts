@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { createNativeAudioFeed } from './nativeAudio';
+import { beatTelemetry, parseBeatTraces } from '../../../extensions/kanban-music/beat-telemetry.js';
 
 const receivers = new Set<(value: unknown) => void>();
 const publish = (value: unknown) => { for (const receive of receivers) receive(value); };
@@ -12,6 +13,14 @@ function ensureFeed() {
     const stop = await listen<unknown>('native-music-beat', ({ payload }) => { if (audio.companion(payload)) publish(payload); });
     try { await listen<unknown>('native-audio-ended', ({ payload }) => audio.ended(payload)); }
     catch (error) { stop(); throw error; }
+    // An optional diagnostic listener must not block capture/control setup.
+    void listen<Record<string, unknown>>('native-beat-telemetry', ({ payload }) => {
+      if (!payload || typeof payload.stage !== 'string') return;
+      const traces = parseBeatTraces(payload.telemetry);
+      const tracer = beatTelemetry.at(String(payload.component));
+      if (traces?.length) tracer.mark(payload.stage, traces, payload);
+      else tracer.record(payload.stage, undefined, payload);
+    }).catch(() => {});
   })().catch((error) => { ready = undefined; throw error; });
 }
 export async function requestNativeMusic(action: string, sessionId?: string, subscriptionId?: string): Promise<Record<string, unknown>> {

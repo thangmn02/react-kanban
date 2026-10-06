@@ -1,5 +1,7 @@
 import { isNativeWidget } from '../native/runtime';
 import { requestNativeMusic, subscribeNativeMusic } from '../native/nativeMusic';
+import { beatTelemetry, parseBeatTraces, type BeatTrace } from '../../../extensions/kanban-music/beat-telemetry.js';
+const telemetry = beatTelemetry.at('media-bridge');
 
 export interface BrowserMusicSession {
   id: string;
@@ -25,12 +27,12 @@ export interface MusicClock {
 }
 export type BeatBand = 'kick' | 'clap' | 'hat' | 'bass' | 'melody';
 export interface MelodyState { active: boolean; level: number; note: number }
-export type BeatEvent = { kind: 'clock'; clock: MusicClock }
+export type BeatEvent = ({ kind: 'clock'; clock: MusicClock }
   | { kind: 'sync.state'; mode: 'clock' | 'capture'; reason?: string; captureId?: string }
   | { kind: 'onset'; bands: BeatBand[]; captureId?: string; sequence?: number }
   | { kind: 'melody.state'; captureId: string; melody: MelodyState }
   | { kind: 'tempo.state'; captureId: string; tempo: { locked: boolean; bpm: number | null; confidence: number } }
-  | { kind: 'tempo.tick'; captureId: string; tick: { step: number; bands: BeatBand[] } };
+  | { kind: 'tempo.tick'; captureId: string; tick: { step: number; bands: BeatBand[] } }) & { telemetry?: BeatTrace[] };
 
 const channel = 'kanban-music-v1';
 const supportedBands = ['kick', 'clap', 'hat', 'bass', 'melody', 'snare'];
@@ -123,17 +125,21 @@ export async function openInstrumentNotesSetup(sessionId: string): Promise<void>
   await requestBridge('instrument.setup', sessionId);
 }
 
-export function subscribeBeatEvents(sessionId: string, subscriptionId: string, receive: (event: BeatEvent) => void) {
+export function subscribeBeatEvents(sessionId: string, subscriptionId: string, callback: (event: BeatEvent) => void) {
   const parse = (data: unknown, native = false) => {
     if (!data || typeof data !== 'object') return;
     // Payload fields are checked below before reaching the controller.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const message = data as Record<string, any>;
-    if (message.sessionId !== sessionId || message.subscriptionId !== subscriptionId) return;
+    const traces = parseBeatTraces(message.telemetry);
+    if (message.sessionId !== sessionId || message.subscriptionId !== subscriptionId) { telemetry.mark('EVENT_DROPPED', traces, { reason: 'owner' }); return; }
     if (!native && (message.channel !== channel || message.direction !== 'extension-event' || message.event !== 'beat')) return;
     // Never replay queued flashes when a minimized webview resumes.
     if (native && (typeof message.emittedAt !== 'number' || !Number.isFinite(message.emittedAt)
-      || Date.now() - message.emittedAt > 600 || message.emittedAt > Date.now() + 100)) return;
+      || Date.now() - message.emittedAt > 600 || message.emittedAt > Date.now() + 100)) { telemetry.mark('EVENT_LATE', traces); telemetry.mark('EVENT_DROPPED', traces, { reason: 'late' }); return; }
+    telemetry.mark('EVENT_RECEIVED', traces);
+    let delivered = false;
+    const receive = (event: BeatEvent) => { delivered = true; callback({ ...event, ...(traces ? { telemetry: traces } : {}) }); };
     if (['sync.state', 'status'].includes(message.kind) && ['clock', 'capture'].includes(message.mode)) receive({
       kind: 'sync.state', mode: message.mode,
       reason: typeof (message.reason ?? message.fallbackReason) === 'string' ? String(message.reason ?? message.fallbackReason).slice(0, 80) : undefined,
@@ -170,6 +176,7 @@ export function subscribeBeatEvents(sessionId: string, subscriptionId: string, r
       if (clock && typeof clock.playing === 'boolean' && typeof clock.paused === 'boolean'
         && ['currentTime', 'playbackRate', 'sampledAt'].every((key) => typeof clock[key] === 'number' && Number.isFinite(clock[key]) && clock[key] >= 0)) receive({ kind: 'clock', clock });
     }
+    if (!delivered) telemetry.mark('EVENT_DROPPED', traces, { reason: 'invalid' });
   };
   if (isNativeWidget()) return subscribeNativeMusic((payload) => parse(payload, true));
   const listener = (event: MessageEvent) => {
