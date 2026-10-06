@@ -1,5 +1,6 @@
 const copy = {
   en: {
+    updateTitle: 'Update the installed Companion', updateBody: 'Download the latest extension ZIP above. If you loaded Kora’s included extension, extract its contents into %LOCALAPPDATA%\\Kora\\music-companion\\extension and replace the existing files. The folder must contain manifest.json directly. In your browser’s extension page, click Reload on Kora Music Companion, then refresh your music tabs. No project folder or app reinstall is needed. This updates the Companion only; Kora’s app version updates separately.',
     instrumentTitle: 'Follow instrumental notes', instrumentBody: "Windows Kora: choose AI instrument notes to download the local 157 MB model once. Instrument flashes follow with processing delay; sound and percussion stay immediate. Web/PiP: enable AI in Companion options; its 3.5-second audio buffer aligns all rows but can put videos out of sync. All audio stays on your device. Disable AI to leave row five dark. Dense mixtures can cause missed or extra notes.",
     back: '← Back to Kora', eyebrow: 'KORA MUSIC COMPANION', title: 'Your music, beside your focus timer.',
     intro: 'Connect browser music to the Kora web dock or Windows widget. Use Chrome, Edge, or Brave.',
@@ -13,6 +14,7 @@ const copy = {
     privacy: 'Music metadata and visual signals stay local. Audio is never recorded or uploaded.', privacyLink: 'Privacy details', copied: 'Address copied. Paste it into your browser’s address bar.', copyFailed: 'Select the address above and copy it manually.',
   },
   vi: {
+    updateTitle: 'Cập nhật Companion đã cài', updateBody: 'Tải ZIP tiện ích mới nhất ở phía trên. Nếu đang dùng tiện ích đi kèm Kora, giải nén nội dung vào %LOCALAPPDATA%\\Kora\\music-companion\\extension và thay thế các tệp cũ. Tệp manifest.json phải nằm ngay trong thư mục này. Mở trang tiện ích trình duyệt, nhấn Reload trên Kora Music Companion rồi tải lại các thẻ nhạc. Không cần thư mục mã nguồn hay cài lại ứng dụng. Bước này chỉ cập nhật Companion; phiên bản ứng dụng Kora cập nhật riêng.',
     instrumentTitle: 'Nháy theo nốt nhạc cụ', instrumentBody: "Windows Kora: chọn Nốt nhạc cụ AI để tải mô hình 157 MB một lần. Nốt nhạc cụ nháy trễ do xử lý; âm thanh và hàng trống vẫn tức thời. Web/PiP: bật AI trong tùy chọn Companion; bộ đệm 3,5 giây đồng bộ các hàng nhưng có thể lệch tiếng video. Âm thanh chỉ xử lý trên thiết bị. Tắt AI để hàng thứ năm tối. Bài nhiều nhạc cụ có thể bỏ sót hoặc nháy dư.",
     back: '← Quay lại Kora', eyebrow: 'TIỆN ÍCH NHẠC KORA', title: 'Nhạc của bạn, bên cạnh đồng hồ tập trung.',
     intro: 'Kết nối nhạc trình duyệt với dock web hoặc widget Windows của Kora. Dùng Chrome, Edge hoặc Brave.',

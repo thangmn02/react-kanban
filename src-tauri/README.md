@@ -103,6 +103,14 @@ settings choose **Install or update Companion** to open its resource folder,
 then use the browser's **Load unpacked** action for its `extension` folder.
 Browser installation remains a one-time user action.
 
+Browser **Reload** rereads the installed files; it does not fetch new Companion
+code. When an app update cannot complete, users can independently download the
+[public Companion ZIP and update instructions](https://koraspace.online/music-companion.html#update-companion).
+Replace the contents of `%LOCALAPPDATA%\Kora\music-companion\extension`, keeping
+`manifest.json` directly in that folder, then reload the extension and music
+tabs. A repository checkout is unnecessary. The offline guide links to this
+route. Updating these files does not update the Kora executable.
+
 `music:package` generates the current and legacy public Companion ZIP URLs and
 the native resource tree under `generated/music-companion/`, plus executable
 AI assets under `../public/music-analysis/`. Generated archives
@@ -123,6 +131,10 @@ files atomically; the updater checks the existing HTTPS Netlify host.
 The CI artifact includes the installer, signature and feed; CI does not publish
 a release or deploy the website. Updater signatures are not Windows Authenticode
 publisher signing, so Windows may still show an unknown-publisher warning.
+An enforced Windows signing policy can block the installer entirely, leaving
+both the prior executable and its included Companion unchanged. Such machines
+require an installer with a Windows-trusted publisher signature; the Minisign
+update signature alone does not satisfy that policy.
 Keep Windows security enabled and review the source
 and publisher warnings before choosing whether to install.
 
