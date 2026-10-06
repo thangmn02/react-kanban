@@ -12,6 +12,12 @@ export interface BrowserMusicSession {
   playing?: boolean;
   canControl?: boolean;
   currentTime?: number;
+  duration?: number;
+  volume?: number;
+  muted?: boolean;
+  canSeek?: boolean;
+  canPrevious?: boolean;
+  canNext?: boolean;
   playbackRate?: number;
   sampledAt?: number;
   selectionToken?: string;
@@ -38,7 +44,7 @@ export type BeatEvent = ({ kind: 'clock'; clock: MusicClock }
 const channel = 'kanban-music-v1';
 const supportedBands = ['kick', 'clap', 'hat', 'bass', 'melody', 'snare'];
 const canonicalBand = (band: string): BeatBand => band === 'snare' ? 'clap' : band as BeatBand;
-export type MusicAction = 'sessions.get' | 'diagnostics.get' | 'media.play' | 'media.pause' | 'media.focus' | 'instrument.setup';
+export type MusicAction = 'sessions.get' | 'diagnostics.get' | 'media.play' | 'media.pause' | 'media.focus' | 'media.seek' | 'media.volume' | 'media.previous' | 'media.next' | 'instrument.setup';
 type BeatAction = 'dock.beat.sync.start' | 'dock.beat.sync.stop';
 
 export class MusicBridgeError extends Error {
@@ -67,6 +73,9 @@ export function isMusicSession(value: unknown): value is BrowserMusicSession {
     && typeof item.paused === 'boolean'
     && (item.playing === undefined || typeof item.playing === 'boolean')
     && (item.canControl === undefined || typeof item.canControl === 'boolean')
+    && ['muted', 'canSeek', 'canPrevious', 'canNext'].every(key => item[key] === undefined || typeof item[key] === 'boolean')
+    && (item.duration === undefined || typeof item.duration === 'number' && Number.isFinite(item.duration) && item.duration >= 0)
+    && (item.volume === undefined || typeof item.volume === 'number' && Number.isFinite(item.volume) && item.volume >= 0 && item.volume <= 1)
     && (item.selectionToken === undefined || (typeof item.selectionToken === 'string' && item.selectionToken.length <= 100))
     && (item.syncState === undefined || isSyncState(item.syncState))
     && ['currentTime', 'playbackRate', 'sampledAt'].every((key) => item[key] === undefined || (typeof item[key] === 'number' && Number.isFinite(item[key]) && (item[key] as number) >= 0));
@@ -80,8 +89,8 @@ function isSyncState(value: unknown): boolean {
     && (state.captureId === undefined || (typeof state.captureId === 'string' && state.captureId.length <= 100));
 }
 
-function requestBridge(action: MusicAction | BeatAction, sessionId?: string, subscriptionId?: string): Promise<Record<string, unknown>> {
-  if (isNativeWidget()) return requestNativeMusic(action, sessionId, subscriptionId).then((response) => {
+function requestBridge(action: MusicAction | BeatAction, sessionId?: string, subscriptionId?: string, value?: number): Promise<Record<string, unknown>> {
+  if (isNativeWidget()) return requestNativeMusic(action, sessionId, subscriptionId, value).then((response) => {
     if (response.ok !== true) throw new MusicBridgeError(response.error === 'not-installed' ? 'not-installed' : 'unavailable');
     return response;
   }).catch((error) => {
@@ -102,12 +111,15 @@ function requestBridge(action: MusicAction | BeatAction, sessionId?: string, sub
     const timeout = window.setTimeout(() => { cleanup(); reject(new MusicBridgeError('not-installed')); }, 2500);
     window.addEventListener('message', receive);
     window.postMessage({ channel, direction: 'app-to-extension', requestId, action, sessionId,
+      ...(value !== undefined ? { value } : {}),
       ...(subscriptionId ? { subscriptionId } : {}) }, window.location.origin);
   });
 }
 
-export async function sendMusicRequest(action: MusicAction, sessionId?: string): Promise<BrowserMusicSession[]> {
-  const response = await requestBridge(action, sessionId);
+export async function sendMusicRequest(action: MusicAction, sessionId?: string, value?: number): Promise<BrowserMusicSession[]> {
+  if (action === 'media.seek' && (!Number.isFinite(value) || value! < 0 || value! > 864000)
+    || action === 'media.volume' && (!Number.isFinite(value) || value! < 0 || value! > 1)) throw new MusicBridgeError('playback');
+  const response = await requestBridge(action, sessionId, undefined, value);
   if (!Array.isArray(response.sessions) || !response.sessions.every(isMusicSession)) throw new MusicBridgeError('invalid-response');
   return response.sessions;
 }

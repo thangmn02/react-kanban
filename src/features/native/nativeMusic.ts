@@ -23,10 +23,11 @@ function ensureFeed() {
     }).catch(() => {});
   })().catch((error) => { ready = undefined; throw error; });
 }
-export async function requestNativeMusic(action: string, sessionId?: string, subscriptionId?: string): Promise<Record<string, unknown>> {
+export async function requestNativeMusic(action: string, sessionId?: string, subscriptionId?: string, value?: number): Promise<Record<string, unknown>> {
   await ensureFeed();
   if (action === 'dock.beat.sync.stop' && sessionId && subscriptionId) audio.stop(sessionId, subscriptionId);
   const response = await invoke<Record<string, unknown>>('native_music_request', { action, sessionId, subscriptionId,
+    ...(value !== undefined ? { value } : {}),
     ...(action === 'dock.beat.sync.start' ? { nativeAudio: true } : {}) });
   if (response.ok === true && action === 'dock.beat.sync.start' && sessionId && subscriptionId) audio.activate(sessionId, subscriptionId);
   return response;

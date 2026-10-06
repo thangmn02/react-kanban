@@ -324,6 +324,7 @@ pub async fn native_music_request(
     session_id: Option<String>,
     subscription_id: Option<String>,
     native_audio: Option<bool>,
+    value: Option<f64>,
 ) -> Result<Value, String> {
     if action == "sessions.get" {
         let peers: Vec<_> = music.peers.lock().unwrap().keys().cloned().collect();
@@ -362,11 +363,20 @@ pub async fn native_music_request(
         "media.play"
             | "media.pause"
             | "media.focus"
+            | "media.seek"
+            | "media.volume"
+            | "media.previous"
+            | "media.next"
             | "instrument.setup"
             | "dock.beat.sync.start"
             | "dock.beat.sync.stop"
     ) {
         return Err("Unsupported music action".into());
+    }
+    if (action == "media.seek" && !value.is_some_and(|v| v.is_finite() && v >= 0.0 && v <= 864000.0))
+        || (action == "media.volume" && !value.is_some_and(|v| v.is_finite() && v >= 0.0 && v <= 1.0))
+    {
+        return Err("Invalid playback value".into());
     }
     let session = session_id
         .filter(|s| s.len() <= 300)
@@ -382,7 +392,7 @@ pub async fn native_music_request(
     let mut result = music
         .ask(
             peer,
-            json!({"action":action,"sessionId":session,"subscriptionId":subscription_id,"nativeAudio":native_audio.unwrap_or(false)}),
+            json!({"action":action,"sessionId":session,"subscriptionId":subscription_id,"nativeAudio":native_audio.unwrap_or(false),"value":value}),
         )
         .await?;
     if let Some(sessions) = result["sessions"].as_array_mut() {

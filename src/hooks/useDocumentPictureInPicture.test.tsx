@@ -42,7 +42,7 @@ it('renders timer and music together in the detached document, with shared timer
   const root = host.shadowRoot!.getElementById('floating-focus-root') as HTMLElement;
   const popup = within(root);
   expect(popup.getByText('01:30')).toBeInTheDocument();
-  expect(requestWindow).toHaveBeenCalledWith({ width: 520, height: 680 });
+  expect(requestWindow).toHaveBeenCalledWith({ width: 520, height: 580 });
   fireEvent.click(popup.getByRole('tab', { name: 'Music' }));
   expect(popup.getByRole('tabpanel', { name: 'Music' })).toBeInTheDocument();
   expect(screen.queryByRole('tabpanel', { name: 'Music' })).not.toBeInTheDocument();

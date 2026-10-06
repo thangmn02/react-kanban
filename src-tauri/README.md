@@ -30,9 +30,16 @@ Tabs is the only dock layout, including installations with old saved layouts.
 The circular timer stays visible above all three tabs with Start/Pause, Reset
 and Complete & next. Drag the native dock from any empty header area or its
 Tabs label; buttons and settings stay interactive. Color and palette settings
-are retained. Native and browser PiP open at 520×680; native can shrink to
-360×540. Music fits its allotted panel with no scrolling, including the source
-picker, permission action and error message. Tasks can scroll without visible
+  are retained. Native and browser PiP open at 520×580; native can shrink to
+  320×360. At compact sizes the timer moves beside its controls and the grid
+  keeps five rows of eight cells with smaller tiles/gaps. Music has a seekable
+  timeline, current/total time, previous/play/next and volume/mute controls.
+  Seeking is disabled for streams without a finite, seekable duration; track
+  navigation is disabled when the source exposes no enabled player button.
+  Older Companions still supply play/pause; reload the updated Companion for
+  the new controls and capability metadata. Only playing music shows the small
+  strip outside Music. Long task lists or exceptional status messages can scroll
+  when necessary. Tasks can scroll without visible
 scrollbar bars. Tab changes preserve the native window's resized size.
 The same composition is used in browser PiP, where CSS
 glass blurs page content rather than the desktop behind the browser window.

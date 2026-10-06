@@ -332,6 +332,43 @@ it('changes glass tabs without remounting the live music, grid or timer', async 
   expect(view.container.querySelector('.floating-focus')).toHaveAttribute('data-style', 'tabs');
 });
 
+it('shows a real timeline and volume, and routes committed changes to the selected track', async () => {
+  vi.mocked(sendMusicRequest).mockResolvedValue([{ ...session, currentTime: 30, duration: 180, volume: .6, canSeek: true, canPrevious: true, canNext: true }]);
+  renderPlayer();
+  const seek = await screen.findByRole('slider', { name: 'Seek music' });
+  expect(screen.getByText('0:30')).toBeInTheDocument();
+  expect(screen.getByText('3:00')).toBeInTheDocument();
+  fireEvent.change(seek, { target: { value: '90' } });
+  expect(sendMusicRequest).not.toHaveBeenCalledWith('media.seek', session.id, 90);
+  fireEvent.pointerUp(seek);
+  await waitFor(() => expect(sendMusicRequest).toHaveBeenCalledWith('media.seek', session.id, 90));
+  const volume = screen.getByRole('slider', { name: 'Music volume' });
+  fireEvent.change(volume, { target: { value: '.25' } }); fireEvent.keyUp(volume, { key: 'ArrowLeft' });
+  await waitFor(() => expect(sendMusicRequest).toHaveBeenCalledWith('media.volume', session.id, .25));
+  fireEvent.click(screen.getByRole('button', { name: 'Next track' }));
+  await waitFor(() => expect(sendMusicRequest).toHaveBeenCalledWith('media.next', session.id, undefined));
+  fireEvent.click(screen.getByRole('button', { name: 'Previous track' }));
+  await waitFor(() => expect(sendMusicRequest).toHaveBeenCalledWith('media.previous', session.id, undefined));
+});
+
+it('keeps unsupported controls disabled and shows only a strip outside Music while playing', async () => {
+  vi.mocked(sendMusicRequest).mockResolvedValue([session]);
+  const view = renderPlayer(); await screen.findByRole('heading', { name: session.title });
+  expect(screen.getByRole('slider', { name: 'Seek music' })).toBeDisabled();
+  expect(screen.getByRole('slider', { name: 'Music volume' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Previous track' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Next track' })).toBeDisabled();
+  expect(view.container.querySelector('.dock-now-playing')).toHaveAttribute('hidden');
+  fireEvent.click(screen.getByRole('tab', { name: 'Beat grid' }));
+  expect(view.container.querySelector('.dock-now-playing')).not.toHaveAttribute('hidden');
+  expect(screen.queryByRole('slider', { name: 'Seek music' })).toBeNull();
+  expect(view.container.querySelectorAll('.beat-channel')).toHaveLength(5);
+  expect(view.container.querySelectorAll('.beat-square')).toHaveLength(40);
+  vi.mocked(sendMusicRequest).mockResolvedValue([{ ...session, paused: true }]);
+  fireEvent.click(screen.getByRole('button', { name: 'Pause music' }));
+  await waitFor(() => expect(view.container.querySelector('.dock-now-playing')).toHaveAttribute('hidden'));
+});
+
 it('keeps color and palette pickers in an accessible settings popover', async () => {
   vi.mocked(sendMusicRequest).mockResolvedValue([session]);
   renderPlayer();

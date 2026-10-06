@@ -39,8 +39,10 @@ async function scan() {
 }
 
 const publicSessions = (items) => items.map((session) => {
-  const { id, title, artist, source, paused, playing, currentTime, playbackRate, sampledAt, selectionToken } = session;
-  return { id, title, artist, source, paused, playing, currentTime, playbackRate, sampledAt, syncState: beats.status(session),
+  const { id, title, artist, source, paused, playing, currentTime, playbackRate, sampledAt, selectionToken,
+    duration, volume, muted, canSeek, canPrevious, canNext } = session;
+  return { id, title, artist, source, paused, playing, currentTime, playbackRate, sampledAt,
+    duration, volume, muted, canSeek, canPrevious, canNext, syncState: beats.status(session),
   ...(selectionToken ? { selectionToken } : {}),
   };
 });
@@ -67,7 +69,7 @@ async function handle(message, sender) {
   try {
     const result = await chrome.scripting.executeScript({
       target: { tabId: session.tabId, documentIds: [session.documentId] }, world: 'MAIN',
-      func: controlMedia, args: [session.index, session.src, message.action],
+      func: controlMedia, args: [session.index, session.src, message.action, message.value],
     });
     if (!result.some((frame) => frame.result === true)) throw new Error('Playback unavailable');
     return { ok: true, sessions: publicSessions(await scan()) };

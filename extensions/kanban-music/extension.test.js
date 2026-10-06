@@ -3,6 +3,38 @@ import { allowedRequest } from './protocol.js';
 import { controlMedia, readMedia } from './media.js';
 
 afterEach(() => { document.body.replaceChildren(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+it('controls actual seek and volume, and rejects unavailable targets and non-finite inputs', async () => {
+  const audio = document.createElement('audio');
+  Object.defineProperties(audio, { currentSrc: { value: 'blob:track' }, readyState: { value: 4 }, duration: { value: 120 },
+    seekable: { value: { length: 1, start: () => 10, end: () => 120 } } });
+  document.body.append(audio);
+  expect(readMedia()[0]).toMatchObject({ duration: 120, volume: 1, canSeek: true, canPrevious: false, canNext: false });
+  await controlMedia(0, 'blob:track', 'media.seek', 60); expect(audio.currentTime).toBe(60);
+  await controlMedia(0, 'blob:track', 'media.volume', 0); expect(audio.volume).toBe(0); expect(audio.muted).toBe(true);
+  await controlMedia(0, 'blob:track', 'media.volume', .4); expect(audio.volume).toBe(.4); expect(audio.muted).toBe(false);
+  await expect(controlMedia(0, 'blob:track', 'media.seek', 5)).rejects.toThrow('Position unavailable');
+  await expect(controlMedia(0, 'blob:track', 'media.volume', NaN)).rejects.toThrow('Invalid volume');
+  await expect(controlMedia(0, 'blob:track', 'media.volume', 2)).rejects.toThrow('Invalid volume');
+  await expect(controlMedia(0, 'blob:track', 'media.next')).rejects.toThrow('navigation unavailable');
+  await expect(controlMedia(0, 'changed', 'media.seek', 60)).rejects.toThrow('Track changed');
+});
+
+it('uses enabled player navigation buttons and never pretends a missing button succeeded', async () => {
+  const audio = document.createElement('audio'); Object.defineProperty(audio, 'currentSrc', { value: 'blob:song' });
+  const next = document.createElement('button'); next.className = 'ytp-next-button';
+  vi.spyOn(next, 'getClientRects').mockReturnValue([{}]); const click = vi.fn(); next.addEventListener('click', click);
+  document.body.append(audio, next);
+  await controlMedia(0, 'blob:song', 'media.next'); expect(click).toHaveBeenCalledOnce();
+  next.disabled = true; await expect(controlMedia(0, 'blob:song', 'media.next')).rejects.toThrow('navigation unavailable');
+});
+
+it('validates numeric playback commands at the trusted-origin boundary', () => {
+  const sender = { url: 'http://localhost:5173/' }, message = { protocol: 'kanban-music-v1', sessionId: 'song' };
+  expect(allowedRequest({ ...message, action: 'media.seek', value: 120 }, sender)).toBe(true);
+  expect(allowedRequest({ ...message, action: 'media.volume', value: .4 }, sender)).toBe(true);
+  for (const value of [undefined, '1', NaN, Infinity, -1]) expect(allowedRequest({ ...message, action: 'media.volume', value }, sender)).toBe(false);
+  expect(allowedRequest({ ...message, action: 'media.seek', value: 864001 }, sender)).toBe(false);
+});
 it('allows only exact app origins and known commands', () => {
   const message = { protocol: 'kanban-music-v1', action: 'sessions.get' };
   expect(allowedRequest(message, { url: 'https://kanthangboard.netlify.app/home' })).toBe(true);

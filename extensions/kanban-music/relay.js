@@ -20,7 +20,9 @@ if (allowedOrigins.has(location.origin)) {
     if (event.source !== window || event.origin !== location.origin || !message
       || message.channel !== channel || message.direction !== 'app-to-extension'
       || typeof message.requestId !== 'string' || message.requestId.length > 100
-      || !['sessions.get', 'diagnostics.get', 'media.play', 'media.pause', 'media.focus', 'instrument.setup', 'dock.beat.sync.start', 'dock.beat.sync.stop'].includes(message.action) || pending >= 4) return;
+      || !['sessions.get', 'diagnostics.get', 'media.play', 'media.pause', 'media.focus', 'media.seek', 'media.volume', 'media.previous', 'media.next', 'instrument.setup', 'dock.beat.sync.start', 'dock.beat.sync.stop'].includes(message.action) || pending >= 4) return;
+    if (message.action === 'media.seek' && (!Number.isFinite(message.value) || message.value < 0 || message.value > 864000)) return;
+    if (message.action === 'media.volume' && (!Number.isFinite(message.value) || message.value < 0 || message.value > 1)) return;
     if (!['sessions.get', 'diagnostics.get'].includes(message.action) && (typeof message.sessionId !== 'string' || message.sessionId.length > 250)) return;
     if (message.action.startsWith('dock.beat.') && (typeof message.subscriptionId !== 'string' || message.subscriptionId.length > 100)) return;
     pending++;
@@ -30,6 +32,7 @@ if (allowedOrigins.has(location.origin)) {
     };
     try {
       chrome.runtime.sendMessage({ protocol: channel, action: message.action, sessionId: message.sessionId,
+        ...(message.value !== undefined ? { value: message.value } : {}),
         ...(message.subscriptionId ? { subscriptionId: message.subscriptionId } : {}) }, (response) => {
         if (chrome.runtime.lastError) reply({ ok: false, error: 'unavailable' });
         else reply(response || { ok: false, error: 'unavailable' });

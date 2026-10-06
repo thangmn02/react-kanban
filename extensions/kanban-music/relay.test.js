@@ -11,6 +11,16 @@ function harness(origin = 'https://kanthangboard.netlify.app') {
   return { sendMessage, postMessage, page, receive: (data, options = {}) => receive?.({ source: page, origin, data, ...options }) };
 }
 const request = { channel: 'kanban-music-v1', direction: 'app-to-extension', requestId: 'request-1', action: 'sessions.get' };
+it('preserves seek and volume values while rejecting invalid control input', () => {
+  const h = harness();
+  h.receive({ ...request, action: 'media.seek', sessionId: 'song', value: 90 });
+  expect(h.sendMessage).toHaveBeenLastCalledWith(expect.objectContaining({ action: 'media.seek', value: 90 }), expect.any(Function));
+  h.receive({ ...request, action: 'media.volume', sessionId: 'song', value: .5 });
+  expect(h.sendMessage).toHaveBeenLastCalledWith(expect.objectContaining({ action: 'media.volume', value: .5 }), expect.any(Function));
+  h.sendMessage.mockClear();
+  for (const value of [undefined, '1', NaN, Infinity, -1, 2]) h.receive({ ...request, action: 'media.volume', sessionId: 'song', value });
+  expect(h.sendMessage).not.toHaveBeenCalled();
+});
 it('relays only supported messages through the internal extension connection, with no ID', () => {
   const h = harness();
   h.receive(request);

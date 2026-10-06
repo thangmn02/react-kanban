@@ -12,7 +12,10 @@ export function allowedRequest(message, sender) {
     return message?.protocol === 'kanban-music-v1' && (
       message.action === 'sessions.get'
       || message.action === 'diagnostics.get'
-      || (['media.play', 'media.pause', 'media.focus', 'instrument.setup'].includes(message.action) && typeof message.sessionId === 'string' && message.sessionId.length < 250)
+      || ((['media.play', 'media.pause', 'media.focus', 'media.previous', 'media.next', 'instrument.setup'].includes(message.action)
+        || message.action === 'media.seek' && Number.isFinite(message.value) && message.value >= 0 && message.value <= 864000
+        || message.action === 'media.volume' && Number.isFinite(message.value) && message.value >= 0 && message.value <= 1)
+        && typeof message.sessionId === 'string' && message.sessionId.length < 250)
       || (['dock.beat.sync.start', 'dock.beat.sync.stop'].includes(message.action)
         && typeof message.sessionId === 'string' && message.sessionId.length < 250
         && typeof message.subscriptionId === 'string' && message.subscriptionId.length > 0 && message.subscriptionId.length <= 100)

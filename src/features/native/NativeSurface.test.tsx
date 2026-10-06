@@ -30,8 +30,8 @@ it('opens Tabs at its ring size once and keeps the timer and user resizing acros
   const shadow = view.container.querySelector('.native-dock-host')!.shadowRoot!;
   const start = shadow.querySelector('.dock-start')!;
   const ring = shadow.querySelector('.dock-ring')!;
-  await waitFor(() => expect(nativeWindow.setSize).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ width: 520, height: 680 })));
-  expect(nativeWindow.setMinSize).toHaveBeenCalledWith(expect.objectContaining({ width: 360, height: 540 }));
+  await waitFor(() => expect(nativeWindow.setSize).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ width: 520, height: 580 })));
+  expect(nativeWindow.setMinSize).toHaveBeenCalledWith(expect.objectContaining({ width: 320, height: 360 }));
   fireEvent.click(shadow.querySelectorAll('[role="tab"]')[2]);
   expect(shadow.querySelector('.dock-start')).toBe(start);
   expect(shadow.querySelector('.dock-ring')).toBe(ring);

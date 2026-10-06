@@ -1,6 +1,7 @@
 import { useI18n } from '../../i18n';
 import { getMusicInstallUrl, openInstrumentNotesSetup } from './mediaBridge';
 import { useState, useSyncExternalStore } from 'react';
+import MusicPlaybackControls from './music-playback-controls';
 import { getNativeInstrumentStatus, subscribeNativeInstrument, setNativeInstrumentEnabled } from '../../../extensions/kanban-music/native-instrument.js';
 import type { BrowserMusicController } from './useBrowserMusic';
 import { patternAt } from './beatVisuals';
@@ -17,7 +18,7 @@ export interface MusicVisualOptions {
 
 export function MusicNowPlaying({ music }: { music: BrowserMusicController }) {
   const { t } = useI18n();
-  if (!music.selected) return null;
+  if (!music.selected || !music.playing) return null;
   return <div className="music-now-playing-strip">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true"><path d="M9 18V5l11-2v13M9 8l11-2" /><ellipse cx="6" cy="18" rx="3" ry="2" /><ellipse cx="17" cy="16" rx="3" ry="2" /></svg>
     <span className="music-now-playing-label">{t(music.playing ? 'dock.nowPlaying' : 'focus.island.music')}</span>
@@ -31,7 +32,7 @@ export function MusicNowPlaying({ music }: { music: BrowserMusicController }) {
 
 export function MusicTrack({ music }: { music: BrowserMusicController }) {
   const { t } = useI18n();
-  const { sessions, selected, setSelectedId, busy, toggle } = music;
+  const { sessions, selected, setSelectedId } = music;
   if (!sessions.length) return null;
   return <>
     <div className="music-heading">
@@ -41,10 +42,11 @@ export function MusicTrack({ music }: { music: BrowserMusicController }) {
         <h2 title={selected?.title}>{selected?.title || t('music.nothingPlaying')}</h2>
         {selected && <p className="muted track-artist">{[selected.artist, selected.source].filter(Boolean).join(' · ')}</p>}
       </div>
-      <button type="button" className="round solid music-play" disabled={!selected || selected.canControl === false || busy} onClick={() => void toggle()} aria-label={selected && !selected.paused ? t('music.pause') : t('music.play')}>
-        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">{selected && !selected.paused ? <path d="M7 5h4v14H7zm6 0h4v14h-4z" /> : <path d="m8 5 11 7-11 7z" />}</svg>
-      </button>
+      <span className={`music-playing-state${music.playing ? ' playing' : ''}`} role="status" aria-label={t(music.playing ? 'music.playing' : 'music.paused')}>
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 10h3v10H3zm5-6h3v16H8zm5 3h3v13h-3zm5-5h3v18h-3z" /></svg>
+      </span>
     </div>
+    <MusicPlaybackControls key={selected?.id} music={music} />
     {sessions.length > 1 && <select className="music-sessions" aria-label={t('music.choose')} value={selected?.id || ''} onChange={(event) => setSelectedId(event.target.value)}>{sessions.map((session) => <option key={session.id} value={session.id}>{session.title} · {session.source}</option>)}</select>}
   </>;
 }

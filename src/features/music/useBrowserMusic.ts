@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useI18n } from '../../i18n';
-import { MusicBridgeError, sendMusicRequest, type BrowserMusicSession, type MusicClock } from './mediaBridge';
+import { MusicBridgeError, sendMusicRequest, type BrowserMusicSession, type MusicClock, type MusicAction } from './mediaBridge';
 import { useMusicBeatSync } from './useMusicBeatSync';
 import { mergeMusicSessions } from './mergeMusicSessions';
 import { getBeatSource } from '../native/runtime';
@@ -95,8 +95,17 @@ export function useBrowserMusic() {
     finally { setBusy(false); }
   }
 
+  async function control(action: Extract<MusicAction, 'media.seek' | 'media.volume' | 'media.previous' | 'media.next'>, value?: number) {
+    if (!selected || selected.canControl === false || busy) return;
+    setBusy(true);
+    try {
+      const next = await sendMusicRequest(action, selected.id, value);
+      setMusic(current => updateSelection(current, next)); setError('');
+    } catch { setError(t('music.failed')); }
+    finally { setBusy(false); }
+  }
   const refresh = () => { setChecking(true); setAttempt((value) => value + 1); };
-  return { sessions, selected, setSelectedId, connected, checking, error, busy, toggle, openMusicTab, refresh, beat,
+  return { sessions, selected, setSelectedId, connected, checking, error, busy, toggle, openMusicTab, refresh, beat, control,
     source: getBeatSource(connected),
     playing: Boolean(selected && !selected.paused && selected.playing !== false) };
 }

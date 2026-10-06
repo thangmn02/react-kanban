@@ -167,7 +167,7 @@ export default function FloatingFocus(props: FloatingFocusProps) {
             <button className="dock-next" type="button" disabled={!taskId || !onMarkDoneAndNext || activeTask?.isDone} onClick={() => onMarkDoneAndNext?.(taskId)}>{t('floating.completeNext')}</button>
           </div>
         </motion.section>
-        <div className="dock-now-playing" hidden={activeTab === 'music' || !hasMusic}>
+        <div className="dock-now-playing" hidden={activeTab === 'music' || !music.playing}>
           {hasMusic && <MusicNowPlaying music={music} />}
         </div>
         <section id={`${groupId}-focus`} className="dock-panel dock-work-pane" role="tabpanel" aria-labelledby={`${groupId}-focus-tab`}

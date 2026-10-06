@@ -36,9 +36,9 @@ function NativeDock({ props }: { props: FloatingFocusProps }) {
       const maxWidth = monitor ? monitor.workArea.size.width / monitor.scaleFactor : 1100;
       const maxHeight = monitor ? monitor.workArea.size.height / monitor.scaleFactor : 900;
       if (!active) return;
-      await nativeWindow.setMinSize(new LogicalSize(Math.min(360, maxWidth), Math.min(540, maxHeight)));
+      await nativeWindow.setMinSize(new LogicalSize(Math.min(320, maxWidth), Math.min(360, maxHeight)));
       if (await nativeWindow.isMaximized() || !active) return;
-      await nativeWindow.setSize(new LogicalSize(Math.min(520, maxWidth), Math.min(680, maxHeight)));
+      await nativeWindow.setSize(new LogicalSize(Math.min(520, maxWidth), Math.min(580, maxHeight)));
     };
     void fit().catch(() => {});
     return () => { active = false; };
