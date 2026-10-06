@@ -16,6 +16,8 @@ updates the extension, not the application executable.
 Edge verified English/Vietnamese instructions, the download link, narrow layout
 and no page errors. Syntax, TypeScript and production build passed. No Beat
 detector, scheduler, app data, executable, registry or security-policy changes.
+Published guide/header changes at `8655c68`: live update instructions return
+HTTP 200 and the ZIP has the configured revalidation header. Preview stopped.
 
 Unresolved: full app updates on this PC require Windows-trusted publisher
 signing. Closing app windows alone does not remove the policy block.

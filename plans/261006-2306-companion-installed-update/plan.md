@@ -14,7 +14,7 @@ authentication does not provide Windows Authenticode publisher trust.
 - [x] Verify all deployed extension files and the installed manifest version.
 - [x] Make standalone installed-folder update instructions discoverable online
       and in the offline guide; ensure downloads revalidate after publication.
-- [ ] Run scoped verification, publish the guide and record the app-update limit.
+- [x] Run scoped verification, publish the guide and record the app-update limit.
 
 Rollback: restore the saved Companion archive. No app data, browser profiles,
 security policy, installed executable or registry changes are authorized by
@@ -29,3 +29,7 @@ public download link, 390px layout and absence of page errors passed an Edge
 browser check. Syntax, typecheck and production build passed. Initial browser
 check import used an unavailable root `playwright` module; rerunning with the
 repository's installed `@playwright/test` succeeded. No detector changes.
+
+Published at `8655c68`. The live setup page returns HTTP 200 with the installed
+folder update section; the public ZIP returns `Cache-Control: no-cache` and
+`Content-Type: application/zip`. The temporary port 5173 server is stopped.
