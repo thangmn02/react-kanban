@@ -25,7 +25,8 @@ interface HomeDashboardProps {
   onStartFocusTask?: (task: HomeTaskSummary, nextStep?: string) => void;
   onPlanFocusTasks?: (tasks: HomeTaskSummary[]) => void;
   isFocusTask: (taskId: string) => boolean;
-  currentUser: AppUser;
+  currentUser: AppUser | null;
+  onRequireSignIn?: () => boolean;
   activeWorkspace: WorkspaceSummary | null;
   onCreateBoard?: () => void;
   onCreateTask?: () => void;
@@ -89,25 +90,26 @@ function dueOffset(task: HomeTaskSummary) {
 
 // Reset immediately on workspace/identity changes, including in-flight retries.
 export default function HomeDashboard(props: HomeDashboardProps) {
-  return <HomeBriefing key={`${props.currentUser.id}:${props.activeWorkspace?.id ?? 'none'}`} {...props} />;
+  return <HomeBriefing key={`${props.currentUser?.id ?? 'public'}:${props.activeWorkspace?.id ?? 'none'}`} {...props} />;
 }
 
 function HomeBriefing({ currentUser, activeWorkspace, onOpenTask, onOpenBoard,
   onToggleFocusTask, onStartFocusTask, isFocusTask, onCreateBoard, onCreateTask,
-  onPlanFocusTasks, onOpenQuickPlan, onOpenToday, focusTaskCount = 0, focusSessionsToday = 0, refreshKey, taskRevision, focusControls,
+  onPlanFocusTasks, onOpenQuickPlan, onOpenToday, focusTaskCount = 0, focusSessionsToday = 0, refreshKey, taskRevision, focusControls, onRequireSignIn,
 }: HomeDashboardProps) {
   const { t, language } = useI18n();
   const workspaceId = activeWorkspace?.id;
   const [data, setData] = useState<HomeDashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
-  const { focusViewId, setFocusViewId } = useHomeFocusView(currentUser.id, workspaceId);
+  const { focusViewId, setFocusViewId } = useHomeFocusView(currentUser?.id, workspaceId);
   const [isPinFormOpen, setIsPinFormOpen] = useState(false);
   const [isPlanMyDayOpen, setIsPlanMyDayOpen] = useState(false);
   const closePlanMyDay = useCallback(() => setIsPlanMyDayOpen(false), []);
   const { pins, isLoading: arePinsLoading, error: pinsError, createPin, removePin } = useBriefingPins(workspaceId);
 
   useEffect(() => {
+    if (!currentUser) return;
     let active = true;
     fetchHomeDashboardData({ currentUser, workspaceId }).then((result) => {
       if (active) { setData(result); setError(null); }
@@ -127,11 +129,12 @@ function HomeBriefing({ currentUser, activeWorkspace, onOpenTask, onOpenBoard,
     : tasks.filter((task) => isFocusTask(task.id)).slice(0, 3).map((task) => ({ ...task, listTitle: undefined }));
   const overdue = tasks.filter((task) => { const offset = dueOffset(task); return offset !== null && offset < 0; }).length;
   const dueToday = tasks.filter((task) => dueOffset(task) === 0).length;
-  const loading = !data && !error;
+  const loading = Boolean(currentUser) && !data && !error;
+  const showBriefing = !error && (!currentUser || Boolean(data));
   const date = new Intl.DateTimeFormat(language === 'vi' ? 'vi-VN' : 'en-US', { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date());
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'briefing.morning' : hour < 18 ? 'briefing.afternoon' : 'briefing.evening';
-  const rawFirstName = currentUser.name.trim().split(/\s+/)[0] || '';
+  const rawFirstName = currentUser?.name.trim().split(/\s+/)[0] || '';
   const firstName = rawFirstName ? rawFirstName.charAt(0).toLocaleUpperCase(language === 'vi' ? 'vi-VN' : 'en-US') + rawFirstName.slice(1) : '';
   const canEditPins = activeWorkspace?.role !== 'viewer';
   const openLinkedPinTask = async (pin: BriefingPin) => {
@@ -163,21 +166,21 @@ function HomeBriefing({ currentUser, activeWorkspace, onOpenTask, onOpenBoard,
       <main className="mx-auto grid max-w-[1140px] items-start gap-10 px-5 py-8 pb-28 sm:px-8 sm:py-11 sm:pb-28 lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-x-16" aria-busy={loading}>
         <div className="min-w-0">
           <header>
-            <p className="text-[13px] text-slate-500">{date}<span className="mx-2" aria-hidden="true">·</span>{activeWorkspace?.name}</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">{t(greeting, { name: firstName })}</h1>
-            {data && !error && <p className="mt-2 text-[13px] leading-6 text-slate-500">{t('briefing.dailyFacts', { sessions: focusSessionsToday, plural: focusSessionsToday === 1 ? '' : 's', overdue, today: dueToday })}</p>}
-            {data && !error && canEditPins && <button type="button" onClick={() => setIsPinFormOpen(true)} className={`${primaryButton} mt-4 px-5 py-2.5`}>{t('briefing.pin.pinAction')}</button>}
+            <p className="text-[13px] text-slate-500">{date}<span className="mx-2" aria-hidden="true">·</span>{activeWorkspace?.name || 'Kora'}</p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">{currentUser ? t(greeting, { name: firstName }) : 'Kora'}</h1>
+            {showBriefing && <p className="mt-2 text-[13px] leading-6 text-slate-500">{t('briefing.dailyFacts', { sessions: focusSessionsToday, plural: focusSessionsToday === 1 ? '' : 's', overdue, today: dueToday })}</p>}
+            {showBriefing && canEditPins && <button type="button" onClick={() => { if (onRequireSignIn?.() !== false) setIsPinFormOpen(true); }} className={`${primaryButton} mt-4 px-5 py-2.5`}>{t('briefing.pin.pinAction')}</button>}
           </header>
 
           {loading && <div className="mt-10 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /></div>}
           {error && <div className="mt-8"><ErrorState title={t('today.errorTitle')} description={t('today.errorDescription')} details={error} onRetry={() => { setError(null); setAttempt((value) => value + 1); }} /></div>}
 
-          {data && !error && <>
+          {showBriefing && <>
             {(arePinsLoading || pins.length > 0 || pinsError) && <section aria-labelledby="briefing-pins" className="mt-10 border-t border-slate-200 pt-8">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h2 id="briefing-pins" className={sectionLabel}>{t('briefing.pin.sectionTitle')}</h2><span className="text-xs text-slate-400">{t('briefing.pin.teamVisible')}</span></div>
               {arePinsLoading && <Skeleton className="h-44 w-full" />}
               {pinsError && <p className="text-sm text-rose-600">{t('briefing.pin.loadError')}</p>}
-              <div className="space-y-3">{pins.map((pin) => <PinnedThreadCard key={pin.id} pin={pin} language={language} canDelete={canEditPins || pin.createdBy === currentUser.id} onOpenLinkedTask={() => { void openLinkedPinTask(pin); }} onDelete={(pinId) => { void removePin(pinId).catch((reason) => notify.error(reason instanceof Error ? reason.message : t('briefing.pin.deleteError'))); }} t={t} />)}</div>
+              <div className="space-y-3">{pins.map((pin) => <PinnedThreadCard key={pin.id} pin={pin} language={language} canDelete={canEditPins || pin.createdBy === currentUser?.id} onOpenLinkedTask={() => { void openLinkedPinTask(pin); }} onDelete={(pinId) => { void removePin(pinId).catch((reason) => notify.error(reason instanceof Error ? reason.message : t('briefing.pin.deleteError'))); }} t={t} />)}</div>
             </section>}
 
             <section aria-labelledby="briefing-attention" className="mt-10 border-t border-slate-200 pt-8">
@@ -207,7 +210,7 @@ function HomeBriefing({ currentUser, activeWorkspace, onOpenTask, onOpenBoard,
             <section aria-labelledby="briefing-plan" className="mt-8 border-t border-slate-200 pt-8">
               <h2 id="briefing-plan" className={sectionLabel}>{t('briefing.makeRoom')}</h2>
               <div className="mt-4 flex flex-wrap gap-2">
-                {onStartFocusTask && onPlanFocusTasks && <button type="button" className={`${primaryButton} px-5 py-2.5`} onClick={() => setIsPlanMyDayOpen(true)}>{t('planDay.action')}</button>}
+                {onStartFocusTask && onPlanFocusTasks && <button type="button" className={`${primaryButton} px-5 py-2.5`} onClick={() => { if (onRequireSignIn?.() !== false) setIsPlanMyDayOpen(true); }}>{t('planDay.action')}</button>}
                 {onOpenQuickPlan && <button type="button" className={`${primaryButton} px-5 py-2.5`} onClick={onOpenQuickPlan}>{t('home.quickPlan')}</button>}
                 {onCreateTask && <button type="button" className={quietButton} onClick={onCreateTask}>{t('home.createSingleTask')}</button>}
               </div>
@@ -215,7 +218,7 @@ function HomeBriefing({ currentUser, activeWorkspace, onOpenTask, onOpenBoard,
           </>}
         </div>
 
-        {data && !error && <aside className="min-w-0 space-y-10 border-t border-slate-200 pt-8 lg:border-0 lg:pt-0">
+        {showBriefing && <aside className="min-w-0 space-y-10 border-t border-slate-200 pt-8 lg:border-0 lg:pt-0">
           <section aria-labelledby="briefing-focus">
             <h2 id="briefing-focus" className={sectionLabel}>{t('today.plan')}</h2>
             <p className="mt-2 text-[13px] text-slate-600">{t('home.focusSelectedCount', { count: focusControls ? plannedTasks.length : focusTaskCount || plannedTasks.length, max: 3 })}</p>
@@ -238,14 +241,14 @@ function HomeBriefing({ currentUser, activeWorkspace, onOpenTask, onOpenBoard,
           <section aria-labelledby="briefing-boards">
             <h2 id="briefing-boards" className={sectionLabel}>{t('briefing.boards')}</h2>
             <ul className="mt-2 space-y-2">
-              {data.recentBoards.slice(0, 4).map((board) => <li key={board.id}><button type="button" aria-label={`${t('home.openBoard')}: ${board.title}`} onClick={() => onOpenBoard(board.id)} className="w-full cursor-pointer rounded py-2 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"><span className="block break-words text-sm font-semibold text-slate-800">{board.title}</span><span className="mt-1 block text-xs text-slate-500">{t('home.taskCount', { count: board.taskCount })}</span></button></li>)}
+              {(data?.recentBoards ?? []).slice(0, 4).map((board) => <li key={board.id}><button type="button" aria-label={`${t('home.openBoard')}: ${board.title}`} onClick={() => onOpenBoard(board.id)} className="w-full cursor-pointer rounded py-2 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"><span className="block break-words text-sm font-semibold text-slate-800">{board.title}</span><span className="mt-1 block text-xs text-slate-500">{t('home.taskCount', { count: board.taskCount })}</span></button></li>)}
             </ul>
-            {data.recentBoards.length === 0 && <p className="mt-3 text-sm text-slate-500">{t('home.noBoardsTitle')}</p>}
+            {!data?.recentBoards.length && <p className="mt-3 text-sm text-slate-500">{t('home.noBoardsTitle')}</p>}
             {onCreateBoard && <button type="button" className={`${quietButton} mt-1 -ml-3`} onClick={onCreateBoard}>{t('home.createBoard')}</button>}
           </section>
         </aside>}
       </main>
-      {workspaceId && <BriefingPinForm isOpen={isPinFormOpen} workspaceId={workspaceId} currentUser={currentUser} tasks={tasks} onClose={() => setIsPinFormOpen(false)} onSubmit={async (input) => { await createPin(input); notify.success(t('briefing.pin.created')); }} />}
+      {workspaceId && currentUser && <BriefingPinForm isOpen={isPinFormOpen} workspaceId={workspaceId} currentUser={currentUser} tasks={tasks} onClose={() => setIsPinFormOpen(false)} onSubmit={async (input) => { await createPin(input); notify.success(t('briefing.pin.created')); }} />}
       {isPlanMyDayOpen && onStartFocusTask && onPlanFocusTasks && <PlanMyDayDialog tasks={tasks} workspaceId={workspaceId} onCreateTask={onCreateTask} onClose={closePlanMyDay} onStart={(task, nextStep) => { setFocusViewId(task.id); onStartFocusTask(task, nextStep); }} onAddTopThree={onPlanFocusTasks} />}
     </div>
   );

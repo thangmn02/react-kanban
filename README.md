@@ -343,6 +343,21 @@ Tests run in jsdom via Vitest. Coverage is collected through
 
 ## Deployment
 
+### Public product identity
+
+`/about/`, `/privacy/` and `/terms/` are static public documents readable without
+signing in or JavaScript. About links to public Home at `/` and identifies Kora
+as an Early Access product. The Home layout is unchanged. Canonical URLs, sharing
+metadata and structured data use `https://koraspace.online` and the supplied public
+contact address `contact@koraspace.online`. See
+[public identity maintenance](docs/public-identity.md) for the owning files.
+
+Home (`/` and the existing `/home` alias) and `/contact` are public. Tasks,
+Today, Music, Beat Grid, Focus and workspace routes require sign-in. Protected
+destinations survive redirects and page refreshes in a validated `returnTo`
+query parameter, including first-workspace setup. Run the connected-auth browser
+checks with `pnpm exec playwright test --config playwright.public-auth.config.ts`.
+
 ### Contact form
 
 The Contact tab uses a Supabase Edge Function, private message storage, Cloudflare

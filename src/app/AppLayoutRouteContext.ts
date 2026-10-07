@@ -14,6 +14,7 @@ import AcceptInvitePage from '../components/invite/AcceptInvitePage';
 import NotFoundPage from '../components/error/NotFoundPage';
 import WorkspaceMembersDialog from '../components/workspace/WorkspaceMembersDialog';
 import ArcanaBoothDialog from '../features/arcana/ArcanaBoothDialog';
+import type { FloatingFocusProps } from '../components/focus/FloatingFocus';
 
 export interface AppLayoutRouteContext {
   header: ReactNode;
@@ -32,6 +33,7 @@ export interface AppLayoutRouteContext {
   members: ComponentProps<typeof WorkspaceMembersDialog>;
   arcana: ComponentProps<typeof ArcanaBoothDialog>;
   home: ComponentProps<typeof HomeDashboard>;
+  featureDock: FloatingFocusProps;
   today: ComponentProps<typeof TodayPage>;
   board: {
     hasActiveBoard: boolean;

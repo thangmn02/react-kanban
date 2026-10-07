@@ -18,6 +18,20 @@ const props = { currentUser: user, activeWorkspace: workspace('a'), onOpenTask: 
 beforeEach(() => { vi.clearAllMocks(); localStorage.clear(); sessionStorage.clear(); });
 afterEach(cleanup);
 
+it('keeps the public Home layout without fetching private data and gates local planning', () => {
+  const onRequireSignIn = vi.fn().mockReturnValue(false);
+  render(<I18nProvider><HomeDashboard {...props} currentUser={null} activeWorkspace={null} onRequireSignIn={onRequireSignIn} /></I18nProvider>);
+  expect(screen.getByRole('heading', { level: 1, name: 'Kora' })).toBeInTheDocument();
+  expect(screen.getByText('Needs attention')).toBeInTheDocument();
+  expect(screen.getByText('Recent boards')).toBeInTheDocument();
+  expect(fetchHomeDashboardData).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: 'Order today’s tasks' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Pin a thread' }));
+  expect(onRequireSignIn).toHaveBeenCalledTimes(2);
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(props.onPlanFocusTasks).not.toHaveBeenCalled();
+});
+
 it('discards a previous workspace retry and immediately clears old tasks', async () => {
   let finishRetry!: (value: HomeDashboardData) => void;
   vi.mocked(fetchHomeDashboardData).mockResolvedValueOnce(data('Old task'));

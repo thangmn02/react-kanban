@@ -1,0 +1,20 @@
+* { box-sizing: border-box; }
+body { margin: 0; background: #f8fafc; color: #0f172a; font: 16px/1.7 system-ui, sans-serif; }
+.shell { max-width: 800px; margin: auto; padding: 24px; }
+header, nav, footer { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; }
+header { justify-content: space-between; margin-bottom: 32px; }
+.brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 700; text-decoration: none; }
+.brand img { width: 36px; height: 36px; border-radius: 10px; }
+a { color: #1d4ed8; text-underline-offset: 3px; }
+a:focus-visible { outline: 2px solid #2563eb; outline-offset: 4px; }
+nav, footer { font-size: 14px; }
+nav a[aria-current="page"] { color: #0f172a; font-weight: 600; }
+main { background: white; border: 1px solid #e2e8f0; border-radius: 24px; padding: clamp(24px, 5vw, 40px); }
+h1 { margin: 0 0 16px; font-size: clamp(28px, 5vw, 38px); line-height: 1.2; letter-spacing: -.035em; }
+h2 { margin: 28px 0 8px; font-size: 21px; line-height: 1.4; }
+p { margin: 12px 0; }
+li + li { margin-top: 8px; }
+.status { color: #475569; font-size: 13px; margin: 0 0 12px; }
+.primary { display: inline-block; background: #2563eb; color: white; padding: 10px 18px; border-radius: 12px; text-decoration: none; font-weight: 600; }
+footer { margin-top: 24px; padding-bottom: 16px; color: #475569; }
+@media (max-width: 480px) { .shell { padding: 16px; } header { align-items: flex-start; } nav { gap: 12px; } }

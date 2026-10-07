@@ -108,7 +108,7 @@ test('unknown and auth routes settle without redirect loops', async ({ page }) =
 
   navigations.length = 0;
   await page.goto('/auth/sign-in');
-  await expect(page).toHaveURL('/home');
+  await expect(page).toHaveURL('/');
   await expect(page.locator('#root')).not.toBeEmpty();
   expect(navigations.length).toBeLessThanOrEqual(3);
   expect(errors).toEqual([]);

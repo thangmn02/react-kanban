@@ -9,9 +9,11 @@ import type { FocusSessionValue } from '../features/focus/useFocusSessionControl
 import type { AppUser, WorkspaceInvite, WorkspaceMember, WorkspaceSummary } from '../types/auth.type';
 import type { OnboardingSetupValues } from '../types/onboarding.type';
 import type { TodayTaskSummary } from '../services/today.service';
+import { readReturnTo } from './auth-routing';
 
 interface Params {
   header: ReactNode;
+  featureDock: AppLayoutRouteContext['featureDock'];
   user: AppUser | null;
   activeWorkspace: WorkspaceSummary | null;
   activeWorkspaceId: string | null;
@@ -46,14 +48,14 @@ interface Params {
 
 export function useAppLayoutRouteContextValue(params: Params): AppLayoutRouteContext {
   const { board, focus, routing } = params;
-  const returnTo = typeof routing.location.state === 'object'
-    && routing.location.state
-    && 'returnTo' in routing.location.state
-    ? String(routing.location.state.returnTo)
-    : '/home';
+  const returnTo = readReturnTo(routing.location.search, routing.location.state);
+  const taskAction = (action: () => void) => () => {
+    if (routing.requireFeature('/tasks')) action();
+  };
 
   return {
     header: params.header,
+    featureDock: params.featureDock,
     isBoardLoading: board.isBoardLoading,
     isSavingBoard: params.isSavingBoard,
     workspaceErrorMessage: params.workspaceErrorMessage,
@@ -62,7 +64,7 @@ export function useAppLayoutRouteContextValue(params: Params): AppLayoutRouteCon
     isRetryingBoard: board.isRetryingBoard,
     onRetryWorkspace: params.onRetryWorkspace,
     onRetryBoard: board.handleRetryBoard,
-    auth: { onAuthenticated: () => routing.navigate(returnTo, { replace: true }) },
+    auth: { onAuthenticated: () => { if (params.user) routing.navigate(returnTo, { replace: true }); } },
     onboarding: {
       userName: params.user?.name || '',
       onCompleteSetup: params.onCompleteOnboarding,
@@ -100,21 +102,22 @@ export function useAppLayoutRouteContextValue(params: Params): AppLayoutRouteCon
     },
     arcana: { isOpen: true, onClose: () => routing.navigate('/home') },
     home: {
-      focusControls: { session: focus, onMarkDone: params.onMarkFocusDone },
+      focusControls: params.user ? { session: focus, onMarkDone: params.onMarkFocusDone } : undefined,
+      onRequireSignIn: () => routing.requireFeature('/today'),
       onOpenTask: board.handleOpenTaskFromHome,
       onOpenBoard: board.handleOpenBoardFromHome,
       onToggleFocusTask: focus.handleToggleFocusTaskFromHome,
       onStartFocusTask: focus.handleStartFocusTaskFromHome,
       onPlanFocusTasks: focus.handlePlanFocusTasksFromHome,
       isFocusTask: focus.isFocusTask,
-      currentUser: params.user!,
-      activeWorkspace: params.activeWorkspace,
-      onCreateBoard: params.boardDialogs.openCreateBoardDialog,
-      onCreateTask: board.handleQuickAddTask,
-      onOpenQuickPlan: params.handleOpenQuickPlan,
-      onOpenToday: () => routing.navigate('/today'),
-      focusTaskCount: focus.focusTasks.length,
-      focusSessionsToday: focus.dailyFocusStats.completedSessions,
+      currentUser: params.user,
+      activeWorkspace: params.user ? params.activeWorkspace : null,
+      onCreateBoard: taskAction(params.boardDialogs.openCreateBoardDialog),
+      onCreateTask: taskAction(board.handleQuickAddTask),
+      onOpenQuickPlan: taskAction(params.handleOpenQuickPlan),
+      onOpenToday: () => { void routing.goToView('today'); },
+      focusTaskCount: params.user ? focus.focusTasks.length : 0,
+      focusSessionsToday: params.user ? focus.dailyFocusStats.completedSessions : 0,
       hasTeamMembers: params.workspaceMembers.length > 1,
     },
     today: {

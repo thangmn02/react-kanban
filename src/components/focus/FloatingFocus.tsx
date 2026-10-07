@@ -8,6 +8,7 @@ import { useBrowserMusic } from '../../features/music/useBrowserMusic';
 import { useDockPreferences, beatColorModes, beatPalettes } from './useDockPreferences';
 
 export interface FloatingFocusProps {
+  initialTab?: 'focus' | 'beat' | 'music';
   activeTask: FocusTask | null;
   focusTasks: FocusTask[];
   timerState: PomodoroTimerState;
@@ -53,7 +54,7 @@ export default function FloatingFocus(props: FloatingFocusProps) {
   const groupId = useId();
   const settingsId = useId();
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [tab, setTab] = useState<Card>('focus');
+  const [tab, setTab] = useState<Card>(props.initialTab ?? 'focus');
   const toolbarRef = useRef<HTMLDivElement>(null);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
   const timeButtonRef = useRef<HTMLButtonElement>(null);

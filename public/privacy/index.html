@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Privacy — Kora</title>
+    <meta name="description" content="How Kora handles account, workspace, local settings and contact data, with information about music features and privacy requests." />
+    <link rel="canonical" href="https://koraspace.online/privacy/" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="stylesheet" href="/kora-public.css" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Kora" />
+    <meta property="og:title" content="Privacy — Kora" />
+    <meta property="og:description" content="How Kora handles account, workspace, local settings and contact data." />
+    <meta property="og:url" content="https://koraspace.online/privacy/" />
+    <meta property="og:image" content="https://koraspace.online/logo.png" />
+    <meta property="og:image:alt" content="Kora cat logo" />
+  </head>
+  <body>
+    <div class="shell">
+      <header>
+        <a class="brand" href="/"><img src="/logo.png" alt="" />Kora</a>
+        <nav aria-label="Public pages"><a href="/about/">About</a><a href="/privacy/" aria-current="page">Privacy</a><a href="/terms/">Terms</a><a href="/contact">Contact</a></nav>
+      </header>
+      <main>
+        <p class="status">Updated October 7, 2026</p>
+        <h1>Privacy</h1>
+        <p>This page explains data handling for Kora at <a href="https://koraspace.online/">koraspace.online</a> and its Windows app. Contact the project at <a href="mailto:contact@koraspace.online">contact@koraspace.online</a> or through the <a href="/contact">contact form</a>.</p>
+        <h2>Accounts and workspace data</h2>
+        <p>Kora uses Supabase for account authentication and hosted workspace data. Your account information, boards, tasks, uploaded task images, membership information and completed focus-session history are used to provide the workspace. Shared workspace content is accessible to members according to their access permissions.</p>
+        <h2>Data on your device</h2>
+        <p>Kora uses browser or app storage for session state, preferences, cached data and local focus settings. Local demo mode stores workspace data on the device. Clearing browser or app data can remove local information.</p>
+        <h2>Contact messages</h2>
+        <p>The contact form sends your name, reply email, subject and message to a private Supabase table and sends an email notification through Resend. These details are used to respond to your message. Cloudflare Turnstile checks submissions for abuse; a hashed client-IP identifier is used for rate limiting. Do not send passwords or sensitive information through the form.</p>
+        <h2>Music and optional analysis</h2>
+        <p>The Music Companion reads supported tabs' track metadata and playback state for music controls and Beat Grid. Supported local audio capture analyzes browser audio; on Windows, other audio from the same browser, including calls, may affect the result. Read the <a href="/music-companion-privacy.html">Music Companion privacy details</a> before enabling it.</p>
+        <p>Server Beat analysis uses an authorized media input and stores reusable, timestamped music events rather than workspace content. This capability is still in development and is not available for every media source.</p>
+        <p>If you request AI task breakdown, the task details needed for that request are sent to the configured AI service. Avoid including confidential information in such requests.</p>
+        <h2>Service providers and retention</h2>
+        <p>Netlify hosts the web app; Supabase provides authentication and data services. Email, anti-abuse and optional analysis providers process the information needed for their functions. Hosting and service providers may process network requests and operational logs.</p>
+        <p>Hosted workspace data and contact messages are retained to operate the product and respond to users. Backups and operational logs may remain after live data is removed. Contact Kora to request access to or deletion of your account data; identity and workspace permissions may need to be verified.</p>
+        <h2>Changes</h2>
+        <p>As this Early Access product develops, this page will be updated when data handling changes. Check the date above for the latest revision.</p>
+      </main>
+      <footer><a href="/about/">About Kora</a><a href="/terms/">Terms</a><a href="/home">Open Kora</a></footer>
+    </div>
+  </body>
+</html>

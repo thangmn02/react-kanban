@@ -14,6 +14,18 @@ export default defineConfig(({ mode }) => ({
     react(),
     tailwindcss(),
     {
+      name: 'public-document-routes',
+      configureServer(server) {
+        server.middlewares.use((request, _response, next) => {
+          const url = new URL(request.url || '/', 'http://localhost');
+          if (/^\/(about|privacy|terms)\/?$/.test(url.pathname)) {
+            request.url = `${url.pathname.replace(/\/$/, '')}/index.html${url.search}`;
+          }
+          next();
+        });
+      },
+    },
+    {
       name: 'exclude-installer-from-native-bundle',
       apply: 'build',
       async writeBundle(options) {

@@ -98,34 +98,34 @@ export default function AuthPage({ onAuthenticated }: AuthPageProps) {
               className="h-12 w-12 rounded-2xl object-cover shadow-[0_14px_36px_rgba(37,99,235,0.28)]"
             />
             <h1 className="mt-8 text-4xl font-semibold tracking-[-0.04em] text-white">
-              Kora Workspace
+              Kora
             </h1>
             <p className="mt-4 max-w-sm text-base leading-7 text-slate-300">
-              Focus-first Kora for personal work and small teams.
+              Intelligent Focus Space
             </p>
           </div>
 
           <div className="space-y-3 text-sm text-slate-300">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              Workspace-isolated boards protected by Supabase RLS.
+              Organize your tasks and make room to focus.
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              Realtime Kora, Focus Dock, Pomodoro, and lightweight team flow.
+              Tasks, music, and focus in one space.
             </div>
           </div>
         </aside>
 
         <div className="p-6 sm:p-8">
           <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-blue-600">
-            Secure access
+            Kora
           </p>
           <h2 className="mt-3 text-3xl font-semibold tracking-[-0.03em] text-slate-950">
             {formMode === 'sign-in' ? 'Welcome back' : 'Create your account'}
           </h2>
           <p className="mt-2 text-sm leading-6 text-slate-500">
             {formMode === 'sign-in'
-              ? 'Sign in to continue to your private workspace.'
-              : 'Start with a workspace, starter board, and focused task rhythm.'}
+              ? 'Sign in to continue.'
+              : 'Create an account to get started.'}
           </p>
 
           <div className="mt-6 grid grid-cols-2 rounded-2xl bg-slate-100 p-1">
@@ -222,6 +222,11 @@ export default function AuthPage({ onAuthenticated }: AuthPageProps) {
               ? 'New here? Create an account to set up your first workspace.'
               : 'Already have an account? Switch back to sign in.'}
           </p>
+          <nav aria-label="About Kora and policies" className="mt-4 flex justify-center gap-4 text-xs text-slate-500">
+            <a href="https://koraspace.online/about/" className="underline underline-offset-4">About Kora</a>
+            <a href="https://koraspace.online/privacy/" className="underline underline-offset-4">Privacy</a>
+            <a href="https://koraspace.online/terms/" className="underline underline-offset-4">Terms</a>
+          </nav>
         </div>
       </section>
     </main>

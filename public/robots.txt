@@ -1,0 +1,7 @@
+User-agent: *
+Disallow: /auth/
+Disallow: /workspaces/
+Disallow: /onboarding
+Disallow: /invite/
+
+Sitemap: https://koraspace.online/sitemap.xml

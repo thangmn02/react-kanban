@@ -2,6 +2,7 @@ import { Navigate, Outlet, useLocation, useOutletContext } from 'react-router-do
 
 import { useAuth } from '../hooks/useAuth';
 import type { AppLayoutRouteContext } from './AppLayoutRouteContext';
+import { authDestination } from './auth-routing';
 
 export default function RequireAuth() {
   const { authMode, isAuthLoading, user } = useAuth();
@@ -13,7 +14,7 @@ export default function RequireAuth() {
   }
 
   if (authMode === 'supabase' && !user) {
-    return <Navigate to="/auth/sign-in" replace state={{ returnTo: location.pathname }} />;
+    return <Navigate to={authDestination(location.pathname + location.search + location.hash)} replace />;
   }
 
   return <Outlet context={routeContext} />;

@@ -35,6 +35,7 @@ import { useAppLayoutRouteContextValue } from './app/createAppLayoutRouteContext
 import { useHomeFocusView } from './hooks/useHomeFocusView';
 import { isNativeWidget } from './features/native/runtime';
 import NativeSurface from './features/native/NativeSurface';
+import { authDestination, readReturnTo } from './app/auth-routing';
 
 function AppLayout() {
   const native = isNativeWidget();
@@ -213,7 +214,8 @@ function AppLayout() {
     setBoardData(boardSnapshot.boardData);
     setBoardSummaries(boardRows);
     syncBoardCache(boardSnapshot.boardId, boardSnapshot.boardData);
-    navigate(`/workspaces/${createdWorkspace.id}/boards/${boardSnapshot.boardId}`);
+    const requested = new URLSearchParams(location.search).has('returnTo');
+    navigate(requested ? readReturnTo(location.search) : `/workspaces/${createdWorkspace.id}/boards/${boardSnapshot.boardId}`);
     notify.success(t('toast.workspaceCreated'));
   };
 
@@ -289,11 +291,12 @@ function AppLayout() {
     onFocusSearch: focusBoardSearch,
   });
 
-  const appHeader = user ? (
+  const appHeader = (
     <AppHeader
       authMode={authMode}
       user={user}
-      workspaces={workspaces}
+      onSignIn={() => navigate(authDestination(location.pathname + location.search + location.hash))}
+      workspaces={user ? workspaces : []}
       activeWorkspace={activeWorkspace}
       activeWorkspaceId={activeWorkspaceId}
       isLocalDemoMode={isLocalDemoMode}
@@ -301,8 +304,8 @@ function AppLayout() {
       onGoToday={() => setActiveViewWithPath('today')}
       activeView={activeView}
       onNavigate={setActiveViewWithPath}
-      onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
-      onCreateBoard={openCreateBoardDialog}
+      onOpenCommandPalette={() => { if (routing.requireFeature('/tasks')) setIsCommandPaletteOpen(true); }}
+      onCreateBoard={() => { if (routing.requireFeature('/tasks')) openCreateBoardDialog(); }}
       onWorkspaceChange={(workspaceId) => {
         setActiveWorkspaceId(workspaceId);
         setIsBoardLoading(true);
@@ -312,7 +315,7 @@ function AppLayout() {
       onOpenArcanaBooth={() => handleOpenArcanaBooth()}
       arcanaAvailableDraws={arcanaRewardState.availableDraws}
     />
-  ) : null;
+  );
 
   const sharedDialogs = (
     <AppOverlays
@@ -341,13 +344,23 @@ function AppLayout() {
         isOpen: isProgressReportOpen,
         onClose: () => setIsProgressReportOpen(false),
       }}
-      isHomeFocusActive={location.pathname === '/home' && focusSession.focusTasks.some((task) => task.id === focusViewId && task.id === focusSession.timerState.activeTaskId && !task.isDone)}
+      isHomeFocusActive={['/', '/home'].includes(location.pathname) && focusSession.focusTasks.some((task) => task.id === focusViewId && task.id === focusSession.timerState.activeTaskId && !task.isDone)}
       onOpenNativeDock={native ? () => setNativeDock(true) : undefined}
     />
   );
 
   const routeContext = useAppLayoutRouteContextValue({
     header: appHeader,
+    featureDock: {
+      activeTask: focusSession.selectedTimerTask || focusSession.activeFocusTask,
+      focusTasks: focusSession.focusTasks, timerState: focusSession.timerState,
+      remainingSeconds: focusSession.remainingSeconds, cycleTotal: focusSession.timerSettings.longBreakEvery,
+      timerSettings: focusSession.timerSettings, onTimerSettingsChange: focusSession.updateTimerSettings, onModeChange: focusSession.setMode,
+      onStart: () => { focusSession.startFocusSessionNow(); }, onPause: pauseTimer, onReset: resetTimer,
+      onActiveTaskChange: (taskId) => { focusSession.startFocusSessionNow(taskId); },
+      onMarkDoneAndNext: focusIntegration.handleMarkDoneAndNext,
+      canPopOut: isPictureInPictureSupported, onPopOut: handleOpenFloatingFocusTimer,
+    },
     user,
     activeWorkspace,
     activeWorkspaceId,
@@ -380,16 +393,17 @@ function AppLayout() {
     onOpenProgressReport: () => setIsProgressReportOpen(true),
   });
 
-  if (activeView !== 'contact' && (isAuthLoading || (authMode === 'supabase' && user && isWorkspaceLoading))) {
+  if (activeView !== 'contact' && ((activeView !== 'home' && isAuthLoading) || (authMode === 'supabase' && user && isWorkspaceLoading))) {
     return <div className="flex min-h-screen items-center justify-center bg-canvas text-sm font-medium text-slate-500">Preparing secure workspace...</div>;
   }
 
-  const shouldRenderOverlays = Boolean(user) && !['auth', 'onboarding', 'invite', 'not-found'].includes(activeView);
+  const showNavigation = (Boolean(user) && !['auth', 'onboarding', 'invite', 'not-found'].includes(activeView)) || ['home', 'contact'].includes(activeView);
+  const shouldRenderOverlays = showNavigation && Boolean(user) && !['music', 'beat-grid', 'focus'].includes(activeView);
 
   const content = (
     <FocusSessionProvider value={focusSession}>
-      {shouldRenderOverlays && <AppNavigation activeView={activeView} onNavigate={setActiveViewWithPath} />}
-      <div className={shouldRenderOverlays ? 'lg:pl-20' : undefined}>
+      {showNavigation && <AppNavigation activeView={activeView} onNavigate={setActiveViewWithPath} />}
+      <div className={showNavigation ? 'lg:pl-20' : undefined}>
         <Outlet context={routeContext} />
       </div>
       {shouldRenderOverlays && sharedDialogs}

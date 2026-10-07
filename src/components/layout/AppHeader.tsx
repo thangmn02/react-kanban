@@ -8,7 +8,8 @@ import { isNativeWidget } from '../../features/native/runtime';
 
 interface AppHeaderProps {
   authMode: AuthMode;
-  user: AppUser;
+  user: AppUser | null;
+  onSignIn?: () => void;
   workspaces: WorkspaceSummary[];
   activeWorkspace: WorkspaceSummary | null;
   activeWorkspaceId: string | null;
@@ -28,6 +29,7 @@ interface AppHeaderProps {
 export default function AppHeader({
   authMode,
   user,
+  onSignIn,
   workspaces,
   activeWorkspace,
   activeWorkspaceId,
@@ -69,6 +71,7 @@ export default function AppHeader({
           </span>
         </button>
 
+        {!user && <a href="/about/" className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100">About Kora</a>}
         <WorkspaceSwitcher
           workspaces={workspaces}
           activeWorkspaceId={activeWorkspaceId}
@@ -122,14 +125,14 @@ export default function AppHeader({
             <span className="ml-2 hidden text-sm font-semibold sm:inline">{t('app.new')}</span>
           </button>
 
-          <UserMenu
+          {user ? <UserMenu
             user={user}
             authMode={authMode}
             activeWorkspace={activeWorkspace}
             onSignOut={onSignOut}
             onOpenArcanaBooth={onOpenArcanaBooth}
             arcanaAvailableDraws={arcanaAvailableDraws}
-          />
+          /> : <button type="button" onClick={onSignIn} className="rounded-xl px-3 py-2 text-sm font-semibold text-blue-600 hover:bg-blue-50">Sign in</button>}
         </div>
       </div>
       {onNavigate && <AppNavigation mobile activeView={activeView} onNavigate={onNavigate} />}

@@ -11,6 +11,7 @@ const ContactRoute = lazy(() => import('./pages/contact/ContactRoute'));
 const OnboardingRoute = lazy(() => import('./pages/onboarding/OnboardingRoute'));
 const InviteRoute = lazy(() => import('./pages/invite/InviteRoute'));
 const HomeRoute = lazy(() => import('./pages/home/HomeRoute'));
+const FeatureRoute = lazy(() => import('./pages/focus/FeatureRoute'));
 const TodayRoute = lazy(() => import('./pages/today/TodayRoute'));
 const BoardRoute = lazy(() => import('./pages/board/BoardRoute'));
 const CalendarRoute = lazy(() => import('./pages/board/CalendarRoute'));
@@ -28,13 +29,17 @@ export default function App() {
       <Suspense fallback={routeFallback}>
         <Routes>
           <Route element={<AppLayout />}>
-            <Route index element={<Navigate to="/home" replace />} />
+            <Route index element={<HomeRoute />} />
+            <Route path="home" element={<HomeRoute />} />
             <Route path="auth/sign-in" element={<AuthRoute />} />
             <Route path="invite/:token" element={<InviteRoute />} />
             <Route path="contact" element={<ContactRoute />} />
             <Route element={<RequireAuth />}>
               <Route path="onboarding" element={<OnboardingRoute />} />
-              <Route path="home" element={<HomeRoute />} />
+              <Route path="tasks" element={<BoardRoute />} />
+              <Route path="music" element={<FeatureRoute tab="music" />} />
+              <Route path="beat-grid" element={<FeatureRoute tab="beat" />} />
+              <Route path="focus" element={<FeatureRoute tab="focus" />} />
               <Route path="today" element={<TodayRoute />} />
               <Route path="arcana" element={ARCANA_ENABLED ? <ArcanaRoute /> : <Navigate to="/home" replace />} />
               <Route path="workspaces/:workspaceId/members" element={<WorkspaceMembersRoute />} />

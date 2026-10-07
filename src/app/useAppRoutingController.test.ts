@@ -3,13 +3,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { deriveAppRouteState, useAppRoutingController } from './useAppRoutingController';
 
-const routing = vi.hoisted(() => ({ navigate: vi.fn() }));
+const routing = vi.hoisted(() => ({ navigate: vi.fn(), location: { pathname: '/contact', search: '', hash: '' } }));
 vi.mock('react-router-dom', async original => ({
   ...await original<typeof import('react-router-dom')>(),
   useNavigate: () => routing.navigate,
-  useLocation: () => ({ pathname: '/contact' }),
+  useLocation: () => routing.location,
 }));
-afterEach(() => { cleanup(); vi.clearAllMocks(); });
+afterEach(() => { cleanup(); vi.clearAllMocks(); routing.location = { pathname: '/contact', search: '', hash: '' }; });
 
 describe('navigation from a direct Contact visit', () => {
   function setup(signedIn = true, initialBoardId: string | null = null) {
@@ -38,13 +38,36 @@ describe('navigation from a direct Contact visit', () => {
     const { result, refreshBoardList } = setup(false);
     await act(async () => { await result.current.goToView('board'); });
     expect(refreshBoardList).not.toHaveBeenCalled();
-    expect(routing.navigate).toHaveBeenCalledWith('/auth/sign-in');
+    expect(routing.navigate).toHaveBeenCalledWith('/auth/sign-in?returnTo=%2Ftasks');
+  });
+  it('leaves guest Home public without fetching private boards', () => {
+    routing.location.pathname = '/';
+    const { board, refreshBoardList } = setup(false);
+    expect(routing.navigate).not.toHaveBeenCalled();
+    expect(refreshBoardList).not.toHaveBeenCalled();
+    expect(board.refreshBoardData).not.toHaveBeenCalled();
+  });
+  it('leaves authenticated auth callbacks in control of their feature destination', () => {
+    routing.location = { pathname: '/auth/sign-in', search: '?returnTo=%2Fbeat-grid', hash: '' };
+    const { refreshBoardList } = setup();
+    expect(routing.navigate).not.toHaveBeenCalled();
+    expect(refreshBoardList).not.toHaveBeenCalled();
+  });
+  it('uses the preserved feature after a workspace becomes available', () => {
+    routing.location = { pathname: '/onboarding', search: '?returnTo=%2Fbeat-grid', hash: '' };
+    setup();
+    expect(routing.navigate).toHaveBeenCalledWith('/beat-grid', { replace: true });
   });
 });
 
 describe('deriveAppRouteState', () => {
   it.each([
     ['/home', 'home'],
+    ['/', 'home'],
+    ['/tasks', 'board'],
+    ['/music', 'music'],
+    ['/beat-grid', 'beat-grid'],
+    ['/focus', 'focus'],
     ['/today', 'today'],
     ['/contact', 'contact'],
     ['/contact/', 'contact'],

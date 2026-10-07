@@ -3,9 +3,10 @@ import { matchPath, useLocation, useNavigate } from 'react-router-dom';
 
 import type { AppUser, AuthMode, WorkspaceSummary } from '../types/auth.type';
 import type { BoardViewMode } from '../hooks/useViewRouting';
+import { authDestination, readReturnTo } from './auth-routing';
 import type { useBoardPageController } from '../features/board/hooks/useBoardPageController';
 
-type AppView = BoardViewMode | 'table' | 'arcana' | 'members' | 'contact';
+type AppView = BoardViewMode | 'table' | 'arcana' | 'members' | 'contact' | 'music' | 'beat-grid' | 'focus';
 
 export function deriveAppRouteState(pathname: string) {
   const boardMatch = matchPath('/workspaces/:workspaceId/boards/:boardId/*', pathname);
@@ -29,7 +30,9 @@ export function deriveAppRouteState(pathname: string) {
                 ? 'calendar'
                 : pathname.endsWith('/table')
                   ? 'table'
-                  : boardMatch
+                    : ['/music', '/beat-grid', '/focus'].includes(pathname.replace(/\/$/, ''))
+                      ? pathname.replace(/^\//, '').replace(/\/$/, '') as AppView
+                    : boardMatch || matchPath('/tasks', pathname)
                     ? 'board'
                     : membersMatch
                       ? 'members'
@@ -73,6 +76,17 @@ export function useAppRoutingController({
     setIsBoardLoading,
   } = board;
   const { activeView, activeInviteToken, routeWorkspaceId, routeBoardId } = deriveAppRouteState(location.pathname);
+  const requireFeature = useCallback((destination: string) => {
+    if (authMode === 'supabase' && !user) {
+      navigate(authDestination(destination));
+      return false;
+    }
+    if (authMode === 'supabase' && !activeWorkspaceId) {
+      navigate(`/onboarding?${new URLSearchParams({ returnTo: destination })}`);
+      return false;
+    }
+    return true;
+  }, [authMode, user, activeWorkspaceId, navigate]);
 
   const goToView = useCallback(async (nextView: AppView, options?: { inviteToken?: string | null }) => {
     if (nextView === 'invite') {
@@ -85,10 +99,11 @@ export function useAppRoutingController({
     if (nextView === 'home') return navigate('/home');
     if (nextView === 'today') return navigate('/today');
     if (nextView === 'contact') return navigate('/contact');
+    if (nextView === 'music' || nextView === 'beat-grid' || nextView === 'focus') return navigate(`/${nextView}`);
     if (nextView === 'arcana') return navigate('/arcana');
     if (nextView === 'members' && activeWorkspaceId) return navigate(`/workspaces/${activeWorkspaceId}/members`);
     if (nextView === 'not-found') return;
-    if (authMode === 'supabase' && !user) return navigate('/auth/sign-in');
+    if (authMode === 'supabase' && !user) return navigate(authDestination('/tasks'));
     if (!activeWorkspaceId) return navigate('/onboarding');
     let boardId = activeBoardId;
     // A direct public Contact visit deliberately has no loaded board yet.
@@ -104,9 +119,14 @@ export function useAppRoutingController({
   }, [activeBoardId, activeInviteToken, activeWorkspaceId, authMode, initialBoardId, navigate, refreshBoardList, user]);
 
   useEffect(() => {
-    // Contact is public and does not need a workspace or board fetch.
+    // Public pages and auth callbacks must never be redirected by workspace setup.
     if (activeView === 'contact') return;
     if (isAuthLoading || isWorkspaceLoading) return;
+    if (activeView === 'auth') {
+      if (authMode === 'mock') navigate(readReturnTo(location.search, location.state), { replace: true });
+      return;
+    }
+    if (activeView === 'home' && (!user || !activeWorkspaceId)) { setIsBoardLoading(false); return; }
     if (activeView === 'not-found') {
       setIsBoardLoading(false);
       return;
@@ -116,16 +136,16 @@ export function useAppRoutingController({
       return;
     }
     if (authMode === 'supabase' && !user && activeView !== 'invite') {
-      navigate('/auth/sign-in', { replace: true });
+      navigate(authDestination(location.pathname + location.search + location.hash), { replace: true });
       return;
     }
     if (authMode === 'supabase' && user && !activeWorkspaceId && activeView !== 'invite') {
-      navigate('/onboarding', { replace: true });
+      if (activeView !== 'onboarding') navigate(`/onboarding?${new URLSearchParams({ returnTo: location.pathname + location.search + location.hash })}`, { replace: true });
       setIsBoardLoading(false);
       return;
     }
-    if (authMode === 'supabase' && user && activeWorkspaceId && (activeView === 'auth' || activeView === 'onboarding')) {
-      navigate('/home', { replace: true });
+    if (authMode === 'supabase' && user && activeWorkspaceId && activeView === 'onboarding') {
+      navigate(readReturnTo(location.search, location.state), { replace: true });
       return;
     }
     if (activeView === 'invite') {
@@ -152,6 +172,10 @@ export function useAppRoutingController({
     })();
   }, [
     activeView,
+    location.pathname,
+    location.search,
+    location.hash,
+    location.state,
     activeWorkspaceId,
     authMode,
     initialBoardId,
@@ -168,5 +192,5 @@ export function useAppRoutingController({
     workspaces,
   ]);
 
-  return { activeView, activeInviteToken, location, navigate, goToView };
+  return { activeView, activeInviteToken, location, navigate, goToView, requireFeature };
 }
