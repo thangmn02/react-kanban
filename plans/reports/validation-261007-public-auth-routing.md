@@ -51,4 +51,10 @@ Rollback: republish that deployment through the site's Netlify Deploys page.
 Draft 6ac659359e6d73d226333bb7 passed 14 hosted Edge checks, including public
 routes, protected deep-link refresh, full return destinations and Home feature
 interaction. The first upload returned HTTP 422; the diagnostic retry succeeded.
-Production publication and canonical-domain verification are pending.
+Published source commit: 4e2c2f87e40314e145f197f6e5bfcebdfcbb7826.
+Production deploy: 6ac65b5c221cc00008fd1e7f (ready, published 2026-10-07).
+All 14 checks passed again against https://koraspace.online, with a fresh Edge
+session. Hosted validation does not submit production credentials; successful
+login and restored-session destinations are covered by connected-auth tests.
+GitHub frontend quality and Playwright jobs passed for the published commit;
+the database isolation job was still running when this record was written.
