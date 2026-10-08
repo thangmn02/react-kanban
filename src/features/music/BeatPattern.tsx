@@ -58,7 +58,7 @@ export default function BeatPattern({ session, beat, colorMode = 'random', palet
     const nextCounts = { kick: kickCount, clap: clapCount, hat: hatCount, bass: bassCount, melody: melodyCount };
     const traces = diagnostics.current.traces;
     const decoration = degraded ? telemetry.events('random', ['generic'], { captureId: beat.captureId })?.[0] : undefined;
-    if (decoration) telemetry.record('EVENT_DETECTED', decoration, { parentId: traces?.['tempo:generic']?.id });
+    if (decoration) telemetry.record('EVENT_QUEUED', decoration, { semantic: false, parentId: traces?.['tempo:generic']?.id });
     const timer = setTimeout(() => setPulse((previous) => ({ captureKey, counts: nextCounts, rawTotal: onsetTotal, tickTotal,
       ...(traces || decoration ? { telemetry: { ...traces, ...(decoration ? { 'random:generic': decoration } : {}) } } : {}),
       shapeHit: audioLive && captureKey === previous.captureKey
@@ -129,7 +129,7 @@ export default function BeatPattern({ session, beat, colorMode = 'random', palet
     gate.nextAt = songSeconds + 35 + Math.random() * 10;
     const parent = Object.values(diagnostics.current.traces || {}).filter((t) => t.source === 'onset').sort((a, b) => b.detectedAt - a.detectedAt)[0];
     const decoration = telemetry.events('random', ['generic'], { captureId: diagnostics.current.captureId })?.[0];
-    telemetry.record('EVENT_DETECTED', decoration, { parentId: parent?.id });
+    telemetry.record('EVENT_QUEUED', decoration, { semantic: false, parentId: parent?.id });
     const next = { id: Date.now(), captureKey, shape, effect, ...(decoration ? { telemetry: decoration, parentId: parent?.id } : {}) };
     // A real onset triggers each moment; the timers only end its visual state.
     momentTimers.current.forEach(clearTimeout);
@@ -165,9 +165,18 @@ export default function BeatPattern({ session, beat, colorMode = 'random', palet
     if (trace) telemetry.record('EVENT_RENDERED', trace, { delayMs, parentId });
   };
 
-  return <div ref={root} className={`music-pattern${capture ? ' live' : ''}${capture && colorMode === 'flow' ? ' flow' : ''}${liveMoment ? ' moment' : ''}${palette === 'ultraviolet' ? ' ultraviolet' : ''} ${orientation}`}
+  return <div ref={root} className={`music-pattern${capture ? ' live' : ''}${capture && !degraded && colorMode === 'flow' ? ' flow' : ''}${liveMoment ? ' moment' : ''}${palette === 'ultraviolet' ? ' ultraviolet' : ''} ${orientation}`}
     data-pattern={pattern} data-event-path={beat.eventPath || 'local'} data-reshuffle={epoch} data-moment={liveMoment?.shape || ''}
     data-moment-source={liveMoment ? 'accent' : ''} data-moment-effect={liveMoment?.effect || ''} aria-hidden="true">
+    {/* Generic timing belongs to the frame, never to an instrument row. */}
+    {degraded && pulse.captureKey === captureKey && pulse.shapeHit && <span
+      key={'decoration:' + captureKey + ':' + pulse.tickTotal} className="decorative-tempo-pulse"
+      data-beat-trace={pulse.telemetry?.['random:generic']?.id}
+      data-event-type="generic" data-event-source="random"
+      data-semantic="false" data-presentation="decorative-global" data-detector-origin="tempo-fallback"
+      data-parent-id={pulse.telemetry?.['tempo:generic']?.id}
+      data-target-playback-time={pulse.telemetry?.['tempo:generic']?.targetPlaybackTime}
+      onAnimationStart={() => rendered(pulse.telemetry?.['random:generic'], 0, pulse.telemetry?.['tempo:generic']?.id)} />}
     {beatBands.map((band, row) => {
       const steps = activeSteps(session?.id || 'empty', epoch, row);
       const colors = channelColors(colorMode, palette, session?.id || 'empty', epoch, row);
@@ -184,19 +193,18 @@ export default function BeatPattern({ session, beat, colorMode = 'random', palet
         </svg>
         {steps.map((active, step) => {
           const delay = pulseDelay(pattern, step, pulseSeed);
-          const fallbackFlash = degraded && pulse.shapeHit && active && delay !== null;
-          const onset = fallbackFlash || capture && band !== 'melody' && !liveMoment && active && newOnsets[band] && delay !== null;
+          const onset = capture && band !== 'melody' && !liveMoment && active && newOnsets[band] && delay !== null;
           const momentLit = band !== 'melody' && liveMoment && isShapeCell(liveMoment.shape, row, step);
           const cellStyle = { '--melody-level': beat.melody?.level || 0, '--pulse-delay': `${delay || 0}ms`, '--moment-delay': `${liveMoment ? momentDelay(liveMoment.effect, row, step, liveMoment.id) : 0}ms`, '--moment-duration': `${momentFlashMs}ms` } as CSSProperties;
           const shapeHit = momentLit && pulse.captureKey === captureKey && pulse.shapeHit;
           const type = band === 'clap' ? 'snare' : band === 'melody' ? 'melodic' : band;
           const origin = band === 'melody' ? melodyFlash?.telemetry : pulse.telemetry?.[`onset:${type}`];
-          const cellTrace = fallbackFlash ? pulse.telemetry?.['random:generic'] : onset ? origin : momentLit ? liveMoment.telemetry : undefined;
-          return <span key={`${step}:${onset ? `${captureKey}:${fallbackFlash ? pulse.tickTotal : counts[band]}` : 0}:${momentLit ? liveMoment.id : 0}`}
+          const cellTrace = onset ? origin : momentLit ? liveMoment.telemetry : undefined;
+          return <span key={`${step}:${onset ? `${captureKey}:${counts[band]}` : 0}:${momentLit ? liveMoment.id : 0}`}
             data-beat-trace={cellTrace?.id}
             onAnimationStart={(event) => { if (event.target === event.currentTarget && event.animationName !== 'hue-cycle') rendered(cellTrace, onset ? delay || 0 : liveMoment ? momentDelay(liveMoment.effect, row, step, liveMoment.id) : 0, liveMoment?.parentId); }}
             data-pattern-active={active} style={cellStyle}
-            className={`beat-square${active && (band !== 'melody' || melodyHit) ? ' active' : ''}${onset ? ' onset' : ''}${momentLit ? ' moment-lit' : ''}`}>
+            className={`beat-square${active && (!degraded || onset || melodyHit) && (band !== 'melody' || melodyHit) ? ' active' : ''}${onset ? ' onset' : ''}${momentLit ? ' moment-lit' : ''}`}>
             {/* Captured accents or a confident audio tempo lock retrigger the held mask. */}
             {shapeHit && <span key={`${captureKey}:${pulse.rawTotal}:${pulse.tickTotal}`} className="shape-beat-flash"
               data-beat-trace={liveMoment.telemetry?.id}

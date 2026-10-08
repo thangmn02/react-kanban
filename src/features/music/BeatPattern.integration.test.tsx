@@ -18,16 +18,24 @@ it('animates degraded timing as decorative traces without inventing instrument c
   view.rerender(<BeatPattern session={session} beat={tick(1)} />);
   await act(async () => { await vi.advanceTimersByTimeAsync(0); });
   expect(view.container.querySelectorAll('.beat-square')).toHaveLength(40);
-  const first = view.container.querySelector('.beat-square.onset'); expect(first).not.toBeNull();
+  expect(view.container.querySelectorAll('.onset,.semantic-beat-flash,.melody-beat-flash')).toHaveLength(0);
+  const first = view.container.querySelector('.decorative-tempo-pulse'); expect(first).not.toBeNull();
+  expect(first).toHaveAttribute('data-semantic', 'false');
+  expect(first).toHaveAttribute('data-detector-origin', 'tempo-fallback');
+  expect(first).toHaveAttribute('data-presentation', 'decorative-global');
+  expect(first).not.toHaveAttribute('data-beat-row');
+  expect(view.container.querySelectorAll('.beat-square.active')).toHaveLength(0);
   view.rerender(<BeatPattern session={session} beat={tick(2)} />);
   await act(async () => { await vi.advanceTimersByTimeAsync(0); });
-  expect(view.container.querySelector('.beat-square.onset')).not.toBe(first);
+  expect(view.container.querySelector('.decorative-tempo-pulse')).not.toBe(first);
   expect(live.onsets).toEqual({});
   const committed = beatTelemetry.snapshot().records.filter(r => r.stage === 'EVENT_COMMITTED');
   expect(committed.some(r => r.source === 'random' && r.type === 'generic')).toBe(true);
   expect(committed.some(r => r.source === 'onset')).toBe(false);
+  expect(beatTelemetry.snapshot().records.some(r => r.source === 'random' && r.stage === 'EVENT_DETECTED')).toBe(false);
   view.rerender(<BeatPattern session={{ ...session, playing: false, paused: true }} beat={tick(3)} />);
   expect(view.container.querySelector('.beat-square.onset')).toBeNull();
+  expect(view.container.querySelector('.decorative-tempo-pulse')).toBeNull();
 });
 
 it('keeps percussion and note flashes intact when only diagnostic metadata changes', async () => {
