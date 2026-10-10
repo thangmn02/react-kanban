@@ -6,6 +6,8 @@ export interface BeatTrace {
   active?: boolean; noteSequence?: number;
   targetPlaybackTime?: number;
   eventSource?: 'cache' | 'local' | 'degraded';
+  eventId?: string;
+  origin?: 'event-track-cache' | 'local-detector' | 'capture-engine' | 'native-audio-engine' | 'visual-decoration';
 }
 export interface BeatTelemetry {
   enable(value?: boolean): void; readonly enabled: boolean; clear(): void;

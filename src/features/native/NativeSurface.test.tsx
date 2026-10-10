@@ -16,7 +16,8 @@ const nativeInvoke = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: nativeInvoke }));
 vi.mock('@tauri-apps/api/window', () => ({ getCurrentWindow: () => nativeWindow, currentMonitor: async () => null, Effect: { Blur: 'blur' },
   LogicalSize: class { width: number; height: number; constructor(width: number, height: number) { this.width = width; this.height = height; } } }));
-vi.mock('../music/useBrowserMusic', () => ({ useBrowserMusic: () => ({ sessions: [], connected: true, checking: false }) }));
+vi.mock('../music/useBrowserMusic', () => ({ useBrowserMusic: () => ({ sessions: [], connected: true, checking: false,
+  beat: { sessionId: '', mode: 'clock', onsets: {} } }) }));
 beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); nativeInvoke.mockResolvedValue(undefined); nativeWindow.isMaximized.mockResolvedValue(false);
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} }); });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
@@ -41,6 +42,9 @@ it('opens Tabs at its ring size once and keeps the timer and user resizing acros
   await waitFor(() => expect(nativeWindow.setSize).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ width: 520, height: 580 })));
   expect(nativeWindow.setMinSize).toHaveBeenCalledWith(expect.objectContaining({ width: 320, height: 360 }));
   fireEvent.click(shadow.querySelectorAll('[role="tab"]')[2]);
+  expect(shadow.querySelectorAll('.beat-channel')).toHaveLength(4);
+  expect(shadow.querySelectorAll('.beat-square')).toHaveLength(32);
+  expect(shadow.querySelector('[aria-label="Lead availability"]')).toBeNull();
   expect(shadow.querySelector('.dock-start')).toBe(start);
   expect(shadow.querySelector('.dock-ring')).toBe(ring);
   expect(nativeWindow.setSize).toHaveBeenCalledOnce();

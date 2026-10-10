@@ -1,14 +1,17 @@
 import { useI18n } from '../../i18n';
-import { getMusicInstallUrl, openInstrumentNotesSetup } from './mediaBridge';
-import { useState, useSyncExternalStore } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { getMusicInstallUrl } from './mediaBridge';
 import MusicPlaybackControls from './music-playback-controls';
-import { getNativeInstrumentStatus, subscribeNativeInstrument, setNativeInstrumentEnabled } from '../../../extensions/kanban-music/native-instrument.js';
 import type { BrowserMusicController } from './useBrowserMusic';
 import { patternAt } from './beatVisuals';
 import type { BeatColorMode, BeatPalette } from './beatVisuals';
 import BeatPattern from './BeatPattern';
 import { openNativeMusicSetup } from '../native/nativeMusic';
 import { isNativeWidget } from '../native/runtime';
+import { beatRowDiagnostics, fourRowBaseline } from './beat-row-diagnostics';
+import { beatTelemetry } from '../../../extensions/kanban-music/beat-telemetry.js';
+import { leadPulseEnabled, leadAvailabilityText } from './lead-feature';
+const PrivateMelodyDemo=import.meta.env.DEV ? lazy(()=>import('./diagnostics/MelodyDetectorDemo')) : null;
 
 export interface MusicVisualOptions {
   colorMode?: BeatColorMode;
@@ -53,22 +56,67 @@ export function MusicTrack({ music }: { music: BrowserMusicController }) {
 
 export function MusicGrid({ music, colorMode = 'random', palette = 'bloom', orientation = 'horizontal' }: { music: BrowserMusicController } & MusicVisualOptions) {
   const showDebug = import.meta.env.DEV && new URLSearchParams(window.location.search).has('musicDebug');
+  const [demo,setDemo]=useState(() => new URLSearchParams(window.location.search).get('musicDemo') === 'lead');
+  const visibility = useRef<{ at: number; event: string; hidden: boolean }[]>([]);
+  useEffect(() => {
+    if (!showDebug) return;
+    const record = (event: Event) => {
+      visibility.current.push({ at: Date.now(), event: event.type, hidden: document.hidden });
+      if (visibility.current.length > 64) visibility.current.shift();
+    };
+    document.addEventListener('visibilitychange', record);
+    window.addEventListener('focus', record); window.addEventListener('blur', record);
+    return () => {
+      document.removeEventListener('visibilitychange', record);
+      window.removeEventListener('focus', record); window.removeEventListener('blur', record);
+    };
+  }, [showDebug]);
+  if(showDebug&&demo&&PrivateMelodyDemo)return <div style={{height:'100%',overflowY:'auto'}}>
+    <button type="button" onClick={()=>setDemo(false)}>Return to live Beat Grid</button>
+    <Suspense fallback={<p>Loading private Melody comparison…</p>}><PrivateMelodyDemo /></Suspense>
+  </div>;
   return <>
     <BeatPattern key={music.selected?.id} session={music.selected} beat={music.beat} colorMode={colorMode} palette={palette} orientation={orientation} />
-    {showDebug && <details className="music-debug" open><summary>Beat debug</summary><pre aria-label="Beat sync debug">{JSON.stringify({
+    {showDebug && <details className="music-debug" open><summary>Beat debug</summary>
+      {PrivateMelodyDemo&&<button type="button" onClick={()=>setDemo(true)}>Open saved Lead listening demo</button>}
+      <>
+        {fourRowBaseline ? <><p className="muted">Four-row baseline · Melody off · semantic events only</p>
+        <p aria-label="Four-row event counters">Kick: {music.beat.onsets.kick || 0} · Snare: {music.beat.onsets.clap || 0} · Hat: {music.beat.onsets.hat || 0} · Bass: {music.beat.onsets.bass || 0}</p></>
+          : <><p aria-label="Live event counters">Kick: {music.beat.onsets.kick || 0} · Snare / Clap: {music.beat.onsets.clap || 0} · Hat: {music.beat.onsets.hat || 0} · Bass: {music.beat.onsets.bass || 0} · Lead: {music.beat.melody?.note || music.beat.onsets.melody || 0}</p>
+          <p aria-label="Lead pipeline status">Lead: {leadPulseEnabled()
+            ? `${leadAvailabilityText(music.beat.leadAvailability)}${music.beat.lead ? ` · ${music.beat.lead.source} · ${music.beat.lead.kind}` : ''}`
+            : 'new pipeline disabled · live local capture does not generate Lead events'}</p></>}
+        <p aria-label="Companion capture status">Capture: {music.selected?.syncState?.mode || 'unknown'} · {music.selected?.syncState?.reason || 'no failure reported'} · Playback: {music.selected?.playing && !music.selected.paused ? 'playing' : 'paused'} · Path: {music.beat.eventPath || 'waiting'}</p>
+        {music.selected?.syncState?.captureError && <p>Capture error: {music.selected.syncState.captureError.stage} · {music.selected.syncState.captureError.code}</p>}
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        <button type="button" className="text-button" onClick={() => { visibility.current = []; beatTelemetry.clear(); beatRowDiagnostics.start(30); }}>Record 30 seconds</button>
+        <button type="button" className="text-button" onClick={() => {
+          const rows = beatRowDiagnostics.snapshot(fourRowBaseline ? 'semantic-only' : undefined);
+          const telemetry = beatTelemetry.snapshot();
+          const snapshot = { ...rows, source: music.source,
+            telemetry: { ...telemetry, records: telemetry.records.filter(record => Number(record.at) >= rows.startTime && Number(record.at) <= rows.endTime) },
+            visibility: visibility.current.filter(record => record.at >= rows.startTime && record.at <= rows.endTime),
+            leadEnabled: leadPulseEnabled(), leadAvailability: music.beat.leadAvailability,
+            captureStatus: music.selected?.syncState, playback: { playing: music.selected?.playing, paused: music.selected?.paused, currentTime: music.selected?.currentTime },
+            controller: { mode: music.beat.mode, reason: music.beat.reason, eventPath: music.beat.eventPath, onsets: music.beat.onsets } };
+          const url = URL.createObjectURL(new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' }));
+          const link = document.createElement('a'); link.href = url; link.download = fourRowBaseline ? 'kora-four-row-trace.json' : 'kora-live-grid-trace.json'; link.click();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }}>Export row trace</button>
+        </div>
+      </>
+      <pre aria-label="Beat sync debug">{JSON.stringify({
       source: music.source, mode: music.beat.mode, reason: music.beat.reason, onsets: music.beat.onsets, rates: music.beat.rates,
       tempo: music.beat.tempo, tickCount: music.beat.tickCount, pattern: patternAt(music.selected?.currentTime || 0), captureId: music.beat.captureId,
-      melody: music.beat.melody,
+      melody: music.beat.melody, lead: music.beat.lead, leadAvailability: music.beat.leadAvailability,
       eventPath: music.beat.eventPath, assetProvider: music.selected?.asset?.provider,
+      captureStatus: music.selected?.syncState, browserAnalysisSupported: music.selected?.canAnalyze,
     }, null, 2)}</pre></details>}
   </>;
 }
 
 export function MusicFeedback({ music }: { music: BrowserMusicController }) {
   const { t } = useI18n();
-  const [setupFailed, setSetupFailed] = useState(false);
-  const instrumentStatus = useSyncExternalStore(subscribeNativeInstrument, getNativeInstrumentStatus);
-  const native = isNativeWidget();
   const { selected, playing, busy, openMusicTab, error, beat } = music;
   const needsAccess = playing && (beat.mode !== 'capture' || beat.eventPath === 'degraded') && beat.reason === 'capture-permission';
   const outdatedCapturePolicy = beat.mode === 'clock' && (beat.reason === 'drm-protected' || selected?.syncState?.reason === 'drm-protected');
@@ -83,16 +131,6 @@ export function MusicFeedback({ music }: { music: BrowserMusicController }) {
     {silentPlayback && <p className="music-status muted" role="status">{t('music.silentCapture')}</p>}
     {outdatedCapturePolicy && <p className="music-status muted" role="status">{t('music.captureUpdate')}</p>}
     {error && <p className="music-status muted" role="status" title={error}>{error}</p>}
-    {selected && <button type="button" className="text-button" onClick={() => {
-      setSetupFailed(false);
-      if (native) setNativeInstrumentEnabled(instrumentStatus === 'off' || instrumentStatus === 'failed');
-      else void openInstrumentNotesSetup(selected.id).catch(() => setSetupFailed(true));
-    }} title={native ? t('music.nativeInstrumentHelp') : undefined}>{native && instrumentStatus !== 'off' && instrumentStatus !== 'failed' ? t('music.nativeInstrumentDisable') : t('music.instrumentNotesSetup')}</button>}
-    {native && instrumentStatus !== 'off' && <p className="music-status muted" role="status" title={t('music.nativeInstrumentHelp')}>
-      {t(instrumentStatus === 'failed' ? 'music.nativeInstrumentFailed' : instrumentStatus === 'ready' ? 'music.nativeInstrumentReady' : instrumentStatus === 'waiting' ? 'music.nativeInstrumentWaiting' : 'music.nativeInstrumentLoading')}
-      {instrumentStatus.startsWith('loading:') ? ` ${instrumentStatus.split(':')[1]}%` : ''}
-    </p>}
-    {setupFailed && <p className="music-status muted" role="status">{t('music.instrumentNotesUpdate')}</p>}
   </div>;
 }
 

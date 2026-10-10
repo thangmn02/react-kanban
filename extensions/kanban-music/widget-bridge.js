@@ -15,7 +15,7 @@ export function createWidgetBridge({ api, handle, disconnected, Socket = WebSock
   const valid = (request) => request?.type === 'request' && request.nonce === nonce
     && typeof request.requestId === 'string' && request.requestId.length <= 100
     && (request.action === 'sessions.get'
-      || (['media.play', 'media.pause', 'media.focus', 'media.previous', 'media.next', 'instrument.setup'].includes(request.action)
+      || (['media.play', 'media.pause', 'media.focus', 'media.previous', 'media.next'].includes(request.action)
         || request.action === 'media.seek' && Number.isFinite(request.value) && request.value >= 0 && request.value <= 864000
         || request.action === 'media.volume' && Number.isFinite(request.value) && request.value >= 0 && request.value <= 1)
         && typeof request.sessionId === 'string' && request.sessionId.length <= 250

@@ -1,9 +1,17 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { getMusicInstallUrl, isMusicSession, sendMusicRequest, sendMusicDiagnostics, subscribeBeatEvents, openInstrumentNotesSetup } from './mediaBridge';
+import { getMusicInstallUrl, isMusicSession, sendMusicRequest, sendBeatRequest, sendMusicDiagnostics, subscribeBeatEvents } from './mediaBridge';
 import { beatTelemetry } from '../../../extensions/kanban-music/beat-telemetry.js';
 
 afterEach(() => { beatTelemetry.enable(false); beatTelemetry.clear(); vi.restoreAllMocks(); vi.useRealTimers(); vi.unstubAllEnvs(); });
 const session = { id: '1', title: 'Song', artist: 'Artist', source: 'youtube.com', paused: true };
+it('sends debug opt-in only with the capture start request', async () => {
+  beatTelemetry.enable();
+  const post = vi.spyOn(window, 'postMessage').mockImplementation(message => reply(message, { ok: true }));
+  await sendBeatRequest('dock.beat.sync.start', session.id, 'subscription');
+  expect(post).toHaveBeenLastCalledWith(expect.objectContaining({ telemetryEnabled: true }), location.origin);
+  await sendBeatRequest('dock.beat.sync.stop', session.id, 'subscription');
+  expect(post.mock.calls.at(-1)?.[0]).not.toHaveProperty('telemetryEnabled');
+});
 it('preserves queued future targets despite old transport timestamps and rejects malformed anchors', () => {
   vi.useFakeTimers(); beatTelemetry.enable();
   const receive = vi.fn(), stop = subscribeBeatEvents('song', 'subscription', receive);
@@ -78,25 +86,17 @@ it('forwards only valid diagnostic sidecars and never rejects an otherwise valid
   expect(beatTelemetry.snapshot().counts.EVENT_RECEIVED).toBe(1);
   stop();
 });
-it('opens instrument setup through a correlated selected-session acknowledgement', async () => {
-  const post = vi.spyOn(window, 'postMessage').mockImplementation(message => reply(message, { ok: true }));
-  await expect(openInstrumentNotesSetup(session.id)).resolves.toBeUndefined();
-  expect(post).toHaveBeenCalledWith(expect.objectContaining({ action: 'instrument.setup', sessionId: session.id }), location.origin);
-  post.mockImplementation(message => reply(message, { ok: false, error: 'unavailable' }));
-  await expect(openInstrumentNotesSetup(session.id)).rejects.toMatchObject({ code: 'unavailable' });
-});
-
-it('accepts isolated instrument states, rejects legacy tonal states and canonicalizes snare to Clap', () => {
+it('rejects retired instrument states and canonicalizes snare to Clap', () => {
   const receive = vi.fn();
   const stop = subscribeBeatEvents('song', 'subscription', receive);
   const send = (data: object) => window.dispatchEvent(new MessageEvent('message', { source: window, origin: location.origin,
-    data: { channel: 'kanban-music-v1', direction: 'extension-event', event: 'beat', sessionId: 'song', subscriptionId: 'subscription', captureId: 'live', detector: 'instrument-v1', ...data } }));
+    data: { channel: 'kanban-music-v1', direction: 'extension-event', event: 'beat', sessionId: 'song', subscriptionId: 'subscription', captureId: 'live', detector: 'lead-events-v1', ...data } }));
   send({ kind: 'melody.state', melody: { active: true, level: NaN, note: 1 } });
   send({ kind: 'melody.state', melody: { active: true, level: 2, note: 1 } });
-  send({ kind: 'melody.state', detector: undefined, melody: { active: true, level: .6, note: 1 } });
+  send({ kind: 'melody.state', detector: 'instrument-v1', melody: { active: true, level: .6, note: 1 } });
   expect(receive).not.toHaveBeenCalled();
   send({ kind: 'melody.state', melody: { active: true, level: .6, note: 1 } });
-  expect(receive).toHaveBeenCalledWith({ kind: 'melody.state', captureId: 'live', melody: { active: true, level: .6, note: 1 } });
+  expect(receive).not.toHaveBeenCalled();
   send({ kind: 'onset', bands: ['snare'] });
   expect(receive).toHaveBeenLastCalledWith({ kind: 'onset', captureId: 'live', bands: ['clap'] });
   stop();

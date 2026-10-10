@@ -1,6 +1,62 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { createBeatSync } from './beat-sync.js';
 afterEach(() => vi.restoreAllMocks());
+it('pulls bounded PCM only for the live capture owner and rejects a delayed result after pause', async () => {
+  const f = fixture();
+  f.session.src = 'https://music.example/audio.wav';
+  f.session.asset = { provider: 'youtube', id: 'abcdefghijk' };
+  await f.sync.start(f.session, f.owner, 'subscription');
+  await vi.waitFor(() => expect(f.sync.status(f.session).mode).toBe('capture'));
+  const packet = { sequence: 1, pcm: 'A'.repeat(23520), sampleRate: 44100, targetOutputTime: Date.now() };
+  f.api.runtime.sendMessage.mockImplementation(async message => message.kind === 'audio.read' ? { packet } : { ok: true });
+  expect(await f.sync.readAudio(f.session, { ...f.owner, documentId: 'other' }, 'subscription')).toBeUndefined();
+  expect(await f.sync.readAudio({ ...f.session, asset: { ...f.session.asset, id: 'xxxxxxxxxxx' } }, f.owner, 'subscription')).toBeUndefined();
+  expect(await f.sync.readAudio(f.session, f.owner, 'subscription')).toMatchObject({ asset: f.session.asset, sequence: 1,
+    clock: { currentTime: expect.any(Number), sampledAt: packet.targetOutputTime } });
+  let finish;
+  f.api.runtime.sendMessage.mockImplementation(message => message.kind === 'audio.read'
+    ? new Promise(resolve => { finish = resolve; }) : Promise.resolve({ ok: true }));
+  const waiting = f.sync.readAudio(f.session, f.owner, 'subscription');
+  f.sync.clock({ token: f.token(), valid: true, clock: { ...f.session, paused: true, playing: false } },
+    { tab: { id: f.session.tabId }, documentId: f.session.documentId });
+  finish({ packet });
+  expect(await waiting).toBeUndefined();
+  await f.sync.stop();
+});
+it('carries diagnostic opt-in through stream start and lease renewal without requiring offscreen storage', async () => {
+  const f = fixture();
+  await f.sync.start(f.session, f.owner, 'subscription', true);
+  await vi.waitFor(() => expect(f.sync.status(f.session).mode).toBe('capture'));
+  expect(f.api.runtime.sendMessage).toHaveBeenCalledWith(expect.objectContaining({ kind: 'start', telemetryEnabled: true }));
+  await f.sync.start(f.session, f.owner, 'subscription', true);
+  expect(f.api.runtime.sendMessage).toHaveBeenCalledWith(expect.objectContaining({ kind: 'lease', telemetryEnabled: true }));
+  await f.sync.start(f.session, f.owner, 'subscription', false);
+  expect(f.api.runtime.sendMessage).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'lease', telemetryEnabled: false }));
+  await f.sync.stop();
+});
+it('distinguishes a missing offscreen receiver from a rejected audio stream without changing fallback', async () => {
+  const f = fixture();
+  f.api.runtime.sendMessage.mockRejectedValue(new Error('Could not establish connection. Receiving end does not exist.'));
+  await f.sync.start(f.session, f.owner, 'subscription');
+  await vi.waitFor(() => expect(f.sync.status(f.session).reason).toBe('capture-stream'));
+  expect(f.sync.status(f.session)).toMatchObject({ mode: 'clock', captureError: { stage: 'offscreen-response', code: 'TransportError' } });
+  await f.sync.stop();
+});
+it('exposes a safe offscreen failure category while preserving clock fallback and capture retry', async () => {
+  const f = fixture();
+  f.api.runtime.sendMessage.mockResolvedValue({ ok: false,
+    captureError: { stage: 'stream-open', code: 'NotAllowedError', message: 'private source identifier' } });
+  await f.sync.start(f.session, f.owner, 'subscription');
+  await vi.waitFor(() => expect(f.sync.status(f.session).reason).toBe('capture-stream'));
+  expect(f.sync.status(f.session)).toMatchObject({ mode: 'clock',
+    captureError: { stage: 'stream-open', code: 'NotAllowedError' } });
+  expect(JSON.stringify(f.sync.status(f.session))).not.toContain('private');
+  f.api.runtime.sendMessage.mockResolvedValue({ ok: true });
+  f.sync.invoke(f.session.tabId);
+  await vi.waitFor(() => expect(f.api.tabCapture.getMediaStreamId).toHaveBeenCalledTimes(2));
+  await vi.waitFor(() => expect(f.sync.status(f.session).captureError).toBeUndefined());
+  await f.sync.stop();
+});
 it('does not expire a capture while its initial stream setup is still pending', async () => {
   const f = fixture(); let finish;
   f.api.runtime.sendMessage.mockImplementation((message) => message.kind === 'start'
@@ -232,17 +288,15 @@ it('publishes capture only after stream confirmation AND audible analysis, and t
   await f.sync.stop();
 });
 
-it('relays sustained Melody only from the live, playing captured stream', async () => {
+it('rejects retired instrument notes even from the live captured stream', async () => {
   const f = fixture();
   await f.sync.start(f.session, f.owner, 'subscription');
   await vi.waitFor(() => expect(f.sync.status(f.session).mode).toBe('capture'));
   const captureId = f.sync.status(f.session).captureId;
   const sender = { url: f.api.runtime.getURL('offscreen.html') };
   const melody = { active: true, level: .6, note: 1 };
-  f.sync.offscreen({ kind: 'melody.state', detector: 'instrument-v1', captureId, melody }, sender);
-  expect(f.api.tabs.sendMessage).toHaveBeenLastCalledWith(24,
-    expect.objectContaining({ kind: 'melody.state', detector: 'instrument-v1', captureId, melody }), expect.anything());
   const before = f.api.tabs.sendMessage.mock.calls.length;
+  f.sync.offscreen({ kind: 'melody.state', detector: 'instrument-v1', captureId, melody }, sender);
   f.sync.offscreen({ kind: 'melody.state', captureId, melody }, sender);
   f.sync.offscreen({ kind: 'melody.state', captureId: 'old', melody }, sender);
   f.sync.offscreen({ kind: 'melody.state', captureId, melody }, { ...sender, tab: { id: 12 } });

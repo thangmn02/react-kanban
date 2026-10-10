@@ -7,6 +7,7 @@ import { diagnoseDiscovery } from './discovery-diagnostics.js';
 import { createWidgetBridge } from './widget-bridge.js';
 import { beatTelemetry } from './beat-telemetry.js';
 import { mediaAssetFromUrl } from './media-asset.js';
+import { authorizedLeadAudio } from './lead-audio-authorization.js';
 
 void chrome.storage.local.get('beatTelemetryEnabled').then((data) => beatTelemetry.enable(data.beatTelemetryEnabled === true)).catch(() => {});
 chrome.storage.onChanged.addListener((changes, area) => {
@@ -22,14 +23,20 @@ let scanInFlight;
 async function scan() {
   if (scanInFlight) return scanInFlight;
   scanInFlight = (async () => {
-    const tabs = await chrome.tabs.query({ url: mediaSites });
+    const { leadAudioTestScope } = await chrome.storage.local.get('leadAudioTestScope');
+    const source = (() => { try { return new URL(leadAudioTestScope?.sourceUrl); } catch { return undefined; } })();
+    const developmentOrigin = source?.protocol === 'https:' && !source.username && !source.password
+      && leadAudioTestScope?.asset?.provider === 'kora-development'
+      && leadAudioTestScope.expiresAt > Date.now() && leadAudioTestScope.expiresAt <= Date.now() + 3600000
+      ? `${source.origin}/*` : undefined;
+    const tabs = await chrome.tabs.query({ url: developmentOrigin ? [...mediaSites, developmentOrigin] : mediaSites });
     const results = await Promise.all(tabs.map(async (tab) => {
       try {
         // Idempotent; also installs observation in tabs left open during reload.
         await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'MAIN', files: ['media-observer.js'] });
         const frames = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'MAIN', func: readMedia });
         return frames.flatMap((frame) => (frame.result || []).map((media) => ({
-          ...media, asset: mediaAssetFromUrl(media.assetUrl), tabId: tab.id, tabMuted: Boolean(tab.mutedInfo?.muted), documentId: frame.documentId,
+          ...media, asset: mediaAssetFromUrl(media.assetUrl, leadAudioTestScope), tabId: tab.id, tabMuted: Boolean(tab.mutedInfo?.muted), documentId: frame.documentId,
           id: `${tab.id}:${frame.documentId}:${media.index}`,
         })));
       } catch { return []; } // Closed, restricted, or permission-blocked tabs are unavailable.
@@ -60,13 +67,32 @@ async function handle(message, sender) {
   if (message.action === 'sessions.get') return { ok: true, sessions: publicSessions(await companion.prefer(sessions)) };
   const session = sessions.find((item) => item.id === message.sessionId);
   if (!session) return { ok: false, error: 'unavailable' };
-  if (message.action === 'instrument.setup') { await chrome.runtime.openOptionsPage(); return { ok: true }; }
+  if (message.action === 'dock.audio.read') {
+    const { leadAudioTestScope } = await chrome.storage.local.get('leadAudioTestScope');
+    if (!authorizedLeadAudio(leadAudioTestScope, session, sender)) return { ok: false, error: 'unavailable' };
+    const packet = await beats.readAudio(session, owner, message.subscriptionId);
+    const refreshed = await chrome.storage.local.get('leadAudioTestScope');
+    if (!authorizedLeadAudio(refreshed.leadAudioTestScope, session, sender)) return { ok: false, error: 'unavailable' };
+    if (packet) {
+      // Check the actual element again after capture; discovery before an await
+      // cannot authorize samples from a player whose source changed meanwhile.
+      const frames = await chrome.scripting.executeScript({
+        target: { tabId: session.tabId, documentIds: [session.documentId] }, world: 'MAIN', func: readMedia,
+      });
+      const sourceStillMatches = frames.some(frame => (frame.result || []).some(media => media.index === session.index
+        && media.src === session.src && media.playing && !media.paused && !media.muted && media.playbackRate === 1
+        && authorizedLeadAudio(refreshed.leadAudioTestScope,
+          { src: media.src, asset: mediaAssetFromUrl(media.assetUrl, refreshed.leadAudioTestScope) }, sender)));
+      if (!sourceStillMatches) return { ok: false, error: 'unavailable' };
+    }
+    return { ok: true, ...(packet ? { packet } : {}) };
+  }
   if (message.action === 'media.focus') {
     await companion.openMusic(session); return { ok: true, sessions: publicSessions(sessions) };
   }
   if (message.action === 'dock.beat.sync.start') {
     if (!owner.native && (!Number.isInteger(owner.tabId) || !owner.documentId)) return { ok: false, error: 'unavailable' };
-    await beats.start(session, owner, message.subscriptionId); return { ok: true };
+    await beats.start(session, owner, message.subscriptionId, message.telemetryEnabled === true); return { ok: true };
   }
   try {
     const result = await chrome.scripting.executeScript({

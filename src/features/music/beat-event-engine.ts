@@ -1,13 +1,16 @@
 import type { BeatEvent, MusicClock } from './mediaBridge';
 import { createBeatScheduler } from './beat-scheduler';
 import { CHUNK_SECONDS, type MediaAsset, type TrackChunk, type TrackManifest, type EventRow } from './event-track';
-import { createEventTrackClient, InvalidEventTrack, type EventTrackClient } from './event-track-client';
+import { createEventTrackClient, EventTrackServiceError, InvalidEventTrack, type EventTrackClient } from './event-track-client';
 import type { BeatCapabilities } from './beat-capabilities';
+import { playbackRange, type PlaybackRange } from './event-track-ranges';
 import { clockAdvancing, clockDiscontinuity, parsePlaybackClock, parsePlaybackTiming, playbackPosition } from '../../../extensions/kanban-music/beat-timing.js';
 import { beatTelemetry } from '../../../extensions/kanban-music/beat-telemetry.js';
+import type { PlaybackAudioSegment } from './playback-audio-segment';
+import type { LeadAvailability } from './lead-feature';
 
 export type BeatEventPath = 'cache' | 'local' | 'degraded';
-export interface BeatEventOptions { asset?: MediaAsset; duration?: number; capabilities: BeatCapabilities; initialClock?: MusicClock }
+export interface BeatEventOptions { asset?: MediaAsset; duration?: number; capabilities: BeatCapabilities; initialClock?: MusicClock; demand?: boolean; capturedInput?: boolean; onLeadAvailability?: (state: LeadAvailability) => void }
 const telemetry = beatTelemetry.at('beat-event-engine');
 const tolerance = .04;
 interface Candidate { row: EventRow; time: number; rank: number; key: string }
@@ -17,6 +20,7 @@ type ScheduledEvent = Extract<BeatEvent, { kind: 'onset' | 'melody.state' | 'tem
 // Local capture stays alive during cache waits and supplies recovery signals.
 export function createBeatEventEngine(options: BeatEventOptions, emit: (event: BeatEvent) => void, recover: () => void,
   clientFactory = createEventTrackClient) {
+  options = { ...options };
   const lifetime = new AbortController();
   let range = new AbortController();
   const client: EventTrackClient | undefined = options.asset && clientFactory(options.asset, lifetime.signal, options.duration);
@@ -26,10 +30,30 @@ export function createBeatEventEngine(options: BeatEventOptions, emit: (event: B
   let localSequence = 0, localAt = 0, announcedAt = 0, stale = false;
   const retired = new Set<string>();
   let path: BeatEventPath = 'degraded', announced: BeatEventPath | undefined;
-  let manifestBusy = false, nextLookup = 0, requestedAnalysis = false, serial = 0, lastTick = -1;
+  let manifestBusy = false, nextLookup = 0, nextDemand = 0, demandBusy = false, demandLive = false, serial = 0, lastTick = -1;
+  let demandId = crypto.randomUUID(), demandRange: PlaybackRange | undefined;
+  let demandRequest: Promise<unknown> | undefined;
+  let uploadBusy = false;
+  const releaseDemand = () => {
+    const identity = demandId, request = demandRequest;
+    demandId = crypto.randomUUID(); demandRange = undefined; nextDemand = 0;
+    if (!demandLive) return;
+    demandLive = false;
+    // End after an in-flight admission so its response cannot recreate the
+    // released lease. A resumed session gets a different demand identity.
+    void Promise.resolve(request).catch(() => {}).then(() => client?.endDemand?.(identity)).catch(() => {});
+  };
   const chunks = new Map<number, TrackChunk>(), inFlight = new Map<number, number>(), retry = new Map<number, number>();
   const pending = new Map<string, Candidate>(), delivered: Candidate[] = [];
   const sent = new Map<number, Set<string>>();
+  // Availability is observation only: it never inserts, removes or schedules events.
+  let analysis: LeadAvailability = 'checking', reported: LeadAvailability | undefined;
+  const reportAvailability = () => {
+    if (stopped || !options.demand) return;
+    const current = clock && chunks.get(Math.floor(playbackPosition(clock) / CHUNK_SECONDS));
+    const state = current ? current.events.some(event => event.row === 'melody') ? 'ready' : 'empty' : client ? analysis : 'unavailable';
+    if (state !== reported) { reported = state; options.onLeadAvailability?.(state); }
+  };
   const scheduler = createBeatScheduler(event => {
     if (stopped || !clock || !clockAdvancing(clock)) return;
     if (event.kind === 'clock' || event.kind === 'sync.state' || event.kind === 'sync.recover') return;
@@ -62,10 +86,13 @@ export function createBeatEventEngine(options: BeatEventOptions, emit: (event: B
     }
   };
   const clear = () => {
+    releaseDemand();
     epoch++; captureId = crypto.randomUUID(); sequence = melody = 0; announced = undefined; lastTick = -1;
     scheduler.reset('schedule-reset', true); pending.clear(); delivered.length = 0; sent.clear();
     // Old fetch completions cannot insert or schedule data after a seek.
     range.abort(); range = new AbortController(); inFlight.clear(); retry.clear();
+    nextLookup = nextDemand = 0;
+    analysis = 'checking'; reportAvailability();
   };
   const add = (event: ScheduledEvent, row: EventRow, time: number, rank: number) => {
     if (delivered.some(item => item.row === row && Math.abs(item.time - time) <= tolerance)) {
@@ -109,31 +136,67 @@ export function createBeatEventEngine(options: BeatEventOptions, emit: (event: B
     }).catch(error => { if (!stopped && owner === epoch) {
       if (error instanceof InvalidEventTrack) {
         manifest = undefined; chunks.clear(); clear(); nextLookup = Date.now() + 15000; announce();
-      } else retry.set(index, Date.now() + 15000);
+      } else retry.set(index, error instanceof EventTrackServiceError && error.permanent ? Infinity : Date.now() + 15000);
       telemetry.record('CACHE_MISS', undefined, { reason: error instanceof InvalidEventTrack ? 'invalid' : 'transport' });
+      analysis = error instanceof EventTrackServiceError ? error.permanent ? 'blocked' : 'unavailable' : 'failed'; reportAvailability();
     } })
       .finally(() => { if (inFlight.get(index) === owner) inFlight.delete(index); });
   };
   const lookup = () => {
-    if (!client || manifestBusy || manifest || Date.now() < nextLookup) return;
+    if (!options.demand || !client || !clock || manifestBusy || Date.now() < nextLookup) return;
+    const view = playbackRange(playbackPosition(clock), options.duration || manifest?.duration || 0);
+    if (!view) return;
+    const owner = epoch;
     manifestBusy = true; nextLookup = Date.now() + 15000;
-    void client.manifest().then(value => {
-      if (stopped) return;
+    void client.manifest(view).then(value => {
+      if (stopped || owner !== epoch) return;
+      if (value && manifest && manifest.revision !== value.revision) { chunks.clear(); clear(); }
       manifest = value;
       telemetry.record(value ? 'CACHE_HIT' : 'CACHE_MISS');
-      if (!value && !requestedAnalysis) {
-        requestedAnalysis = true;
-        void client.requestAnalysis().then(status => {
-          if (!stopped) telemetry.record('ANALYSIS_REQUESTED', undefined, { reason: status === 'pending' ? 'starting' : 'failed' });
-        }).catch(() => {});
-      }
+      const status = client.analysisStatus?.();
+      if (status) telemetry.record('ANALYSIS_REQUESTED', undefined, { reason: status });
+      if (status === 'failed') analysis = 'failed';
+      else if (status === 'input_unavailable' || status === 'cancelled') analysis = 'unavailable';
+      else if (status === 'pending' || status === 'queued' || status === 'running') analysis = 'pending';
       pump();
-    }).catch(() => { if (!stopped) telemetry.record('CACHE_MISS', undefined, { reason: 'transport' }); })
+    }).catch(error => { if (!stopped && owner === epoch) {
+      telemetry.record('CACHE_MISS', undefined, { reason: 'transport' });
+      analysis = error instanceof EventTrackServiceError ? error.permanent ? 'blocked' : 'unavailable' : 'failed';
+      if (analysis === 'blocked') nextLookup = nextDemand = Infinity;
+      reportAvailability();
+    } })
       .finally(() => { manifestBusy = false; });
+  };
+  const demand = () => {
+    const wanted = Boolean(options.demand && clock && clockAdvancing(clock) && Date.now() - clock.sampledAt <= 3500 && !muted);
+    if (!wanted) {
+      if (demandLive) releaseDemand();
+      return;
+    }
+    if (!client || !clock || demandBusy || Date.now() < nextDemand) return;
+    const position = playbackPosition(clock);
+    const view = demandRange && position >= demandRange.start && position < demandRange.end - 60
+      ? demandRange : playbackRange(position, options.duration || manifest?.duration || 0);
+    if (!view) return;
+    demandRange = view;
+    demandBusy = demandLive = true; nextDemand = Date.now() + 15000;
+    const owner = epoch, identity = demandId;
+    demandRequest = client.requestAnalysis(view, demandId, options.capturedInput).then(status => {
+      if (!stopped && owner === epoch && identity === demandId && analysis !== 'blocked') {
+        telemetry.record('ANALYSIS_REQUESTED', undefined, { reason: status === 'pending' ? 'starting' : 'failed' });
+        analysis = status; reportAvailability();
+      }
+    }).catch(error => { if (!stopped && owner === epoch && identity === demandId) {
+      telemetry.record('ANALYSIS_REQUESTED', undefined, { reason: 'transport' });
+      analysis = error instanceof EventTrackServiceError && error.permanent ? 'blocked' : 'failed';
+      if (analysis === 'blocked') nextDemand = Infinity;
+      reportAvailability();
+    } })
+      .finally(() => { demandBusy = false; });
   };
   function pump() {
     if (stopped) return;
-    lookup(); if (!clock) return;
+    demand(); lookup(); if (!clock) return;
     if (localLive && Date.now() - localAt > 3500) {
       localLive = false; scheduler.cancelSource('local');
       for (const [key, item] of pending) if (item.rank === 2) pending.delete(key);
@@ -149,7 +212,9 @@ export function createBeatEventEngine(options: BeatEventOptions, emit: (event: B
     for (const key of retry.keys()) if (key < index || key > index + 1) retry.delete(key);
     for (const [key, item] of pending) if (item.time < position - 1) pending.delete(key);
     while (delivered[0]?.time < position - 1) delivered.shift();
-    loadChunk(index); loadChunk(index + 1); announce();
+    if (options.demand) { loadChunk(index); loadChunk(index + 1); }
+    reportAvailability();
+    announce();
     if (!active()) return;
     const horizon = position + Math.min(30, clock.playbackRate * 4);
     for (const chunk of chunks.values()) for (const note of chunk.events) {
@@ -158,11 +223,13 @@ export function createBeatEventEngine(options: BeatEventOptions, emit: (event: B
       if (note.time < position - .05 || note.time > horizon || sentEvents.has(note.id)) continue;
       sentEvents.add(note.id);
       const traces = telemetry.events('onset', [note.row === 'melody' ? 'melodic' : note.row], { confidence: note.confidence })
-        ?.map(trace => ({ ...trace, targetPlaybackTime: note.time, targetTime: clock!.sampledAt + (note.time - clock!.currentTime) / clock!.playbackRate * 1000, eventSource: 'cache' as const }));
+        ?.map(trace => ({ ...trace, eventId: note.id, origin: 'event-track-cache' as const, captureId,
+          targetPlaybackTime: note.time, targetTime: clock!.sampledAt + (note.time - clock!.currentTime) / clock!.playbackRate * 1000, eventSource: 'cache' as const }));
       telemetry.mark('EVENT_DETECTED', traces);
+      if (note.lead) telemetry.mark('LEAD_EVENT', traces, { ...note.lead, targetPlaybackTime:note.time, eventId:note.id });
       const event: ScheduledEvent = note.row === 'melody'
-        ? { kind: 'melody.state', captureId, melody: { active: true, level: note.confidence, note: 0 } }
-        : { kind: 'onset', bands: [note.row === 'snare' ? 'clap' : note.row] };
+        ? { kind: 'melody.state', captureId, melody: { active: true, level: note.confidence, note: 0 }, ...(note.lead ? {lead:note.lead} : {}) }
+        : { kind: 'onset', bands: [note.row === 'snare' ? 'clap' : note.row], duration: note.duration };
       add({ ...event, targetPlaybackTime: note.time, playbackClock: clock, telemetry: traces, eventSource: 'cache' }, note.row, note.time, 3);
     }
     if (path === 'degraded') {
@@ -180,6 +247,27 @@ export function createBeatEventEngine(options: BeatEventOptions, emit: (event: B
   }
   const timer = setInterval(pump, 100);
   return {
+    setDemand(value: boolean) {
+      if (stopped || options.demand === value) return;
+      options.demand = value;
+      pump();
+    },
+    needsCapturedAudio() {
+      return Boolean(!stopped && options.demand && options.capturedInput && demandLive
+        && !uploadBusy && clock && active() && !coverage(playbackPosition(clock)));
+    },
+    captureSegment(segment: PlaybackAudioSegment) {
+      if (stopped || !options.demand || !options.capturedInput || !demandLive || !clock || !active()
+        || uploadBusy || !client?.uploadSegment || segment.end > (options.duration || 0)) return;
+      const owner = epoch, identity = demandId;
+      uploadBusy = true;
+      void client.uploadSegment(segment, identity).then(uploaded => {
+        if (stopped || owner !== epoch) return;
+        telemetry.record('ANALYSIS_REQUESTED', undefined, { reason: uploaded ? 'captured-input' : 'input-unavailable' });
+        if (uploaded) { nextLookup = 0; lookup(); }
+      }).catch(() => { if (!stopped && owner === epoch) telemetry.record('ANALYSIS_REQUESTED', undefined, { reason: 'input-unavailable' }); })
+        .finally(() => { uploadBusy = false; });
+    },
     accept(event: BeatEvent) {
       if (stopped) return;
       if (event.kind === 'clock') {
@@ -245,14 +333,21 @@ export function createBeatEventEngine(options: BeatEventOptions, emit: (event: B
             telemetry.mark('EVENT_DROPPED', event.telemetry?.filter(t => t.type === (row === 'melody' ? 'melodic' : row)), { reason: 'priority' }); continue;
           }
           const split: ScheduledEvent = event.kind === 'onset' ? { ...event, bands: [row === 'snare' ? 'clap' : row] } : event;
-          const traces = event.telemetry?.filter(t => t.type === (row === 'melody' ? 'melodic' : row)).map(t => ({ ...t, eventSource: 'local' as const }));
+          const observed = event.telemetry?.length ? event.telemetry.filter(t => t.type === (row === 'melody' ? 'melodic' : row))
+            : telemetry.events('onset', [row], { origin: 'local-detector' });
+          const traces = observed?.map(t => ({ ...t,
+            captureId, targetPlaybackTime: timing.targetPlaybackTime, origin: t.origin || 'local-detector' as const, eventSource: 'local' as const }));
+          // Older capture realms may have diagnostics disabled. This trace
+          // begins at receipt of their real typed event, never at a detector.
+          if (!event.telemetry?.length) telemetry.mark('EVENT_RECEIVED', traces);
           add({ ...split, ...timing, telemetry: traces, eventSource: 'local' }, row, timing.targetPlaybackTime, 2);
         }
       } else if (path !== 'degraded' && !(event.kind === 'melody.state' && coverage(timing.targetPlaybackTime))) {
         scheduler.enqueue({ ...event, ...timing, captureId, eventSource: 'local' });
       }
     },
-    stop() { stopped = true; clearInterval(timer); lifetime.abort(); range.abort(); scheduler.reset('stopped', true); chunks.clear(); inFlight.clear(); retry.clear(); pending.clear(); delivered.length = 0; sent.clear(); },
+    stop() { stopped = true; releaseDemand();
+      clearInterval(timer); lifetime.abort(); range.abort(); scheduler.reset('stopped', true); chunks.clear(); inFlight.clear(); retry.clear(); pending.clear(); delivered.length = 0; sent.clear(); },
     stats() { return { path, chunks: chunks.size, requests: inFlight.size, pending: pending.size, delivered: delivered.length, manifest: Boolean(manifest) }; },
   };
 }

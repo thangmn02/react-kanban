@@ -26,6 +26,15 @@ const ready = (media, src = 'blob:detached-track') => {
   return media;
 };
 
+it('exposes only a connected content-addressed first-party test player as a development URL candidate', () => {
+  const src = `https://private-test.example/kora-lead-test/${'a'.repeat(64)}.wav`;
+  const media = ready(new Audio(), src);
+  document.body.append(media);
+  expect(readMedia()[0].assetUrl).toBe(src);
+  media.remove();
+  expect(readMedia()[0].assetUrl).toBeUndefined();
+});
+
 it('identifies the playing Spotify asset instead of the page being browsed', () => {
   ready(new Audio());
   document.body.innerHTML = '<a data-testid="nowplaying-track-link" href="https://open.spotify.com/track/0123456789012345678901">Playing</a>';

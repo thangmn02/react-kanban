@@ -1,5 +1,6 @@
 import { appOrigins } from './protocol.js';
 import { isMusicUrl } from './sites.js';
+import { mediaAssetFromUrl } from './media-asset.js';
 
 const appPatterns = ['https://kanthangboard.netlify.app/*', 'http://localhost/*', 'http://127.0.0.1/*'];
 const defaultApp = 'https://kanthangboard.netlify.app';
@@ -32,7 +33,15 @@ export function createCompanionAction(api, beats, widgetConnected = () => false)
     },
     async openMusic(session) { await focus({ id: session.tabId }); },
     async invoke(tab) {
-      if (!isMusicTab(tab)) { await api.runtime.openOptionsPage(); return; }
+      if (!isMusicTab(tab)) {
+        const { leadAudioTestScope } = await api.storage.local.get('leadAudioTestScope').catch(() => ({}));
+        const source = mediaAssetFromUrl(leadAudioTestScope?.sourceUrl, leadAudioTestScope);
+        let sameOrigin = false;
+        try { sameOrigin = new URL(tab.url).origin === new URL(leadAudioTestScope?.sourceUrl).origin; } catch { /* Invalid URL. */ }
+        if (!Number.isInteger(tab?.id) || source?.provider !== 'kora-development' || !sameOrigin) {
+          await api.runtime.openOptionsPage(); return;
+        }
+      }
       // The toolbar invocation grants browser access even if Floating Focus is
       // not mounted yet. Never manufacture our own permission flag.
       beats.invoke(tab.id);

@@ -4,6 +4,13 @@ import { audibleClock, playbackTiming, playbackTraces, parsePlaybackClock, clock
 const telemetry = beatTelemetry.at('beat-sync');
 const validBands = new Set(['kick', 'bass', 'clap', 'hat']);
 const sameOwner = (a, b) => a.native === b.native && a.tabId === b.tabId && a.documentId === b.documentId;
+const telemetryEnabled = current => beatTelemetry.enabled || current.diagnostics === true;
+function captureError(failure) {
+  if (['audio-context', 'stream-open', 'audio-graph', 'audio-resume', 'offscreen-response'].includes(failure?.stage)
+    && ['NotAllowedError', 'NotFoundError', 'NotReadableError', 'AbortError', 'OverconstrainedError', 'SecurityError', 'InvalidStateError', 'TypeError', 'Error', 'TransportError', 'TimeoutError', 'UnavailableError'].includes(failure?.code)) {
+    return { stage: failure.stage, code: failure.code };
+  }
+}
 function captureFailure(stage, error) {
   if (stage !== 'capture-permission') return stage;
   const message = String(error?.message || '');
@@ -110,17 +117,26 @@ export function createBeatSync(api, nativePublish) {
         const streamId = await api.tabCapture.getMediaStreamId({ targetTabId: current.session.tabId });
         if (state !== current || current.captureId !== captureId) return;
         stage = 'capture-stream';
-        const response = await timeout(offscreenMessage({ kind: 'start', captureId, streamId }), 4500);
+        const response = await timeout(offscreenMessage({ kind: 'start', captureId, streamId, telemetryEnabled: telemetryEnabled(current) }), 4500);
         if (state !== current || current.captureId !== captureId) {
           void offscreenMessage({ kind: 'stop', captureId }).catch(() => {}); return;
         }
-        if (!response?.ok) throw new Error('Capture unavailable');
+        if (!response?.ok) {
+          current.captureError = captureError(response?.captureError);
+          throw new Error('Capture unavailable');
+        }
+        current.captureError = undefined;
         current.delaySeconds = Number.isFinite(response.delaySeconds) && response.delaySeconds >= 0 && response.delaySeconds <= 5 ? response.delaySeconds : 0;
         current.captureReady = true;
         // An open stream can still be silent/protected. Wait for analyser proof.
         confirmCapture(current);
       } catch (error) {
         if (state === current && current.captureId === captureId) {
+          if (stage === 'capture-stream' && !current.captureError) {
+            const message = String(error?.message || '');
+            current.captureError = { stage: 'offscreen-response', code: /timeout/i.test(message) ? 'TimeoutError'
+              : /receiving end|connection|port.*closed/i.test(message) ? 'TransportError' : 'UnavailableError' };
+          }
           const reason = captureFailure(stage, error);
           current.retryAt = Date.now() + (reason === 'capture-permission' ? 30000 : 3000);
           current.fallbackReason = reason;
@@ -171,22 +187,24 @@ export function createBeatSync(api, nativePublish) {
   return {
     status(session) {
       if (state?.session.id === session.id) return { mode: state.mode, reason: clockReason(state),
+        ...(state.captureError ? { captureError: { ...state.captureError } } : {}),
         ...(state.mode === 'capture' ? { captureId: state.captureId } : {}) };
       return { mode: 'clock', reason: !session.playing ? 'not-playing'
         : session.muted || session.tabMuted ? 'muted' : 'not-selected' };
     },
-    start(session, owner, subscriptionId) {
+    start(session, owner, subscriptionId, diagnostics = false) {
       return serialize(async () => {
         if (state && sameOwner(state.owner, owner) && state.owner.nativeAudio === owner.nativeAudio
           && state.subscriptionId === subscriptionId && state.session.id === session.id) {
           const current = state;
+          current.diagnostics = diagnostics === true;
           current.tabMuted = session.tabMuted;
           const lease = await api.tabs.sendMessage(session.tabId, { target: 'beat-clock', kind: 'lease', token: current.token },
             { documentId: session.documentId }).catch(() => {});
           if (!lease?.ok) await startClock(current).catch(() => {});
           if (current.captureId && current.captureReady) {
             const captureId = current.captureId;
-            const captureLease = await offscreenMessage({ kind: 'lease', captureId }).catch(() => undefined);
+            const captureLease = await offscreenMessage({ kind: 'lease', captureId, telemetryEnabled: telemetryEnabled(current) }).catch(() => undefined);
             telemetry.record(captureLease?.ok ? 'LEASE_RENEW' : 'LEASE_EXPIRED', undefined, { captureId });
             if (!captureLease?.ok && current.captureId === captureId) {
               current.retryAt = 0;
@@ -201,7 +219,7 @@ export function createBeatSync(api, nativePublish) {
           return;
         }
         await stopCurrent();
-        const current = { owner, session, subscriptionId, token: crypto.randomUUID(), mode: 'clock', retryAt: 0,
+        const current = { owner, session, subscriptionId, diagnostics: diagnostics === true, token: crypto.randomUUID(), mode: 'clock', retryAt: 0,
           tabMuted: session.tabMuted, clock: session };
         state = current;
         publishState(current);
@@ -212,6 +230,28 @@ export function createBeatSync(api, nativePublish) {
       });
     },
     stop,
+    async readAudio(session, owner, subscriptionId) {
+      const current = state;
+      if (!current || !sameOwner(current.owner, owner) || current.subscriptionId !== subscriptionId
+        || current.session.id !== session.id || current.session.documentId !== session.documentId
+        || current.session.src !== session.src || current.mode !== 'capture' || !current.captureId
+          || current.session.asset?.provider !== session.asset?.provider || current.session.asset?.id !== session.asset?.id
+          || !current.clock?.playing || current.clock.paused || current.clock.seeking || current.clock.buffering
+          || current.clock.muted || current.tabMuted || current.clock.playbackRate !== 1
+        || Date.now() - current.clock.sampledAt > 1500) return;
+      const captureId = current.captureId;
+      const result = await timeout(offscreenMessage({ kind: 'audio.read', captureId }), 800).catch(() => undefined);
+        if (state !== current || current.captureId !== captureId || !current.clock?.playing
+          || current.clock.paused || current.clock.seeking || current.clock.buffering || current.clock.muted
+          || current.tabMuted || current.clock.playbackRate !== 1 || Date.now() - current.clock.sampledAt > 1500) return;
+      const packet = result?.packet;
+      const timing = playbackTiming(current.clock, packet);
+      if (!timing || !Number.isSafeInteger(packet.sequence) || packet.sequence <= 0 || packet.sampleRate !== 44100
+        || typeof packet.pcm !== 'string' || packet.pcm.length !== 23520
+        || Date.now() - packet.targetOutputTime > 500 || packet.targetOutputTime > Date.now() + 100) return;
+      return { pcm: packet.pcm, sequence: packet.sequence, captureId, asset: session.asset,
+        clock: { ...timing.playbackClock, currentTime: timing.targetPlaybackTime, sampledAt: packet.targetOutputTime } };
+    },
     clock(message, sender) {
       const current = state;
       if (!current || sender.tab?.id !== current.session.tabId || sender.documentId !== current.session.documentId || message.token !== current.token) return;
@@ -257,14 +297,6 @@ export function createBeatSync(api, nativePublish) {
         delivered = true;
         publish(current, { kind: 'tempo.state', captureId: current.captureId, tempo: message.tempo, ...diagnostic });
       }
-      if (message.kind === 'melody.state' && message.detector === 'instrument-v1' && current.mode === 'capture' && current.clock?.playing
-        && typeof message.melody?.active === 'boolean' && Number.isFinite(message.melody.level)
-        && message.melody.level >= 0 && message.melody.level <= 1
-        && Number.isSafeInteger(message.melody.note) && message.melody.note >= 0) {
-        delivered = true;
-        publish(current, { kind: 'melody.state', detector: 'instrument-v1', captureId: current.captureId,
-          melody: { active: message.melody.active, level: message.melody.level, note: message.melody.note }, ...diagnostic });
-      }
       if (message.kind === 'tempo.tick' && current.mode === 'capture' && current.clock?.playing
         && Number.isInteger(message.tick?.step) && message.tick.step >= 0 && message.tick.step < 8
         && Number.isFinite(message.tick.phase) && message.tick.phase >= 0 && message.tick.phase < 1
@@ -276,6 +308,7 @@ export function createBeatSync(api, nativePublish) {
       }
       if (!delivered) telemetry.mark('EVENT_DROPPED', trace, { reason: current.mode !== 'capture' ? 'clock' : !current.clock?.playing ? 'not-playing' : 'invalid' });
       if (message.kind === 'stopped') {
+        current.captureError = captureError(message.captureError);
         current.retryAt = Date.now() + (message.reason === 'failed' ? 3000 : 0);
         current.fallbackReason = ['expired', 'silent', 'ended', 'failed'].includes(message.reason) ? message.reason : 'stopped';
         cancelCapture(current);

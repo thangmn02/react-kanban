@@ -2,6 +2,13 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { beatTelemetry, createBeatTelemetry, parseBeatTraces } from './beat-telemetry.js';
 
 afterEach(() => { beatTelemetry.enable(false); beatTelemetry.clear(); vi.restoreAllMocks(); });
+it('preserves allowlisted event provenance and row/cell observations across transport', () => {
+  const log = createBeatTelemetry(); log.enable();
+  const trace = { ...log.events('onset', ['melody'], { origin: 'capture-engine' })[0], eventId: 'note-5', eventSource: 'local', targetPlaybackTime: 5 };
+  expect(parseBeatTraces([trace])).toEqual([trace]);
+  log.record('EVENT_RENDERED', trace, { row: 5, cell: 8, semantic: true });
+  expect(log.snapshot().records[0]).toMatchObject({ eventId: 'note-5', origin: 'capture-engine', row: 5, cell: 8, semantic: true });
+});
 
 it('is inert by default and bounds memory while keeping lifetime stage counts', () => {
   const now = vi.fn(() => 1000), log = createBeatTelemetry({ now, limit: 3 });

@@ -2,10 +2,18 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { createNativeAudioFeed } from './nativeAudio';
 import { beatTelemetry, parseBeatTraces } from '../../../extensions/kanban-music/beat-telemetry.js';
+import type { PlaybackClock } from '../../../extensions/kanban-music/beat-timing.js';
 
 const receivers = new Set<(value: unknown) => void>();
 const publish = (value: unknown) => { for (const receive of receivers) receive(value); };
-const audio = createNativeAudioFeed(publish);
+const audioReceivers = new Set<(sessionId: string, samples: Float32Array, clock: PlaybackClock) => void>();
+const audio = createNativeAudioFeed(publish, (sessionId, samples, clock) => {
+  for (const receive of audioReceivers) receive(sessionId, samples, clock);
+});
+export function subscribeNativeAudio(receive: (sessionId: string, samples: Float32Array, clock: PlaybackClock) => void) {
+  audioReceivers.add(receive);
+  return () => { audioReceivers.delete(receive); };
+}
 // Register before sync.start. A single listener survives surface/layout swaps.
 let ready: Promise<unknown> | undefined;
 function ensureFeed() {

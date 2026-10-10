@@ -7,7 +7,10 @@ export type MomentShape = 'heart' | 'diamond' | 'smile';
 export type MomentEffect = 'cascade' | 'wave' | 'rain';
 
 export const beatBands: BeatBand[] = ['kick', 'clap', 'hat', 'bass', 'melody'];
-export const trackNames: Record<BeatBand, string> = { kick: 'Drum (Kick)', clap: 'Clap', hat: 'Hi-hat', bass: 'Bass', melody: 'Melody' };
+// Presentation only: event contracts retain all five semantic types.
+export const productBeatBands: BeatBand[] = ['kick', 'clap', 'hat', 'bass'];
+export type BeatRowCount = 4 | 5;
+export const trackNames: Record<BeatBand, string> = { kick: 'Kick', clap: 'Snare / Clap', hat: 'Hi-hat / Cymbal', bass: 'Bass / Low pulse', melody: 'Lead' };
 export const momentFlashMs = 8000;
 export const patternNames: BeatPatternName[] = ['pop', 'wave', 'splash', 'ripple'];
 export const shapeNames: MomentShape[] = ['heart', 'diamond', 'smile'];
@@ -35,6 +38,11 @@ const shapes: Record<MomentShape, string[]> = {
   heart: ['01100110', '11111111', '11111111', '01111110', '00011000'],
   diamond: ['00011000', '00111100', '01111110', '00111100', '00011000'],
   smile: ['01111110', '01011010', '01000010', '01011010', '00111100'],
+};
+const fourRowShapes: Record<MomentShape, string[]> = {
+  heart: ['01100110', '11111111', '01111110', '00011000'],
+  diamond: ['00011000', '01111110', '01111110', '00011000'],
+  smile: ['01111110', '01011010', '01000010', '00111100'],
 };
 
 export function hashText(value: string): number {
@@ -69,12 +77,12 @@ export function activeSteps(sessionId: string, epoch: number, row: number): bool
   return Array.from({ length: 8 }, (_, step) => chosen.has(step));
 }
 
-export function channelColors(mode: BeatColorMode, palette: BeatPalette, sessionId: string, epoch: number, row: number) {
+export function channelColors(mode: BeatColorMode, palette: BeatPalette, sessionId: string, epoch: number, row: number, rowCount: BeatRowCount = 5) {
   if (mode !== 'random') return fixedColors[palette][row];
   const seed = hashText(`${sessionId}:${epoch}:hue`);
   const base = Math.floor(randomUnit(seed) * 360);
   const jitter = Math.floor(randomUnit(seed + row * 997) * 25) - 12;
-  const hue = (base + row * (360 / beatBands.length) + jitter + 360) % 360;
+  const hue = (base + row * (360 / rowCount) + jitter + 360) % 360;
   return { hit: `hsl(${hue} 80% 62%)`, idle: `hsl(${hue} 85% 90%)` };
 }
 
@@ -85,8 +93,8 @@ export function pulseDelay(pattern: BeatPatternName, step: number, seed: number)
   return randomUnit(seed + step * 431) < 0.6 ? Math.floor(randomUnit(seed + step * 271) * 71) : null;
 }
 
-export function isShapeCell(shape: MomentShape, row: number, step: number): boolean {
-  return shapes[shape][row]?.[step] === '1';
+export function isShapeCell(shape: MomentShape, row: number, step: number, rowCount: BeatRowCount = 5): boolean {
+  return (rowCount === 4 ? fourRowShapes : shapes)[shape][row]?.[step] === '1';
 }
 
 export function momentDelay(effect: MomentEffect, row: number, step: number, seed: number): number {
@@ -95,8 +103,8 @@ export function momentDelay(effect: MomentEffect, row: number, step: number, see
   return step * 75 + Math.floor(randomUnit(seed + row * 79 + step * 17) * 65);
 }
 
-export function momentDuration(effect: MomentEffect, seed: number): number {
-  const delays = beatBands.flatMap((_, row) => Array.from({ length: 8 }, (_, step) => momentDelay(effect, row, step, seed)));
+export function momentDuration(effect: MomentEffect, seed: number, rowCount: BeatRowCount = 5): number {
+  const delays = Array.from({ length: rowCount }, (_, row) => Array.from({ length: 8 }, (_, step) => momentDelay(effect, row, step, seed))).flat();
   // Keep the whole shape mounted through the last square's hold and fade.
   return momentFlashMs + Math.max(...delays) + 50;
 }

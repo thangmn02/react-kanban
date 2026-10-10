@@ -66,7 +66,7 @@ function FocusDock({
 }: FocusDockProps) {
   const shouldReduceMotion = useReducedMotion();
   const { t } = useI18n();
-  const { ref: islandRef, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onKeyDown } = useIslandPosition(focusTasks.length > 0);
+  const { ref: islandRef, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onKeyDown } = useIslandPosition(focusTasks.length > 0 || showWhenEmpty);
   const activeTask = focusTasks.find((task) => task.id === (timerState.activeTaskId || activeTaskId)) || focusTasks[0];
   const cycle = Math.min((timerState.completedCycleFocus || 0) + 1, timerSettings.longBreakEvery);
 

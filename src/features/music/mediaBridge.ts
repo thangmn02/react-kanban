@@ -4,6 +4,7 @@ import { beatTelemetry, parseBeatTraces, type BeatTrace } from '../../../extensi
 import { parsePlaybackTiming, parsePlaybackClock, playbackDeadline, type PlaybackTiming, type PlaybackClock } from '../../../extensions/kanban-music/beat-timing.js';
 import { parseMediaAsset, type MediaAsset } from '../../../extensions/kanban-music/media-asset.js';
 import type { BeatEventPath } from './beat-event-engine';
+import type { LeadProvenance } from './lead-events';
 const telemetry = beatTelemetry.at('media-bridge');
 
 export interface BrowserMusicSession {
@@ -26,7 +27,7 @@ export interface BrowserMusicSession {
   playbackRate?: number;
   sampledAt?: number;
   selectionToken?: string;
-  syncState?: { mode: 'clock' | 'capture'; reason?: string; captureId?: string };
+  syncState?: { mode: 'clock' | 'capture'; reason?: string; captureId?: string; captureError?: { stage: string; code: string } };
 }
 
 export type MusicClock = PlaybackClock;
@@ -35,16 +36,17 @@ export interface MelodyState { active: boolean; level: number; note: number }
 export type BeatEvent = ({ kind: 'clock'; clock: MusicClock }
   | { kind: 'sync.recover' }
   | { kind: 'sync.state'; mode: 'clock' | 'capture'; reason?: string; captureId?: string; eventPath?: BeatEventPath }
-  | { kind: 'onset'; bands: BeatBand[]; captureId?: string; sequence?: number }
-  | { kind: 'melody.state'; captureId: string; melody: MelodyState }
+  | { kind: 'onset'; bands: BeatBand[]; captureId?: string; sequence?: number; duration?: number }
+  | { kind: 'melody.state'; captureId: string; melody: MelodyState; lead?: LeadProvenance }
   | { kind: 'tempo.state'; captureId: string; tempo: { locked: boolean; bpm: number | null; confidence: number } }
   | { kind: 'tempo.tick'; captureId: string; tick: { step: number; phase: number; beatPosition: number; subdivision: 2 } }) & { telemetry?: BeatTrace[]; eventSource?: BeatEventPath; semanticKey?: string } & Partial<PlaybackTiming>;
 
 const channel = 'kanban-music-v1';
 const supportedBands = ['kick', 'clap', 'hat', 'bass', 'melody', 'snare'];
 const canonicalBand = (band: string): BeatBand => band === 'snare' ? 'clap' : band as BeatBand;
-export type MusicAction = 'sessions.get' | 'diagnostics.get' | 'media.play' | 'media.pause' | 'media.focus' | 'media.seek' | 'media.volume' | 'media.previous' | 'media.next' | 'instrument.setup';
+export type MusicAction = 'sessions.get' | 'diagnostics.get' | 'media.play' | 'media.pause' | 'media.focus' | 'media.seek' | 'media.volume' | 'media.previous' | 'media.next';
 type BeatAction = 'dock.beat.sync.start' | 'dock.beat.sync.stop';
+type AudioAction = 'dock.audio.read';
 
 export class MusicBridgeError extends Error {
   readonly code: 'not-installed' | 'unavailable' | 'playback' | 'invalid-response';
@@ -90,8 +92,9 @@ function isSyncState(value: unknown): boolean {
     && (state.captureId === undefined || (typeof state.captureId === 'string' && state.captureId.length <= 100));
 }
 
-function requestBridge(action: MusicAction | BeatAction, sessionId?: string, subscriptionId?: string, value?: number): Promise<Record<string, unknown>> {
-  if (isNativeWidget()) return requestNativeMusic(action, sessionId, subscriptionId, value).then((response) => {
+function requestBridge(action: MusicAction | BeatAction | AudioAction, sessionId?: string, subscriptionId?: string, value?: number): Promise<Record<string, unknown>> {
+  if (action === 'dock.audio.read' && isNativeWidget()) return Promise.reject(new MusicBridgeError('unavailable'));
+  if (isNativeWidget()) return requestNativeMusic(action as MusicAction | BeatAction, sessionId, subscriptionId, value).then((response) => {
     if (response.ok !== true) throw new MusicBridgeError(response.error === 'not-installed' ? 'not-installed' : 'unavailable');
     return response;
   }).catch((error) => {
@@ -112,6 +115,7 @@ function requestBridge(action: MusicAction | BeatAction, sessionId?: string, sub
     const timeout = window.setTimeout(() => { cleanup(); reject(new MusicBridgeError('not-installed')); }, 2500);
     window.addEventListener('message', receive);
     window.postMessage({ channel, direction: 'app-to-extension', requestId, action, sessionId,
+      ...(action === 'dock.beat.sync.start' ? { telemetryEnabled: beatTelemetry.enabled } : {}),
       ...(value !== undefined ? { value } : {}),
       ...(subscriptionId ? { subscriptionId } : {}) }, window.location.origin);
   });
@@ -129,14 +133,15 @@ export async function sendBeatRequest(action: BeatAction, sessionId: string, sub
   await requestBridge(action, sessionId, subscriptionId);
 }
 
+export async function readCompanionAudio(sessionId: string, subscriptionId: string): Promise<unknown> {
+  const response = await requestBridge('dock.audio.read', sessionId, subscriptionId);
+  return response.packet;
+}
+
 export async function sendMusicDiagnostics(): Promise<unknown[]> {
   const response = await requestBridge('diagnostics.get');
   if (!Array.isArray(response.tabs)) throw new MusicBridgeError('invalid-response');
   return response.tabs;
-}
-
-export async function openInstrumentNotesSetup(sessionId: string): Promise<void> {
-  await requestBridge('instrument.setup', sessionId);
 }
 
 export function subscribeBeatEvents(sessionId: string, subscriptionId: string, callback: (event: BeatEvent) => void) {
@@ -227,13 +232,6 @@ export function subscribeBeatEvents(sessionId: string, subscriptionId: string, c
       && (message.tempo.bpm === null || typeof message.tempo.bpm === 'number' && Number.isFinite(message.tempo.bpm)
         && message.tempo.bpm >= 60 && message.tempo.bpm <= 180)) receive({ kind: 'tempo.state', captureId: message.captureId,
         tempo: { locked: message.tempo.locked, bpm: message.tempo.bpm, confidence: message.tempo.confidence } });
-    if (message.kind === 'melody.state' && message.detector === 'instrument-v1' && typeof message.captureId === 'string' && message.captureId.length <= 100
-      && typeof message.melody?.active === 'boolean' && Number.isFinite(message.melody.level)
-      && message.melody.level >= 0 && message.melody.level <= 1
-      && Number.isSafeInteger(message.melody.note) && message.melody.note >= 0) receive({
-        kind: 'melody.state', captureId: message.captureId,
-        melody: { active: message.melody.active, level: message.melody.level, note: message.melody.note },
-      });
     if (message.kind === 'tempo.tick' && typeof message.captureId === 'string' && message.captureId.length <= 100
       && Number.isInteger(message.tick?.step) && message.tick.step >= 0 && message.tick.step < 8
       && Number.isFinite(message.tick.phase) && message.tick.phase >= 0 && message.tick.phase < 1

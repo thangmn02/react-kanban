@@ -5,6 +5,8 @@ import { useMusicBeatSync } from './useMusicBeatSync';
 import { mergeMusicSessions } from './mergeMusicSessions';
 import { getBeatSource, isNativeWidget } from '../native/runtime';
 import { beatCapabilities } from './beat-capabilities';
+import { leadPulseEnabled, leadProcessingEnabled } from './lead-feature';
+import { companionLeadInputEnabled } from './companion-lead-audio';
 
 interface MusicSelection {
   sessions: BrowserMusicSession[];
@@ -35,7 +37,7 @@ function updateSelection(current: MusicSelection, next: BrowserMusicSession[], t
 }
 
 // Keep discovery alive even while the music panel is hidden.
-export function useBrowserMusic() {
+export function useBrowserMusic(beatDemand = false) {
   const { t } = useI18n();
   const [{ sessions, selectedId }, setMusic] = useState<MusicSelection>({ sessions: [], selectedId: '', explicitSelection: false, selectionToken: '' });
   const [connected, setConnected] = useState(false);
@@ -79,9 +81,11 @@ export function useBrowserMusic() {
   const provider = selected?.asset?.provider, mediaId = selected?.asset?.id;
   const canAnalyze = selected?.canAnalyze, duration = selected?.duration;
   const eventOptions = useMemo(() => ({ asset: provider && mediaId ? { provider, id: mediaId } : undefined,
+    capturedInput: isNativeWidget() ? !leadPulseEnabled() || leadProcessingEnabled()
+      : companionLeadInputEnabled(provider && mediaId ? { provider, id: mediaId } : undefined),
     duration, capabilities: beatCapabilities(isNativeWidget(), canAnalyze !== false),
   }), [provider, mediaId, duration, canAnalyze]);
-  const beat = useMusicBeatSync(selected?.id, updateClock, eventOptions);
+  const beat = useMusicBeatSync(selected?.id, updateClock, eventOptions, beatDemand);
   async function toggle() {
     if (!selected || busy) return;
     setBusy(true);

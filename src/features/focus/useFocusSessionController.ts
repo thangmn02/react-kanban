@@ -49,7 +49,7 @@ export function useFocusSessionController({
   const { t } = useI18n();
   const scope: StorageScope = { userId: user?.id ?? 'mock-user', workspaceId };
   const focusTasksApi = useFocusTasks(boardData, scope);
-  const [isFocusDockCollapsed, setIsFocusDockCollapsed] = useState(false);
+  const [isFocusDockCollapsed, setIsFocusDockCollapsed] = useState(true);
   const [focusLaunchTaskId, setFocusLaunchTaskId] = useState<string | null>(null);
   const [focusLaunchIntention, setFocusLaunchIntention] = useState('');
   const [activeFocusIntention, setActiveFocusIntention] = useState<{

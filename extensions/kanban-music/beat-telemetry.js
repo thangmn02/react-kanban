@@ -4,14 +4,17 @@ const stages = new Set(['CAPTURE_START', 'CAPTURE_STOP', 'AUDIO_DETECTED', 'LOW_
   'EVENT_SENT', 'EVENT_RECEIVED', 'EVENT_LATE', 'EVENT_DROPPED', 'EVENT_ACCEPTED',
   'EVENT_STATE_COMMITTED', 'EVENT_COMMITTED', 'EVENT_RENDERED', 'EVENT_SCHEDULED', 'ANALYSIS_FRAME', 'WORKER_BATCH']);
 const sources = new Set(['onset', 'tempo', 'random', 'lifecycle']);
-['CACHE_HIT', 'CACHE_MISS', 'ANALYSIS_REQUESTED', 'EVENT_PATH', 'EVENT_REPLACED'].forEach(stage => stages.add(stage));
+['CACHE_HIT', 'CACHE_MISS', 'ANALYSIS_REQUESTED', 'EVENT_PATH', 'EVENT_REPLACED', 'LEAD_EVENT'].forEach(stage => stages.add(stage));
 const types = new Set(['kick', 'snare', 'hat', 'bass', 'melodic', 'generic']);
+const origins = new Set(['event-track-cache', 'local-detector', 'capture-engine', 'native-audio-engine', 'visual-decoration']);
 const components = new Set(['capture-engine', 'offscreen', 'beat-sync', 'widget-bridge',
   'instrument-worker', 'instrument-runtime', 'native-instrument', 'native-audio-engine',
   'native-audio-feed', 'media-bridge', 'beat-controller', 'beat-renderer']);
 components.add('native-capture'); components.add('native-widget-bridge');
 components.add('beat-scheduler');
 components.add('beat-event-engine');
+components.add('percussion-classifier');
+components.add('lead-fixture');
 const reasons = new Set(['replaced', 'stopped', 'failed', 'expired', 'silent', 'ended',
   'reconfigured', 'queue-full', 'late', 'owner', 'sequence', 'debounce', 'invalid',
   'not-playing', 'sync-stale', 'clock-disconnected', 'audio-backlog', 'transport',
@@ -42,6 +45,8 @@ export function parseBeatTraces(value) {
         ...(Number.isSafeInteger(t.noteSequence) && t.noteSequence >= 0 ? { noteSequence: t.noteSequence } : {}),
         ...(finite(t.targetPlaybackTime) && t.targetPlaybackTime >= 0 ? { targetPlaybackTime: t.targetPlaybackTime } : {}),
         ...(['cache', 'local', 'degraded'].includes(t.eventSource) ? { eventSource: t.eventSource } : {}),
+        ...(opaque(t.eventId) ? { eventId: t.eventId } : {}),
+        ...(origins.has(t.origin) ? { origin: t.origin } : {}),
         ...(opaque(t.captureId) ? { captureId: t.captureId } : {}) });
     }
     return result;
@@ -70,8 +75,20 @@ export function createBeatTelemetry({ now = Date.now, limit = 2048 } = {}) {
         }
         if (opaque(details.captureId)) entry.captureId = details.captureId;
         if (opaque(details.parentId)) entry.parentId = details.parentId;
+        if (Number.isInteger(details.row) && details.row >= 1 && details.row <= 5) entry.row = details.row;
+        if (Number.isInteger(details.cell) && details.cell >= 1 && details.cell <= 8) entry.cell = details.cell;
+        if (typeof details.semantic === 'boolean') entry.semantic = details.semantic;
         if (reasons.has(details.reason)) entry.reason = details.reason;
         if (['cache', 'local', 'degraded'].includes(details.eventSource)) entry.eventSource = details.eventSource;
+        // Narrow Lead provenance allowlist; never log arbitrary metadata or URLs.
+        if (details.policyVersion === 'lead-pulse-v1') {
+          entry.policyVersion = details.policyVersion;
+          if (['vocals', 'piano', 'guitar', 'other'].includes(details.source)) entry.leadSource = details.source;
+          if (['vocal-articulation', 'pitched-note'].includes(details.kind)) entry.leadKind = details.kind;
+          if (['melodia', 'vocal-body-articulation'].includes(details.detector)) entry.leadDetector = details.detector;
+          if (/^[a-f0-9]{64}$/.test(details.inputSha256 || '')) entry.inputSha256 = details.inputSha256;
+          if (finite(details.midiPitch) && details.midiPitch >= 0 && details.midiPitch <= 127) entry.midiPitch = details.midiPitch;
+        }
         if (stage === 'EVENT_SENT') entry.emittedAt = time;
         if (stage === 'EVENT_COMMITTED' || stage === 'EVENT_STATE_COMMITTED') entry.committedAt = time;
         if (stage === 'EVENT_RENDERED') entry.renderedAt = time;
@@ -92,6 +109,7 @@ export function createBeatTelemetry({ now = Date.now, limit = 2048 } = {}) {
           ...(typeof details.active === 'boolean' ? { active: details.active } : {}),
           ...(Number.isSafeInteger(details.noteSequence) && details.noteSequence >= 0 ? { noteSequence: details.noteSequence } : {}),
           ...(opaque(details.captureId) ? { captureId: details.captureId } : {}),
+          ...(origins.has(details.origin) ? { origin: details.origin } : {}),
         }));
       } catch { return undefined; }
     },
@@ -108,6 +126,7 @@ export const beatTelemetry = createBeatTelemetry();
 // Each realm has its own bounded buffer. The extension setting enables its
 // background/offscreen realms; the app can enable via ?musicDebug=1 or console.
 try {
-  beatTelemetry.enable(new URL(globalThis.location.href).searchParams.get('musicDebug') === '1');
+  const params = new URL(globalThis.location.href).searchParams;
+  beatTelemetry.enable(params.get('musicDebug') === '1' || params.get('musicSemanticOnly') === '1');
   globalThis.__koraBeatTelemetry = beatTelemetry;
 } catch { /* A non-browser test environment can configure the recorder directly. */ }

@@ -24,12 +24,11 @@ export default function AppNavigation({ activeView, onNavigate, mobile = false }
     { view: 'home' as const, label: t('navigation.home') },
     { view: 'today' as const, label: t('app.today') },
     { view: 'board' as const, label: t('navigation.board') },
-    { view: 'music' as const, label: t('focus.island.music') },
-    { view: 'beat-grid' as const, label: t('dock.beatGrid') },
     { view: 'focus' as const, label: t('focus.mode.focus') },
     { view: 'contact' as const, label: t('navigation.contact') },
   ];
-  const selected = ['board', 'calendar', 'table'].includes(activeView) ? 'board' : activeView;
+  const selected = ['board', 'calendar', 'table'].includes(activeView) ? 'board'
+    : ['music', 'beat-grid'].includes(activeView) ? 'focus' : activeView;
 
   return (
     <nav aria-label={t('navigation.label')} className={mobile

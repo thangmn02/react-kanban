@@ -1,24 +1,19 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { deflateSync } from 'node:zlib';
-import { build } from 'vite';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const extension = join(root, 'extensions', 'kanban-music');
 const output = join(root, 'public', 'downloads');
 
-// The model itself downloads once on opt-in. All executable code/WASM is
-// packaged locally to comply with Manifest V3's remote-code prohibition.
-await mkdir(join(extension, 'vendor'), { recursive: true });
-for (const name of ['ort.wasm.min.mjs', 'ort-wasm-simd-threaded.mjs', 'ort-wasm-simd-threaded.wasm']) {
-  await writeFile(join(extension, 'vendor', name), await readFile(join(root, 'node_modules/onnxruntime-web/dist', name)));
+// Rebuild generated resources so an incremental build cannot ship retired models.
+for (const path of ['extensions/kanban-music/generated', 'extensions/kanban-music/vendor',
+  'public/music-analysis', 'src-tauri/generated/music-companion']) {
+  const target = join(root, path);
+  if (!target.startsWith(root)) throw new Error('Generated resource outside project');
+  await rm(target, { recursive: true, force: true });
 }
-await build({ configFile: false, publicDir: false, logLevel: 'warn', build: {
-  outDir: join(extension, 'generated'), emptyOutDir: true, minify: true,
-  lib: { entry: join(extension, 'instrument-worker.js'), formats: ['es'], fileName: () => 'instrument-worker.js' },
-  rolldownOptions: { external: ['onnxruntime-web/wasm'], output: { paths: { 'onnxruntime-web/wasm': '../vendor/ort.wasm.min.mjs' } } },
-} });
 
 function crc32(bytes) {
   let crc = 0xffffffff;
@@ -87,16 +82,17 @@ function zip(files) {
 
 await mkdir(join(extension, 'icons'), { recursive: true });
 for (const size of [16, 48, 128]) await writeFile(join(extension, 'icons', `${size}.png`), icon(size));
-const names = ['manifest.json', 'background.js', 'widget-bridge.js', 'sites.js', 'companion-action.js', 'media.js', 'media-observer.js', 'discovery-diagnostics.js', 'protocol.js', 'relay.js', 'clock.js', 'beat-sync.js', 'beat-detector.js', 'tempo-tracker.js', 'capture-engine.js', 'offscreen.html', 'offscreen.js', 'setup.html', 'setup.js', 'setup.css', 'icons/16.png', 'icons/48.png', 'icons/128.png'];
-names.push('instrument-runtime.js', 'instrument-models.js', 'instrument-worklet.js', 'INSTRUMENT-NOTICES.md',
-  'beat-telemetry.js', 'beat-timing.js', 'media-asset.js',
-  'generated/instrument-worker.js', 'vendor/ort.wasm.min.mjs', 'vendor/ort-wasm-simd-threaded.mjs', 'vendor/ort-wasm-simd-threaded.wasm',
-  'THIRD-PARTY-LICENSES.txt');
+const names = ['manifest.json', 'background.js', 'widget-bridge.js', 'sites.js', 'companion-action.js', 'media.js', 'media-observer.js', 'discovery-diagnostics.js', 'protocol.js', 'relay.js', 'clock.js', 'beat-sync.js', 'beat-detector.js', 'tempo-tracker.js', 'capture-engine.js', 'beat-telemetry.js', 'beat-timing.js', 'media-asset.js', 'offscreen.html', 'offscreen.js', 'setup.html', 'setup.js', 'setup.css', 'icons/16.png', 'icons/48.png', 'icons/128.png'];
 const files = await Promise.all(names.map(async (name) => ({ name, bytes: await readFile(join(extension, name)) })));
-for (const { name, bytes } of files.filter((file) => /^(generated\/|vendor\/)|NOTICES|LICENSES/.test(file.name))) {
-  const target = join(root, 'public', 'music-analysis', name);
-  await mkdir(join(target, '..'), { recursive: true });
-  await writeFile(target, bytes);
+for (const name of ['percussion-classifier.js', 'causal-percussion-classifier.js', 'percussion-features.js', 'percussion-worklet.js',
+  'percussion-worker.js', 'percussion-runtime.js', 'lead-audio-authorization.js', 'lead-audio-tap.js', 'lead-audio-worklet.js']) files.push({ name, bytes: await readFile(join(extension, name)) });
+// Reject broken runtime imports before writing either the ZIP or desktop bundle.
+// Private model weights and optional inference assets remain outside this package.
+const packagedNames = new Set(files.map(({ name }) => name));
+for (const { name, bytes } of files.filter(({ name }) => name.endsWith('.js'))) {
+  for (const match of bytes.toString().matchAll(/from\s+["']\.\/([^"']+)["']/g)) {
+    if (!packagedNames.has(match[1])) throw new Error(`Missing Companion dependency: ${name} → ${match[1]}`);
+  }
 }
 JSON.parse(files.find((file) => file.name === 'manifest.json').bytes.toString());
 await mkdir(output, { recursive: true });

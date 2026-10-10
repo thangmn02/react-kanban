@@ -283,20 +283,21 @@ it('shows the heartbeat dot only while playing, keeps the paused panel, and hide
   await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
   expect(dot()).toHaveClass('music-dot', 'playing');
   expect(screen.getByRole('heading', { name: session.title })).toBeInTheDocument();
-  expect(view.container.querySelectorAll('.channel-icon')).toHaveLength(5);
+  expect(view.container.querySelectorAll('.channel-icon')).toHaveLength(4);
   expect(view.container.querySelectorAll('.channel-icon.lit')).toHaveLength(0);
   expect(view.container.querySelectorAll('.beat-square.lit, .beat-square.onset')).toHaveLength(0);
   await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
   expect(dot()).toBeNull();
   expect(screen.getByRole('heading', { name: session.title })).toBeInTheDocument();
-  expect(view.container.querySelectorAll('.channel-icon')).toHaveLength(5);
+  expect(view.container.querySelectorAll('.channel-icon')).toHaveLength(4);
   expect(view.container.querySelectorAll('.channel-icon.lit')).toHaveLength(0);
   expect(view.container.querySelectorAll('.beat-square.hit')).toHaveLength(0);
   expect(view.container.querySelectorAll('.beat-square.lit, .beat-square.onset')).toHaveLength(0);
   await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
   expect(dot()).toBeNull();
   expect(screen.queryByRole('heading', { name: session.title })).not.toBeInTheDocument();
-  expect(view.container.querySelectorAll('.beat-square')).toHaveLength(0);
+  expect(view.container.querySelectorAll('.beat-square')).toHaveLength(32);
+  expect(view.container.querySelectorAll('.beat-square.onset, .melody-beat-flash')).toHaveLength(0);
   expect(screen.getByText('01:30')).toBeInTheDocument();
 });
 
@@ -362,8 +363,8 @@ it('keeps unsupported controls disabled and shows only a strip outside Music whi
   fireEvent.click(screen.getByRole('tab', { name: 'Beat grid' }));
   expect(view.container.querySelector('.dock-now-playing')).not.toHaveAttribute('hidden');
   expect(screen.queryByRole('slider', { name: 'Seek music' })).toBeNull();
-  expect(view.container.querySelectorAll('.beat-channel')).toHaveLength(5);
-  expect(view.container.querySelectorAll('.beat-square')).toHaveLength(40);
+  expect(view.container.querySelectorAll('.beat-channel')).toHaveLength(4);
+  expect(view.container.querySelectorAll('.beat-square')).toHaveLength(32);
   vi.mocked(sendMusicRequest).mockResolvedValue([{ ...session, paused: true }]);
   fireEvent.click(screen.getByRole('button', { name: 'Pause music' }));
   await waitFor(() => expect(view.container.querySelector('.dock-now-playing')).toHaveAttribute('hidden'));

@@ -32,7 +32,7 @@ and Complete & next. Drag the native dock from any empty header area or its
 Tabs label; buttons and settings stay interactive. Color and palette settings
   are retained. Native and browser PiP open at 520×580; native can shrink to
   320×360. At compact sizes the timer moves beside its controls and the grid
-  keeps five rows of eight cells with smaller tiles/gaps. Music has a seekable
+  keeps four rows of eight cells with smaller tiles/gaps. Music has a seekable
   timeline, current/total time, previous/play/next and volume/mute controls.
   Seeking is disabled for streams without a finite, seekable duration; track
   navigation is disabled when the source exposes no enabled player button.
@@ -53,7 +53,7 @@ On supported Windows builds, Kora captures the process tree of the browser
 owning that local connection automatically, including new tabs and browser
 restarts. No repeated extension capture click is required in the native app.
 The picker selects metadata and controls, not isolated tab audio: other music,
-calls or notifications in that same browser can affect all five rows. Other
+calls or notifications in that same browser can affect the four visible rows. Other
 desktop processes are excluded. Browser output and volume remain unchanged.
 Silent, unavailable or disconnected capture leaves the grid still. Native PCM
 travels through a bounded local IPC Channel, never WebSocket/network or disk.
@@ -77,20 +77,15 @@ identifier `app.kanthangboard.focus` is deliberately unchanged to preserve
 existing native sign-in and preferences. Branding, product/version and the
 executable are now Kora / 0.1.15 / `kora.exe`.
 
-The fifth row follows AI-separated instrumental note attacks. Choose **AI
-instrument notes** in native Music to download/enable about 157 MB of hash-verified
-model data once, cached locally. All executable code/WASM ships with Kora.
-The model separates vocals/drums/bass first; a retained harmonic profile favors
-one dominant instrumental line. Native AI flashes follow with processing delay,
-preserving attack spacing; browser sound and the first four rows stay immediate.
-Pause/seek/source change clears pending flashes. The native app cannot retain
-the previous 32 ms buffered alignment without delaying the original browser audio.
-Web/PiP AI still uses Companion options and its existing 3.5-second audio buffer.
-Disable AI to keep row five dark. Failed/slow analysis leaves it dark while the
-four percussion detectors continue. Several instruments can remain in a stem;
-exact transcription or named-instrument isolation is not guaranteed.
-See the companion's [model notices](../extensions/kanban-music/INSTRUMENT-NOTICES.md)
-and [validation](../extensions/kanban-music/BEAT-VALIDATION.md).
+The normal product temporarily hides the fifth Lead row and its availability
+strip. Private diagnostics retain timestamped Lead attacks from the validated
+EventTrack cache. The legacy Spleeter feature, model download, workers/WASM and
+delayed-audio path are retired. The frozen Lead pipeline remains available internally; the existing four local
+detectors continue unchanged. Original audio remains immediate.
+Pause/seek/source changes clear stale scheduled events. Previously downloaded
+model data is left inert rather than deleted from user profiles. See the
+[cache contract](../docs/beat-event-cache.md) and current
+[quality report](../plans/reports/diagnosis-261007-1024-five-row-quality.md).
 
 ## Development and distribution
 
@@ -112,8 +107,8 @@ tabs. A repository checkout is unnecessary. The offline guide links to this
 route. Updating these files does not update the Kora executable.
 
 `music:package` generates the current and legacy public Companion ZIP URLs and
-the native resource tree under `generated/music-companion/`, plus executable
-AI assets under `../public/music-analysis/`. Generated archives
+the native resource tree under `generated/music-companion/`. Packaging clears
+retired generated model/runtime assets before copying its runtime inventory. Generated archives
 and resources are ignored by Git; `prebuild` regenerates them from the tracked
 runtime inventory. Native frontend builds omit the ZIP copies because the
 installer already includes the unpacked resource.
@@ -191,9 +186,12 @@ user acceptance checks after installation.
 
 ## Matrix and timer controls
 
-The matrix has Kick, Clap, Hi-hat, Bass and Melody rows. Melody flashes for
-incrementing instrument-v1 note sequences, never raw hats, sustain or a tonal
-energy envelope. Its brief level-scaled flash and 700 ms state expiry remain.
+The normal matrix currently has four rows: Kick, Snare/Clap, Hi-hat/Cymbal and
+Bass/Low pulse, with eight cells per row. Private Lead diagnostics retain a fifth
+row; the normal Lead row and its readiness strip are temporarily hidden. In those
+diagnostics, Melody flashes for actual cached note attacks, never legacy
+instrument-v1 messages, raw hats, sustain or a tonal energy envelope. Its brief
+level-scaled flash and 700 ms state expiry remain.
 Silence and pause clear semantic activity. Percussion remains transient-driven;
 tempo events carry timing without claiming instrument identities. Cached events
 are preferred when available, with existing local capture as fallback. Without
@@ -201,8 +199,8 @@ capture or cached data, the explicitly degraded path uses decorative flashes
 that never claim real instrument detections. See the
 [event cache contract](../docs/beat-event-cache.md) for configuration and bounds.
 Real kick onsets gently correct the locked eighth-note phase within its error gate.
-Long silence/capture
-restart and low-confidence tempo reacquisition retain their existing behavior.
+Quiet playback keeps leased analysis alive. Capture restart and low-confidence
+tempo reacquisition retain their existing recovery behavior.
 Shapes hold for eight seconds and reflash within their
 mask on captured onsets or confident audio-tempo ticks. Each hit brightens and
 pops against the softer held cells; decorative fallback remains distinguishable

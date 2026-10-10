@@ -4,7 +4,7 @@ import { createCompanionAction, isMusicTab } from './companion-action.js';
 function fixture(initial = {}, tabs = []) {
   const stored = { ...initial };
   const api = {
-    storage: { session: { get: vi.fn(async () => ({ ...stored })), set: vi.fn(async value => Object.assign(stored, value)) } },
+    storage: { local: { get: vi.fn(async () => ({ ...stored })) }, session: { get: vi.fn(async () => ({ ...stored })), set: vi.fn(async value => Object.assign(stored, value)) } },
     tabs: { query: vi.fn().mockResolvedValue(tabs), update: vi.fn(async id => ({ id, windowId: 4 })), create: vi.fn().mockResolvedValue({ id: 30 }) },
     windows: { update: vi.fn().mockResolvedValue({}) },
     runtime: { openOptionsPage: vi.fn().mockResolvedValue() },
@@ -13,6 +13,15 @@ function fixture(initial = {}, tabs = []) {
   return { api, beats, stored, action: createCompanionAction(api, beats) };
 }
 const music = { id: 12, url: 'https://www.youtube.com/watch?v=song' };
+it('allows an explicit toolbar invocation only on the scoped first-party test origin', async () => {
+  const asset = { provider: 'kora-development', id: 'a'.repeat(64) };
+  const f = fixture({ leadAudioTestScope: { asset, sourceUrl: `https://private-test.example/kora-lead-test/${asset.id}.wav`, expiresAt: Date.now() + 60000 } });
+  await f.action.invoke({ id: 15, url: 'https://private-test.example/index.html' });
+  expect(f.beats.invoke).toHaveBeenCalledWith(15);
+  await f.action.invoke({ id: 16, url: 'https://another.example/index.html' });
+  expect(f.beats.invoke).toHaveBeenCalledTimes(1);
+  expect(f.api.runtime.openOptionsPage).toHaveBeenCalledOnce();
+});
 it('accepts supported music tabs but rejects lookalike domains and arbitrary URLs', () => {
   expect(isMusicTab(music)).toBe(true);
   expect(isMusicTab({ ...music, url: 'https://m.soundcloud.com/track' })).toBe(true);

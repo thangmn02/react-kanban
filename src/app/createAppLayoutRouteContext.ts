@@ -14,6 +14,7 @@ import { readReturnTo } from './auth-routing';
 interface Params {
   header: ReactNode;
   featureDock: AppLayoutRouteContext['featureDock'];
+  focusDockPage: AppLayoutRouteContext['focusDockPage'];
   user: AppUser | null;
   activeWorkspace: WorkspaceSummary | null;
   activeWorkspaceId: string | null;
@@ -56,6 +57,7 @@ export function useAppLayoutRouteContextValue(params: Params): AppLayoutRouteCon
   return {
     header: params.header,
     featureDock: params.featureDock,
+    focusDockPage: params.focusDockPage,
     isBoardLoading: board.isBoardLoading,
     isSavingBoard: params.isSavingBoard,
     workspaceErrorMessage: params.workspaceErrorMessage,

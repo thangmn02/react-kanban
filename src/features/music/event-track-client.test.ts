@@ -10,7 +10,7 @@ it('uses the real native cache endpoint, omits cookies and propagates lifetime a
   const lifetime = new AbortController(), range = new AbortController();
   const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(Response.json(manifest))
     .mockResolvedValueOnce(Response.json({ version: 1, revision: 'r', index: 0, events: [] }));
-  const client = createEventTrackClient(asset, lifetime.signal, 60);
+  const client = createEventTrackClient(asset, lifetime.signal, 60, 'https://koraspace.online/api/beat-events', 'offline');
   const parsed = await client.manifest(); await client.chunk(parsed!, 0, range.signal);
   expect(fetcher.mock.calls[0][0]).toBe('https://koraspace.online/api/beat-events?provider=youtube&id=abcdefghijk');
   expect(fetcher.mock.calls[0][1]?.credentials).toBe('omit');

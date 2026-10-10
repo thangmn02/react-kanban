@@ -53,6 +53,7 @@ interface Props {
   };
   progressReport: { isOpen: boolean; onClose: () => void };
   isHomeFocusActive?: boolean;
+  hideCompactFocusDock?: boolean;
   onOpenNativeDock?: () => void;
 }
 
@@ -123,7 +124,7 @@ export default function AppOverlays(props: Props) {
       {boardDialogs.groupDialog.isOpen && <AddGroupDialog onClose={boardDialogs.closeGroupDialog} onSubmitGroup={board.onSubmitList} />}
       {boardDialogs.boardDialog.isOpen && <CreateBoardDialog onClose={boardDialogs.closeCreateBoardDialog} onSubmitBoard={board.handleCreateBoard} />}
       <BoardActivityDialog isOpen={boardDialogs.activityDialog.isOpen} onClose={boardDialogs.closeActivityDialog} boardId={board.activeBoardId} />
-      {(!props.isHomeFocusActive || isNativeWidget()) && (
+      {!props.hideCompactFocusDock && (!props.isHomeFocusActive || isNativeWidget()) && (
         <FocusDock
           showWhenEmpty={isNativeWidget()}
           focusTasks={focus.focusTasks}

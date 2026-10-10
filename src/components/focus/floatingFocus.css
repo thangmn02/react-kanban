@@ -69,7 +69,7 @@ h2 { font-size: 15px; line-height: 1.4; margin: 0; overflow-wrap: anywhere; }
 @keyframes decorative-tempo-pulse { 0%,100% { opacity:0; } 25% { opacity:.3; } }
 @media(prefers-reduced-motion:reduce) { .decorative-tempo-pulse { display:none; animation:none; } }
 .music-pattern.horizontal > .beat-channel { display: grid; grid-template-columns: 18px repeat(8,minmax(0,1fr)); align-items: center; gap: 7px; }
-.music-pattern.vertical { grid-template-columns: repeat(5,minmax(0,1fr)); gap: 12px; }
+.music-pattern.vertical { grid-template-columns: repeat(var(--beat-rows,4),minmax(0,1fr)); gap: 12px; }
 .music-pattern.vertical > .beat-channel { display: flex; flex-direction: column; align-items: center; gap: 7px; min-width: 0; }
 .music-pattern.vertical .beat-square { width: 100%; }
 .music-pattern svg { width: 18px; height: 18px; }
@@ -78,8 +78,8 @@ h2 { font-size: 15px; line-height: 1.4; margin: 0; overflow-wrap: anywhere; }
 .music-pattern .beat-square.onset { animation: square-onset 150ms ease-out var(--pulse-delay) both; }
 .music-pattern.flow .beat-square { animation: hue-cycle 9s linear var(--hue-delay) infinite; }
 .music-pattern.flow .beat-square.onset { animation: square-onset 150ms ease-out var(--pulse-delay) both, hue-cycle 9s linear var(--hue-delay) infinite; }
-.music-pattern:is([data-pattern='wave'],[data-pattern='ripple']) .beat-square.onset { animation: square-wave 700ms ease-out var(--pulse-delay) both; }
-.music-pattern.flow:is([data-pattern='wave'],[data-pattern='ripple']) .beat-square.onset { animation: square-wave 700ms ease-out var(--pulse-delay) both, hue-cycle 9s linear var(--hue-delay) infinite; }
+.music-pattern .beat-square.onset:is([data-visual-pattern='wave'],[data-visual-pattern='ripple']) { animation: square-wave 700ms ease-out var(--pulse-delay) both; }
+.music-pattern.flow .beat-square.onset:is([data-visual-pattern='wave'],[data-visual-pattern='ripple']) { animation: square-wave 700ms ease-out var(--pulse-delay) both, hue-cycle 9s linear var(--hue-delay) infinite; }
 @keyframes square-onset {
   0% { background: var(--ci); transform: scale(1); }
   5%, 35% { background: var(--c); border-color: transparent; transform: scale(1.12); box-shadow: 0 0 18px color-mix(in srgb, var(--c) 55%, transparent); }
@@ -101,6 +101,8 @@ h2 { font-size: 15px; line-height: 1.4; margin: 0; overflow-wrap: anywhere; }
 }
 .channel-icon { color: var(--c); opacity: .35; animation: none; transform: none; }
 .music-pattern .beat-square { transition: background-color .4s ease, box-shadow .4s ease; }
+.music-pattern.semantic-only .beat-square { transition: none; }
+.music-pattern.semantic-only .beat-square.onset { --c: #7db4ee; --ci: #eef0f3; --pulse-delay: 0ms; animation: square-onset 150ms ease-out both; }
 .shape-beat-flash {
   position: absolute; inset: -1px; border-radius: inherit; pointer-events: none;
   background: color-mix(in srgb, var(--c) 70%, white);
@@ -113,10 +115,15 @@ h2 { font-size: 15px; line-height: 1.4; margin: 0; overflow-wrap: anywhere; }
   8%, 35% { opacity: 1; transform: scale(1.08); }
   100% { opacity: 0; transform: scale(1); }
 }
-.melody-beat-flash {
+.semantic-beat-flash, .melody-beat-flash {
   position: absolute; inset: -1px; border-radius: inherit; pointer-events: none;
   background: var(--c); box-shadow: 0 0 14px color-mix(in srgb, var(--c) 55%, transparent);
   animation: melody-beat-flash 150ms ease-out both;
+}
+.semantic-beat-flash { animation: semantic-beat-flash var(--semantic-flash-duration, 150ms) ease-out both; }
+@keyframes semantic-beat-flash {
+  0%, 35% { opacity: 1; transform: scale(1.1); }
+  100% { opacity: 0; transform: scale(1); }
 }
 @keyframes melody-beat-flash {
   0%, 100% { opacity: 0; transform: scale(1); }
@@ -124,7 +131,7 @@ h2 { font-size: 15px; line-height: 1.4; margin: 0; overflow-wrap: anywhere; }
 }
 @media(prefers-reduced-motion:reduce) {
   .shape-beat-flash { animation: none; display: none; }
-  .melody-beat-flash { animation: none; transform: none; opacity: var(--melody-flash-level, 1); }
+  .semantic-beat-flash, .melody-beat-flash { animation: none; transform: none; opacity: var(--melody-flash-level, 1); }
 }
 .dock-panel.ultraviolet { background: rgba(13,12,26,.86); color: #f9f8ff; border-color: rgba(255,255,255,.12); }
 .dock-panel.ultraviolet .muted, .dock-panel.ultraviolet .eyebrow { color: #b9b6cc; }
@@ -253,7 +260,7 @@ h2 { font-size: 15px; line-height: 1.4; margin: 0; overflow-wrap: anywhere; }
 .dock-toolbar[data-draggable='true']:active { cursor:grabbing; }
 .dock-toolbar button, .dock-settings { cursor:auto; touch-action:auto; }
 .dock-tabs .dock-panel[aria-hidden='true'] { position:absolute; width:100%; visibility:hidden; pointer-events:none; }
-.dock-beat-pane .music-pattern.horizontal { height:auto; min-height:0; grid-template-rows:repeat(5,clamp(14px,4cqh,28px)); gap:clamp(3px,1cqh,8px); }
+.dock-beat-pane .music-pattern.horizontal { height:auto; min-height:0; grid-template-rows:repeat(var(--beat-rows,4),clamp(14px,4cqh,28px)); gap:clamp(3px,1cqh,8px); }
 .dock-beat-pane .music-pattern.horizontal > .beat-channel { min-height:0; }
 .dock-beat-pane .channel-icon { max-height:100%; }
 .dock-beat-pane .beat-square { aspect-ratio:auto; height:100%; min-height:0; }

@@ -13,8 +13,85 @@ vi.mock('./mediaBridge', () => ({
   },
 }));
 beforeEach(() => { vi.useFakeTimers(); bridge.send.mockResolvedValue(undefined); });
-afterEach(() => { cleanup(); beatTelemetry.enable(false); beatTelemetry.clear(); vi.useRealTimers(); vi.clearAllMocks(); });
+afterEach(() => { cleanup(); beatTelemetry.enable(false); beatTelemetry.clear(); vi.useRealTimers(); vi.clearAllMocks(); vi.restoreAllMocks(); });
 const emit = (event: BeatEvent) => act(() => { bridge.receive?.(event); });
+it('keeps one audible subscription and its counters when analysis demand changes', async () => {
+  const onClock = vi.fn();
+  const options = { capabilities: { tier: 'tab-capture' as const, captureClock: 'output-clock-capable' as const } };
+  const { result, rerender, unmount } = renderHook(({ demand }) => useMusicBeatSync('song', onClock, options, demand),
+    { initialProps: { demand: true } });
+  await act(async () => {});
+  const subscription = bridge.receive;
+  emit({ kind: 'clock', clock: { currentTime: 10, sampledAt: Date.now(), playbackRate: 1, playing: true, paused: false } });
+  emit({ kind: 'sync.state', mode: 'capture', captureId: 'capture' });
+  emit({ kind: 'onset', captureId: 'capture', sequence: 1, bands: ['kick'] });
+  await act(async () => { await vi.advanceTimersByTimeAsync(40); });
+  expect(result.current.onsets.kick).toBe(1);
+  const owner = result.current.captureId;
+  rerender({ demand: false });
+  rerender({ demand: true });
+  expect(bridge.receive).toBe(subscription);
+  expect(result.current.captureId).toBe(owner);
+  expect(result.current.onsets.kick).toBe(1);
+  expect(bridge.send.mock.calls.filter(([kind]) => kind === 'dock.beat.sync.start')).toHaveLength(1);
+  expect(bridge.send.mock.calls.filter(([kind]) => kind === 'dock.beat.sync.stop')).toHaveLength(0);
+  unmount();
+  expect(bridge.send.mock.calls.filter(([kind]) => kind === 'dock.beat.sync.stop')).toHaveLength(1);
+});
+it('preserves validated Lead cache readiness when a paused capture lease expires', async () => {
+  const asset = { provider: 'youtube' as const, id: 'abcdefghijk' };
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async input => Response.json(String(input).includes('chunk=')
+    ? { version: 1, revision: 'r', index: 0, events: [] }
+    : { version: 1, revision: 'r', asset, analysisVersion: 'server-lead-pulse-range-v1', duration: 30, chunkSeconds: 30, melodyPolicy: 'dominant-monophonic' }));
+  const onClock = vi.fn();
+  const options = { asset, duration: 30, demand: true, capabilities: { tier: 'clock-only' as const, captureClock: 'unavailable' as const } };
+  const { result, rerender } = renderHook(({ source }) => useMusicBeatSync(source, onClock, options), { initialProps: { source: 'song' } });
+  emit({ kind: 'clock', clock: { currentTime: 1, sampledAt: Date.now(), playbackRate: 1, playing: true, paused: false } });
+  await act(async () => { await vi.advanceTimersByTimeAsync(100); });
+  expect(result.current.leadAvailability).toBe('empty');
+  emit({ kind: 'clock', clock: { currentTime: 1.1, sampledAt: Date.now(), playbackRate: 1, playing: false, paused: true } });
+  await act(async () => { await vi.advanceTimersByTimeAsync(4000); });
+  expect(result.current).toMatchObject({ leadAvailability: 'empty', mode: 'clock', onsets: {} });
+  rerender({ source: 'other-song' });
+  await act(async () => { await vi.advanceTimersByTimeAsync(4000); });
+  expect(result.current.leadAvailability).toBeUndefined();
+});
+it('delivers dense real hats and kick attacks without a second detector refractory', () => {
+  const onClock = vi.fn();
+  const { result } = renderHook(() => useMusicBeatSync('song', onClock));
+  emit({ kind: 'sync.state', mode: 'capture', captureId: 'capture' });
+  for (let sequence = 1; sequence <= 20; sequence++) {
+    act(() => { vi.advanceTimersByTime(50); });
+    emit({ kind: 'onset', captureId: 'capture', sequence, bands: ['hat', 'kick'] });
+  }
+  expect(result.current.onsets).toEqual({ hat: 20, kick: 20 });
+});
+it('preserves distinct cache attacks when a faster playback rate compresses their delivery times', async () => {
+  const onClock = vi.fn();
+  const { result } = renderHook(() => useMusicBeatSync('song', onClock));
+  emit({ kind: 'sync.state', mode: 'capture', captureId: 'capture', eventPath: 'cache' });
+  const clock = { currentTime: 10, sampledAt: Date.now(), playbackRate: 4, playing: true, paused: false };
+  for (let sequence = 1; sequence <= 10; sequence++) {
+    emit({ kind: 'onset', captureId: 'capture', eventSource: 'cache', sequence, bands: ['hat'],
+      targetPlaybackTime: 10 + sequence * .05, playbackClock: clock });
+  }
+  await act(async () => { await vi.advanceTimersByTimeAsync(150); });
+  expect(result.current.onsets.hat).toBe(10);
+});
+it('preserves distinct timestamped drum attacks delivered together after model look-ahead without changing Bass debounce', async () => {
+  beatTelemetry.enable();
+  const onClock = vi.fn();
+  const { result } = renderHook(() => useMusicBeatSync('song', onClock));
+  emit({ kind: 'sync.state', mode: 'capture', captureId: 'capture', eventPath: 'local' });
+  const clock = { currentTime: 10, sampledAt: Date.now(), playbackRate: 1, playing: true, paused: false };
+  for (let sequence = 1; sequence <= 2; sequence++) emit({ kind: 'onset', captureId: 'capture', eventSource: 'local', sequence,
+    bands: ['clap', 'hat', 'bass'], targetPlaybackTime: 9.75 + sequence * .05, playbackClock: clock,
+    telemetry: beatTelemetry.events('onset', ['clap', 'hat', 'bass']) });
+  await act(async () => { await vi.advanceTimersByTimeAsync(15); });
+  expect(result.current.onsets).toEqual({ clap: 2, hat: 2, bass: 1 });
+  expect(beatTelemetry.snapshot().records.filter(r => r.stage === 'EVENT_DROPPED' && r.reason === 'debounce')
+    .map(r => r.type)).toEqual(['bass']);
+});
 it('cancels scheduled flashes on capture expiry and selected-source replacement', async () => {
   const onClock = vi.fn();
   const { result, rerender } = renderHook(({ source }) => useMusicBeatSync(source, onClock), { initialProps: { source: 'song' } });

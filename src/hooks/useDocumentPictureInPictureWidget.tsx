@@ -31,6 +31,7 @@ export function copyPictureInPictureStyles(source: Document, target: Document) {
 
 export function useDocumentPictureInPicture(props: FloatingFocusProps) {
   const { t } = useI18n();
+  const onDismiss = props.onDismiss;
   const pipWindowRef = useRef<Window | null>(null);
   const openingRef = useRef(false);
   const mountedRef = useRef(true);
@@ -40,23 +41,53 @@ export function useDocumentPictureInPicture(props: FloatingFocusProps) {
   // Keep the portal target stable. Moving its host between documents preserves
   // React state, music subscriptions, and the FLIP elements rather than remounting.
   const hostRef = useRef<HTMLDivElement | null>(null);
+  const pageRef = useRef<HTMLDivElement | null>(null);
+  const poppedOutRef = useRef(false);
   const [target, setTarget] = useState<HTMLDivElement | null>(null);
   const isSupported = typeof window !== 'undefined' && Boolean(window.documentPictureInPicture);
   const hasRunnableTimer = props.focusTasks.length > 0 || Boolean(props.timerState.activeTaskId);
 
+  const ensureHost = useCallback(() => {
+    if (hostRef.current) return hostRef.current;
+    const host = document.createElement('div');
+    host.id = 'floating-focus-widget';
+    const shadow = host.attachShadow({ mode: 'open' });
+    const style = document.createElement('style');
+    style.textContent = floatingFocusStyles;
+    const root = document.createElement('div');
+    root.id = 'floating-focus-root';
+    shadow.append(style, root);
+    hostRef.current = host;
+    setTarget(root);
+    return host;
+  }, []);
+
   const returnToTab = useCallback(() => {
     const host = hostRef.current;
     if (!host) return;
-    document.body.appendChild(host);
+    (pageRef.current || document.body).appendChild(host);
     host.hidden = false;
-    host.style.cssText = 'position:fixed;right:16px;bottom:16px;width:min(520px,calc(100vw - 32px));height:min(580px,calc(100dvh - 32px));z-index:1000;border-radius:22px;';
+    host.style.cssText = pageRef.current ? 'width:100%;height:min(680px,85dvh);min-height:400px;'
+      : 'position:fixed;right:16px;bottom:16px;width:min(520px,calc(100vw - 32px));height:min(580px,calc(100dvh - 32px));z-index:1000;border-radius:22px;';
     pipWindowRef.current = null;
     if (mountedRef.current) setPipWindow(null);
   }, []);
 
+  const attachFocusDock = useCallback((node: HTMLDivElement | null) => {
+    pageRef.current = node;
+    if (node) {
+      ensureHost();
+      setActivated(true);
+      if (!pipWindowRef.current) returnToTab();
+    } else if (!pipWindowRef.current) {
+      if (poppedOutRef.current) returnToTab();
+      else { hostRef.current?.remove(); setActivated(false); }
+    }
+  }, [ensureHost, returnToTab]);
+
   const openPictureInPicture = useCallback(async () => {
     if (!window.documentPictureInPicture) throw new Error('Floating timer is not supported in this browser.');
-    if (!hasRunnableTimer) throw new Error('Pin a focus task before opening the floating timer.');
+    if (!hasRunnableTimer && !pageRef.current) throw new Error('Pin a focus task before opening the floating timer.');
     if (pipWindowRef.current && !pipWindowRef.current.closed) { pipWindowRef.current.focus(); return; }
     if (openingRef.current) return;
     openingRef.current = true;
@@ -64,25 +95,14 @@ export function useDocumentPictureInPicture(props: FloatingFocusProps) {
       const nextWindow = await window.documentPictureInPicture.requestWindow({ width: 520, height: 580 });
       if (!mountedRef.current) { nextWindow.close(); return; }
       setWidgetError('');
-      let host = hostRef.current;
-      if (!host) {
-        host = document.createElement('div');
-        host.id = 'floating-focus-widget';
-        const shadow = host.attachShadow({ mode: 'open' });
-        const style = document.createElement('style');
-        style.textContent = floatingFocusStyles;
-        const root = document.createElement('div');
-        root.id = 'floating-focus-root';
-        shadow.append(style, root);
-        hostRef.current = host;
-        setTarget(root);
-      }
+      const host = ensureHost();
       copyPictureInPictureStyles(document, nextWindow.document);
       nextWindow.document.title = 'Floating Focus';
       host.hidden = false;
       host.style.cssText = 'display:block;width:100%;height:100dvh;';
       nextWindow.document.body.appendChild(host);
       pipWindowRef.current = nextWindow;
+      poppedOutRef.current = true;
       setActivated(true);
       setPipWindow(nextWindow);
       nextWindow.addEventListener('pagehide', () => {
@@ -91,7 +111,7 @@ export function useDocumentPictureInPicture(props: FloatingFocusProps) {
         }
       }, { once: true });
     } finally { openingRef.current = false; }
-  }, [hasRunnableTimer, returnToTab]);
+  }, [ensureHost, hasRunnableTimer, returnToTab]);
 
   const closePictureInPicture = useCallback(() => {
     const current = pipWindowRef.current;
@@ -102,8 +122,10 @@ export function useDocumentPictureInPicture(props: FloatingFocusProps) {
   const dismiss = useCallback(() => {
     closePictureInPicture();
     hostRef.current?.setAttribute('hidden', '');
+    poppedOutRef.current = false;
     setActivated(false);
-  }, [closePictureInPicture]);
+    if (pageRef.current) onDismiss?.();
+  }, [closePictureInPicture, onDismiss]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -120,8 +142,10 @@ export function useDocumentPictureInPicture(props: FloatingFocusProps) {
     isPictureInPictureOpen: Boolean(pipWindow),
     openPictureInPicture,
     closePictureInPicture,
+    attachFocusDock,
     floatingFocusPortal: activated && target ? createPortal(<FloatingFocus
       {...props} isWidget={Boolean(pipWindow)} canPopOut={isSupported} widgetError={widgetError}
+      isMinimized={!pipWindow && props.isMinimized}
       onPopOut={() => { void openPictureInPicture().catch(() => { if (mountedRef.current) setWidgetError(t('dock.widgetFailed')); }); }}
       onReturnToTab={closePictureInPicture} onDismiss={dismiss}
     />, target) : null,

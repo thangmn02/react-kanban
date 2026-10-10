@@ -16,7 +16,9 @@ export function readMedia() {
     if (!src || media.readyState === 0 || media.ended) return [];
     // SPA navigation can leave preview/detached players in the observer. The
     // canonical player still owns the watch URL; previews never inherit it.
-    const assetUrl = playerLink?.href || (media.closest('#movie_player, ytmusic-player') || entries.length === 1 ? youtubeUrl : undefined);
+    const assetUrl = playerLink?.href || (media.closest('#movie_player, ytmusic-player') || entries.length === 1 ? youtubeUrl : undefined)
+      || (entries.length === 1 && media.isConnected
+        && /^https:\/\/[^/?#]+\/kora-lead-test\/[a-f0-9]{64}\.wav$/.test(media.currentSrc) ? media.currentSrc : undefined);
     return [{ index, src, title: (metadata?.title || document.title || 'Untitled media').slice(0, 500), artist: (metadata?.artist || '').slice(0, 500), source: location.hostname, paused: media.paused,
       playing: !media.paused && !media.seeking && media.readyState >= 3,
       currentTime: Number.isFinite(media.currentTime) ? media.currentTime : 0,

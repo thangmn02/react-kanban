@@ -1,11 +1,54 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
+import { createPortal } from 'react-dom';
 import FloatingFocus from './FloatingFocus';
 import { I18nProvider } from '../../i18n';
 import { DEFAULT_POMODORO_TIMER_SETTINGS } from '../../utils/pomodoroTime';
 
-vi.mock('../../features/music/useBrowserMusic', () => ({ useBrowserMusic: () => ({ sessions: [], connected: true, checking: false }) }));
-afterEach(() => { cleanup(); localStorage.clear(); });
+const analysisRequests = vi.hoisted(() => vi.fn());
+vi.mock('../../features/music/useBrowserMusic', () => ({ useBrowserMusic: (enabled: boolean) => {
+  analysisRequests(enabled);
+  return { sessions: [], connected: true, checking: false, beat: { sessionId: '', mode: 'clock', onsets: {} } };
+} }));
+afterEach(() => { cleanup(); localStorage.clear(); window.history.replaceState(null, '', '/'); });
+it('uses the visible PiP document for Beat demand when the opener is hidden', () => {
+  const previous = Object.getOwnPropertyDescriptor(document, 'visibilityState');
+  const frame = document.createElement('iframe');
+  document.body.append(frame);
+  const owner = frame.contentDocument!;
+  Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+  Object.defineProperty(owner, 'visibilityState', { configurable: true, value: 'visible' });
+  const host = document.createElement('div');
+  document.body.append(host);
+  const dock = (widget: boolean) => <I18nProvider>{createPortal(<FloatingFocus activeTask={null} focusTasks={[]}
+    cycleTotal={4} remainingSeconds={1500} activeTab="beat" isWidget={widget}
+    timerState={{ mode: 'focus', activeTaskId: null, isRunning: false, remainingSeconds: 1500, startedAt: null, endsAt: null, plannedSeconds: null }}
+    onStart={vi.fn()} onPause={vi.fn()} onReset={vi.fn()} />, host)}</I18nProvider>;
+  const view = render(dock(false));
+  try {
+    expect(analysisRequests).toHaveBeenLastCalledWith(false);
+    owner.body.append(host);
+    view.rerender(dock(true));
+    expect(analysisRequests).toHaveBeenLastCalledWith(true);
+  } finally {
+    view.unmount(); host.remove(); frame.remove();
+    if (previous) Object.defineProperty(document, 'visibilityState', previous);
+    else Reflect.deleteProperty(document, 'visibilityState');
+  }
+});
+it('keeps unaccepted visual prototypes out of the real dock, even with a private query flag', () => {
+  window.history.replaceState(null, '', '/focus?musicMotion=1');
+  const view = render(<I18nProvider><FloatingFocus activeTask={null} focusTasks={[]} cycleTotal={4} remainingSeconds={1500}
+    timerState={{ mode: 'focus', activeTaskId: null, isRunning: false, remainingSeconds: 1500, startedAt: null, endsAt: null, plannedSeconds: null }}
+    onStart={vi.fn()} onPause={vi.fn()} onReset={vi.fn()} /></I18nProvider>);
+  expect(view.container.querySelector('.km-widget')).toBeNull();
+  expect(screen.getByRole('button', { name: 'Start' })).toBeVisible();
+  fireEvent.click(screen.getByRole('tab', { name: 'Beat grid' }));
+  expect(view.container.querySelector('.km-widget')).toBeNull();
+  fireEvent.click(screen.getByRole('tab', { name: 'Tasks' }));
+  expect(view.container.querySelector('.km-widget')).toBeNull();
+  view.unmount();
+});
 it.each(['island', 'mixer', 'split', 'tabs', 'deck'])('opens only Tabs with the previous %s preference, keeping color and palette settings', oldStyle => {
   localStorage.setItem('floatingDock.style', oldStyle);
   localStorage.setItem('floatingDock.colors', 'pastel');

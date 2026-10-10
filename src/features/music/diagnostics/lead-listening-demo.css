@@ -1,0 +1,9 @@
+.lead-listening-demo {
+  font-size: 12px;
+  line-height: 1.4;
+}
+.lead-listening-demo p { margin: 4px 0; }
+.lead-listening-demo label { display: block; }
+.lead-listening-demo select { width: 100%; }
+.lead-listening-demo button { padding: 6px 10px; }
+.lead-listening-demo .music-pattern { flex: none; }

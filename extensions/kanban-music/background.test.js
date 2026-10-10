@@ -35,14 +35,6 @@ it('scans all supported tabs and reports every session with honest per-session m
   expect(result.sessions.every((session) => !('src' in session) && !('tabId' in session) && !('documentId' in session))).toBe(true);
   expect(result.sessions.find((session) => session.source === 'music.apple.com').syncState).toEqual({ mode: 'clock', reason: 'not-selected' });
   expect(result.sessions.find((session) => session.source === 'open.spotify.com').syncState).toEqual({ mode: 'clock', reason: 'not-selected' });
-  const setup = (sessionId) => new Promise((resolve) => listener.addListener.mock.calls[0][0](
-    { protocol: 'kanban-music-v1', action: 'instrument.setup', sessionId },
-    { id: api.runtime.id, url: 'http://localhost:5173/home', tab: { id: 90 }, documentId: 'app-doc' }, resolve,
-  ));
-  expect(await setup('missing-session')).toEqual({ ok: false, error: 'unavailable' });
-  expect(api.runtime.openOptionsPage).not.toHaveBeenCalled();
-  expect(await setup(result.sessions[0].id)).toEqual({ ok: true });
-  expect(api.runtime.openOptionsPage).toHaveBeenCalledOnce();
   expect(result.sessions.find((session) => session.source === 'music.youtube.com').syncState).toEqual({ mode: 'clock', reason: 'not-selected' });
   const request = (sender) => new Promise((resolve) => listener.addListener.mock.calls[0][0](
     { protocol: 'kanban-music-v1', action: 'diagnostics.get' }, sender, resolve,

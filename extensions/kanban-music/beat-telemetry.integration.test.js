@@ -13,20 +13,26 @@ vi.hoisted(() => { window.AnimationEvent ??= class extends Event {}; });
 
 afterEach(() => { cleanup(); beatTelemetry.enable(false); beatTelemetry.clear(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
-it('follows a timestamped detector event through scheduled delivery, DOM and animation start', async () => {
+it('follows a timestamped learned percussion event through scheduled delivery, DOM and animation start', async () => {
   vi.useFakeTimers(); beatTelemetry.enable();
   const started = Date.now(); let clockTimer;
   const session = { id: 'song', title: '', artist: '', source: '', playing: true, paused: false, currentTime: 0,
     sampledAt: started, playbackRate: 1, tabId: 1, documentId: 'music-doc' };
   const track = { readyState: 'live', stop: vi.fn(), addEventListener: vi.fn() };
   const stream = { getTracks: () => [track], getAudioTracks: () => [track], getVideoTracks: () => [] };
-  let energy = -60, sync;
+  let energy = -60, sync, learned;
   const context = { sampleRate: 44100, state: 'running', get currentTime() { return (Date.now() - started) / 1000; },
     baseLatency: .1, destination: {}, resume: async () => {}, close: async () => {},
     createMediaStreamSource: () => ({ connect() {}, disconnect() {} }),
-    createAnalyser: () => ({ frequencyBinCount: 1024, disconnect() {}, getFloatFrequencyData: (values) => values.fill(energy) }) };
+    createAnalyser: () => ({ frequencyBinCount: 1024, disconnect() {}, getFloatFrequencyData: (values) => {
+      values.fill(energy === -20 ? -Infinity : energy);
+      // A low-frequency body supplies the kick evidence. Equal energy in all
+      // bins is broadband noise and must not be assumed to contain a kick.
+      if (energy === -20) for (let bin = 3; bin <= 6; bin++) values[bin] = energy;
+    } }) };
   const forward = (message) => sync.offscreen(message, { url: 'chrome-extension://companion/offscreen.html' });
   const engine = createCaptureEngine({ getUserMedia: async () => stream, createAudioContext: () => context, now: Date.now,
+    createPercussion: async ({ onEvent }) => { learned = onEvent; return { stop() {} }; },
     onAudible: (captureId) => forward({ kind: 'audible', captureId }),
     onStop: (captureId, reason) => forward({ kind: 'stopped', captureId, reason }),
     onBeat: (captureId, bands, telemetry, timing) => forward({ kind: 'onset', captureId, bands, telemetry, ...timing }),
@@ -66,6 +72,7 @@ it('follows a timestamped detector event through scheduled delivery, DOM and ani
   await act(async () => { await vi.advanceTimersByTimeAsync(450); });
   await act(async () => { await vi.advanceTimersByTimeAsync(0); });
   energy = -20;
+  learned({ band: 'kick', audioTime: context.currentTime, confidence: .9, classMargin: .4 });
   await act(async () => { await vi.advanceTimersByTimeAsync(20); });
   expect(view.container.querySelector('[data-channel="drum"] .onset')).toBeNull();
   await act(async () => { await vi.advanceTimersByTimeAsync(100); });
@@ -85,6 +92,7 @@ it('follows a timestamped detector event through scheduled delivery, DOM and ani
   await act(async () => { await vi.advanceTimersByTimeAsync(10000); });
   expect(track.stop).not.toHaveBeenCalled();
   energy = -20;
+  learned({ band: 'kick', audioTime: context.currentTime, confidence: .9, classMargin: .4 });
   await act(async () => { await vi.advanceTimersByTimeAsync(20); });
   await act(async () => { await vi.advanceTimersByTimeAsync(100); });
   await act(async () => { await vi.advanceTimersByTimeAsync(0); });

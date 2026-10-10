@@ -1,5 +1,5 @@
-import { useCallback, useRef } from 'react';
-import type { NavigateFunction } from 'react-router-dom';
+import { useCallback, useRef, useState } from 'react';
+import { useLocation, type NavigateFunction } from 'react-router-dom';
 
 import { notify } from '../../components/organisms/toast/notify';
 import { useDocumentPictureInPicture } from '../../hooks/useDocumentPictureInPicture';
@@ -36,6 +36,17 @@ export function useAppFocusIntegration({
   onTaskCompleted,
   t,
 }: Params) {
+  const [dockTab, setDockTab] = useState<'focus' | 'music' | 'beat'>('focus');
+  const location = useLocation();
+  const isFocusPage = ['/focus', '/music', '/beat-grid'].includes(location.pathname);
+  const handleDockTabChange = useCallback((tab: 'focus' | 'music' | 'beat') => {
+    setDockTab(tab);
+    if (isFocusPage) {
+      const query = new URLSearchParams(location.search);
+      query.set('tab', tab);
+      navigate(`${location.pathname}?${query}${location.hash}`, { replace: true });
+    }
+  }, [isFocusPage, location.pathname, location.search, location.hash, navigate]);
   const focusContextRef = useRef({
     scopeKey: `${user?.id ?? 'none'}:${workspaceId ?? 'none'}`,
     activeTaskId: focus.timerState.activeTaskId,
@@ -152,6 +163,9 @@ export function useAppFocusIntegration({
   }, [focus, handleMarkFocusTaskDone]);
 
   const pictureInPicture = useDocumentPictureInPicture({
+    activeTab: dockTab, onTabChange: handleDockTabChange,
+    isMinimized: isFocusPage && focus.isFocusDockCollapsed,
+    onDismiss: () => navigate('/home'),
     activeTask: focus.selectedTimerTask || focus.activeFocusTask,
     focusTasks: focus.focusTasks,
     timerState: focus.timerState,
@@ -177,6 +191,7 @@ export function useAppFocusIntegration({
 
   return {
     ...pictureInPicture,
+    dockTab, setDockTab, handleDockTabChange,
     handleOpenFocusTask,
     handleMarkFocusTaskDone,
     handleMarkDoneFromCompletion,

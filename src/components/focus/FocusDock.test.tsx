@@ -45,7 +45,7 @@ it('does not expose music controls on the inline dock', () => {
   expect(props.onStartTimer).not.toHaveBeenCalled();
 });
 
-it('keeps an empty native dock available and opens its shared timer controls', () => {
+it('keeps an explicitly enabled empty native dock available and hides the empty browser dock', () => {
   const { props } = setup({ focusTasks: [], activeTaskId: null, showWhenEmpty: true });
   fireEvent.click(screen.getByRole('button', { name: 'Timer settings' }));
   expect(props.onCollapseChange).toHaveBeenCalledWith(false);

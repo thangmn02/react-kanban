@@ -45,11 +45,14 @@ it('keeps one timer/grid and music control when changing tabs, including keyboar
   expect(music.current.toggle).toHaveBeenCalledOnce();
   const work = screen.getByRole('tab', { name: 'Tasks' });
   fireEvent.keyDown(work, { key: 'ArrowRight' });
+  expect(view.container.querySelector('.dock-beat-pane')).toHaveAttribute('aria-hidden', 'true');
   expect(screen.getByRole('tab', { name: 'Music' })).toHaveFocus();
   expect(screen.getByRole('tabpanel', { name: 'Music' })).toBeInTheDocument();
   expect(screen.getAllByRole('button', { name: 'Pause music' })).toHaveLength(1);
   expect(screen.getByRole('button', { name: 'Start' })).toBeEnabled();
   fireEvent.keyDown(screen.getByRole('tab', { name: 'Music' }), { key: 'End' });
+  expect(view.container.querySelector('.dock-track-pane')).toHaveAttribute('aria-hidden', 'true');
+  expect(view.container.querySelector('.dock-beat-pane')).toHaveAttribute('aria-hidden', 'false');
   expect(screen.getByRole('tab', { name: 'Beat grid' })).toHaveFocus();
   expect(screen.getByRole('tabpanel', { name: 'Beat grid' })).toBeInTheDocument();
   expect(view.container.querySelectorAll('.dock-ring')).toHaveLength(1);
@@ -57,6 +60,8 @@ it('keeps one timer/grid and music control when changing tabs, including keyboar
   expect(view.container.querySelector('.dock-ring')).toBe(timer);
   expect(view.container.querySelector('.music-pattern')).toBe(grid);
   fireEvent.keyDown(screen.getByRole('tab', { name: 'Beat grid' }), { key: 'Home' });
+  expect(view.container.querySelector('.dock-track-pane')).toHaveAttribute('aria-hidden', 'true');
+  expect(view.container.querySelector('.dock-beat-pane')).toHaveAttribute('aria-hidden', 'true');
   expect(work).toHaveFocus();
 });
 

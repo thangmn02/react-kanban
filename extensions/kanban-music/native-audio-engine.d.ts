@@ -12,6 +12,5 @@ export interface NativeAudioCallbacks {
   onAudible(id: string): void;
   onTempo(id: string, tempo: { locked: boolean; bpm: number | null; confidence: number }, telemetry?: BeatTrace[], timing?: OutputTiming): void;
   onTempoTick(id: string, tick: { step: number; phase: number; beatPosition: number; subdivision: 2 }, telemetry?: BeatTrace[], timing?: OutputTiming): void;
-  onMelody(id: string, melody: { active: boolean; level: number; note: number }, telemetry?: BeatTrace[], timing?: OutputTiming): void;
 }
 export function createNativeAudioEngine(options: NativeAudioCallbacks): NativeAudioEngine;

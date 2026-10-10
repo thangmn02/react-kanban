@@ -1,4 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { useState } from 'react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { I18nProvider } from '../i18n';
 import { copyPictureInPictureStyles, useDocumentPictureInPicture } from './useDocumentPictureInPicture';
@@ -111,4 +112,60 @@ it('closes the detached window on app unmount', async () => {
   await act(async () => { fireEvent.click(screen.getByText('Open popup')); });
   view.unmount();
   expect(close).toHaveBeenCalledOnce();
+});
+
+it('moves the explicit empty Focus page dock into one PiP window and back without remounting', async () => {
+  function PageHarness() {
+    const pip = useDocumentPictureInPicture({ ...props, activeTask: null, focusTasks: [],
+      timerState: { ...props.timerState, activeTaskId: null } });
+    return <><div data-testid="page-dock" ref={pip.attachFocusDock} />{pip.floatingFocusPortal}</>;
+  }
+  render(<I18nProvider><PageHarness /></I18nProvider>);
+  const pageHost = screen.getByTestId('page-dock');
+  const host = pageHost.querySelector('#floating-focus-widget')!;
+  const root = host.shadowRoot!.getElementById('floating-focus-root') as HTMLElement;
+  const dock = within(root);
+  const ring = root.querySelector('.dock-ring');
+  expect(requestWindow).not.toHaveBeenCalled();
+  fireEvent.click(dock.getByRole('tab', { name: 'Music' }));
+  const musicPanel = dock.getByRole('tabpanel', { name: 'Music' });
+  await act(async () => { fireEvent.click(dock.getByRole('button', { name: 'Pop out dock' })); });
+  expect(requestWindow).toHaveBeenCalledOnce();
+  expect(popupDocument.getElementById('floating-focus-widget')).toBe(host);
+  await act(async () => { fireEvent.click(dock.getByRole('button', { name: 'Return dock to tab' })); });
+  expect(pageHost.querySelector('#floating-focus-widget')).toBe(host);
+  expect(root.querySelector('.dock-ring')).toBe(ring);
+  expect(dock.getByRole('tabpanel', { name: 'Music' })).toBe(musicPanel);
+  expect(dock.getByRole('tab', { name: 'Music' })).toHaveAttribute('aria-selected', 'true');
+});
+
+it('does not open a floating window for a task-free incidental caller', async () => {
+  const denied = vi.fn();
+  function EmptyHarness() {
+    const pip = useDocumentPictureInPicture({ ...props, activeTask: null, focusTasks: [],
+      timerState: { ...props.timerState, activeTaskId: null } });
+    return <><button onClick={() => { void pip.openPictureInPicture().catch(error => denied(error.message)); }}>Try empty popup</button>{pip.floatingFocusPortal}</>;
+  }
+  render(<I18nProvider><EmptyHarness /></I18nProvider>);
+  await act(async () => { fireEvent.click(screen.getByText('Try empty popup')); });
+  expect(denied).toHaveBeenCalledWith('Pin a focus task before opening the floating timer.');
+  expect(requestWindow).not.toHaveBeenCalled();
+});
+
+it('can dismiss an in-page dock and reopen it through navigation', () => {
+  function NavigationHarness() {
+    const [shown, setShown] = useState(true);
+    const pip = useDocumentPictureInPicture({ ...props, onDismiss: () => setShown(false) });
+    return <><button onClick={() => setShown(true)}>Focus page</button>
+      {shown && <div data-testid="page-dock" ref={pip.attachFocusDock} />}{pip.floatingFocusPortal}</>;
+  }
+  render(<I18nProvider><NavigationHarness /></I18nProvider>);
+  const host = screen.getByTestId('page-dock').querySelector('#floating-focus-widget')!;
+  const root = host.shadowRoot!.getElementById('floating-focus-root') as HTMLElement;
+  fireEvent.click(within(root).getByRole('button', { name: 'Close dock' }));
+  expect(screen.queryByTestId('page-dock')).toBeNull();
+  fireEvent.click(screen.getByText('Focus page'));
+  expect(screen.getByTestId('page-dock').querySelector('#floating-focus-widget')).toBe(host);
+  expect(host).not.toHaveAttribute('hidden');
+  expect(root.querySelectorAll('.floating-focus')).toHaveLength(1);
 });

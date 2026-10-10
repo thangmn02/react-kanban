@@ -5,21 +5,16 @@ import { beatTelemetry } from './beat-telemetry.js';
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => { beatTelemetry.enable(false); beatTelemetry.clear(); vi.useRealTimers(); vi.restoreAllMocks(); });
-it('retains a fresh detected onset when future instrument work saturates the queue', async () => {
-  const f = fixture(); f.context.currentTime = 0; let notes;
-  const engine = createCaptureEngine({ ...f.deps, createInstrumentCapture: (options) => {
-    notes = options.onNotes;
-    return { ready: Promise.resolve(), delaySeconds: 3.5, connect() {}, stop() {} };
-  } });
-  await engine.start('stream', 'saturated');
-  notes(Array.from({ length: 2048 }, (_, note) => ({ time: 10, state: { active: true, level: .5, note } })));
-  await vi.advanceTimersByTimeAsync(450);
-  f.analyser.getFloatFrequencyData = (array) => array.fill(-20);
-  await vi.advanceTimersByTimeAsync(20);
-  f.context.currentTime = 4; await vi.advanceTimersByTimeAsync(20);
-  expect(f.deps.onBeat).toHaveBeenCalledWith('saturated', expect.arrayContaining(['kick']), undefined,
-    expect.objectContaining({ targetOutputTime: expect.any(Number) }));
-  engine.stop(); expect(vi.getTimerCount()).toBe(0);
+it('reports a bounded capture failure category without retaining source details or changing recovery', async () => {
+  const f = fixture();
+  f.deps.getUserMedia.mockRejectedValueOnce(new DOMException('private source identifier', 'NotReadableError'));
+  expect(await f.engine.start('stream', 'failed-stream')).toBe(false);
+  expect(f.engine.lastFailure).toEqual({ stage: 'stream-open', code: 'NotReadableError' });
+  expect(f.deps.onBeat).not.toHaveBeenCalled();
+  expect(f.deps.onStop).toHaveBeenCalledWith('failed-stream', 'failed');
+  expect(await f.engine.start('fresh', 'recovered-stream')).toBe(true);
+  expect(f.engine.lastFailure).toBeUndefined();
+  f.engine.stop();
 });
 it('keeps actual detection delivering through thirty minutes with long quiet sections', async () => {
   const f = fixture(); let time = 0, sample;
@@ -55,71 +50,40 @@ function fixture() {
   const analyser = { frequencyBinCount: 1024, getFloatFrequencyData: (array) => array.fill(-60), disconnect: vi.fn() };
   const context = { sampleRate: 48000, state: 'running', destination: {}, resume: vi.fn().mockResolvedValue(), close: vi.fn().mockResolvedValue(),
     createMediaStreamSource: () => source, createAnalyser: () => analyser };
+  Object.defineProperty(context, 'currentTime', { configurable: true, get: () => Date.now() / 1000 });
+  let classify;
   const deps = { getUserMedia: vi.fn().mockResolvedValue(stream), createAudioContext: vi.fn(() => context), onBeat: vi.fn(), onStop: vi.fn(), onAudible: vi.fn(),
-    onTempo: vi.fn(), onTempoTick: vi.fn(), onMelody: vi.fn(), now: () => Date.now() };
-  return { audio, video, stream, source, analyser, context, deps, engine: createCaptureEngine(deps) };
+    onTempo: vi.fn(), onTempoTick: vi.fn(), onMelody: vi.fn(), now: () => Date.now(),
+    createPercussion: vi.fn(async ({ onEvent }) => { classify = onEvent; return { stop: vi.fn() }; }) };
+  return { audio, video, stream, source, analyser, context, deps, engine: createCaptureEngine(deps),
+    learned: (band, audioTime = context.currentTime) => classify({ band, audioTime, confidence: .9, classMargin: .4 }) };
 }
-it('traces lifecycle and detector delivery without changing the detected bands', async () => {
+function percussionSpectrum(array, rate = 48000) {
+  array.fill(-Infinity);
+  for (const [from, to, db] of [[45, 150, -20], [170, 350, -30], [1500, 5000, -45], [6000, 12000, -50]]) {
+    array.fill(db, Math.ceil(from * 2048 / rate), Math.floor(to * 2048 / rate) + 1);
+  }
+}
+it('traces unchanged Bass delivery while acoustic proposals cannot claim drum identities', async () => {
   beatTelemetry.enable();
   const f = fixture(); await f.engine.start('stream', 'traced');
   await vi.advanceTimersByTimeAsync(450);
-  f.analyser.getFloatFrequencyData = (array) => array.fill(-20);
+  f.analyser.getFloatFrequencyData = percussionSpectrum;
   await vi.advanceTimersByTimeAsync(20);
   expect(f.deps.onBeat).toHaveBeenCalled();
   const [id, bands, traces] = f.deps.onBeat.mock.calls[0];
-  expect(id).toBe('traced'); expect(bands).toEqual(['kick', 'clap', 'hat', 'bass']);
-  expect(traces.map((t) => t.type)).toEqual(['kick', 'snare', 'hat', 'bass']);
+  expect(id).toBe('traced'); expect(bands).toEqual(['bass']);
+  expect(traces.map((t) => t.type)).toEqual(['bass']);
   expect(f.engine.renew('traced')).toBe(true);
   f.analyser.getFloatFrequencyData = (array) => array.fill(-Infinity);
   await vi.advanceTimersByTimeAsync(50);
-  f.analyser.getFloatFrequencyData = (array) => array.fill(-20);
+  f.analyser.getFloatFrequencyData = percussionSpectrum;
+  f.learned('kick');
   await vi.advanceTimersByTimeAsync(20);
   f.engine.stop();
   const log = beatTelemetry.snapshot();
   for (const stage of ['CAPTURE_START', 'AUDIO_DETECTED', 'LOW_ENERGY', 'CAPTURE_RECOVERED', 'LEASE_RENEW', 'CAPTURE_STOP']) expect(log.counts[stage]).toBeGreaterThan(0);
   expect(log.records.filter((r) => r.id === traces[0].id).map((r) => r.stage)).toEqual(['EVENT_DETECTED', 'EVENT_QUEUED', 'EVENT_SENT']);
-});
-it('emits ahead of delayed playback while reporting expired queued work and capture leases', async () => {
-  beatTelemetry.enable();
-  const f = fixture(); let audioTime = 0;
-  Object.defineProperty(f.context, 'currentTime', { get: () => audioTime });
-  const instrument = { ready: Promise.resolve(), delaySeconds: 3.5, connect() {}, stop() {} };
-  const engine = createCaptureEngine({ ...f.deps, createInstrumentCapture: () => instrument });
-  await engine.start('stream', 'late'); await vi.advanceTimersByTimeAsync(450);
-  f.analyser.getFloatFrequencyData = (array) => array.fill(-20);
-  await vi.advanceTimersByTimeAsync(20);
-  expect(f.deps.onBeat).toHaveBeenCalledOnce();
-  expect(f.deps.onBeat.mock.calls[0][3].targetOutputTime).toBeGreaterThan(Date.now() + 3000);
-  let notes;
-  const queued = createCaptureEngine({ ...f.deps, createInstrumentCapture: ({ onNotes }) => {
-    notes = onNotes; return instrument;
-  } });
-  await queued.start('stream', 'queued');
-  notes([{ time: 1, state: { active: true, level: .7, note: 1 } }]);
-  audioTime = 6; await vi.advanceTimersByTimeAsync(20);
-  queued.stop();
-  audioTime = 4.2; await vi.advanceTimersByTimeAsync(20);
-  expect(beatTelemetry.snapshot().records.some((r) => r.stage === 'EVENT_DROPPED' && r.reason === 'late')).toBe(true);
-  await vi.advanceTimersByTimeAsync(5600);
-  expect(f.deps.onStop).toHaveBeenCalledWith('late', 'expired');
-  expect(beatTelemetry.snapshot().counts.LEASE_EXPIRED).toBe(1);
-  engine.stop();
-});
-it('reports a full existing queue and cancellation without extending its capacity', async () => {
-  beatTelemetry.enable();
-  const f = fixture(); let notes;
-  f.context.currentTime = 0;
-  const engine = createCaptureEngine({ ...f.deps, createInstrumentCapture: (options) => {
-    notes = options.onNotes;
-    return { ready: Promise.resolve(), delaySeconds: 3.5, connect() {}, stop() {} };
-  } });
-  await engine.start('stream', 'full');
-  notes(Array.from({ length: 2049 }, (_, note) => ({ time: 10, state: { active: true, level: .5, note } })));
-  expect(beatTelemetry.snapshot().records.some((r) => r.stage === 'EVENT_DROPPED' && r.reason === 'queue-full')).toBe(true);
-  expect(f.deps.onMelody).not.toHaveBeenCalled();
-  engine.stop();
-  expect(beatTelemetry.snapshot().counts.EVENT_DROPPED).toBe(2049);
-  expect(vi.getTimerCount()).toBe(0);
 });
 it('uses the documented constraints, discards video, and restores tab audio once', async () => {
   const f = fixture();
@@ -168,69 +132,11 @@ it('does not label mixed tonal energy as an instrumental note without AI separat
   await f.engine.start('stream', 'melody');
   await vi.advanceTimersByTimeAsync(3000);
   expect(f.deps.onMelody.mock.calls.filter(([, state]) => state.active)).toHaveLength(0);
-  expect(f.deps.onMelody).toHaveBeenLastCalledWith('melody', expect.objectContaining({ active: false, note: 0 }));
   expect(f.deps.onTempoTick).not.toHaveBeenCalled();
   tone = false;
   await vi.advanceTimersByTimeAsync(500);
-  expect(f.deps.onMelody).toHaveBeenLastCalledWith('melody', expect.objectContaining({ active: false, level: 0 }));
+  expect(f.deps.onMelody).not.toHaveBeenCalled();
   f.engine.stop();
-  expect(vi.getTimerCount()).toBe(0);
-});
-
-it('sends individual model notes ahead with preserved delayed deadlines and cancels queued work on stop', async () => {
-  const f = fixture();
-  const started = Date.now();
-  Object.defineProperty(f.context, 'currentTime', { get: () => (Date.now() - started) / 1000 });
-  let publish;
-  const pipeline = { ready: Promise.resolve(), delaySeconds: 3.5, connect: vi.fn(), stop: vi.fn(), stopAnalysis: vi.fn() };
-  f.deps.createInstrumentCapture = ({ onNotes }) => { publish = onNotes; return pipeline; };
-  const engine = createCaptureEngine(f.deps);
-  await engine.start('stream', 'buffered');
-  expect(f.source.connect.mock.calls.filter(([target]) => target === f.context.destination)).toHaveLength(0);
-  publish([{ time: .1, state: { active: true, level: .7, note: 1 } }, { time: .19, state: { active: true, level: .8, note: 2 } }]);
-  await vi.advanceTimersByTimeAsync(20);
-  const attacks = f.deps.onMelody.mock.calls.filter(([, state]) => state.active);
-  expect(attacks.map(([, state]) => state.note)).toEqual([1, 2]);
-  expect(attacks.map(([, , , timing]) => Math.round(timing.targetOutputTime - started))).toEqual([3600, 3690]);
-  publish([{ time: 1, state: { active: true, level: .8, note: 3 } }]);
-  engine.stop();
-  await vi.advanceTimersByTimeAsync(1000);
-  expect(pipeline.stop).toHaveBeenCalledOnce();
-  expect(f.deps.onMelody.mock.calls.filter(([, state]) => state.active)).toHaveLength(2);
-});
-
-it('leaves original audio connected when AI misses a note deadline', async () => {
-  const f = fixture();
-  f.context.currentTime = 10;
-  let publish;
-  const pipeline = { ready: Promise.resolve(), delaySeconds: 3.5, connect: vi.fn(), stop: vi.fn(), stopAnalysis: vi.fn() };
-  f.deps.createInstrumentCapture = ({ onNotes }) => { publish = onNotes; return pipeline; };
-  const engine = createCaptureEngine(f.deps);
-  await engine.start('stream', 'slow');
-  publish([{ time: 0, state: { active: true, level: .8, note: 1 } }]);
-  expect(pipeline.stopAnalysis).not.toHaveBeenCalled();
-  expect(pipeline.stop).not.toHaveBeenCalled();
-  publish([{ time: 7, state: { active: true, level: .8, note: 2 } }]);
-  f.context.currentTime = 10.5;
-  await vi.advanceTimersByTimeAsync(20);
-  expect(f.deps.onMelody).toHaveBeenLastCalledWith('slow', { active: true, level: .8, note: 2 }, undefined,
-    expect.objectContaining({ targetOutputTime: expect.any(Number) }));
-  engine.stop();
-});
-
-it('continues ordinary capture without AI delay if model setup stalls', async () => {
-  const f = fixture();
-  const pipeline = { ready: new Promise(() => {}), stop: vi.fn(), stopAnalysis: vi.fn() };
-  f.deps.createInstrumentCapture = () => pipeline;
-  const engine = createCaptureEngine(f.deps);
-  const started = engine.start('stream', 'stalled');
-  expect(f.deps.getUserMedia).not.toHaveBeenCalled();
-  await vi.advanceTimersByTimeAsync(3010);
-  expect(await started).toBe(true);
-  expect(engine.delaySeconds).toBe(0);
-  expect(f.source.connect).toHaveBeenCalledWith(f.context.destination);
-  expect(pipeline.stop).toHaveBeenCalledOnce();
-  engine.stop();
   expect(vi.getTimerCount()).toBe(0);
 });
 
@@ -242,10 +148,11 @@ it('keeps leased quiet analysis alive without claiming audible capture and resum
   expect(f.deps.onAudible).not.toHaveBeenCalled();
   expect(f.deps.onBeat).not.toHaveBeenCalled();
   expect(f.deps.onStop).not.toHaveBeenCalled();
-  f.analyser.getFloatFrequencyData = (array) => array.fill(-20);
+  f.analyser.getFloatFrequencyData = percussionSpectrum;
+  f.learned('kick');
   await vi.advanceTimersByTimeAsync(20);
   expect(f.deps.onAudible).toHaveBeenCalledWith('silent');
-  expect(f.deps.onBeat).toHaveBeenCalledWith('silent', expect.arrayContaining(['kick']));
+  expect(f.deps.onBeat.mock.calls.map(call => call.slice(0, 2))).toContainEqual(['silent', ['kick']]);
   f.engine.stop();
   expect(f.audio.stop).toHaveBeenCalledOnce();
 });
@@ -265,19 +172,23 @@ it('locks sparse periodic captured transients, emits live tempo ticks, and drops
   expect(locks.length).toBeGreaterThan(0);
   expect(locks.at(-1).bpm).toBeGreaterThan(118);
   expect(locks.at(-1).bpm).toBeLessThan(124);
-  expect(f.deps.onTempoTick).toHaveBeenCalledWith('tempo', expect.objectContaining({ step: expect.any(Number), phase: expect.any(Number), subdivision: 2 }));
+  expect(f.deps.onTempoTick.mock.calls.map(call => call.slice(0, 2))).toContainEqual(['tempo', expect.objectContaining({ step: expect.any(Number), phase: expect.any(Number), subdivision: 2 })]);
   periodic = false;
   for (let index = 0; index < 3; index++) {
     await vi.advanceTimersByTimeAsync(4000);
     f.engine.renew('tempo');
   }
-  expect(f.deps.onTempo).toHaveBeenLastCalledWith('tempo', expect.objectContaining({ locked: false, bpm: null }));
+  expect(f.deps.onTempo.mock.calls.at(-1).slice(0, 2)).toEqual(['tempo', expect.objectContaining({ locked: false, bpm: null })]);
   f.engine.stop();
 });
-it('keeps dense multi-band drums in raw-accent mode', async () => {
+it('keeps dense learned drums in direct onset mode', async () => {
   const f = fixture();
   f.analyser.getFloatFrequencyData = (array) => {
-    array.fill(Math.round(Date.now() / (1000 / 60)) % 30 === 0 ? -25 : -60);
+    if (Math.round(Date.now() / (1000 / 60)) % 30 === 0) {
+      percussionSpectrum(array);
+      for (const band of ['kick', 'clap', 'hat']) f.learned(band);
+    }
+    else array.fill(-60);
   };
   await f.engine.start('stream', 'drums');
   for (let index = 0; index < 3; index++) {
@@ -295,13 +206,14 @@ it('feeds real kick onsets back into the locked tracker and never uses hats as p
   let time = 0;
   let sample;
   f.deps.now = () => time;
+  Object.defineProperty(f.context, 'currentTime', { get: () => time / 1000 });
   f.deps.schedule = (callback) => { sample = callback; return 1; };
   f.deps.cancel = vi.fn();
   f.analyser.getFloatFrequencyData = (array) => {
     array.fill(-60);
-    // Sparse true FFT kick/bass transients, with independent off-beat hats.
-    if (Math.round(time / (1000 / 60)) % 30 === 0) array.fill(-25, 2, 7);
-    if (Math.round(time / (1000 / 60)) % 30 === 15) array.fill(-25, 256, 512);
+    // Learned identities, with independent off-beat hats. DSP is only energy.
+    if (Math.round(time / (1000 / 60)) % 30 === 0) { array.fill(-25, 2, 7); f.learned('kick'); }
+    if (Math.round(time / (1000 / 60)) % 30 === 15) { array.fill(-25, 256, 512); f.learned('hat'); }
   };
   const engine = createCaptureEngine(f.deps);
   await engine.start('stream', 'feedback');
@@ -338,4 +250,38 @@ it('does not let stale stop commands stop a new capture, and releases an expired
   await vi.advanceTimersByTimeAsync(6100);
   expect(f.audio.stop).toHaveBeenCalledOnce();
   expect(f.deps.onStop).toHaveBeenCalledWith('new', 'expired');
+});
+it('cancels pending inference on stop and rejects stale owner, invalid class and unscored events', async () => {
+  const f = fixture(); let listener, signal, finish;
+  f.deps.createPercussion = ({ onEvent, signal: aborted }) => {
+    listener = onEvent; signal = aborted;
+    return new Promise(resolve => { finish = resolve; });
+  };
+  const engine = createCaptureEngine(f.deps);
+  await engine.start('stream', 'pending');
+  for (const event of [{ band: 'kick', audioTime: f.context.currentTime },
+    { band: 'bass', audioTime: f.context.currentTime, confidence: .9, classMargin: .4 },
+    { band: 'kick', audioTime: f.context.currentTime, confidence: .9, classMargin: -.1 }]) listener(event);
+  await vi.advanceTimersByTimeAsync(20);
+  expect(f.deps.onBeat).not.toHaveBeenCalled();
+  engine.stop(); expect(signal.aborted).toBe(true);
+  listener({ band: 'kick', audioTime: f.context.currentTime, confidence: .9, classMargin: .4 });
+  const stop = vi.fn(); finish({ stop }); await Promise.resolve();
+  expect(stop).toHaveBeenCalledOnce(); expect(f.deps.onBeat).not.toHaveBeenCalled();
+});
+it('preserves learned confidence, original audio time and observable late-event policy', async () => {
+  beatTelemetry.enable(); const f = fixture();
+  await f.engine.start('stream', 'scored');
+  const target = f.context.currentTime - .2;
+  f.learned('clap', target);
+  await vi.advanceTimersByTimeAsync(20);
+  const [id, bands, traces] = f.deps.onBeat.mock.calls[0];
+  expect(id).toBe('scored'); expect(bands).toEqual(['clap']);
+  expect(traces[0]).toMatchObject({ type: 'snare', confidence: .9, targetTime: target, targetClock: 'audio-seconds' });
+  f.learned('hat', f.context.currentTime - 1);
+  await vi.advanceTimersByTimeAsync(20);
+  expect(f.deps.onBeat).toHaveBeenCalledOnce();
+  expect(beatTelemetry.snapshot().counts.EVENT_LATE).toBeGreaterThan(0);
+  expect(beatTelemetry.snapshot().records.some(r => r.stage === 'EVENT_DROPPED' && r.reason === 'late')).toBe(true);
+  f.engine.stop();
 });

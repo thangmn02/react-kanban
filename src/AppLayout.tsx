@@ -345,13 +345,26 @@ function AppLayout() {
         onClose: () => setIsProgressReportOpen(false),
       }}
       isHomeFocusActive={['/', '/home'].includes(location.pathname) && focusSession.focusTasks.some((task) => task.id === focusViewId && task.id === focusSession.timerState.activeTaskId && !task.isDone)}
+      hideCompactFocusDock={['music', 'beat-grid', 'focus'].includes(activeView)}
       onOpenNativeDock={native ? () => setNativeDock(true) : undefined}
     />
   );
 
   const routeContext = useAppLayoutRouteContextValue({
     header: appHeader,
+    focusDockPage: {
+      attach: focusIntegration.attachFocusDock,
+      isFloating: focusIntegration.isPictureInPictureOpen,
+      returnToPage: focusIntegration.closePictureInPicture,
+      selectTab: focusIntegration.setDockTab,
+      native,
+      minimized: focusSession.isFocusDockCollapsed,
+      setMinimized: focusSession.setIsFocusDockCollapsed,
+      openShutdown: () => planning.setIsShutdownRitualOpen(true),
+    },
     featureDock: {
+      activeTab: focusIntegration.dockTab, onTabChange: focusIntegration.handleDockTabChange,
+      isMinimized: focusSession.isFocusDockCollapsed,
       activeTask: focusSession.selectedTimerTask || focusSession.activeFocusTask,
       focusTasks: focusSession.focusTasks, timerState: focusSession.timerState,
       remainingSeconds: focusSession.remainingSeconds, cycleTotal: focusSession.timerSettings.longBreakEvery,
@@ -359,7 +372,8 @@ function AppLayout() {
       onStart: () => { focusSession.startFocusSessionNow(); }, onPause: pauseTimer, onReset: resetTimer,
       onActiveTaskChange: (taskId) => { focusSession.startFocusSessionNow(taskId); },
       onMarkDoneAndNext: focusIntegration.handleMarkDoneAndNext,
-      canPopOut: isPictureInPictureSupported, onPopOut: handleOpenFloatingFocusTimer,
+      canPopOut: native || isPictureInPictureSupported,
+      onPopOut: native ? () => setNativeDock(true) : handleOpenFloatingFocusTimer,
     },
     user,
     activeWorkspace,
@@ -398,7 +412,7 @@ function AppLayout() {
   }
 
   const showNavigation = (Boolean(user) && !['auth', 'onboarding', 'invite', 'not-found'].includes(activeView)) || ['home', 'contact'].includes(activeView);
-  const shouldRenderOverlays = showNavigation && Boolean(user) && !['music', 'beat-grid', 'focus'].includes(activeView);
+  const shouldRenderOverlays = showNavigation && Boolean(user);
 
   const content = (
     <FocusSessionProvider value={focusSession}>
@@ -416,6 +430,7 @@ function AppLayout() {
   return <FocusSessionProvider value={focusSession}><NativeSurface dock={showDock}
     onToggle={shouldRenderOverlays ? () => setNativeDock((current) => !current) : undefined}
     focusProps={{
+      activeTab: focusIntegration.dockTab, onTabChange: focusIntegration.handleDockTabChange,
       activeTask: focusSession.selectedTimerTask || focusSession.activeFocusTask,
       focusTasks: focusSession.focusTasks, timerState: focusSession.timerState,
       remainingSeconds: focusSession.remainingSeconds, cycleTotal: focusSession.timerSettings.longBreakEvery,

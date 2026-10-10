@@ -34,6 +34,16 @@ export interface AppLayoutRouteContext {
   arcana: ComponentProps<typeof ArcanaBoothDialog>;
   home: ComponentProps<typeof HomeDashboard>;
   featureDock: FloatingFocusProps;
+  focusDockPage: {
+    attach: (node: HTMLDivElement | null) => void;
+    isFloating: boolean;
+    returnToPage: () => void;
+    selectTab: (tab: 'focus' | 'music' | 'beat') => void;
+    native: boolean;
+    minimized: boolean;
+    setMinimized: (minimized: boolean) => void;
+    openShutdown: () => void;
+  };
   today: ComponentProps<typeof TodayPage>;
   board: {
     hasActiveBoard: boolean;

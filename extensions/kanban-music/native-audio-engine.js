@@ -1,12 +1,11 @@
 import { createCaptureEngine } from './capture-engine.js';
-import { createNativeInstrument } from './native-instrument.js';
 import { beatTelemetry } from './beat-telemetry.js';
 const telemetry = beatTelemetry.at('native-audio-engine');
 
 // Feed Windows PCM through the same detector graph as tab capture. The browser
 // keeps playing normally: this graph only analyses and never replays its audio.
 export function createNativeAudioEngine(options) {
-  let context, destination, instrument, nextTime = 0, live = false, ready = false, generation = 0;
+  let context, destination, nextTime = 0, live = false, ready = false, generation = 0;
   const sources = new Set();
   const engine = createCaptureEngine({ ...options, monitorOnly: true,
     createAudioContext() {
@@ -29,7 +28,6 @@ export function createNativeAudioEngine(options) {
         await new Promise((resolve) => setTimeout(resolve, 20));
       }
       ready = live && request === generation && context.state === 'running';
-      if (ready) instrument = createNativeInstrument((state, traces, timing) => options.onMelody?.(id, state, traces, timing));
       return ready;
     },
     push(samples, diagnostic) {
@@ -45,13 +43,11 @@ export function createNativeAudioEngine(options) {
       nextTime = Math.max(nextTime, context.currentTime + .02);
       source.start(nextTime); nextTime += buffer.duration;
       telemetry.record('EVENT_QUEUED', undefined, { audioTime: context.currentTime, delayMs: (nextTime - context.currentTime) * 1000, queueDepth: sources.size, frames: samples.length / 2, sequence: diagnostic?.sequence });
-      instrument?.push(left, right);
       return true;
     },
     renew(id) { return engine.renew(id); },
     stop(reason = 'stopped') {
       live = false; ready = false; generation++;
-      instrument?.stop(); instrument = undefined;
       for (const source of sources) { try { source.stop(); } catch { /* An ended source is already released. */ } source.disconnect(); }
       sources.clear(); engine.stop(reason);
     },

@@ -36,3 +36,23 @@ it('cycles onset styles without moving icons and keeps channel colors distinct',
   expect(nextDifferent(['heart', 'diamond', 'smile'], 'heart', .1)).not.toBe('heart');
   expect(isShapeCell('heart', 0, 1)).toBe(true);
 });
+
+it('fits symmetric heart, diamond and smile masks within four rows and eight columns', () => {
+  const expected = {
+    heart: ['01100110', '11111111', '01111110', '00011000'],
+    diamond: ['00011000', '01111110', '01111110', '00011000'],
+    smile: ['01111110', '01011010', '01000010', '00111100'],
+  };
+  for (const shape of shapeNames) {
+    const mask = Array.from({ length: 4 }, (_, row) => Array.from({ length: 8 }, (_, step) => isShapeCell(shape, row, step, 4) ? '1' : '0').join(''));
+    expect(mask).toEqual(expected[shape]);
+    mask.forEach(row => expect(row).toBe([...row].reverse().join('')));
+    expect(isShapeCell(shape, 4, 3, 4)).toBe(false);
+    expect(isShapeCell(shape, 0, 8, 4)).toBe(false);
+  }
+  for (const effect of effectNames) {
+    const delays = Array.from({ length: 4 }, (_, row) => Array.from({ length: 8 }, (_, step) => momentDelay(effect, row, step, 1))).flat();
+    expect(momentDuration(effect, 1, 4)).toBe(momentFlashMs + Math.max(...delays) + 50);
+  }
+  expect(new Set(Array.from({ length: 4 }, (_, row) => channelColors('random', 'bloom', 'song', 0, row, 4).hit)).size).toBe(4);
+});

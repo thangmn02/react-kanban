@@ -24,7 +24,8 @@ export function decodeNativeAudio(value: unknown): { sequence: number; samples: 
   return { sequence, samples };
 }
 
-export function createNativeAudioFeed(publish: (message: Message) => void) {
+export function createNativeAudioFeed(publish: (message: Message) => void,
+  onAudio?: (sessionId: string, samples: Float32Array, clock: PlaybackClock) => void) {
   let current: Subscription | undefined;
   const clocks = new Map<string, Message>();
   const key = (session: string, subscription: string) => `${session}/${subscription}`;
@@ -59,7 +60,6 @@ export function createNativeAudioFeed(publish: (message: Message) => void) {
       onBeat: (_, bands, traces, timing) => { if (owner.captureId === id) emit(owner, { kind: 'onset', bands, sequence: ++owner.beatSequence, ...diagnostic(traces, timing) }); },
       onTempo: (_, tempo, traces, timing) => { if (owner.captureId === id) emit(owner, { kind: 'tempo.state', tempo, ...diagnostic(traces, timing) }); },
       onTempoTick: (_, tick, traces, timing) => { if (owner.captureId === id) emit(owner, { kind: 'tempo.tick', tick, ...diagnostic(traces, timing) }); },
-      onMelody: (_, melody, traces, timing) => { if (owner.captureId === id) emit(owner, { kind: 'melody.state', detector: 'instrument-v1', melody, ...diagnostic(traces, timing) }); },
       onAudible: () => { if (owner.captureId === id) {
         owner.audible = true;
         if (owner.recoveryReason) { telemetry.record('CAPTURE_RECOVERED', undefined, { captureId: id, reason: owner.recoveryReason }); owner.recoveryReason = undefined; }
@@ -81,6 +81,7 @@ export function createNativeAudioFeed(publish: (message: Message) => void) {
           owner.retryAt = 0; halt(owner, 'audio-backlog'); return;
         }
         owner.sequence = packet.sequence;
+        if (owner.previousClock && owner.playing) onAudio?.(owner.sessionId, packet.samples, owner.previousClock);
       };
       await invoke('native_audio_start', { sessionId: owner.sessionId, captureId: id, onAudio: channel,
         ...(beatTelemetry.enabled ? { telemetryEnabled: true } : {}) });

@@ -1,4 +1,5 @@
 import { parseMediaAsset, type MediaAsset } from '../../../extensions/kanban-music/media-asset.js';
+import { LEAD_ANALYSIS_VERSION, parseLeadProvenance, type LeadProvenance } from './lead-events.ts';
 export type { MediaAsset };
 export const EVENT_TRACK_VERSION = 1;
 export const CHUNK_SECONDS = 30;
@@ -9,7 +10,7 @@ export interface TrackManifest {
   version: 1; asset: MediaAsset; revision: string; analysisVersion: string;
   duration: number; chunkSeconds: 30; melodyPolicy: 'dominant-monophonic';
 }
-export interface TrackOnset { id: string; time: number; row: EventRow; confidence: number; duration?: number }
+export interface TrackOnset { id: string; time: number; row: EventRow; confidence: number; duration?: number; lead?: LeadProvenance }
 export interface TrackChunk { version: 1; revision: string; index: number; events: TrackOnset[] }
 const object = (v: unknown): v is Record<string, unknown> => Boolean(v && typeof v === 'object' && !Array.isArray(v));
 const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
@@ -45,22 +46,26 @@ export function parseChunk(value: unknown, manifest: TrackManifest, index: numbe
       melodyTime = event.time;
       melodyEnd = event.time + Number(event.duration || 0);
     }
+    const lead = event.lead === undefined ? undefined : parseLeadProvenance(event.lead);
+    if (event.lead !== undefined && (!lead || event.row !== 'melody')
+      || event.row === 'melody' && manifest.analysisVersion === LEAD_ANALYSIS_VERSION && !lead) return;
     ids.add(event.id); lastTime = event.time;
     events.push({ id: event.id, time: event.time, row: event.row as EventRow, confidence: event.confidence,
-      ...(event.duration !== undefined ? { duration: event.duration as number } : {}) });
+      ...(event.duration !== undefined ? { duration: event.duration as number } : {}), ...(lead ? {lead} : {}) });
   }
   return { version: 1, revision: manifest.revision, index, events };
 }
 
-export async function readBoundedJson(response: Response): Promise<unknown> {
-  if (Number(response.headers.get('content-length')) > MAX_RESPONSE_BYTES) throw new Error('Oversized EventTrack');
+export async function readBoundedJson(response: Response, maximum = MAX_RESPONSE_BYTES): Promise<unknown> {
+  if (!Number.isSafeInteger(maximum) || maximum < 1 || maximum > MAX_RESPONSE_BYTES) throw new Error('Invalid response bound');
+  if (Number(response.headers.get('content-length')) > maximum) throw new Error('Oversized EventTrack');
   const reader = response.body?.getReader();
   if (!reader) throw new Error('Missing EventTrack body');
   const decoder = new TextDecoder(); let text = '', bytes = 0;
   try {
     for (;;) {
       const { done, value } = await reader.read(); if (done) break;
-      bytes += value.length; if (bytes > MAX_RESPONSE_BYTES) throw new Error('Oversized EventTrack');
+      bytes += value.length; if (bytes > maximum) throw new Error('Oversized EventTrack');
       text += decoder.decode(value, { stream: true });
     }
     return JSON.parse(text + decoder.decode());

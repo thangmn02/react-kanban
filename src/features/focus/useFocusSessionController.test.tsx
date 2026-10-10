@@ -12,7 +12,9 @@ const summary = (id: string) => ({ id, title: id, boardId: 'board', boardTitle: 
 it('starts, counts down, pauses and resumes without a task or launch modal', () => {
   vi.useFakeTimers();
   const { result } = renderHook(() => useFocusSessionController({ user: null, workspaceId: 'workspace', boardData: { columns: [], task: {}, list: {} }, activeBoardId: null, activeBoardSummary: null }), { wrapper: I18nProvider });
+  expect(result.current.isFocusDockCollapsed).toBe(true);
   act(() => result.current.handleStartFocusTimer());
+  expect(result.current.isFocusDockCollapsed).toBe(false);
   expect(result.current.timerState.isRunning).toBe(true);
   expect(result.current.timerState.activeTaskId).toBeNull();
   expect(result.current.focusTasks).toHaveLength(0);
