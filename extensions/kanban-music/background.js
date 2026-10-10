@@ -34,6 +34,7 @@ async function scan() {
       try {
         // Idempotent; also installs observation in tabs left open during reload.
         await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'MAIN', files: ['media-observer.js'] });
+        await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'MAIN', func: controlMedia, args: [0, '', 'install'] });
         const frames = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'MAIN', func: readMedia });
         return frames.flatMap((frame) => (frame.result || []).map((media) => ({
           ...media, asset: mediaAssetFromUrl(media.assetUrl, leadAudioTestScope), tabId: tab.id, tabMuted: Boolean(tab.mutedInfo?.muted), documentId: frame.documentId,
@@ -95,11 +96,12 @@ async function handle(message, sender) {
     await beats.start(session, owner, message.subscriptionId, message.telemetryEnabled === true); return { ok: true };
   }
   try {
-    const result = await chrome.scripting.executeScript({
-      target: { tabId: session.tabId, documentIds: [session.documentId] }, world: 'MAIN',
-      func: controlMedia, args: [session.index, session.src, message.action, message.value],
-    });
-    if (!result.some((frame) => frame.result === true)) throw new Error('Playback unavailable');
+    // Install idempotently for tabs left open across a Companion reload.
+    await chrome.scripting.executeScript({ target: { tabId: session.tabId, documentIds: [session.documentId] }, files: ['clock.js'] });
+    const result = await chrome.tabs.sendMessage(session.tabId, {
+      target: 'media-control', index: session.index, src: session.src, action: message.action, value: message.value,
+    }, { documentId: session.documentId });
+    if (result?.ok !== true) throw new Error('Playback unavailable');
     return { ok: true, sessions: publicSessions(await scan()) };
   } catch {
     return { ok: false, error: 'playback' };

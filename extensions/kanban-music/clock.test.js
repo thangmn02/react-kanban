@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { controlMedia } from './media.js';
 
 let receive;
 let send;
@@ -18,11 +19,39 @@ beforeEach(async () => {
   await import('./clock.js');
 });
 afterEach(() => {
+  if (globalThis.__kanbanMusicMedia?.controlListener) document.removeEventListener('kanban-music-control', globalThis.__kanbanMusicMedia.controlListener);
+  delete globalThis.__kanbanMusicMedia;
   globalThis.__kanbanMusicClock?.dispose();
   delete globalThis.__kanbanMusicClock;
   document.body.replaceChildren();
   vi.unstubAllGlobals();
   vi.useRealTimers();
+});
+
+it('executes content-script commands against the selected real media element and rejects a changed source', async () => {
+  globalThis.__kanbanMusicMedia = { entries: () => [{ index: 0, media: video }] };
+  await controlMedia(0, '', 'install');
+  const sendControl = (action, value, src = video.currentSrc) => new Promise(resolve => {
+    receive({ target: 'media-control', index: 0, src, action, value }, { id: 'companion' }, resolve);
+  });
+  expect(await sendControl('media.volume', .25)).toEqual({ ok: true });
+  expect(video.volume).toBe(.25);
+  expect(await sendControl('media.volume', .8, 'changed-source')).toEqual({ ok: false });
+  expect(video.volume).toBe(.25);
+  expect(await sendControl('media.volume', 2)).toEqual({ ok: false });
+  Object.defineProperty(video, 'duration', { configurable: true, value: 180 });
+  Object.defineProperty(video, 'seekable', { configurable: true, value: { length: 1, start: () => 0, end: () => 180 } });
+  expect(await sendControl('media.seek', 50)).toEqual({ ok: true });
+  expect(video.currentTime).toBe(50);
+  video.play = vi.fn().mockResolvedValue(undefined); video.pause = vi.fn();
+  expect(await sendControl('media.play')).toEqual({ ok: true });
+  expect(await sendControl('media.pause')).toEqual({ ok: true });
+  expect(video.play).toHaveBeenCalledOnce(); expect(video.pause).toHaveBeenCalledOnce();
+  const next = document.createElement('button'); next.className = 'ytp-next-button';
+  next.getClientRects = () => [{ width: 32, height: 32 }];
+  document.body.append(next); const click = vi.fn(); next.addEventListener('click', click);
+  expect(await sendControl('media.next')).toEqual({ ok: true });
+  expect(click).toHaveBeenCalledOnce();
 });
 const command = (message) => {
   const reply = vi.fn();

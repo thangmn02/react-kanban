@@ -57,7 +57,7 @@ function NativeFocusPage() {
     setTarget(root);
     return () => { shadow.replaceChildren(); };
   }, []);
-  return <div ref={attach} className="h-[min(680px,85dvh)] min-h-[400px]">
+  return <div ref={attach} className="h-auto">
     {target && createPortal(<FloatingFocus {...featureDock} />, target)}
   </div>;
 }

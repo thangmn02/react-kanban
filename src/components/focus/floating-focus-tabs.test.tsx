@@ -37,6 +37,18 @@ it('defaults to glass Tabs with a persistent timer and real focus-task actions',
   expect(props.onStart).toHaveBeenCalledOnce();
 });
 
+it('reserves the same mini-player wrapper across tabs and idle playback', () => {
+  const view = renderDock();
+  const wrapper = view.container.querySelector('.mini-player-wrapper');
+  for (const tab of ['Music', 'Beat grid', 'Tasks']) {
+    fireEvent.click(screen.getByRole('tab', { name: tab }));
+    expect(view.container.querySelector('.mini-player-wrapper')).toBe(wrapper);
+    expect(wrapper).not.toHaveAttribute('hidden');
+    expect(wrapper?.querySelector('.mini-player-content')).toHaveAttribute('aria-hidden', String(tab === 'Music'));
+  }
+  expect(view.container.querySelectorAll('.tab-content-area')).toHaveLength(1);
+});
+
 it('keeps one timer/grid and music control when changing tabs, including keyboard selection', () => {
   const view = renderDock();
   const timer = view.container.querySelector('.dock-ring');

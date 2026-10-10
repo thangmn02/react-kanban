@@ -31,6 +31,21 @@ export function readMedia() {
 }
 
 export async function controlMedia(index, expectedSource, action, value) {
+  if (action === 'install') {
+    const observer = globalThis.__kanbanMusicMedia;
+    if (!observer || observer.controlListener) return Boolean(observer);
+    observer.controlListener = async (event) => {
+      let command;
+      try { command = JSON.parse(event.detail); } catch { return; }
+      if (typeof command?.token !== 'string' || !Number.isInteger(command.index)
+        || typeof command.src !== 'string' || !['media.play', 'media.pause', 'media.seek', 'media.volume', 'media.previous', 'media.next'].includes(command.action)) return;
+      let ok = false;
+      try { ok = await controlMedia(command.index, command.src, command.action, command.value); } catch { /* Report the actual command failure. */ }
+      document.dispatchEvent(new CustomEvent('kanban-music-control-result', { detail: JSON.stringify({ token: command.token, ok }) }));
+    };
+    document.addEventListener('kanban-music-control', observer.controlListener);
+    return true;
+  }
   const media = globalThis.__kanbanMusicMedia
     ? globalThis.__kanbanMusicMedia.entries().find((entry) => entry.index === index)?.media
     : document.querySelectorAll('audio,video')[index];

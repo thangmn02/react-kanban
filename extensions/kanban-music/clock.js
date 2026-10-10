@@ -1,6 +1,6 @@
 // Installed only on supported media sites; activated for one selected element.
 (() => {
-try { globalThis.__kanbanMusicClock?.dispose(); } catch { /* Previous extension context was reloaded. */ }
+try { if (globalThis.__kanbanMusicClock?.active()) return; globalThis.__kanbanMusicClock?.dispose(); } catch { /* Previous extension context was reloaded. */ }
 let watcher;
 function stopClock() {
   if (!watcher) return;
@@ -14,6 +14,20 @@ function stopClock() {
 }
 
 const receive = (message, sender, respond) => {
+  if (sender.id === chrome.runtime.id && message?.target === 'media-control') {
+    const token = crypto.randomUUID();
+    const complete = (ok) => { clearTimeout(timeout); document.removeEventListener('kanban-music-control-result', result); respond({ ok }); };
+    const result = (event) => {
+      let response; try { response = JSON.parse(event.detail); } catch { return; }
+      if (response?.token === token) complete(response.ok === true);
+    };
+    const timeout = setTimeout(() => complete(false), 4000);
+    document.addEventListener('kanban-music-control-result', result);
+    document.dispatchEvent(new CustomEvent('kanban-music-control', { detail: JSON.stringify({
+      token, index: message.index, src: message.src, action: message.action, value: message.value,
+    }) }));
+    return true;
+  }
   if (sender.id !== chrome.runtime.id || message?.target !== 'beat-clock') return false;
   if (message.kind === 'stop') { stopClock(); respond({ ok: true }); return false; }
   if (message.kind === 'lease') {
@@ -74,5 +88,5 @@ const receive = (message, sender, respond) => {
   return false;
 };
 chrome.runtime.onMessage.addListener(receive);
-globalThis.__kanbanMusicClock = { dispose() { stopClock(); chrome.runtime.onMessage.removeListener(receive); } };
+globalThis.__kanbanMusicClock = { active() { return Boolean(chrome.runtime.id); }, dispose() { stopClock(); chrome.runtime.onMessage.removeListener(receive); } };
 })();

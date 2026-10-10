@@ -67,7 +67,7 @@ export function useDocumentPictureInPicture(props: FloatingFocusProps) {
     if (!host) return;
     (pageRef.current || document.body).appendChild(host);
     host.hidden = false;
-    host.style.cssText = pageRef.current ? 'width:100%;height:min(680px,85dvh);min-height:400px;'
+    host.style.cssText = pageRef.current ? 'width:100%;height:auto;'
       : 'position:fixed;right:16px;bottom:16px;width:min(520px,calc(100vw - 32px));height:min(580px,calc(100dvh - 32px));z-index:1000;border-radius:22px;';
     pipWindowRef.current = null;
     if (mountedRef.current) setPipWindow(null);

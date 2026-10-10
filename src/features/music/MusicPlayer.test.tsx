@@ -359,15 +359,15 @@ it('keeps unsupported controls disabled and shows only a strip outside Music whi
   expect(screen.getByRole('slider', { name: 'Music volume' })).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Previous track' })).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Next track' })).toBeDisabled();
-  expect(view.container.querySelector('.dock-now-playing')).toHaveAttribute('hidden');
+  expect(view.container.querySelector('.mini-player-content')).toHaveAttribute('aria-hidden', 'true');
   fireEvent.click(screen.getByRole('tab', { name: 'Beat grid' }));
-  expect(view.container.querySelector('.dock-now-playing')).not.toHaveAttribute('hidden');
+  expect(view.container.querySelector('.mini-player-content')).toHaveAttribute('aria-hidden', 'false');
   expect(screen.queryByRole('slider', { name: 'Seek music' })).toBeNull();
   expect(view.container.querySelectorAll('.beat-channel')).toHaveLength(4);
   expect(view.container.querySelectorAll('.beat-square')).toHaveLength(32);
   vi.mocked(sendMusicRequest).mockResolvedValue([{ ...session, paused: true }]);
   fireEvent.click(screen.getByRole('button', { name: 'Pause music' }));
-  await waitFor(() => expect(view.container.querySelector('.dock-now-playing')).toHaveAttribute('hidden'));
+  await waitFor(() => expect(view.container.querySelector('.mini-player-content')).toHaveAttribute('aria-hidden', 'true'));
 });
 
 it('keeps color and palette pickers in an accessible settings popover', async () => {

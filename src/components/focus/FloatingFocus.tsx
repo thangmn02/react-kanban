@@ -138,7 +138,7 @@ export default function FloatingFocus(props: FloatingFocusProps) {
         </AnimatePresence>
       </div>
 
-      <motion.div layout className="dock-layout dock-tabs" data-tab={activeTab} transition={{ layout: layoutTransition }}>
+      <motion.div className="dock-layout dock-tabs" data-tab={activeTab}>
         <div className="dock-scaffold" aria-hidden="true" />
         <div className="dock-tabbar" role="tablist" aria-label={t('dock.style.tabs')}>
           <span className="dock-tab-pill" aria-hidden="true" style={{ transform: `translateX(${cards.indexOf(activeTab) * 100}%)` }} />
@@ -181,9 +181,12 @@ export default function FloatingFocus(props: FloatingFocusProps) {
             <button className="dock-next" type="button" disabled={!taskId || !onMarkDoneAndNext || activeTask?.isDone} onClick={() => onMarkDoneAndNext?.(taskId)}>{t('floating.completeNext')}</button>
           </div>
         </motion.section>
-        <div className="dock-now-playing" hidden={activeTab === 'music' || !music.playing}>
-          {hasMusic && <MusicNowPlaying music={music} />}
+        <div className="dock-now-playing mini-player-wrapper">
+          <div className="mini-player-content" aria-hidden={activeTab === 'music' || !music.playing} inert={activeTab === 'music' || !music.playing}>
+            {hasMusic && <MusicNowPlaying music={music} />}
+          </div>
         </div>
+        <div className="tab-content-area">
         <section id={`${groupId}-focus`} className="dock-panel dock-work-pane" role="tabpanel" aria-labelledby={`${groupId}-focus-tab`}
           tabIndex={0} hidden={activeTab !== 'focus'}>
           <p className="eyebrow">{t('dock.focusTasks')}</p>
@@ -211,6 +214,7 @@ export default function FloatingFocus(props: FloatingFocusProps) {
           animate={{ opacity: hidden('music') ? 0 : 1 }} transition={{ ...layoutTransition, layout: layoutTransition }}>
           {hasMusic ? <><MusicTrack music={music} /><MusicFeedback music={music} /></> : <p className="dock-empty muted">{t('music.nothingPlaying')}</p>}
         </motion.section>
+        </div>
       </motion.div>
       <MusicSetup music={music} />
       {props.widgetError && <p className="widget-error muted" role="status">{props.widgetError}</p>}

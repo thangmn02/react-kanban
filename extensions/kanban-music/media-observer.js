@@ -76,6 +76,7 @@
     dispose() {
       stop();
       document.removeEventListener('kanban-music-media-watch', receive);
+      if (this.controlListener) document.removeEventListener('kanban-music-control', this.controlListener);
       if (HTMLMediaElement.prototype.play === observedPlay) HTMLMediaElement.prototype.play = originalPlay;
       if (globalThis.Audio === ObservedAudio) globalThis.Audio = OriginalAudio;
       delete globalThis.__kanbanMusicMedia;
