@@ -54,7 +54,7 @@ self.onmessage = async ({ data }) => {
     try {
       config = data.config;
       classifier = config.classifier === 'causal' ? new CausalPercussionClassifier() : new PercussionClassifier();
-      ort = await import('./vendor/percussion/ort.wasm.min.mjs');
+      ort = await import(/* @vite-ignore */ './vendor/percussion/ort.wasm.min.mjs');
       ort.env.wasm.numThreads = 1; ort.env.wasm.proxy = false;
       ort.env.wasm.wasmPaths = new URL('./vendor/percussion/', import.meta.url).href;
       session = await ort.InferenceSession.create(data.model, { executionProviders: ['wasm'] });
