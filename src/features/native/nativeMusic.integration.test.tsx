@@ -7,9 +7,10 @@ import { sendMusicRequest } from '../music/mediaBridge';
 import type { NativeAudioCallbacks } from '../../../extensions/kanban-music/native-audio-engine.js';
 import { LEAD_ANALYSIS_VERSION } from '../music/lead-events';
 import { beatTelemetry } from '../../../extensions/kanban-music/beat-telemetry.js';
+import { invoke } from '@tauri-apps/api/core';
 
 const native = vi.hoisted(() => ({ receive: new Map<string, (event: { payload: unknown }) => void>(), subscription: '',
-  cached: false,
+  cached: false, learned: false,
   detectors: [] as { options: NativeAudioCallbacks; id: string }[] }));
 vi.mock('../../../extensions/kanban-music/native-audio-engine.js', () => ({ createNativeAudioEngine(options: NativeAudioCallbacks) {
   const detector={options,id:''};native.detectors.push(detector);
@@ -18,10 +19,11 @@ vi.mock('../../../extensions/kanban-music/native-audio-engine.js', () => ({ crea
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => true, Channel: class { onmessage: (data: ArrayBuffer) => void = () => {}; }, invoke: vi.fn(async (_command, args) => {
   if (args.action === 'dock.beat.sync.start') native.subscription = args.subscriptionId;
   return { ok: true, sessions: [{ id: 'native:song', title: 'Browser song', artist: 'Artist', source: 'music.youtube.com', paused: false, playing: true,
+    learnedPercussion: native.learned,
     ...(native.cached ? { asset:{provider:'youtube',id:'abcdefghijk'},duration:30 } : {}) }] };
 }) }));
 vi.mock('@tauri-apps/api/event', () => ({ listen: vi.fn(async (name, receive) => { native.receive.set(name,receive); return () => native.receive.delete(name); }) }));
-beforeEach(() => { native.subscription = '';native.detectors.length=0;native.cached=false; });
+beforeEach(() => { native.subscription = '';native.detectors.length=0;native.cached=false;native.learned=false; });
 afterEach(() => { cleanup();vi.restoreAllMocks();vi.unstubAllEnvs();beatTelemetry.enable(false);beatTelemetry.clear(); });
 function Harness({demand=false,melodyEnabled=false}:{demand?:boolean;melodyEnabled?:boolean}) {
   const music = useBrowserMusic(demand);
@@ -40,6 +42,19 @@ async function startDetector() {
 }
 it('routes browser companion metadata through the native event transport', async () => {
   await expect(sendMusicRequest('sessions.get')).resolves.toEqual([expect.objectContaining({ title: 'Browser song', source: 'music.youtube.com' })]);
+});
+it('uses equipped Companion inference for all four native rows without a competing PCM detector', async () => {
+  native.learned = true;
+  const view = render(<I18nProvider><Harness /></I18nProvider>);
+  await waitFor(() => expect(native.subscription).not.toBe(''));
+  expect(invoke).toHaveBeenCalledWith('native_music_request', expect.objectContaining({ action: 'dock.beat.sync.start', nativeAudio: false }));
+  act(() => emit({ kind: 'clock', clock: { playing: true, paused: false, currentTime: 1, playbackRate: 1, sampledAt: Date.now() } }));
+  act(() => emit({ kind: 'sync.state', mode: 'capture', captureId: 'companion-learned' }));
+  act(() => emit({ kind: 'onset', captureId: 'companion-learned', sequence: 1, bands: ['kick', 'clap', 'hat', 'bass'] }));
+  await waitFor(() => expect(view.container.querySelectorAll('[data-channel] .beat-square.onset').length).toBeGreaterThanOrEqual(4));
+  expect(native.detectors).toHaveLength(0);
+  act(() => emit({ kind: 'clock', clock: { playing: false, paused: true, currentTime: 1.2, playbackRate: 1, sampledAt: Date.now() } }));
+  expect(view.container.querySelectorAll('.beat-square.onset')).toHaveLength(0);
 });
 it('pops native onset rows, ignores companion fallback events, and clears on silence', async () => {
   const view = render(<I18nProvider><Harness /></I18nProvider>);

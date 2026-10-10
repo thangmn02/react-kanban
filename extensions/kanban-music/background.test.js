@@ -29,9 +29,10 @@ it('scans all supported tabs and reports every session with honest per-session m
     { id: api.runtime.id, url: 'http://localhost:5173/home', tab: { id: 90 }, documentId: 'app-doc' }, resolve,
   ));
   expect(api.tabs.query).toHaveBeenCalledWith({ url: mediaSites });
-  expect(api.scripting.executeScript).toHaveBeenCalledTimes(70);
+  expect(api.scripting.executeScript).toHaveBeenCalledTimes(105);
   expect(result.ok).toBe(true);
   expect(result.sessions).toHaveLength(35);
+  expect(result.sessions.every(session => session.learnedPercussion === false)).toBe(true);
   expect(result.sessions.every((session) => !('src' in session) && !('tabId' in session) && !('documentId' in session))).toBe(true);
   expect(result.sessions.find((session) => session.source === 'music.apple.com').syncState).toEqual({ mode: 'clock', reason: 'not-selected' });
   expect(result.sessions.find((session) => session.source === 'open.spotify.com').syncState).toEqual({ mode: 'clock', reason: 'not-selected' });

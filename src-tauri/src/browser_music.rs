@@ -420,8 +420,14 @@ pub async fn native_music_request(
 
 #[tauri::command]
 pub fn native_music_setup(app: AppHandle) -> Result<(), String> {
-    let folder = app.path().resolve("music-companion", tauri::path::BaseDirectory::Resource)
+    let bundled = app.path().resolve("music-companion", tauri::path::BaseDirectory::Resource)
         .map_err(|_| "Could not locate the included Companion".to_owned())?;
+    // Non-commercial releases now bundle the learned ONNX weights.
+    // An optional private installation path remains supported for developers.
+    let private = app.path().app_local_data_dir().ok().map(|path| path.join("music-companion"));
+    let folder = private.filter(|path| path.join("extension/manifest.json").is_file()
+        && path.join("extension/generated/percussion/percussion.onnx").is_file())
+        .unwrap_or(bundled);
     if !folder.join("extension/manifest.json").is_file() {
         return Err("The included Companion is missing. Reinstall Kora to restore it.".into());
     }

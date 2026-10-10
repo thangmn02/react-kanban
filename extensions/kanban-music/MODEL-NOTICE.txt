@@ -1,0 +1,4 @@
+Local evaluation only. ADTOF model or private distilled derivative: CC-BY-NC-SA-4.0 rights unresolved.
+Weights: https://github.com/xavriley/ADTOF-pytorch
+Model SHA256: c571062d76c322d54c2808c95339ea2dadd2f6ab99f9d83163d0f5311cd0f80a
+Pseudo labels are not human ground truth. Do not publish as a commercial release without resolving model rights.

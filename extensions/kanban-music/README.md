@@ -13,39 +13,53 @@ can affect beats; the picker does not isolate tab audio. Other desktop apps are
 excluded. Web/PiP tab capture can still require a toolbar permission click. See
 [native setup and security](../../src-tauri/README.md).
 
-The five rows are Kick, Clap, Hi-hat, Bass and Melody. Melody flashes on note
-attacks from one dominant harmonic part in an AI-isolated instrumental stem.
-Repeated pitches can trigger separate flashes; sustain, vocals, raw hats and
-decorative percussion shapes do not trigger the fifth row. It stays dark until
-AI instrument notes are enabled. Missing states expire after 700 ms.
+The five rows are Kick, Snare/Clap, Hi-hat/Cymbal, Bass/Low pulse and Melody/Main
+Lead. Melody flashes on timestamped attacks from one dominant lead in a
+validated EventTrack cache. Sustained envelopes, raw hats and decorative shapes
+do not create Melody attacks. Without cached lead events, the fifth row stays
+dark while local analysis continues. Brief note flashes and
+the 700 ms state expiry remain.
 
-In native Kora Music, **AI instrument notes** enables its own local model cache;
-instrument flashes follow with processing delay while sound/percussion remain
-immediate. All code/WASM ships with the installer. Native pause/seek/handoff clears
-pending flashes. In web/PiP, choose **AI instrument notes**, or open the companion's
-**Details → Extension options**, then **Download and enable**. This downloads
-about 157 MB of hash-verified Spleeter model data once, cached in this browser
-profile. All inference code and WASM ship in the extension. Audio stays in a
-bounded memory buffer and is never uploaded or saved to disk. Original audio
-and all five rows share a 3.5-second delay while enabled; videos can be out of
-sync. **Turn off** restores immediate playback and leaves the fifth row dark.
+The learned-percussion listening candidate requires a scored ADTOF decision
+before local Kick/Snare/Hat events are published. Spectral-flux DSP remains an
+acoustic proposal/envelope source; Bass retains its existing detector. Missing
+model assets, incompatible audio context or inference failure leave the three
+drum rows dark rather than returning to band-energy classification. Playback,
+audibility and capture leases continue independently.
 
-Spleeter separates vocals, drums, bass and other instruments; it does not
-separate piano from guitar or name instruments. A harmonic-profile tracker
-retains one prominent part within the instrumental stem. Dense arrangements,
-similar timbres and source leakage can cause missed or extra notes; this is
-not exact transcription. Model setup or missed processing deadlines leave
-the fifth row dark while the first four detectors keep running. A runtime
-failure preserves the existing audio delay until capture restarts, avoiding
-an abrupt skipped section. See [model provenance/licenses](./INSTRUMENT-NOTICES.md).
+For the private candidate, export the installed ADTOF weights with
+`scripts/export-percussion-model.py`, then run
+`node scripts/package-percussion-listening.mjs`. This writes the unpacked test
+Companion under `src-tauri/target/learned-percussion/companion`; it does not
+publish a download or include the model in the normal release archive. Its
+manifest identifies **Learned Percussion Test** and permits local WASM. Load
+that folder in the browser, disabling the existing Companion to avoid competing
+capture owners. The existing local four-row diagnostic page disables Melody
+and cell decoration. The experimental weights are non-commercial licensed;
+production distribution requires resolving model rights.
+
+The candidate uses a trailing one-second spectro-temporal window with 100 ms
+right context. It publishes original audio timestamps, uncalibrated model
+activations and peak decision margins; playback remains undelayed. Visual
+delivery therefore has bounded processing lag, observable in telemetry. The
+bidirectional source model is not an inherently causal/zero-latency model.
+See the [candidate evaluation](../../plans/reports/validation-261008-1528-learned-percussion.md)
+for exact controls, misses and the open listening gate.
+
+The legacy Spleeter feature, model download, inference workers/WASM, setup
+controls and delayed-audio path have been retired. No replacement model runs
+in the client. Captured original audio routes directly to output. Previously
+downloaded browser model data is left inert; this change does not delete data
+from user profiles. See [cache setup and protocol](../../docs/beat-event-cache.md)
+for precomputed data and honest cache-miss fallback.
 
 For sparse captured drums, real kick hits gently correct the locked grid phase
 with a 0.4 gain, accepting errors within 0.35 of an eighth note. Dense drums
 retain direct onset lighting. The gate rejects distant accents; it cannot
 identify every syncopation or repair an arbitrary initial phase offset. Long
-silence still releases capture after 2.5 seconds, and low tempo confidence
-releases the lock after four seconds. Capture/tempo then reacquire automatically;
-this is distinct from preserving a running phase during an audible section.
+quiet sections keep leased analysis alive while playback remains active; audio
+return resumes detection without a silence-triggered stop. Low tempo confidence
+still releases the lock after four seconds, independently of capture recovery.
 
 ## Test now in Chrome, Edge, or Brave (desktop)
 
@@ -73,14 +87,14 @@ After publication, set `VITE_MUSIC_EXTENSION_STORE_URL` in Netlify to the actual
 - Reads Media Session title/artist where available, falling back to the tab document title. Generic HTML audio/video playback is supported; WebAudio-only players, protected frames and some sites' custom players are not guaranteed.
 - Polls while Floating Focus is open, with no tracking server, API key or persistent track history. Closing Floating Focus stops polling. Closing the parent app closes Floating Focus too.
 - Session-only storage remembers the last approved app origin/tab and the clicked music tab with a random selection token. A toolbar click returns to that app (or opens the deployed app if none exists). Ordinary polls preserve manual song selections until another detected source starts playback; a fresh toolbar click selects its music tab again. When the selected playing source pauses or disappears, the dock follows another playing source. If all sources pause, it keeps the last available selection. Each handoff releases the previous beat subscription and automatically requests capture for the new source; browser capture permission may still require a toolbar click on a new tab. No song titles or audio are stored. App host access locates existing tabs without broad `tabs` or all-sites permission.
-- No native desktop app control, seeking, next/previous, or automatic extension installation is included. Browser consent is always required.
+- The player uses real media position, seeking, previous/next and volume capabilities where the source permits them. Unsupported controls are disabled. There is no automatic extension installation; browser consent is required.
 - Browser autoplay rules still apply. If resume is blocked, play once in the source tab. Incognito and separate browser profiles are not shared.
 - The island-bar dot keeps its decorative double-thump heartbeat. Pausing hides the dot and keeps the panel; no session means no music panel or dot. Reduced-motion preferences disable the heartbeat and scaling.
 - **Fallback:** `mode: clock` retains playback metadata and controls, but squares stay completely still. There is no timer or clock-driven beat animation. Icons always stay dim and static.
-- **Live beat sync (v3):** playing sessions on every supported service automatically request capture from the browser. Each real band onset pops that row's active squares to full color and 1.12× scale for 150ms. For sparse, steady transients, v0.3.7 can lock to an estimated 60–180 BPM pulse and drive kick/hat/snare squares on an eighth-note grid. The lock needs a strong six-second autocorrelation peak and releases after more than four seconds of low confidence; irregular music keeps the calmer raw-accent mode. The worker reports `capture` only after both stream confirmation and an audible analyser sample; a silent stream stays in clock mode and is stopped after 2.5 seconds. Denied or silent requests retry after 30 seconds; transient failures retry after 3 seconds. Resume and unmute also retry. No in-memory “clicked” flag blocks retries after app/worker reloads.
+- **Live beat sync:** playing sessions automatically request browser capture. Actual detected onsets drive semantic rows. Tempo subdivisions carry timing/phase only and may retrigger an existing decorative shape; they never claim kick/snare/hat detections. Capture requires an audible analyser sample; quiet input keeps leased analysis running without claiming audibility or generating onsets. Capture expiration and interruption recover while playback remains active. Browser denial retains bounded retry and visible permission guidance.
 - **Browser permission:** automatic attempts do not grant permission. Chrome, Edge or Brave may require clicking **Kora Music Companion** on the music tab, especially after extension reload/revocation or on a new tab. A click retries immediately, including when done before Floating Focus opens. The app shows a visible **Open music tab** button and instructions on permission denial. Transient failures are not mislabeled as permission denial. Do not promise click-free capture when the browser revokes access.
 - **Developer ground truth:** **Beat debug (dev)** shows the selected session's actual mode/reason, capture ID, kick/snare/bass/hat counters, and per-session mode snapshots from discovery. Each `sync.state` event is tagged with the selected session/subscription. Only one session is captured; others honestly report clock mode (`not-selected`, `not-playing`, or `muted`). Actual failures report `silent`, `capture-permission` or the relevant failure code, not guessed DRM. Older companions reporting `drm-protected` show an update hint. Duplicate/stale onsets cannot add extra pops. Missing state/onset traffic expires capture mode even when clock updates keep arriving.
-- Capture uses `tabCapture`, `activeTab`, and an offscreen `USER_MEDIA` document. The documented audio-plus-video constraints use the same stream ID; video tracks are stopped immediately. Captured original audio is routed back to the speakers once because Chrome suppresses the original output during capture, with the disclosed delay only when AI notes are enabled. Nothing is recorded or uploaded.
+- Capture uses `tabCapture`, `activeTab`, and an offscreen `USER_MEDIA` document. The documented audio-plus-video constraints use the same stream ID; video tracks are stopped immediately. Captured original audio is routed back to the speakers once because Chrome suppresses the original output during capture. No model buffer delays playback. Nothing is recorded or uploaded.
 - Pause, ended playback, mute, session replacement, tab closure, navigation, and closing Floating Focus release capture. A six-second lease releases tracks if the app disappears without cleanup. The offscreen sampler runs at 60Hz with one reused FFT buffer; background documents do not reliably receive animation frames.
 - To remove access, disable/remove the extension in the browser's extension manager.
 
@@ -88,19 +102,29 @@ Document Picture-in-Picture must be supported by the browser. The browser-owned 
 
 ## Updating an existing installation
 
-Use Kora 0.1.12/web release with companion 0.3.12 for isolated instrumental notes.
-This companion patch confirms attack pitch and groups faint leading tails with
-the full attack, preventing double flashes at different audio-frame alignments.
-The new app rejects legacy broad-tone Melody events, leaving that row dark
-until the companion is updated and AI notes are enabled. Replace the unpacked
-folder with the new ZIP contents, click **Reload** on its card, and refresh
-Kora and the music tab once. Keep the extracted folder. No broad host access
-is added; the CSP permits the bundled WASM runtime. Install separately in
-each browser/profile. Browser permission can still require a toolbar click
-after restarting, opening a new music tab or reloading the extension.
-Silent input stops after 2.5 seconds plus the active audio delay so buffered
-music drains; pause, seek, rate change and source switch discard the buffer
-immediately. Resume/unmute or a toolbar click retries capture.
+Learned percussion weights are not included in public downloads while model
+distribution rights remain unresolved. Without them, local acoustic proposals
+cannot label Kick/Snare/Hat, and Bass remains available. The public package enables
+WASM but does not include private model/config/vendor files. Packaging preserves
+optional assets in the developer's unpacked source folder while excluding them
+from both release archives and the Desktop installer.
+
+An equipped Companion advertises `learnedPercussion` per discovered session.
+Desktop then uses that same browser capture/inference transport as Web, instead
+of overriding its typed events with a native PCM detector lacking those weights.
+Only one capture owner is selected. Browser capture may require a toolbar click;
+unequipped/older Companions retain the existing native PCM path. This is delivery
+compatibility, not a change to the learned model or Bass detector.
+
+Replace the unpacked folder with the ZIP matching the published Kora build,
+click **Reload** on its extension card, and refresh Kora and the music tab once.
+Keep the extracted folder and install separately in each browser/profile.
+Reload rereads local files; it does not download an update. Native installations
+can update the installed Companion resource folder without a repository checkout;
+see the [installation guide](../../src-tauri/README.md#development-and-distribution).
+Browser tab capture can still require a toolbar click after permission loss.
+Native Windows process capture remains automatic. Pause, seek, rate change and
+source switching discard stale scheduled events; quiet input retains analysis.
 
 See [BEAT-VALIDATION.md](./BEAT-VALIDATION.md) for API evidence, detector settings, and the live validation status.
 
@@ -117,9 +141,9 @@ Version 0.3.6 additionally confirmed real Apple Music capture on “Waiting For 
 
 ## Beat Grid telemetry
 
-Phase 0 adds local diagnostics to the existing pipeline. It does not change
-detectors, tempo selection, playback delays, recovery timers or decorative
-visuals. The current optional instrument models remain optional and unchanged.
+The established opt-in diagnostics remain across detection, scheduling,
+transport, controller, DOM commit and animation. Historical instrument-worker
+records remain readable, but retired workers no longer produce them.
 
 ### Enable and collect
 
@@ -138,7 +162,7 @@ console from the browser extension manager, then run:
 await chrome.storage.local.set({ beatTelemetryEnabled: true });
 ```
 
-Pause and resume after enabling. Native capture and instrument workers receive
+Pause and resume after enabling. Native capture receives
 the diagnostic setting when they start. Background/offscreen storage changes
 alone do not restart capture or affect playback.
 
@@ -150,7 +174,7 @@ console.table(trace.records);
 console.log(trace.counts, trace.evicted);
 ```
 
-The app, Companion background, offscreen document and instrument worker have
+The app, Companion background and offscreen document have
 separate buffers. Native transport observations enter the app's buffer. Closing
 an offscreen document or worker destroys its local buffer. At most 2,048 records
 are retained per realm; frequent analysis frames can evict older events quickly.
@@ -191,9 +215,8 @@ without invalidating an otherwise valid beat message.
 
 `detectedAt`, `at`, `emittedAt` and `renderedAt` are epoch milliseconds.
 `targetTime` is explicitly either `audio-seconds` or `epoch-ms`; never subtract
-timestamps from different domains. The native instrument scheduler records its
-existing remapping from worker audio time to the delayed visual timeline. It
-does not imply synchronization to the original audible note.
+timestamps from different domains. Historical native instrument-worker records
+describe the retired delayed timeline, not the current playback path.
 
 `EVENT_STATE_COMMITTED` observes controller state. `EVENT_COMMITTED` observes
 the renderer's DOM commit. `EVENT_RENDERED` observes CSS animation start, which
@@ -204,9 +227,9 @@ Several cells can report the same event ID with different animation delays.
 Native PCM retains its 16-byte binary header. Sequence/frame counters correlate
 the native channel and Web Audio buffering; no hardware capture timestamp is
 introduced. `queueDepth` is local to each component: event count in capture,
-pending messages in the runtime, buffered samples in worker batch records,
+pending messages in the runtime, buffered native samples,
 scheduled sources in the native engine, and unacknowledged packets in Rust.
-`durationMs` measures analyzer/tempo work or a worker inference batch only when
+`durationMs` measures analyzer/tempo work only when
 tracing is enabled.
 
 ### Diagnose a stopped grid
@@ -249,7 +272,7 @@ bounded backoff; pause/resume can retry immediately.
 Tempo ticks contain `step`, `phase`, `beatPosition` and `subdivision: 2` instead
 of instrument bands. The controller exposes a structural `tickCount`. Semantic
 rows use detected onsets even during tempo lock. Random patterns, held shapes,
-their tempo retriggers, CSS delays and optional note models remain unchanged.
+their tempo retriggers and decorative CSS delays remain.
 
 Late transport events (over 600 ms, up to 2 seconds old) are logged and coalesced
 to the latest event per kind before UI delivery. Older events expire and request
@@ -260,8 +283,8 @@ recovery does not promise correct rhythmic timing during a blocked UI.
 
 The analyzer's playback queue still drops events more than 600 ms past their
 audio deadline and continues with fresh detector events. At capacity it evicts
-the oldest enqueued work rather than rejecting new work. A late instrument
-batch drops missed notes without permanently disabling subsequent analysis.
+the oldest enqueued work rather than rejecting new work. Missed events expire
+without permanently disabling subsequent analysis.
 `EVENT_LATE` and `EVENT_DROPPED` retain provenance; `CAPTURE_RECOVERED` records
 returning audio or resumed delivery after a miss. `delivery-coalesced` and
 `delivery-late` identify transport recovery. No replacement semantic events are
@@ -284,7 +307,7 @@ become epoch deadlines, then song timestamps using the selected media clock.
 If supported, browser output timestamps supply the output-clock mapping.
 Absent/invalid/throwing capabilities use sampled context time. Native monitor
 audio is not speaker output; its mapping is an estimate, with the existing
-capture buffering and optional AI offset retained. Future capture timestamps
+native capture buffering estimate retained. Future capture timestamps
 can improve this boundary without changing the UI scheduler or event schema.
 No new capture timestamp or mandatory model is introduced.
 
@@ -307,8 +330,10 @@ semantic detection sources.
 Existing event IDs survive scheduling. DOM and animation offsets use the latest
 clock mapping; earlier producer mappings remain in transport records. Tempo,
 onsets, envelope/lifecycle messages and decorative shapes stay distinct. The
-five-row/eight-cell renderer and its intentional masks/CSS delays are unchanged,
-so scheduler release, DOM commit and delayed animation start are separate
+five-row/eight-cell renderer retains intentional random masks and decorative
+delays. Actual onsets guarantee one immediate selected-cell flash, including
+during held shapes; decorative effects retain their own provenance. Scheduler
+release, DOM commit and animation start remain separate
 measurements. Physical speaker/display latency is not inferred from DOM time.
 
 ### Cached Beat events and capability fallbacks

@@ -8,6 +8,7 @@ import { createWidgetBridge } from './widget-bridge.js';
 import { beatTelemetry } from './beat-telemetry.js';
 import { mediaAssetFromUrl } from './media-asset.js';
 import { authorizedLeadAudio } from './lead-audio-authorization.js';
+import { hasLearnedPercussion } from './percussion-capability.js';
 
 void chrome.storage.local.get('beatTelemetryEnabled').then((data) => beatTelemetry.enable(data.beatTelemetryEnabled === true)).catch(() => {});
 chrome.storage.onChanged.addListener((changes, area) => {
@@ -19,6 +20,7 @@ const beats = createBeatSync(chrome, (owner, event) => widget?.beat(owner, event
 const companion = createCompanionAction(chrome, beats, () => Boolean(widget?.connected));
 
 let scanInFlight;
+let learnedPercussion;
 
 async function scan() {
   if (scanInFlight) return scanInFlight;
@@ -47,12 +49,12 @@ async function scan() {
   try { return await scanInFlight; } finally { scanInFlight = undefined; }
 }
 
-const publicSessions = (items) => items.map((session) => {
+const publicSessions = (items, percussionAvailable = false) => items.map((session) => {
   const { id, title, artist, source, paused, playing, currentTime, playbackRate, sampledAt, selectionToken,
     duration, volume, muted, canSeek, canPrevious, canNext, asset } = session;
   return { id, title, artist, source, paused, playing, currentTime, playbackRate, sampledAt,
     duration, volume, muted, canSeek, canPrevious, canNext, asset,
-    canAnalyze: Boolean(chrome.offscreen && chrome.tabCapture?.getMediaStreamId && chrome.runtime.getContexts), syncState: beats.status(session),
+    canAnalyze: Boolean(chrome.offscreen && chrome.tabCapture?.getMediaStreamId && chrome.runtime.getContexts), learnedPercussion: percussionAvailable, syncState: beats.status(session),
   ...(selectionToken ? { selectionToken } : {}),
   };
 });
@@ -65,7 +67,10 @@ async function handle(message, sender) {
     await beats.stop(owner, message.subscriptionId); return { ok: true };
   }
   const sessions = await scan();
-  if (message.action === 'sessions.get') return { ok: true, sessions: publicSessions(await companion.prefer(sessions)) };
+  if (message.action === 'sessions.get') {
+    learnedPercussion ??= hasLearnedPercussion(chrome);
+    return { ok: true, sessions: publicSessions(await companion.prefer(sessions), await learnedPercussion) };
+  }
   const session = sessions.find((item) => item.id === message.sessionId);
   if (!session) return { ok: false, error: 'unavailable' };
   if (message.action === 'dock.audio.read') {

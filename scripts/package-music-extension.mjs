@@ -7,9 +7,9 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const extension = join(root, 'extensions', 'kanban-music');
 const output = join(root, 'public', 'downloads');
 
-// Rebuild generated resources so an incremental build cannot ship retired models.
-for (const path of ['extensions/kanban-music/generated', 'extensions/kanban-music/vendor',
-  'public/music-analysis', 'src-tauri/generated/music-companion']) {
+// Rebuild release resources; the explicit inventory excludes private/retired
+// models without deleting an existing developer's optional inference assets.
+for (const path of ['public/music-analysis', 'src-tauri/generated/music-companion']) {
   const target = join(root, path);
   if (!target.startsWith(root)) throw new Error('Generated resource outside project');
   await rm(target, { recursive: true, force: true });
@@ -84,10 +84,15 @@ await mkdir(join(extension, 'icons'), { recursive: true });
 for (const size of [16, 48, 128]) await writeFile(join(extension, 'icons', `${size}.png`), icon(size));
 const names = ['manifest.json', 'background.js', 'widget-bridge.js', 'sites.js', 'companion-action.js', 'media.js', 'media-observer.js', 'discovery-diagnostics.js', 'protocol.js', 'relay.js', 'clock.js', 'beat-sync.js', 'beat-detector.js', 'tempo-tracker.js', 'capture-engine.js', 'beat-telemetry.js', 'beat-timing.js', 'media-asset.js', 'offscreen.html', 'offscreen.js', 'setup.html', 'setup.js', 'setup.css', 'icons/16.png', 'icons/48.png', 'icons/128.png'];
 const files = await Promise.all(names.map(async (name) => ({ name, bytes: await readFile(join(extension, name)) })));
-for (const name of ['percussion-classifier.js', 'causal-percussion-classifier.js', 'percussion-features.js', 'percussion-worklet.js',
+for (const name of ['percussion-capability.js', 'percussion-classifier.js', 'causal-percussion-classifier.js', 'percussion-features.js', 'percussion-worklet.js',
   'percussion-worker.js', 'percussion-runtime.js', 'lead-audio-authorization.js', 'lead-audio-tap.js', 'lead-audio-worklet.js']) files.push({ name, bytes: await readFile(join(extension, name)) });
 // Reject broken runtime imports before writing either the ZIP or desktop bundle.
-// Private model weights and optional inference assets remain outside this package.
+// Note: Kora is non-commercial. Pretrained assets and dependencies are public.
+for (const name of ['generated/percussion/percussion.json', 'generated/percussion/percussion.onnx',
+  'vendor/percussion/ort.wasm.min.mjs', 'vendor/percussion/ort-wasm-simd-threaded.mjs',
+  'vendor/percussion/ort-wasm-simd-threaded.wasm', 'MODEL-NOTICE.txt']) {
+  files.push({ name, bytes: await readFile(join(extension, name)) });
+}
 const packagedNames = new Set(files.map(({ name }) => name));
 for (const { name, bytes } of files.filter(({ name }) => name.endsWith('.js'))) {
   for (const match of bytes.toString().matchAll(/from\s+["']\.\/([^"']+)["']/g)) {
