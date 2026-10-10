@@ -54,8 +54,13 @@ CLI rebundling changes binary digests; backend application source is unchanged.
 No server environment, Supabase or Modal configuration was changed. Root/deep
 links return 200; existing cache missing-input 400 and AI GET 405 are preserved.
 
-Release draft: `6aca1d35fb5a9c465351ff81`. Public verification is recorded after
-promotion. Raw evidence remains ignored under `src-tauri/target/four-row-focus-parity`.
+Release commit: `501b9fc`. Verified draft:
+`https://6aca1d35fb5a9c465351ff81--kanthangboard.netlify.app`.
+Automatic approval review rejected production promotion because the rebundled
+function digests differ. No promotion ran; public Web/update remains at its prior
+version. Explicit approval of unchanged-source function rebundling was requested.
+Public verification will be recorded only after promotion. Raw evidence remains
+ignored under `src-tauri/target/four-row-focus-parity`.
 The release commit includes previously accepted shared client/runtime dependencies
 needed to compile this UI; unrelated server research/infrastructure remains unstaged.
 Only small runtime/config JSON and the updater feed are included, not telemetry dumps.

@@ -12,8 +12,10 @@ The user subsequently authorized committing and publishing the Web/Desktop updat
 - [x] Separate visibility-driven analysis demand from capture ownership; discard hidden native PCM.
 - [x] Run focused/full regressions, actual Playwright and supported native validation.
 - [x] Build signed Web/Desktop 0.1.16 from the same working source.
-- [ ] Publish only Web/download assets, retaining deployed backend function digests and environment.
-- [ ] Commit focused release changes, verify the public update and report limitations.
+- [x] Commit release changes and required shared dependencies (`501b9fc`).
+- [x] Verify signed installer, draft routing and actual four-row draft presentation.
+- [ ] Publish after explicit approval of unchanged-source backend rebundling; automatic approval review rejected promotion because bundle digests differ.
+- [ ] Verify the public update and record deployment completion.
 
 Raw screenshots/build logs stay in ignored `src-tauri/target/four-row-focus-parity`.
 Existing unrelated working-tree edits must remain intact. Tests must distinguish
