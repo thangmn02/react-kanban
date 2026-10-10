@@ -14,8 +14,8 @@ The user subsequently authorized committing and publishing the Web/Desktop updat
 - [x] Build signed Web/Desktop 0.1.16 from the same working source.
 - [x] Commit release changes and required shared dependencies (`501b9fc`).
 - [x] Verify signed installer, draft routing and actual four-row draft presentation.
-- [ ] Publish after explicit approval of unchanged-source backend rebundling; automatic approval review rejected promotion because bundle digests differ.
-- [ ] Verify the public update and record deployment completion.
+- [x] Publish after explicit approval of unchanged-source backend rebundling.
+- [x] Verify the public update and record deployment completion (deploy `6aca1d35fb5a9c465351ff81`).
 
 Raw screenshots/build logs stay in ignored `src-tauri/target/four-row-focus-parity`.
 Existing unrelated working-tree edits must remain intact. Tests must distinguish

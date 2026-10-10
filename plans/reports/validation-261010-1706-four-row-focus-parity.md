@@ -56,11 +56,7 @@ links return 200; existing cache missing-input 400 and AI GET 405 are preserved.
 
 Release commit: `501b9fc`. Verified draft:
 `https://6aca1d35fb5a9c465351ff81--kanthangboard.netlify.app`.
-Automatic approval review rejected production promotion because the rebundled
-function digests differ. No promotion ran; public Web/update remains at its prior
-version. Explicit approval of unchanged-source function rebundling was requested.
-Public verification will be recorded only after promotion. Raw evidence remains
-ignored under `src-tauri/target/four-row-focus-parity`.
+Automatic approval review initially rejected the changed bundle digests. The user explicitly approved unchanged-source function rebundling, and production promotion succeeded on 2026-10-10 at 11:23:08 UTC. Public Web and the verified signed updater now serve 0.1.16. Installer hash/signature, public routing and existing API method/input checks passed after promotion. Raw evidence remains ignored under `src-tauri/target/four-row-focus-parity`.
 The release commit includes previously accepted shared client/runtime dependencies
 needed to compile this UI; unrelated server research/infrastructure remains unstaged.
 Only small runtime/config JSON and the updater feed are included, not telemetry dumps.
