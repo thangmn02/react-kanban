@@ -4,11 +4,17 @@ export async function createPercussionRuntime({ context, source, onEvent, signal
   if (signal?.aborted) return null;
   if (!context.audioWorklet || typeof AudioWorkletNode === 'undefined') return null;
   const response = await fetch(new URL('./generated/percussion/percussion.json', import.meta.url), { signal });
-  if (!response.ok) return null;
+  if (!response.ok) {
+    fetch('http://localhost:12345/', { method: 'POST', body: 'json fetch failed: ' + response.status }).catch(() => {});
+    return null;
+  }
   const config = await response.json();
   // Raw learned activations are private, explicitly requested diagnostics only.
   config.diagnostics = typeof onDiagnostic === 'function';
-  if (context.sampleRate !== config.sampleRate || config.version !== 1 || config.bins !== 84) return null;
+  if (context.sampleRate !== config.sampleRate || config.version !== 1 || config.bins !== 84) {
+    fetch('http://localhost:12345/', { method: 'POST', body: `Config mismatch: cSR=${context.sampleRate} c.v=${config.version} c.b=${config.bins}` }).catch(() => {});
+    return null;
+  }
   let live = true;
   let resolveReady;
   let timeout;
@@ -44,7 +50,10 @@ export async function createPercussionRuntime({ context, source, onEvent, signal
     }
   };
   worker.postMessage({ kind: 'init', config, model: new URL('./generated/percussion/percussion.onnx', import.meta.url).href });
-  if (!await ready) { stop(); return null; }
+  if (!await ready) { 
+    fetch('http://localhost:12345/', { method: 'POST', body: 'worker ready timeout or failed' }).catch(() => {});
+    stop(); return null; 
+  }
   clearTimeout(timeout);
   try {
     await context.audioWorklet.addModule(new URL('./percussion-worklet.js', import.meta.url));
@@ -53,5 +62,9 @@ export async function createPercussionRuntime({ context, source, onEvent, signal
     node.port.onmessage = ({ data }) => { if (live) worker.postMessage(data, [data.data.buffer]); };
     source.connect(node); node.connect(context.destination);
     return { stop };
-  } catch { stop(); return null; }
+  } catch (e) {
+    stop();
+    fetch('http://localhost:12345/', { method: 'POST', body: 'percussion-runtime.js error: ' + (e?.stack || e) }).catch(() => {});
+    return null;
+  }
 }

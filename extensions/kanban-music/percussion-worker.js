@@ -46,7 +46,7 @@ async function drain() {
             availableAudioTime: block.availableAudioTime, inferenceStartedAt, inferenceEndedAt: Date.now() } : {}) });
       }
     }
-  } catch { self.postMessage({ kind: 'failed' }); stopped = true; }
+  } catch (e) { self.postMessage({ kind: 'failed', error: String(e?.stack || e) }); stopped = true; }
   finally { running = false; }
 }
 self.onmessage = async ({ data }) => {
@@ -59,7 +59,7 @@ self.onmessage = async ({ data }) => {
       ort.env.wasm.wasmPaths = new URL('./vendor/percussion/', import.meta.url).href;
       session = await ort.InferenceSession.create(data.model, { executionProviders: ['wasm'] });
       self.postMessage({ kind: 'ready' }); void drain();
-    } catch { self.postMessage({ kind: 'failed' }); stopped = true; }
+    } catch (e) { self.postMessage({ kind: 'failed', error: String(e?.stack || e) }); stopped = true; }
   }
   if (data.kind === 'frames' && !stopped && data.times?.length === config?.stepFrames
     && data.data?.length === data.times.length * config.bins) {
