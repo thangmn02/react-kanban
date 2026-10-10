@@ -1,0 +1,6 @@
+/* Private listening page overrides after the shared dock stylesheet. */
+body { background: #121724; color: #edf1fa; font: 16px system-ui; max-width: 1100px; margin: 30px auto; padding: 0 18px; }
+button, select, textarea { font: inherit; color: inherit; background: #253047; border: 1px solid #8296bc; border-radius: 8px; padding: 9px; margin: 4px; }
+h2 { font-size: 20px; margin: 18px 0 8px; }
+.melody-fixture-grid { margin: 18px 0; max-width: 850px; }
+.melody-fixture-grid .beat-square { aspect-ratio: 2.5; }

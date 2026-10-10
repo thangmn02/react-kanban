@@ -35,20 +35,16 @@ function ensureFeed() {
 export async function requestNativeMusic(action: string, sessionId?: string, subscriptionId?: string, value?: number): Promise<Record<string, unknown>> {
   await ensureFeed();
   if (action === 'dock.beat.sync.stop' && sessionId && subscriptionId) audio.stop(sessionId, subscriptionId);
-  // The desktop PCM bundle has no distributed learned weights. An equipped
-  // Companion must own capture/inference, just as it does for the Web client.
-  const companionInference = !!sessionId && learnedSessions.has(sessionId);
-  if (action === 'dock.beat.sync.start' && companionInference && sessionId && subscriptionId) audio.stop(sessionId, subscriptionId);
   const response = await invoke<Record<string, unknown>>('native_music_request', { action, sessionId, subscriptionId,
     ...(value !== undefined ? { value } : {}),
-    ...(action === 'dock.beat.sync.start' ? { nativeAudio: !companionInference } : {}) });
+    ...(action === 'dock.beat.sync.start' ? { nativeAudio: true } : {}) });
   if (action === 'sessions.get') {
     learnedSessions.clear();
     if (response.ok === true && Array.isArray(response.sessions)) for (const session of response.sessions) {
       if (session && typeof session.id === 'string' && session.learnedPercussion === true) learnedSessions.add(session.id);
     }
   }
-  if (response.ok === true && action === 'dock.beat.sync.start' && !companionInference && sessionId && subscriptionId) audio.activate(sessionId, subscriptionId);
+  if (response.ok === true && action === 'dock.beat.sync.start' && sessionId && subscriptionId) audio.activate(sessionId, subscriptionId);
   return response;
 }
 export function subscribeNativeMusic(receive: (value: unknown) => void) {

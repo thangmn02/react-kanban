@@ -1,5 +1,12 @@
 # Beat sync validation
 
+This is a historical release-validation record. The Spleeter model path,
+instrument workers and verification scripts described below have since been
+retired. Their results do not validate the current cached Melody path. See the
+[current quality report](../../plans/reports/diagnosis-261007-1024-five-row-quality.md)
+and [EventTrack contract](../../docs/beat-event-cache.md) for current behavior
+and remaining acceptance checks.
+
 ## Version 0.3.13 / Kora 0.1.14 — automatic native capture
 
 Windows captures only the browser process tree owning the accepted Companion
@@ -44,7 +51,7 @@ The first four rows retain their own detectors and tempo phase correction.
 
 Opt-in source analysis uses four real Spleeter ONNX models (vocals, drums,
 bass, other), pinned and SHA-256 verified by
-[instrument-models.js](./instrument-models.js). Executable ONNX Runtime Web
+the former `instrument-models.js`. Executable ONNX Runtime Web
 and FFT code/WASM ship locally in the extension; only model data downloads.
 The fully convolutional exports use 128-frame windows with unchanged weights
 and operators. The protobuf adaptation was compared byte-for-byte with Python
@@ -98,8 +105,8 @@ stream with FFmpeg, e.g. `ffmpeg -i input.stem.mp4 -map 0:a:3 -ar 44100 -ac 2
 -f f32le fixture-0-other.f32`; stream indices are mixture=0, drums=1, bass=2,
 other=3, vocals=4. Audio fixtures and model binaries are not committed.
 
-Privacy and licensing: see [INSTRUMENT-NOTICES.md](./INSTRUMENT-NOTICES.md) and
-the packaged third-party licenses. Model setup explicitly discloses download,
+Historical privacy and licensing were documented in the former
+`INSTRUMENT-NOTICES.md` and packaged third-party licenses. Model setup disclosed download,
 delay and limitations before enabling it. Live service permission, first-time
 options-page download and full-song listening on the user's installed browser
 remain separate acceptance checks.

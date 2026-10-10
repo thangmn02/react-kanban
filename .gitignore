@@ -18,6 +18,8 @@ lerna-debug.log*
 # Dependencies and build outputs
 # =========================================================
 node_modules/
+__pycache__/
+*.pyc
 /extensions/kanban-music/generated/
 /extensions/kanban-music/vendor/
 dist/
@@ -38,6 +40,7 @@ coverage/
 # Test outputs
 playwright-report/
 test-results/
+/.playwright-mcp/
 
 # Netlify CLI local state
 .netlify/

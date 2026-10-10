@@ -1,4 +1,5 @@
 import { createCaptureEngine } from './capture-engine.js';
+import { createPercussionRuntime } from './percussion-runtime.js';
 import { beatTelemetry } from './beat-telemetry.js';
 const telemetry = beatTelemetry.at('native-audio-engine');
 
@@ -8,6 +9,7 @@ export function createNativeAudioEngine(options) {
   let context, destination, nextTime = 0, live = false, ready = false, generation = 0;
   const sources = new Set();
   const engine = createCaptureEngine({ ...options, monitorOnly: true,
+    createPercussion: createPercussionRuntime,
     createAudioContext() {
       context = new AudioContext({ sampleRate: 44100, latencyHint: 'interactive' });
       destination = context.createMediaStreamDestination();

@@ -1,4 +1,5 @@
 import { createCaptureEngine } from './capture-engine.js';
+import { createPercussionRuntime } from './percussion-runtime.js';
 import { beatTelemetry } from './beat-telemetry.js';
 const telemetry = beatTelemetry.at('offscreen');
 
@@ -13,6 +14,7 @@ const engine = createCaptureEngine({
   onAudible: (captureId) => send({ kind: 'audible', captureId }),
   onStop: (captureId, reason) => send({ kind: 'stopped', captureId, reason,
     ...(engine.lastFailure ? { captureError: engine.lastFailure } : {}) }),
+  createPercussion: createPercussionRuntime,
 });
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (sender.id !== chrome.runtime.id || sender.tab || message?.target !== 'beat-offscreen') return false;

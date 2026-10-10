@@ -77,6 +77,12 @@ numbers duplicate names consistently so separate workspaces are distinguishable.
 The selected workspace, pinned focus tasks, timer settings and current Pomodoro
 cycle remain local to each browser or desktop app; they are not cloud-synced.
 
+**Focus** is the single navigation entry for the existing dock's Tasks, Music
+and Beat Grid views. It opens in the application page, even without pinned tasks;
+it does not launch a floating window. **Pop out timer / Pop out dock** explicitly
+moves that experience into the supported window. Old Music/Beat Grid links select
+the corresponding Focus tab. See [Focus workflow](docs/focus-workflow.md).
+
 ---
 
 ## Quick start — local mode
@@ -331,6 +337,9 @@ Navigation is URL-addressable. The browser URL is the single source of truth
 | `npm run build` | Type-check (`tsc -b`) then build (`vite build`) |
 | `npm run typecheck` | Type-check only (`tsc -b`, project references) |
 | `npm run test:ci` | Run tests with coverage (CI gate) |
+| `npm run test:select` | Print affected tests, browser journeys and selection reasons |
+| `npm run test:affected` | Mandatory quality checks plus dependency-selected test lanes |
+| `npm run test:impact` | Verify the test selector's conservative selection invariants |
 | `npm run bundle-size` | Enforce the 1 MB main-entry bundle budget |
 | `npm run e2e` | Playwright E2E (local mock mode) |
 | `npm run quality` | lint + typecheck + test:ci + build + bundle-size |
@@ -338,6 +347,39 @@ Navigation is URL-addressable. The browser URL is the single source of truth
 
 Tests run in jsdom via Vitest. Coverage is collected through
 `@vitest/coverage-v8`.
+
+For development, `npm run test:affected` considers staged, unstaged and untracked
+files. To compare a branch with main, use
+`npm run test:affected -- --base origin/main`. Inspect the same selection first
+with `npm run test:select -- --base origin/main`. Selection follows transitive
+imports, re-exports, type imports, literal dynamic imports, test mocks and local
+asset imports. Shared media contracts also select Web/Companion regression,
+Python analysis contracts and Windows Rust tests.
+
+`--lane unit` or `--lane browser` provides an explicitly narrower feedback run;
+the default runs full lint, typecheck, packaging/build and bundle-budget checks
+as well. Python contracts need Python 3.10 and NumPy; set `KORA_TEST_PYTHON` when
+using a separate environment. Native tests require Windows and the Rust/Tauri
+toolchain. Install the test browser with `npx playwright install chromium`.
+Use `--files path/to/file.ts` for an impact preview, not to hide other changes.
+
+PRs targeting main select tests and browser journeys from their base/head diff.
+Full lint, typecheck, build, bundle budget and database/RLS checks remain
+mandatory. Main pushes, the nightly run, published releases and manual CI runs
+perform full JavaScript, mock/public-auth browser, Python and Windows regression.
+The existing signed Windows build workflow remains separate.
+
+Unknown changes, missing Git history, deleted files, global configuration,
+unresolvable runtime dependencies, uncovered source modules or missing mapped
+browser tests trigger full regression. Coverage collection remains enabled;
+partial PR coverage is not comparable to full-suite coverage. No tests or
+coverage gates are removed.
+
+Browser tests own mock port 5183 and public-auth port 5184, use strict ports and
+never reuse the signed-in development server on 5173. An occupied test port
+fails instead of silently changing ports. Playwright stops its servers on exit.
+Selection JSON, timings and browser traces belong in ignored
+`src-tauri/target/test-impact/`, `test-results/` or `coverage/`.
 
 ---
 

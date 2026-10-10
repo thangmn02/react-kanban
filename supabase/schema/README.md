@@ -80,6 +80,16 @@ transaction; all 21 hosted pgTAP checks passed and migration history was left
 intact. This exception does not authorize baseline replay or history repair.
 See [Contact setup](../../docs/contact-setup.md) for its operational route.
 
+The owner separately authorized the demand-driven Beat cache on 2026-10-07.
+After a fresh encrypted backup and a 51-table restore drill,
+`20261007080000_sparse_beat_cache.sql` was applied and its own migration version
+recorded. No baseline replay or unrelated history repair was performed. The
+private EventTrack Storage bucket and service-role-only range/demand RPCs are
+owned by that migration; see [Beat analysis](../../docs/server-beat-analysis.md).
+Logical database backups contain object metadata, not the EventTrack JSON
+objects themselves. Include private object backups in an operational recovery
+plan before relying on cached data as irreplaceable input.
+
 ## Hosted inspection evidence (2026-07-13)
 
 ```powershell

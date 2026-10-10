@@ -1,0 +1,4 @@
+# Optional private Lead worker dependency; rights review required before deployment.
+# Keep this out of the legacy worker until BEAT_LEAD_PIPELINE is explicitly enabled.
+essentia==2.1b6.dev1438
+numpy==2.5.3

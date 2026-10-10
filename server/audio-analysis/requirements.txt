@@ -1,0 +1,11 @@
+numpy==1.26.4
+setuptools==80.9.0
+torch==2.0.1
+torchaudio==2.0.2
+demucs==4.0.1
+basic-pitch[onnx]==0.4.0
+librosa==0.10.2.post1
+soundfile==0.12.1
+imageio-ffmpeg==0.6.0
+yt-dlp==2026.8.19
+adtof-pytorch @ git+https://github.com/xavriley/ADTOF-pytorch.git@85c192e78f716ea0b111cc8a5ee4a8f6a3a4f8a9

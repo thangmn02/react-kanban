@@ -55,19 +55,20 @@ for (const path of ['/tasks', '/today', '/music', '/beat-grid', '/focus', '/work
   });
 }
 
-test('a Home feature click signs in and returns to the actual Beat Grid', async ({ page }) => {
+test('a Home Focus click signs in and retains its internal Beat Grid and Music views', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Beat grid', exact: true }).filter({ visible: true }).click();
-  await expect(page).toHaveURL(/\/auth\/sign-in\?returnTo=%2Fbeat-grid$/);
+  await page.getByRole('button', { name: 'Focus', exact: true }).filter({ visible: true }).click();
+  await expect(page).toHaveURL(/\/auth\/sign-in\?returnTo=%2Ffocus$/);
   await page.getByLabel('Email', { exact: true }).fill('reader@example.com');
   await page.getByLabel('Password', { exact: true }).fill('valid-password');
   await page.getByRole('button', { name: 'Sign in', exact: true }).last().click();
-  await expect(page).toHaveURL(/\/beat-grid$/);
+  await expect(page).toHaveURL(/\/focus$/);
+  await page.getByRole('tab', { name: 'Beat grid', exact: true }).click();
   await expect(page.getByRole('tab', { name: 'Beat grid', exact: true })).toHaveAttribute('aria-selected', 'true');
   await page.reload();
   await expect(page.getByRole('tab', { name: 'Beat grid', exact: true })).toHaveAttribute('aria-selected', 'true');
-  await page.getByRole('button', { name: 'Music', exact: true }).filter({ visible: true }).click();
-  await expect(page).toHaveURL(/\/music$/);
+  await page.getByRole('tab', { name: 'Music', exact: true }).click();
+  await expect(page).toHaveURL(/\/focus\?tab=music$/);
   await expect(page.getByRole('tab', { name: 'Music', exact: true })).toHaveAttribute('aria-selected', 'true');
 });
 

@@ -43,16 +43,16 @@ async function startDetector() {
 it('routes browser companion metadata through the native event transport', async () => {
   await expect(sendMusicRequest('sessions.get')).resolves.toEqual([expect.objectContaining({ title: 'Browser song', source: 'music.youtube.com' })]);
 });
-it('uses equipped Companion inference for all four native rows without a competing PCM detector', async () => {
+it('uses local ONNX inference for all four native rows with a native audio feed', async () => {
   native.learned = true;
   const view = render(<I18nProvider><Harness /></I18nProvider>);
   await waitFor(() => expect(native.subscription).not.toBe(''));
-  expect(invoke).toHaveBeenCalledWith('native_music_request', expect.objectContaining({ action: 'dock.beat.sync.start', nativeAudio: false }));
+  expect(invoke).toHaveBeenCalledWith('native_music_request', expect.objectContaining({ action: 'dock.beat.sync.start', nativeAudio: true }));
   act(() => emit({ kind: 'clock', clock: { playing: true, paused: false, currentTime: 1, playbackRate: 1, sampledAt: Date.now() } }));
-  act(() => emit({ kind: 'sync.state', mode: 'capture', captureId: 'companion-learned' }));
-  act(() => emit({ kind: 'onset', captureId: 'companion-learned', sequence: 1, bands: ['kick', 'clap', 'hat', 'bass'] }));
+  await waitFor(() => expect(native.detectors).toHaveLength(1));
+  act(() => native.detectors[0].options.onAudible(native.detectors[0].id));
+  act(() => native.detectors[0].options.onBeat(native.detectors[0].id, ['kick', 'clap', 'hat', 'bass']));
   await waitFor(() => expect(view.container.querySelectorAll('[data-channel] .beat-square.onset').length).toBeGreaterThanOrEqual(4));
-  expect(native.detectors).toHaveLength(0);
   act(() => emit({ kind: 'clock', clock: { playing: false, paused: true, currentTime: 1.2, playbackRate: 1, sampledAt: Date.now() } }));
   expect(view.container.querySelectorAll('.beat-square.onset')).toHaveLength(0);
 });

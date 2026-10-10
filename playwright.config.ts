@@ -13,7 +13,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: 'list',
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: 'http://127.0.0.1:5183',
     screenshot: 'only-on-failure',
     trace: 'on-first-retry',
   },
@@ -24,9 +24,9 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'node ./node_modules/vite/bin/vite.js --host 127.0.0.1 --port 5173',
-    url: 'http://localhost:5173',
-    reuseExistingServer: !process.env.CI,
+    command: 'node ./node_modules/vite/bin/vite.js --host 127.0.0.1 --port 5183 --strictPort',
+    url: 'http://127.0.0.1:5183',
+    reuseExistingServer: false,
     timeout: 120_000,
     env: {
       VITE_AUTH_MODE: 'mock',

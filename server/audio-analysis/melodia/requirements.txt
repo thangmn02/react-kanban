@@ -1,0 +1,5 @@
+# Private WSL Python 3.14.4 environment; no frontend or production dependencies.
+essentia==2.1b6.dev1438
+numpy==2.5.3
+PyYAML==6.0.3
+six==1.17.0
