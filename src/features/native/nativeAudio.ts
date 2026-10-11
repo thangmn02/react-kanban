@@ -148,7 +148,7 @@ export function createNativeAudioFeed(publish: (message: Message) => void,
       }
       // The Companion remains the clock/control transport. Its clock-only
       // status cannot overwrite analyser-confirmed native capture.
-      const overridden = current?.sessionId === data.sessionId && current.subscriptionId === data.subscriptionId && data.kind !== 'clock';
+      const overridden = current?.sessionId === data.sessionId && current.subscriptionId === data.subscriptionId && Boolean(current.audible) && data.kind !== 'clock';
       if (overridden) telemetry.mark('EVENT_DROPPED', parseBeatTraces(data.telemetry), { reason: 'native-override' });
       return !overridden;
     },

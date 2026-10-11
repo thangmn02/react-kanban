@@ -49,13 +49,20 @@ export async function createPercussionRuntime({ context, source, onEvent, signal
   if (!await ready) { stop(); return null; }
   clearTimeout(timeout);
   try {
-    await context.audioWorklet.addModule(new URL('./percussion-worklet.js', import.meta.url));
+    let workletUrl = new URL('./percussion-worklet.js', import.meta.url);
+    if (workletUrl.protocol === 'data:') {
+      const res = await fetch(workletUrl);
+      const text = await res.text();
+      workletUrl = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
+    }
+    await context.audioWorklet.addModule(workletUrl);
     if (!live) return null;
     node = new AudioWorkletNode(context, 'kora-percussion-features', { processorOptions: config });
     node.port.onmessage = ({ data }) => { if (live) worker.postMessage(data, [data.data.buffer]); };
     source.connect(node); node.connect(context.destination);
     return { stop };
-  } catch {
+  } catch (error) {
+    telemetry.record('EVENT_DROPPED', undefined, { reason: 'worklet-module-failed', error: String(error?.message || error) });
     stop();
     return null;
   }
