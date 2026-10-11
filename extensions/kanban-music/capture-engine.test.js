@@ -285,3 +285,19 @@ it('preserves learned confidence, original audio time and observable late-event 
   expect(beatTelemetry.snapshot().records.some(r => r.stage === 'EVENT_DROPPED' && r.reason === 'late')).toBe(true);
   f.engine.stop();
 });
+it('falls back to acoustic detection for all 4 rows when learned percussion is unavailable or inactive', async () => {
+  const f = fixture();
+  f.deps.createPercussion = vi.fn().mockResolvedValue(null);
+  const engine = createCaptureEngine(f.deps);
+  await engine.start('stream', 'acoustic-fallback');
+  await vi.advanceTimersByTimeAsync(450);
+  f.analyser.getFloatFrequencyData = percussionSpectrum;
+  await vi.advanceTimersByTimeAsync(20);
+  expect(f.deps.onBeat).toHaveBeenCalled();
+  const deliveredBands = f.deps.onBeat.mock.calls.flatMap(([, bands]) => bands);
+  expect(deliveredBands).toContain('kick');
+  expect(deliveredBands).toContain('clap');
+  expect(deliveredBands).toContain('hat');
+  expect(deliveredBands).toContain('bass');
+  engine.stop();
+});

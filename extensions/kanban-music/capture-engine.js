@@ -110,13 +110,16 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
         const at = now() + (event.audioTime - state.context.currentTime) * 1000;
         if (event.band === 'kick') tempo.snapToBeat(at);
         drumHits.push(at);
+        state.lastLearnedTime = now();
         const trace = telemetry.events('onset', [event.band], { captureId,
           origin: 'local-detector', confidence: event.confidence, targetTime: event.audioTime, targetClock: 'audio-seconds' });
         percussionTelemetry.mark('EVENT_DETECTED', trace, { semantic: true });
         enqueue('beat', [event.band], event.audioTime, trace);
       } }).then(runtime => {
-        if (active === state) state.percussion = runtime;
-        else runtime?.stop();
+        if (active === state) {
+          state.percussion = runtime;
+          if (runtime) state.percussionReadyAt = now();
+        } else runtime?.stop();
       }).catch(() => { telemetry.record('EVENT_DROPPED', undefined, { captureId, reason: 'worker-failed' }); });
       stream.getAudioTracks().forEach((track) => track.addEventListener('ended', () => {
         if (active === state) stop('ended');
@@ -134,7 +137,17 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
         const rhythm = tempo.analyze(result.envelope, time);
         telemetry.record('ANALYSIS_FRAME', undefined, { captureId, audioTime: state.context.currentTime, queueDepth: state.events.length,
           ...(beatTelemetry.enabled ? { durationMs: performance.now() - analysisAt } : {}) });
-        if (result.hits.some(band => band !== 'bass')) {
+        const learnedActive = Boolean(
+          state.percussion && (
+            (state.lastLearnedTime && (time - state.lastLearnedTime < 1500)) ||
+            (!state.lastLearnedTime && state.percussionReadyAt && (time - state.percussionReadyAt < 1000))
+          )
+        );
+        if (!learnedActive) {
+          if (rhythm.locked && result.hits.includes('kick')) tempo.snapToBeat(time);
+          for (const band of result.hits) if (band === 'kick' || band === 'clap' || band === 'hat') drumHits.push(time);
+        }
+        if (learnedActive && result.hits.some(band => band !== 'bass')) {
           const proposals = telemetry.events('onset', ['generic'], { captureId, origin: 'local-detector' });
           telemetry.mark('EVENT_DETECTED', proposals, { semantic: false });
         }
@@ -154,7 +167,8 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
         }
         // Quiet audio is not an ended stream. The owner lease still bounds its
         // lifetime; sampling continues so returning audio needs no new capture.
-        if (result.hits.includes('bass')) enqueue('beat', ['bass']);
+        const activeHits = learnedActive ? (result.hits.includes('bass') ? ['bass'] : []) : result.hits;
+        if (activeHits.length) enqueue('beat', activeHits);
         if (rhythm.updated) enqueue('tempo', { locked: tempoLocked, bpm: tempoLocked ? rhythm.bpm : null, confidence: rhythm.confidence });
         if (tempoLocked && rhythm.tick) enqueue('tick', rhythm.tick);
         const audioTime = state.context.currentTime ?? time / 1000;
