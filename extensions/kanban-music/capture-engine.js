@@ -137,17 +137,7 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
         const rhythm = tempo.analyze(result.envelope, time);
         telemetry.record('ANALYSIS_FRAME', undefined, { captureId, audioTime: state.context.currentTime, queueDepth: state.events.length,
           ...(beatTelemetry.enabled ? { durationMs: performance.now() - analysisAt } : {}) });
-        const learnedActive = Boolean(
-          state.percussion && (
-            (state.lastLearnedTime && (time - state.lastLearnedTime < 1500)) ||
-            (!state.lastLearnedTime && state.percussionReadyAt && (time - state.percussionReadyAt < 1000))
-          )
-        );
-        if (!learnedActive) {
-          if (rhythm.locked && result.hits.includes('kick')) tempo.snapToBeat(time);
-          for (const band of result.hits) if (band === 'kick' || band === 'clap' || band === 'hat') drumHits.push(time);
-        }
-        if (learnedActive && result.hits.some(band => band !== 'bass')) {
+        if (result.hits.some(band => band !== 'bass')) {
           const proposals = telemetry.events('onset', ['generic'], { captureId, origin: 'local-detector' });
           telemetry.mark('EVENT_DETECTED', proposals, { semantic: false });
         }
@@ -167,8 +157,7 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
         }
         // Quiet audio is not an ended stream. The owner lease still bounds its
         // lifetime; sampling continues so returning audio needs no new capture.
-        const activeHits = learnedActive ? (result.hits.includes('bass') ? ['bass'] : []) : result.hits;
-        if (activeHits.length) enqueue('beat', activeHits);
+        if (result.hits.includes('bass')) enqueue('beat', ['bass']);
         if (rhythm.updated) enqueue('tempo', { locked: tempoLocked, bpm: tempoLocked ? rhythm.bpm : null, confidence: rhythm.confidence });
         if (tempoLocked && rhythm.tick) enqueue('tick', rhythm.tick);
         const audioTime = state.context.currentTime ?? time / 1000;
