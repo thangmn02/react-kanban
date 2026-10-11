@@ -46,7 +46,7 @@ async function drain() {
             availableAudioTime: block.availableAudioTime, inferenceStartedAt, inferenceEndedAt: Date.now() } : {}) });
       }
     }
-  } catch (e) { self.postMessage({ kind: 'failed', error: String(e?.stack || e) }); stopped = true; }
+  } catch { self.postMessage({ kind: 'failed' }); stopped = true; }
   finally { running = false; }
 }
 self.onmessage = async ({ data }) => {
@@ -54,15 +54,12 @@ self.onmessage = async ({ data }) => {
     try {
       config = data.config;
       classifier = config.classifier === 'causal' ? new CausalPercussionClassifier() : new PercussionClassifier();
-      ort = await import(/* @vite-ignore */ './vendor/percussion/ort.wasm.min.mjs');
+      ort = await import('./vendor/percussion/ort.wasm.min.mjs');
       ort.env.wasm.numThreads = 1; ort.env.wasm.proxy = false;
-      ort.env.wasm.wasmPaths = {
-        mjs: new URL('./vendor/percussion/ort-wasm-simd-threaded.mjs', import.meta.url).href,
-        wasm: new URL('./vendor/percussion/ort-wasm-simd-threaded.wasm', import.meta.url).href,
-      };
+      ort.env.wasm.wasmPaths = new URL('./vendor/percussion/', import.meta.url).href;
       session = await ort.InferenceSession.create(data.model, { executionProviders: ['wasm'] });
       self.postMessage({ kind: 'ready' }); void drain();
-    } catch (e) { self.postMessage({ kind: 'failed', error: String(e?.stack || e) }); stopped = true; }
+    } catch { self.postMessage({ kind: 'failed' }); stopped = true; }
   }
   if (data.kind === 'frames' && !stopped && data.times?.length === config?.stepFrames
     && data.data?.length === data.times.length * config.bins) {

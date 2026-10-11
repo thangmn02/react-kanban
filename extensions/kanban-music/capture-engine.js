@@ -110,16 +110,13 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
         const at = now() + (event.audioTime - state.context.currentTime) * 1000;
         if (event.band === 'kick') tempo.snapToBeat(at);
         drumHits.push(at);
-        state.lastLearnedTime = now();
         const trace = telemetry.events('onset', [event.band], { captureId,
           origin: 'local-detector', confidence: event.confidence, targetTime: event.audioTime, targetClock: 'audio-seconds' });
         percussionTelemetry.mark('EVENT_DETECTED', trace, { semantic: true });
         enqueue('beat', [event.band], event.audioTime, trace);
       } }).then(runtime => {
-        if (active === state) {
-          state.percussion = runtime;
-          if (runtime) state.percussionReadyAt = now();
-        } else runtime?.stop();
+        if (active === state) state.percussion = runtime;
+        else runtime?.stop();
       }).catch(() => { telemetry.record('EVENT_DROPPED', undefined, { captureId, reason: 'worker-failed' }); });
       stream.getAudioTracks().forEach((track) => track.addEventListener('ended', () => {
         if (active === state) stop('ended');

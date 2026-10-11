@@ -47,7 +47,6 @@ export default defineConfig(({ mode }) => ({
     watch: { ignored: ['**/src-tauri/target/**'] },
   },
   build: {
-    assetsInlineLimit: 0,
     rollupOptions: {
       output: {
         // Vite 8 ships Rolldown, whose manualChunks is typed as a function

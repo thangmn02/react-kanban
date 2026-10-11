@@ -32,9 +32,7 @@ export async function createPercussionRuntime({ context, source, onEvent, signal
   worker.onmessage = ({ data }) => {
     if (!live) return;
     if (data.kind === 'ready') resolveReady(true);
-    if (data.kind === 'failed') { 
-      telemetry.record('EVENT_DROPPED', undefined, { reason: 'worker-failed' }); resolveReady(false); stop(); 
-    }
+    if (data.kind === 'failed') { telemetry.record('EVENT_DROPPED', undefined, { reason: 'worker-failed' }); resolveReady(false); stop(); }
     if (data.kind === 'backlog') telemetry.record('EVENT_DROPPED', undefined, { reason: 'worker-backlog' });
     if (data.kind === 'result') {
       telemetry.record('WORKER_BATCH', undefined, { queueDepth: data.queueDepth, durationMs: data.durationMs });
@@ -49,21 +47,11 @@ export async function createPercussionRuntime({ context, source, onEvent, signal
   if (!await ready) { stop(); return null; }
   clearTimeout(timeout);
   try {
-    let workletUrl = new URL('./percussion-worklet.js', import.meta.url);
-    if (workletUrl.protocol === 'data:') {
-      const res = await fetch(workletUrl);
-      const text = await res.text();
-      workletUrl = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
-    }
-    await context.audioWorklet.addModule(workletUrl);
+    await context.audioWorklet.addModule(new URL('./percussion-worklet.js', import.meta.url));
     if (!live) return null;
     node = new AudioWorkletNode(context, 'kora-percussion-features', { processorOptions: config });
     node.port.onmessage = ({ data }) => { if (live) worker.postMessage(data, [data.data.buffer]); };
     source.connect(node); node.connect(context.destination);
     return { stop };
-  } catch (error) {
-    telemetry.record('EVENT_DROPPED', undefined, { reason: 'worklet-module-failed', error: String(error?.message || error) });
-    stop();
-    return null;
-  }
+  } catch { stop(); return null; }
 }

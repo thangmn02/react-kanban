@@ -3,13 +3,7 @@ export const LEAD_AUDIO_FRAMES = 8820;
 
 export async function createLeadAudioTap({ context, source, Node = globalThis.AudioWorkletNode }) {
   if (context.sampleRate !== 44100 || !context.audioWorklet || !Node) return null;
-  let workletUrl = new URL('./lead-audio-worklet.js', import.meta.url);
-  if (workletUrl.protocol === 'data:') {
-    const res = await fetch(workletUrl);
-    const text = await res.text();
-    workletUrl = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
-  }
-  await context.audioWorklet.addModule(workletUrl);
+  await context.audioWorklet.addModule(new URL('./lead-audio-worklet.js', import.meta.url));
   const node = new Node(context, 'kora-lead-audio');
   let packet;
   node.port.onmessage = ({ data }) => {
