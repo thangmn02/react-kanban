@@ -8,6 +8,15 @@ export class PercussionFeatures {
     this.magnitude = new Float64Array(config.fftSize / 2);
     this.window = Float32Array.from({ length: config.fftSize }, (_, i) => .5 - .5 * Math.cos(2 * Math.PI * i / (config.fftSize - 1)));
     this.reverse = new Uint16Array(config.fftSize);
+    // Immutable twiddles are shared by all butterflies at a given FFT stage.
+    // Compute them once off the rendering hot path, with the same precision.
+    this.twiddles = new Map();
+    for (let length = 2; length <= config.fftSize; length *= 2) {
+      const angle = -2 * Math.PI / length;
+      const cosine = Float64Array.from({ length: length / 2 }, (_, k) => Math.cos(angle * k));
+      const sine = Float64Array.from({ length: length / 2 }, (_, k) => Math.sin(angle * k));
+      this.twiddles.set(length, { cosine, sine });
+    }
     for (let i = 0; i < config.fftSize; i++) {
       let value = i;
       let reversed = 0;
@@ -33,12 +42,12 @@ export class PercussionFeatures {
     }
     for (let length = 2; length <= size; length *= 2) {
       const half = length / 2;
-      const angle = -2 * Math.PI / length;
+      const twiddle = this.twiddles.get(length);
       for (let start = 0; start < size; start += length) for (let k = 0; k < half; k++) {
         const a = start + k;
         const b = a + half;
-        const cosine = Math.cos(angle * k);
-        const sine = Math.sin(angle * k);
+        const cosine = twiddle.cosine[k];
+        const sine = twiddle.sine[k];
         const real = this.real[b] * cosine - this.imag[b] * sine;
         const imag = this.real[b] * sine + this.imag[b] * cosine;
         this.real[b] = this.real[a] - real;

@@ -14,7 +14,7 @@ interface MusicSelection {
   explicitSelection: boolean;
   selectionToken: string;
 }
-const isPlaying = (session: BrowserMusicSession | undefined) => Boolean(session && !session.paused && session.playing !== false);
+const isPlaying = (session: BrowserMusicSession | undefined) => Boolean(session && !session.paused && session.playing !== false && !session.muted);
 
 function updateSelection(current: MusicSelection, next: BrowserMusicSession[], toolbar = false): MusicSelection {
   const sessions = mergeMusicSessions(current.sessions, next);

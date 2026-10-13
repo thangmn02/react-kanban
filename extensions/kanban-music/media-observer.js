@@ -1,7 +1,8 @@
 // MAIN-world, document-start hook. Some players keep new Audio() outside the
 // DOM. Observe standard media APIs, not site-specific controls or page state.
 (() => {
-  if (globalThis.__kanbanMusicMedia?.version === 1) return;
+  if (globalThis.__kanbanMusicMedia?.version === 2) return;
+  globalThis.__kanbanMusicMedia?.dispose();
   const entries = new Map();
   const ids = new WeakMap();
   let nextId = 0;
@@ -14,6 +15,12 @@
   const source = (media) => media.currentSrc || (typeof media.srcObject?.id === 'string' ? `stream:${media.srcObject.id}` : '');
   const list = () => {
     document.querySelectorAll('audio,video').forEach(track);
+    // The SDK song transport owns Spotify identity and time. Retained media
+    // and decorative videos must never inherit the current song metadata.
+    const spotify = globalThis.__kanbanSpotifyPlayer;
+    const song = spotify?.snapshot();
+    if (song) return [{ index: 2147483647, media: spotify }];
+    if (location.hostname === 'open.spotify.com' && spotify?.identity()) return [];
     return Array.from(entries).flatMap(([index, reference]) => {
       const media = reference.deref();
       if (!media) { entries.delete(index); return []; }
@@ -29,14 +36,14 @@
   const receive = (event) => {
     let message;
     try { message = JSON.parse(event.detail); } catch { return; }
-    if (message?.kind === 'stop') { stop(); return; }
+    if (message?.kind === 'stop') { if (watcher?.token === message.token) stop(); return; }
     if (message?.kind === 'lease') {
       if (watcher?.token === message.token) watcher.leaseUntil = Date.now() + 6000;
       return;
     }
     if (message?.kind !== 'watch' || !Number.isInteger(message.index) || typeof message.token !== 'string' || typeof message.src !== 'string') return;
     stop();
-    const media = entries.get(message.index)?.deref();
+    const media = message.index === 2147483647 ? globalThis.__kanbanSpotifyPlayer : entries.get(message.index)?.deref();
     const state = { media, token: message.token, leaseUntil: Date.now() + 6000, generation: 0, buffering: false,
       events: ['play', 'playing', 'pause', 'waiting', 'seeking', 'seeked', 'ended', 'emptied', 'ratechange', 'volumechange'] };
     state.report = (event) => {
@@ -48,8 +55,10 @@
         if (event.type === 'playing' || event.type === 'seeked') state.buffering = false;
       }
       // Detached does not mean unavailable. The identity/source is the guard.
-      const valid = Boolean(media && source(media) && source(media) === message.src && !media.ended);
-      const clock = media && { currentTime: Number.isFinite(media.currentTime) ? media.currentTime : 0,
+      const snapshot = media?.snapshot?.();
+      const identity = media?.identity?.();
+      const valid = media?.snapshot ? Boolean(snapshot && snapshot.src === message.src && (!identity || identity === message.src)) : Boolean(media && source(media) && source(media) === message.src && !media.ended);
+      const clock = snapshot || media && !media.snapshot && { currentTime: Number.isFinite(media.currentTime) ? media.currentTime : 0,
         playbackRate: media.playbackRate, sampledAt: Date.now(), paused: media.paused,
         playing: valid && !media.paused && !media.seeking && !state.buffering && media.readyState >= 3,
         seeking: media.seeking, buffering: state.buffering || media.readyState < 3, generation: state.generation,
@@ -72,7 +81,8 @@
   });
   globalThis.Audio = ObservedAudio;
   document.addEventListener('kanban-music-media-watch', receive);
-  globalThis.__kanbanMusicMedia = { version: 1, entries: list,
+  globalThis.__kanbanMusicMedia = { version: 2, entries: list,
+    mediaEntries: () => Array.from(entries.values()).flatMap(reference => reference.deref() ? [reference.deref()] : []),
     dispose() {
       stop();
       document.removeEventListener('kanban-music-media-watch', receive);

@@ -12,6 +12,12 @@ export function readMedia() {
   const youtubeUrl = /(^|\.)youtube\.com$/.test(location.hostname)
     && !document.querySelector('.ad-showing') ? location.href : undefined;
   return entries.flatMap(({ media, index }) => {
+    if (media.snapshot) {
+      const song = media.snapshot();
+      return song ? [{ ...song, index }] : [];
+    }
+    if (media.tagName === 'VIDEO' && (media.muted || media.volume === 0)
+      && (media.loop || location.hostname === 'open.spotify.com')) return [];
     const src = media.currentSrc || (typeof media.srcObject?.id === 'string' ? `stream:${media.srcObject.id}` : '');
     if (!src || media.readyState === 0 || media.ended) return [];
     // SPA navigation can leave preview/detached players in the observer. The
@@ -46,9 +52,17 @@ export async function controlMedia(index, expectedSource, action, value) {
     document.addEventListener('kanban-music-control', observer.controlListener);
     return true;
   }
-  const media = globalThis.__kanbanMusicMedia
+  let media = globalThis.__kanbanMusicMedia
     ? globalThis.__kanbanMusicMedia.entries().find((entry) => entry.index === index)?.media
     : document.querySelectorAll('audio,video')[index];
+  if (media?.control) {
+    const snapshot = media.snapshot();
+    if (!snapshot || snapshot.src !== expectedSource) throw new Error('Track changed. Refresh and try again.');
+    if (!['media.seek', 'media.volume'].includes(action)) return media.control(expectedSource, action, value);
+    media = media.audio(snapshot);
+    if (!media) throw new Error('Playback control unavailable.');
+    expectedSource = media.currentSrc;
+  }
   const src = media?.currentSrc || (typeof media?.srcObject?.id === 'string' ? `stream:${media.srcObject.id}` : '');
   if (!media || src !== expectedSource) throw new Error('Track changed. Refresh and try again.');
   if (action === 'media.pause') media.pause();

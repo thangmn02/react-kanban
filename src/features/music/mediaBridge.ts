@@ -27,6 +27,9 @@ export interface BrowserMusicSession {
   playbackRate?: number;
   sampledAt?: number;
   selectionToken?: string;
+  buffering?: boolean;
+  seeking?: boolean;
+  generation?: number;
   syncState?: { mode: 'clock' | 'capture'; reason?: string; captureId?: string; captureError?: { stage: string; code: string } };
 }
 

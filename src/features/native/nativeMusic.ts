@@ -7,7 +7,6 @@ import type { PlaybackClock } from '../../../extensions/kanban-music/beat-timing
 const receivers = new Set<(value: unknown) => void>();
 const publish = (value: unknown) => { for (const receive of receivers) receive(value); };
 const audioReceivers = new Set<(sessionId: string, samples: Float32Array, clock: PlaybackClock) => void>();
-const learnedSessions = new Set<string>();
 const audio = createNativeAudioFeed(publish, (sessionId, samples, clock) => {
   for (const receive of audioReceivers) receive(sessionId, samples, clock);
 });
@@ -17,6 +16,7 @@ export function subscribeNativeAudio(receive: (sessionId: string, samples: Float
 }
 // Register before sync.start. A single listener survives surface/layout swaps.
 let ready: Promise<unknown> | undefined;
+let audioOwner: { sessionId: string; subscriptionId: string } | undefined;
 function ensureFeed() {
   return ready ??= (async () => {
     const stop = await listen<unknown>('native-music-beat', ({ payload }) => { if (audio.companion(payload)) publish(payload); });
@@ -33,22 +33,18 @@ function ensureFeed() {
   })().catch((error) => { ready = undefined; throw error; });
 }
 export async function requestNativeMusic(action: string, sessionId?: string, subscriptionId?: string, value?: number): Promise<Record<string, unknown>> {
+  const starting = action === 'dock.beat.sync.start' && sessionId && subscriptionId
+    ? { sessionId, subscriptionId } : undefined;
+  if (starting) audioOwner = starting;
+  if (action === 'dock.beat.sync.stop' && audioOwner?.sessionId === sessionId && audioOwner?.subscriptionId === subscriptionId) audioOwner = undefined;
   await ensureFeed();
   if (action === 'dock.beat.sync.stop' && sessionId && subscriptionId) audio.stop(sessionId, subscriptionId);
-  // The desktop PCM bundle has no distributed learned weights. An equipped
-  // Companion must own capture/inference, just as it does for the Web client.
-  const companionInference = !!sessionId && learnedSessions.has(sessionId);
-  if (action === 'dock.beat.sync.start' && companionInference && sessionId && subscriptionId) audio.stop(sessionId, subscriptionId);
+  // Desktop includes the learned runtime and observes Windows process PCM.
+  // Keep browser playback untouched; Companion provides discovery and clock.
   const response = await invoke<Record<string, unknown>>('native_music_request', { action, sessionId, subscriptionId,
     ...(value !== undefined ? { value } : {}),
-    ...(action === 'dock.beat.sync.start' ? { nativeAudio: !companionInference } : {}) });
-  if (action === 'sessions.get') {
-    learnedSessions.clear();
-    if (response.ok === true && Array.isArray(response.sessions)) for (const session of response.sessions) {
-      if (session && typeof session.id === 'string' && session.learnedPercussion === true) learnedSessions.add(session.id);
-    }
-  }
-  if (response.ok === true && action === 'dock.beat.sync.start' && !companionInference && sessionId && subscriptionId) audio.activate(sessionId, subscriptionId);
+    ...(action === 'dock.beat.sync.start' ? { nativeAudio: true } : {}) });
+  if (response.ok === true && starting && audioOwner === starting) audio.activate(starting.sessionId, starting.subscriptionId);
   return response;
 }
 export function subscribeNativeMusic(receive: (value: unknown) => void) {

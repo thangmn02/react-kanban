@@ -35,7 +35,7 @@ async function scan() {
     const results = await Promise.all(tabs.map(async (tab) => {
       try {
         // Idempotent; also installs observation in tabs left open during reload.
-        await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'MAIN', files: ['media-observer.js'] });
+        await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'MAIN', files: ['spotify-player.js', 'media-observer.js'] });
         await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'MAIN', func: controlMedia, args: [0, '', 'install'] });
         const frames = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'MAIN', func: readMedia });
         return frames.flatMap((frame) => (frame.result || []).map((media) => ({

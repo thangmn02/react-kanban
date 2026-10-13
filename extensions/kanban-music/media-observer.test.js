@@ -2,17 +2,23 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { readMedia, controlMedia } from './media.js';
 
 let nativePlay;
+let clockSampleListener;
 beforeEach(async () => {
   vi.useFakeTimers();
   vi.resetModules();
   nativePlay = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue();
   vi.stubGlobal('navigator', { mediaSession: { metadata: { title: 'Detached track', artist: 'Artist' } } });
+  await import('./spotify-player.js');
   await import('./media-observer.js');
 });
 afterEach(() => {
+  if (clockSampleListener) document.removeEventListener('kanban-music-media-clock', clockSampleListener);
+  clockSampleListener = undefined;
   globalThis.__kanbanMusicClock?.dispose();
   delete globalThis.__kanbanMusicClock;
   globalThis.__kanbanMusicMedia?.dispose();
+  globalThis.__kanbanSpotifyPlayer?.dispose();
+  delete globalThis.__kanbanSpotifyPlayer;
   document.body.replaceChildren();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -41,6 +47,107 @@ it('identifies the playing Spotify asset instead of the page being browsed', () 
   expect(readMedia()[0].assetUrl).toBe('https://open.spotify.com/track/0123456789012345678901');
   document.body.replaceChildren();
   expect(readMedia()[0].assetUrl).toBeUndefined();
+});
+
+it('does not report a muted looping Canvas video as the Spotify song', () => {
+  const canvas = ready(document.createElement('video'), 'blob:canvas');
+  canvas.loop = true; canvas.muted = true;
+  Object.defineProperty(canvas, 'duration', { value: 7 });
+  document.body.append(canvas);
+  const audio = ready(new Audio(), 'blob:song');
+  Object.defineProperty(audio, 'duration', { value: 165 });
+  expect(readMedia()).toEqual([expect.objectContaining({ src: 'blob:song', duration: 165 })]);
+});
+
+it('reads Spotify transport time even when the real audio is outside HTML media', () => {
+  vi.stubGlobal('location', { hostname: 'open.spotify.com', href: 'https://open.spotify.com/search' });
+  document.body.innerHTML = '<a data-testid="nowplaying-track-link" href="https://open.spotify.com/track/0123456789012345678901">Song</a><button data-testid="control-button-playpause" aria-label="Pause"></button><div data-testid="playback-position">0:17</div><div data-testid="playback-duration">2:45</div><video muted loop></video>';
+  ready(document.querySelector('video'), 'blob:canvas');
+  const session = readMedia()[0];
+  expect(session).toMatchObject({ duration: 165, paused: false, playing: true, assetUrl: 'https://open.spotify.com/track/0123456789012345678901' });
+  expect(session.currentTime).toBeGreaterThanOrEqual(17);
+  expect(session.currentTime).toBeLessThan(18);
+});
+
+it('keeps the SDK clock advancing across ordinary second ticks, stops on stall, and invalidates an old track watch', async () => {
+  vi.stubGlobal('location', { hostname: 'open.spotify.com' });
+  document.body.innerHTML = '<a data-testid="nowplaying-track-link" href="https://open.spotify.com/track/0123456789012345678901">Song</a><button data-testid="control-button-playpause" aria-label="Pause"></button><div data-testid="playback-position">0:17</div><div data-testid="playback-duration">2:45</div>';
+  const samples = [];
+  clockSampleListener = event => samples.push(JSON.parse(event.detail));
+  document.addEventListener('kanban-music-media-clock', clockSampleListener);
+  const watch = detail => document.dispatchEvent(new CustomEvent('kanban-music-media-watch', { detail: JSON.stringify(detail) }));
+  const session = readMedia()[0];
+  watch({ kind: 'watch', index: session.index, src: session.src, token: 'old' });
+  await vi.advanceTimersByTimeAsync(100);
+  document.querySelector('[data-testid="playback-position"]').textContent = '0:18';
+  await vi.advanceTimersByTimeAsync(100);
+  expect(samples.at(-1).clock.generation).toBe(samples[0].clock.generation);
+  expect(samples.at(-1).clock.playing).toBe(true);
+  await vi.advanceTimersByTimeAsync(2200);
+  expect(samples.at(-1).clock).toMatchObject({ playing: false, buffering: true });
+  document.querySelector('[data-testid="playback-position"]').textContent = '0:21';
+  await vi.advanceTimersByTimeAsync(100);
+  expect(samples.at(-1).clock.playing).toBe(true);
+  const pause = document.querySelector('button');
+  pause.setAttribute('aria-label', 'Play');
+  await vi.advanceTimersByTimeAsync(100);
+  expect(samples.at(-1).clock).toMatchObject({ paused: true, playing: false });
+  document.querySelector('a').href = 'https://open.spotify.com/track/1123456789012345678901';
+  await vi.advanceTimersByTimeAsync(100);
+  expect(samples.at(-1).valid).toBe(false);
+  expect(readMedia()).toEqual([]);
+  document.querySelector('[data-testid="playback-position"]').textContent = '0:00';
+  expect(readMedia()).toEqual([]);
+  await vi.advanceTimersByTimeAsync(100);
+  document.querySelector('[data-testid="playback-duration"]').textContent = '3:30';
+  expect(readMedia()).toEqual([]);
+  await vi.advanceTimersByTimeAsync(200);
+  const next = readMedia()[0];
+  expect(next).toMatchObject({ duration: 210 });
+  watch({ kind: 'watch', index: next.index, src: next.src, token: 'new' });
+  watch({ kind: 'stop', token: 'old' });
+  await vi.advanceTimersByTimeAsync(100);
+  expect(samples.at(-1)).toMatchObject({ valid: true, token: 'new' });
+});
+
+it('uses Spotify transport buttons with a track guard and retains real audio controls when available', async () => {
+  vi.stubGlobal('location', { hostname: 'open.spotify.com' });
+  document.body.innerHTML = '<a data-testid="nowplaying-track-link" href="https://open.spotify.com/track/0123456789012345678901">Song</a><button data-testid="control-button-playpause" aria-label="Pause"></button><button data-testid="control-button-skip-forward"></button><div data-testid="playback-position">0:17</div><div data-testid="playback-duration">2:45</div>';
+  const click = vi.spyOn(document.querySelector('[data-testid="control-button-skip-forward"]'), 'click');
+  const session = readMedia()[0];
+  await controlMedia(session.index, session.src, 'media.next');
+  expect(click).toHaveBeenCalledOnce();
+  await expect(controlMedia(session.index, 'old-track', 'media.next')).rejects.toThrow('Track changed');
+  const audio = ready(new Audio(), 'blob:real');
+  Object.defineProperty(audio, 'duration', { value: 165 });
+  // Similar duration alone cannot make a retained player the current song.
+  expect(readMedia()).toEqual([expect.objectContaining({ src: session.src, duration: 165 })]);
+  expect(readMedia()[0].volume).toBeUndefined();
+  audio.currentTime = 17;
+  expect(readMedia()[0].volume).toBe(1);
+});
+
+it('preserves an SDK watch through a short transport rerender, but bounds missing state', async () => {
+  vi.stubGlobal('location', { hostname: 'open.spotify.com' });
+  document.body.innerHTML = '<a data-testid="nowplaying-track-link" href="https://open.spotify.com/track/0123456789012345678901">Song</a><button data-testid="control-button-playpause" aria-label="Pause"></button><div data-testid="playback-position">0:17</div><div data-testid="playback-duration">2:45</div>';
+  const samples = [];
+  clockSampleListener = event => samples.push(JSON.parse(event.detail));
+  document.addEventListener('kanban-music-media-clock', clockSampleListener);
+  const session = readMedia()[0];
+  document.dispatchEvent(new CustomEvent('kanban-music-media-watch', { detail: JSON.stringify({ kind: 'watch', index: session.index, src: session.src, token: 'song' }) }));
+  const counter = document.querySelector('[data-testid="playback-position"]');
+  const canvas = ready(document.createElement('video'), 'blob:canvas');
+  canvas.muted = true; canvas.loop = false;
+  Object.defineProperty(canvas, 'duration', { value: 7 });
+  document.body.append(canvas);
+  counter.remove(); await vi.advanceTimersByTimeAsync(200);
+  expect(samples.at(-1)).toMatchObject({ valid: true, clock: { playing: true } });
+  expect(readMedia()).toEqual([expect.objectContaining({ src: session.src, duration: 165 })]);
+  document.body.append(counter); await vi.advanceTimersByTimeAsync(100);
+  expect(samples.at(-1)).toMatchObject({ valid: true, token: 'song' });
+  counter.remove(); await vi.advanceTimersByTimeAsync(800);
+  expect(samples.at(-1).valid).toBe(false);
+  expect(readMedia()).toEqual([]);
 });
 
 it('identifies the canonical YouTube player without assigning its asset to retained previews or advertisements', () => {

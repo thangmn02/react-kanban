@@ -197,7 +197,7 @@ export function createBeatSync(api, nativePublish) {
     start(session, owner, subscriptionId, diagnostics = false) {
       return serialize(async () => {
         if (state && sameOwner(state.owner, owner) && state.owner.nativeAudio === owner.nativeAudio
-          && state.subscriptionId === subscriptionId && state.session.id === session.id) {
+          && state.subscriptionId === subscriptionId && state.session.id === session.id && state.session.src === session.src) {
           const current = state;
           current.diagnostics = diagnostics === true;
           current.tabMuted = session.tabMuted;

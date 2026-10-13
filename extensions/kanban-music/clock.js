@@ -8,7 +8,7 @@ function stopClock() {
   watcher.events.forEach((name) => document.removeEventListener(name, watcher.report, true));
   if (watcher.bridge) {
     document.removeEventListener('kanban-music-media-clock', watcher.report);
-    document.dispatchEvent(new CustomEvent('kanban-music-media-watch', { detail: JSON.stringify({ kind: 'stop' }) }));
+    document.dispatchEvent(new CustomEvent('kanban-music-media-watch', { detail: JSON.stringify({ kind: 'stop', token: watcher.token }) }));
   }
   watcher = undefined;
 }

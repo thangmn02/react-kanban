@@ -46,7 +46,7 @@ glass blurs page content rather than the desktop behind the browser window.
 
 ## Automatic browser audio
 
-Install/reload **Kora Music Companion 0.3.14** in the browser used for music.
+Install/reload the matching **Kora Music Companion** in the browser used for music.
 It discovers supported music sites, connects to Kora, and supplies metadata,
 source selection, controls and fresh playback clocks. No Kora web tab is needed.
 On supported Windows builds, Kora captures the process tree of the browser
@@ -58,6 +58,15 @@ desktop processes are excluded. Browser output and volume remain unchanged.
 Silent, unavailable or disconnected capture leaves the grid still. Native PCM
 travels through a bounded local IPC Channel, never WebSocket/network or disk.
 The web/PiP version retains browser tabCapture and its permission requirements.
+
+Desktop runs the packaged learned percussion model against this Windows PCM;
+Companion remains the discovery, control and clock transport even when it can
+run its own model. Spotify's song transport owns its timeline when playback is
+outside HTML media; muted Canvas videos cannot supply song time. SDK-only players
+expose play/pause/navigation, with seek/volume available only when a matching
+real audio element exposes those controls. A brief transport rerender retains
+the clock for at most 750 ms; sustained missing state stops it. The visible
+Spotify counter has one-second precision, so its interpolated clock is approximate.
 
 The Rust WebSocket bridge binds only `127.0.0.1:47635`, path `/kora-music`.
 It rejects web/null/missing origins, non-extension origins, incorrect hosts

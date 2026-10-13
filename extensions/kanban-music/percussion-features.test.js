@@ -12,6 +12,14 @@ it('matches an independent FFT on a full causal window without magnitude/gain no
   const expected = Math.log10(1 + Math.hypot(spectrum[160], spectrum[161]));
   expect(f.data[0]).toBeCloseTo(expected, 6);
 });
+
+it('reuses immutable FFT twiddles without render-time trigonometry', () => {
+  const features = new PercussionFeatures(config);
+  const originalCos = Math.cos, originalSin = Math.sin;
+  Math.cos = Math.sin = () => { throw new Error('Rendering must reuse FFT twiddles'); };
+  try { features.spectrum(); expect(features.data[0]).toBe(0); }
+  finally { Math.cos = originalCos; Math.sin = originalSin; }
+});
 it('retains exact media-relative feature timestamps across variable worklet block sizes and bounds storage', () => {
   const f = new PercussionFeatures(config), blocks = [];
   for (let at = 0; at < 44100; at += 128) f.push([new Float32Array(Math.min(128,44100-at))], 5 + at/44100, b => blocks.push(b));
