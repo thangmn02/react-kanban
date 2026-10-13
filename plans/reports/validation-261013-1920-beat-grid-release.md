@@ -1,7 +1,7 @@
 # Beat Grid recovery and switching release
 
 Date: 2026-10-13, Asia/Saigon. Versions: Desktop/Web 0.1.29, Companion 0.3.22.
-Status: release verified on draft deployment; production publication in progress.
+Status: published and verified for the user's listening test; live acceptance pending.
 
 The user approved the implementation plan and explicitly authorized publication
 for their own listening test. Installed-browser listening is still a separate
@@ -105,7 +105,16 @@ SHA-256 of the verified release files:
 - Companion ZIP (16,305,058 bytes): `2065e1a8f4bbe5432485a2777914d43e6ec6bd69d446e225dab5ff316cd7d9d6`.
 - ONNX model: `c571062d76c322d54c2808c95339ea2dadd2f6ab99f9d83163d0f5311cd0f80a`.
 
-Production deployment ID and public verification are recorded after publication.
+Production deployment `6ace306c726052f19f7b4abe` is ready at
+[koraspace.online](https://koraspace.online). Both the primary domain and retained
+Netlify domain served byte-identical updater manifest, installer, both archive
+aliases, model/config, worker, worklet, feature module, ONNX MJS/WASM and app
+entry JavaScript with HTTP 200. The primary HTML also matches exactly; the
+Netlify-domain HTML adds only Netlify's hosting comment and otherwise matches.
+Both function redirects returned the expected absent-asset JSON 400. Publication
+was checked against the active site deployment after the automatic Git build
+finished. Implementation commit: `556e6865c6e2ee94e243f5c8fef15c8e6091c414`.
+Task-owned test browsers/servers exited; ports 1431 and 5173 have no listener.
 No installed app or user extension folder was overwritten by this task.
 
 ## User test and remaining acceptance

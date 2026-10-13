@@ -1,6 +1,6 @@
 # Beat Grid flash accuracy, timing, and switching
 
-Status: implementation, review and release verification complete; publication in progress.
+Status: implemented, reviewed, published and verified for user testing; live acceptance pending.
 Date: 2026-10-13, Asia/Saigon. Baseline: `main` at `2ae6703`, rollback `6d46be3`.
 
 ## Outcome and boundaries
