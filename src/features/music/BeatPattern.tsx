@@ -325,7 +325,7 @@ function NormalBeatPattern({ session, beat, colorMode = 'random', palette = 'blo
               data-presentation="decorative-shape"
               onAnimationStart={(event) => { recordCellFlash(event.currentTarget, 'animation'); rendered(liveMoment.telemetry, momentDelay(liveMoment.effect, row, step, pulse.rawTotal) * .18, liveMoment.parentId); }}
               style={{ '--shape-hit-delay': `${momentDelay(liveMoment.effect, row, step, pulse.rawTotal) * .18}ms` } as CSSProperties} />}
-            {(semanticMomentHit || retrigger && step === semanticStep || bassHeld && band === 'bass' && step === semanticStep) && <span key={`onset:${band}:${eventCount}`} className="semantic-beat-flash"
+            {(percussion && newOnsets[band] && step === semanticStep || semanticMomentHit || retrigger && step === semanticStep || bassHeld && band === 'bass' && step === semanticStep) && <span key={`onset:${band}:${eventCount}`} className="semantic-beat-flash"
               style={band === 'bass' ? { '--semantic-flash-duration': `${bassFlash?.duration || 150}ms` } as CSSProperties : undefined}
               {...flashAttributes(origin, row, step)} onAnimationStart={(event) => { recordCellFlash(event.currentTarget, 'animation'); rendered(origin); }} />}
             {band === 'melody' && melodyHit && active && <span

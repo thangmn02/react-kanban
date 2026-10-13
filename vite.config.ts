@@ -3,7 +3,7 @@ import { aiDevelopmentPlugin } from './server/viteAiPlugin'
 import { beatCacheDevelopmentPlugin } from './server/vite-beat-cache-plugin'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
-import { rm } from 'node:fs/promises'
+import { copyFile, rm } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import nativeConfig from './src-tauri/tauri.conf.json' with { type: 'json' }
 
@@ -29,6 +29,9 @@ export default defineConfig(({ mode }) => ({
       name: 'exclude-installer-from-native-bundle',
       apply: 'build',
       async writeBundle(options) {
+        // Emitted AudioWorklets retain their relative feature-module import.
+        if (options.dir) await copyFile(resolve('extensions/kanban-music/percussion-features.js'),
+          resolve(options.dir, 'assets/percussion-features.js'));
         // Web builds ship the download; native builds must not embed old installers.
         if (process.env.TAURI_ENV_PLATFORM && options.dir) {
           await rm(resolve(options.dir, 'downloads/Kora-setup.exe'), { force: true });
@@ -47,6 +50,8 @@ export default defineConfig(({ mode }) => ({
     watch: { ignored: ['**/src-tauri/target/**'] },
   },
   build: {
+    // Worklets need a hierarchical URL so their feature-module import resolves.
+    assetsInlineLimit: 0,
     rollupOptions: {
       output: {
         // Vite 8 ships Rolldown, whose manualChunks is typed as a function

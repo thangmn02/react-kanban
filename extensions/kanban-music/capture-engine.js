@@ -34,8 +34,8 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
     telemetry.record('CAPTURE_STOP', undefined, { captureId: previous.captureId, reason });
     previous.events?.forEach((event) => telemetry.mark('EVENT_DROPPED', event.telemetry, { reason: 'stopped' }));
     cancel(previous.interval);
-    previous.percussionAbort?.abort();
-    previous.percussion?.stop();
+    previous.percussionOwner?.abort.abort();
+    previous.percussionOwner?.runtime?.stop();
     previous.audioTap?.stop();
     previous.stream?.getTracks().forEach((track) => track.stop());
     previous.source?.disconnect();
@@ -58,7 +58,7 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
       telemetry.record('CAPTURE_START', undefined, { captureId });
       state.context = createAudioContext();
       state.events = []; state.eventOrder = 0;
-      const enqueue = (kind, payload, at = (state.context.currentTime ?? now() / 1000), producerTrace) => {
+      const enqueue = (kind, payload, at = (state.context.currentTime ?? now() / 1000), producerTrace, immediate = false) => {
         const target = at + (monitorOnly ? 0 : (state.context.baseLatency || 0) + (state.context.outputLatency || 0));
         const traces = producerTrace?.map((trace) => ({ ...trace, origin: monitorOnly ? 'native-audio-engine' : 'capture-engine', captureId, targetTime: target, targetClock: 'audio-seconds' }))
           || telemetry.events(kind === 'tempo' || kind === 'tick' ? 'tempo' : 'onset', kind === 'beat' ? payload : ['generic'],
@@ -74,6 +74,27 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
         state.events.push({ kind, payload, at: target, order: state.eventOrder++, ...(traces ? { telemetry: traces } : {}) });
         telemetry.mark('EVENT_QUEUED', traces, { queueDepth: state.events.length, audioTime: state.context.currentTime });
         state.events.sort((a, b) => a.at - b.at);
+        // Learned results are already late; do not wait for the next FFT timer.
+        if (immediate && state.audioDetected) flushEvents();
+      };
+      const flushEvents = () => {
+        const audioTime = state.context.currentTime ?? now() / 1000;
+        // Send ahead of the existing audio deadline. The UI owns timed release;
+        // this bounded queue still protects work awaiting the sampling callback.
+        while (state.events.length) {
+          const event = state.events.shift();
+          if (audioTime - event.at > .6) { telemetry.mark('EVENT_LATE', event.telemetry, { delayMs: (audioTime - event.at) * 1000 }); telemetry.mark('EVENT_DROPPED', event.telemetry, { reason: 'late' }); state.recoveryReason = 'late'; continue; }
+          if (state.recoveryReason) {
+            telemetry.record('CAPTURE_RECOVERED', undefined, { captureId, reason: state.recoveryReason, queueDepth: state.events.length });
+            state.recoveryReason = undefined;
+          }
+          telemetry.mark('EVENT_SENT', event.telemetry, { audioTime, delayMs: (audioTime - event.at) * 1000 });
+          const timing = outputTiming(state.context, event.at, monitorOnly);
+          const metadata = timing ? [event.telemetry, timing] : event.telemetry ? [event.telemetry] : [];
+          if (event.kind === 'beat') onBeat(captureId, event.payload, ...metadata);
+          if (event.kind === 'tempo') onTempo(captureId, event.payload, ...metadata);
+          if (event.kind === 'tick') onTempoTick(captureId, event.payload, ...metadata);
+        }
       };
       failureStage = 'stream-open';
       stream = await getUserMedia(tabConstraints(streamId));
@@ -102,22 +123,54 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
       const spectrum = new Float32Array(state.analyser.frequencyBinCount);
       // Loading/inference must never block playback, Bass or lease renewal.
       // Without a learned identity, acoustic proposals cannot label drum rows.
-      state.percussionAbort = new AbortController();
-      void createPercussion({ context: state.context, source: state.source, signal: state.percussionAbort.signal, onEvent(event) {
-        if (active !== state || !['kick', 'clap', 'hat'].includes(event.band)
-          || !Number.isFinite(event.audioTime) || !Number.isFinite(event.confidence)
-          || event.confidence < 0 || event.confidence > 1 || !Number.isFinite(event.classMargin) || event.classMargin < 0) return;
-        const at = now() + (event.audioTime - state.context.currentTime) * 1000;
-        if (event.band === 'kick') tempo.snapToBeat(at);
-        drumHits.push(at);
-        const trace = telemetry.events('onset', [event.band], { captureId,
-          origin: 'local-detector', confidence: event.confidence, targetTime: event.audioTime, targetClock: 'audio-seconds' });
-        percussionTelemetry.mark('EVENT_DETECTED', trace, { semantic: true });
-        enqueue('beat', [event.band], event.audioTime, trace);
-      } }).then(runtime => {
-        if (active === state) state.percussion = runtime;
-        else runtime?.stop();
-      }).catch(() => { telemetry.record('EVENT_DROPPED', undefined, { captureId, reason: 'worker-failed' }); });
+      state.percussionFailures = 0;
+      const startPercussion = () => {
+        const owner = { abort: new AbortController() };
+        state.percussionOwner = owner;
+        state.percussionRetryAt = undefined;
+        const failed = (reason = 'worker-failed') => {
+          if (active !== state || state.percussionOwner !== owner) return;
+          state.percussionOwner = undefined;
+          owner.abort.abort(); owner.runtime?.stop();
+          state.events = state.events.filter(event => {
+            const drum = event.kind === 'beat' && event.payload.some(band => band !== 'bass');
+            if (drum) telemetry.mark('EVENT_DROPPED', event.telemetry, { reason });
+            return !drum;
+          });
+          drumHits.length = 0;
+          state.percussionRecovery = reason;
+          state.percussionRetryAt = now() + Math.min(30000, 1000 * 2 ** Math.min(state.percussionFailures++, 5));
+          telemetry.record('EVENT_DROPPED', undefined, { captureId, reason });
+        };
+        void createPercussion({ context: state.context, source: state.source, signal: owner.abort.signal,
+          onFailure: failed,
+          onProgress() {
+            if (active !== state || state.percussionOwner !== owner) return;
+            state.percussionFailures = 0;
+            if (state.percussionRecovery) {
+              telemetry.record('CAPTURE_RECOVERED', undefined, { captureId, reason: state.percussionRecovery });
+              state.percussionRecovery = undefined;
+            }
+          },
+          onEvent(event) {
+            if (active !== state || state.percussionOwner !== owner || !['kick', 'clap', 'hat'].includes(event.band)
+              || !Number.isFinite(event.audioTime) || !Number.isFinite(event.confidence)
+              || event.confidence < 0 || event.confidence > 1 || !Number.isFinite(event.classMargin) || event.classMargin < 0) return;
+            const at = now() + (event.audioTime - state.context.currentTime) * 1000;
+            if (event.band === 'kick') tempo.snapToBeat(at);
+            drumHits.push(at);
+            const trace = telemetry.events('onset', [event.band], { captureId,
+              origin: 'local-detector', confidence: event.confidence, targetTime: event.audioTime, targetClock: 'audio-seconds' });
+            percussionTelemetry.mark('EVENT_DETECTED', trace, { semantic: true });
+            enqueue('beat', [event.band], event.audioTime, trace, true);
+          },
+        }).then(runtime => {
+          if (active !== state || state.percussionOwner !== owner) { runtime?.stop(); return; }
+          if (runtime) owner.runtime = runtime;
+          else failed();
+        }).catch(() => failed());
+      };
+      startPercussion();
       stream.getAudioTracks().forEach((track) => track.addEventListener('ended', () => {
         if (active === state) stop('ended');
       }, { once: true }));
@@ -128,6 +181,7 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
         const time = now();
         if (state.audioTap && time > state.audioTapUntil) { state.audioTap.stop(); state.audioTap = undefined; }
         if (time > state.leaseUntil || state.context.state !== 'running') { telemetry.record('LEASE_EXPIRED', undefined, { captureId }); stop('expired'); return; }
+        if (state.percussionRetryAt !== undefined && time >= state.percussionRetryAt) startPercussion();
         const analysisAt = beatTelemetry.enabled ? performance.now() : 0;
         state.analyser.getFloatFrequencyData(spectrum);
         const result = detector.analyze(spectrum, time);
@@ -157,23 +211,7 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
         if (result.hits.includes('bass')) enqueue('beat', ['bass']);
         if (rhythm.updated) enqueue('tempo', { locked: tempoLocked, bpm: tempoLocked ? rhythm.bpm : null, confidence: rhythm.confidence });
         if (tempoLocked && rhythm.tick) enqueue('tick', rhythm.tick);
-        const audioTime = state.context.currentTime ?? time / 1000;
-        // Send ahead of the existing audio deadline. The UI owns timed release;
-        // this bounded queue still protects work awaiting the sampling callback.
-        while (state.events.length) {
-          const event = state.events.shift();
-          if (audioTime - event.at > .6) { telemetry.mark('EVENT_LATE', event.telemetry, { delayMs: (audioTime - event.at) * 1000 }); telemetry.mark('EVENT_DROPPED', event.telemetry, { reason: 'late' }); state.recoveryReason = 'late'; continue; }
-          if (state.recoveryReason) {
-            telemetry.record('CAPTURE_RECOVERED', undefined, { captureId, reason: state.recoveryReason, queueDepth: state.events.length });
-            state.recoveryReason = undefined;
-          }
-          telemetry.mark('EVENT_SENT', event.telemetry, { audioTime, delayMs: (audioTime - event.at) * 1000 });
-          const timing = outputTiming(state.context, event.at, monitorOnly);
-          const metadata = timing ? [event.telemetry, timing] : event.telemetry ? [event.telemetry] : [];
-          if (event.kind === 'beat') onBeat(captureId, event.payload, ...metadata);
-          if (event.kind === 'tempo') onTempo(captureId, event.payload, ...metadata);
-          if (event.kind === 'tick') onTempoTick(captureId, event.payload, ...metadata);
-        }
+        flushEvents();
       }, 1000 / 60);
       return true;
     } catch (error) {

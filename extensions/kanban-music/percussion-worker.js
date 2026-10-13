@@ -41,7 +41,7 @@ async function drain() {
           }
         }
         self.postMessage({ kind: 'result', events, outcome: events.length ? 'percussion' : 'non-percussion/abstain',
-          durationMs: performance.now() - began, queueDepth: queue.length,
+          durationMs: performance.now() - began, queueDepth: queue.length, processedAudioTime: time,
           ...(config.diagnostics ? { diagnostics, postedAt: block.postedAt, workerReceivedAt: block.receivedAt,
             availableAudioTime: block.availableAudioTime, inferenceStartedAt, inferenceEndedAt: Date.now() } : {}) });
       }
@@ -54,9 +54,14 @@ self.onmessage = async ({ data }) => {
     try {
       config = data.config;
       classifier = config.classifier === 'causal' ? new CausalPercussionClassifier() : new PercussionClassifier();
-      ort = await import('./vendor/percussion/ort.wasm.min.mjs');
+      // Keep ORT's loader intact and emit its exact assets in production builds.
+      const runtimeUrl = new URL('./vendor/percussion/ort.wasm.min.mjs', import.meta.url).href;
+      ort = await import(/* @vite-ignore */ runtimeUrl);
       ort.env.wasm.numThreads = 1; ort.env.wasm.proxy = false;
-      ort.env.wasm.wasmPaths = new URL('./vendor/percussion/', import.meta.url).href;
+      ort.env.wasm.wasmPaths = {
+        mjs: new URL('./vendor/percussion/ort-wasm-simd-threaded.mjs', import.meta.url).href,
+        wasm: new URL('./vendor/percussion/ort-wasm-simd-threaded.wasm', import.meta.url).href,
+      };
       session = await ort.InferenceSession.create(data.model, { executionProviders: ['wasm'] });
       self.postMessage({ kind: 'ready' }); void drain();
     } catch { self.postMessage({ kind: 'failed' }); stopped = true; }

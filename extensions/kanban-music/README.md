@@ -13,42 +13,37 @@ can affect beats; the picker does not isolate tab audio. Other desktop apps are
 excluded. Web/PiP tab capture can still require a toolbar permission click. See
 [native setup and security](../../src-tauri/README.md).
 
-The five rows are Kick, Snare/Clap, Hi-hat/Cymbal, Bass/Low pulse and Melody/Main
-Lead. Melody flashes on timestamped attacks from one dominant lead in a
+The normal grid has four rows of eight cells: Kick, Snare/Clap, Hi-hat/Cymbal,
+and Bass/Low pulse. Private diagnostics retain Melody/Main Lead. Melody flashes on timestamped attacks from one dominant lead in a
 validated EventTrack cache. Sustained envelopes, raw hats and decorative shapes
 do not create Melody attacks. Without cached lead events, the fifth row stays
 dark while local analysis continues. Brief note flashes and
 the 700 ms state expiry remain.
 
-The learned-percussion listening candidate requires a scored ADTOF decision
+The local percussion runtime requires a scored ADTOF decision
 before local Kick/Snare/Hat events are published. Spectral-flux DSP remains an
 acoustic proposal/envelope source; Bass retains its existing detector. Missing
 model assets, incompatible audio context or inference failure leave the three
 drum rows dark rather than returning to band-energy classification. Playback,
-audibility and capture leases continue independently.
+audibility and capture leases continue independently. Companion 0.3.22 bounds
+the entire model/worklet startup to ten seconds and checks pending inference
+progress with a two-second watchdog. Failed inference is replaced within the
+same capture with retries backing off from one second to at most thirty seconds.
+Empty model results count as progress; quiet music does not cause restarts.
+Retired runtimes cannot emit notes into a replacement.
 
-For the private candidate, export the installed ADTOF weights with
-`scripts/export-percussion-model.py`, then run
-`node scripts/package-percussion-listening.mjs`. This writes the unpacked test
-Companion under `src-tauri/target/learned-percussion/companion`; it does not
-publish a download or include the model in the normal release archive. Its
-manifest identifies **Learned Percussion Test** and permits local WASM. Load
-that folder in the browser, disabling the existing Companion to avoid competing
-capture owners. The existing local four-row diagnostic page disables Melody
-and cell decoration. The experimental weights are non-commercial licensed;
-production distribution requires resolving model rights.
-
-The candidate uses a trailing one-second spectro-temporal window with 100 ms
+The existing model uses a trailing one-second spectro-temporal window with 100 ms
 right context. It publishes original audio timestamps, uncalibrated model
 activations and peak decision margins; playback remains undelayed. Visual
 delivery therefore has bounded processing lag, observable in telemetry. The
 bidirectional source model is not an inherently causal/zero-latency model.
-See the [candidate evaluation](../../plans/reports/validation-261008-1528-learned-percussion.md)
-for exact controls, misses and the open listening gate.
+See the [current validation](./BEAT-VALIDATION.md) for controls, measurement
+boundaries and remaining listening checks. The model's bundled notice remains
+unchanged.
 
-The legacy Spleeter feature, model download, inference workers/WASM, setup
-controls and delayed-audio path have been retired. No replacement model runs
-in the client. Captured original audio routes directly to output. Previously
+The legacy Spleeter feature, its model download, separation workers/WASM, setup
+controls and delayed-audio path have been retired. Current local percussion
+uses its existing ADTOF model and ONNX worker. Captured original audio routes directly to output. Previously
 downloaded browser model data is left inert; this change does not delete data
 from user profiles. See [cache setup and protocol](../../docs/beat-event-cache.md)
 for precomputed data and honest cache-miss fallback.
@@ -102,12 +97,11 @@ Document Picture-in-Picture must be supported by the browser. The browser-owned 
 
 ## Updating an existing installation
 
-Learned percussion weights are not included in public downloads while model
-distribution rights remain unresolved. Without them, local acoustic proposals
-cannot label Kick/Snare/Hat, and Bass remains available. The public package enables
-WASM but does not include private model/config/vendor files. Packaging preserves
-optional assets in the developer's unpacked source folder while excluding them
-from both release archives and the Desktop installer.
+The current release packages the matching percussion model, configuration,
+worklet, worker, ONNX runtime and model notice in both public Companion archives
+and the Desktop resource folder. The packaging inventory in
+`scripts/package-music-extension.mjs` is authoritative. Without a usable learned
+runtime, acoustic proposals cannot label Kick/Snare/Hat, while Bass remains available.
 
 An equipped Companion advertises `learnedPercussion` per discovered session.
 Desktop then uses that same browser capture/inference transport as Web, instead
@@ -125,6 +119,21 @@ see the [installation guide](../../src-tauri/README.md#development-and-distribut
 Browser tab capture can still require a toolbar click after permission loss.
 Native Windows process capture remains automatic. Pause, seek, rate change and
 source switching discard stale scheduled events; quiet input retains analysis.
+
+Source handoffs reuse the empty offscreen document after releasing the old
+stream, graph and worker. Final stop closes the document. Clock-stop commands
+carry the retired watcher token, so delayed cleanup cannot stop a new song.
+Every accepted drum attack also receives an immediately bright semantic flash,
+including the first Wave/Ripple attack; decorative shapes and Bass holds remain.
+Scored drum events dispatch without waiting for the next FFT sampling tick.
+
+For local production-runtime verification, prepare stereo Float32 PCM at
+44.1 kHz as `scratch/instrument-proof/fixture-0-{drums,mixture,vocals}.f32`, then
+run `node scripts/verify-beat-runtime.mjs`. It builds an isolated production
+fixture and runs a muted Edge browser on port 1431, closing its browser/server
+afterward. Set `KORA_TEST_BROWSER=chrome` to use installed Chrome, or
+`KORA_BEAT_PROOF_SECONDS=1800` for one thirty-minute drum-input run. This is
+real model/worklet/renderer execution, not live-service or human-scored accuracy.
 
 See [BEAT-VALIDATION.md](./BEAT-VALIDATION.md) for API evidence, detector settings, and the live validation status.
 

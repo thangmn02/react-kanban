@@ -154,6 +154,7 @@ it.each(['soundcloud.com', 'open.spotify.com', 'music.apple.com', 'www.deezer.co
   const oldSubscription = vi.mocked(sendBeatRequest).mock.calls.find(([action]) => action === 'dock.beat.sync.start')?.[2];
   await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
   expect(screen.getByRole('heading', { name: other.title })).toBeInTheDocument();
+  await act(async () => { await vi.advanceTimersByTimeAsync(0); });
   expect(sendBeatRequest).toHaveBeenCalledWith('dock.beat.sync.stop', youtube.id, oldSubscription);
   expect(sendBeatRequest).toHaveBeenCalledWith('dock.beat.sync.start', other.id, expect.any(String));
   expect(sendMusicRequest).not.toHaveBeenCalledWith('media.focus', expect.anything());

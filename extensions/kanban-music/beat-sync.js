@@ -147,17 +147,19 @@ export function createBeatSync(api, nativePublish) {
     await current.captureTask;
   }
 
-  async function stopCurrent() {
+  async function stopCurrent(keepOffscreen = false) {
     const previous = state;
     state = undefined;
     if (previous) {
-      void api.tabs.sendMessage(previous.session.tabId, { target: 'beat-clock', kind: 'stop' },
+      void api.tabs.sendMessage(previous.session.tabId, { target: 'beat-clock', kind: 'stop', token: previous.token },
         { documentId: previous.session.documentId }).catch(() => {});
-      if (previous.captureId) await offscreenMessage({ kind: 'stop', captureId: previous.captureId }).catch(() => {});
+      if (previous.captureId) await timeout(offscreenMessage({ kind: 'stop', captureId: previous.captureId }), 1000).catch(() => {});
     }
+    // A handoff releases the entire old stream/graph, but can reuse the empty document.
+    if (keepOffscreen) return;
     // Also clean up an orphan left by a restarted service worker.
-    await creating?.catch(() => {});
-    await api.offscreen.closeDocument().catch(() => {});
+    if (creating) await timeout(creating, 4500).catch(() => {});
+    await timeout(api.offscreen.closeDocument(), 1000).catch(() => {});
   }
 
   function stopIfCurrent(current) {
@@ -176,10 +178,10 @@ export function createBeatSync(api, nativePublish) {
     const message = { target: 'beat-clock', kind: 'watch', index: current.session.index, src: current.session.src,
       observed: current.session.observed, token: current.token };
     let result;
-    try { result = await api.tabs.sendMessage(current.session.tabId, message, target); }
+    try { result = await timeout(api.tabs.sendMessage(current.session.tabId, message, target), 1500); }
     catch {
       await api.scripting.executeScript({ target: { tabId: current.session.tabId, documentIds: [current.session.documentId] }, files: ['clock.js'] });
-      result = await api.tabs.sendMessage(current.session.tabId, message, target);
+      result = await timeout(api.tabs.sendMessage(current.session.tabId, message, target), 1500);
     }
     return result?.ok === true;
   }
@@ -199,12 +201,12 @@ export function createBeatSync(api, nativePublish) {
           const current = state;
           current.diagnostics = diagnostics === true;
           current.tabMuted = session.tabMuted;
-          const lease = await api.tabs.sendMessage(session.tabId, { target: 'beat-clock', kind: 'lease', token: current.token },
-            { documentId: session.documentId }).catch(() => {});
+          const lease = await timeout(api.tabs.sendMessage(session.tabId, { target: 'beat-clock', kind: 'lease', token: current.token },
+            { documentId: session.documentId }), 1500).catch(() => {});
           if (!lease?.ok) await startClock(current).catch(() => {});
           if (current.captureId && current.captureReady) {
             const captureId = current.captureId;
-            const captureLease = await offscreenMessage({ kind: 'lease', captureId, telemetryEnabled: telemetryEnabled(current) }).catch(() => undefined);
+            const captureLease = await timeout(offscreenMessage({ kind: 'lease', captureId, telemetryEnabled: telemetryEnabled(current) }), 1000).catch(() => undefined);
             telemetry.record(captureLease?.ok ? 'LEASE_RENEW' : 'LEASE_EXPIRED', undefined, { captureId });
             if (!captureLease?.ok && current.captureId === captureId) {
               current.retryAt = 0;
@@ -218,7 +220,7 @@ export function createBeatSync(api, nativePublish) {
           publishState(current);
           return;
         }
-        await stopCurrent();
+        await stopCurrent(true);
         const current = { owner, session, subscriptionId, diagnostics: diagnostics === true, token: crypto.randomUUID(), mode: 'clock', retryAt: 0,
           tabMuted: session.tabMuted, clock: session };
         state = current;

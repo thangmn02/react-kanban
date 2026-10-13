@@ -58,6 +58,16 @@ const command = (message) => {
   receive({ target: 'beat-clock', ...message }, { id: 'companion' }, reply);
   return reply;
 };
+it('ignores a delayed old stop after a replacement watcher is installed', async () => {
+  command({ kind: 'watch', index: 0, token: 'old' });
+  command({ kind: 'watch', index: 0, token: 'new' });
+  expect(command({ kind: 'stop', token: 'old' })).toHaveBeenCalledWith({ ok: false });
+  await vi.advanceTimersByTimeAsync(100);
+  expect(send).toHaveBeenLastCalledWith(expect.objectContaining({ token: 'new' }));
+  expect(command({ kind: 'lease', token: 'new' })).toHaveBeenCalledWith({ ok: true });
+  expect(command({ kind: 'stop', token: 'new' })).toHaveBeenCalledWith({ ok: true });
+  expect(vi.getTimerCount()).toBe(0);
+});
 
 it('marks small seeks explicitly and reports buffering independently of paused state', () => {
   command({ kind: 'watch', index: 0, token: 'one' });

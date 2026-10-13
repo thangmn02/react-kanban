@@ -29,7 +29,11 @@ const receive = (message, sender, respond) => {
     return true;
   }
   if (sender.id !== chrome.runtime.id || message?.target !== 'beat-clock') return false;
-  if (message.kind === 'stop') { stopClock(); respond({ ok: true }); return false; }
+  if (message.kind === 'stop') {
+    const ok = watcher?.token === message.token;
+    if (ok) stopClock();
+    respond({ ok }); return false;
+  }
   if (message.kind === 'lease') {
     const ok = watcher?.token === message.token;
     if (ok) {

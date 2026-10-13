@@ -99,10 +99,11 @@ it('renews a quiet pending stream before its first audible frame and immediately
 });
 
 function fixture() {
+  let documentOpen = false;
   const api = {
-    runtime: { getURL: (path) => `chrome-extension://companion/${path}`, getContexts: vi.fn().mockResolvedValue([]), sendMessage: vi.fn().mockResolvedValue({ ok: true }) },
+    runtime: { getURL: (path) => `chrome-extension://companion/${path}`, getContexts: vi.fn(async () => documentOpen ? [{}] : []), sendMessage: vi.fn().mockResolvedValue({ ok: true }) },
     tabs: { sendMessage: vi.fn().mockResolvedValue({ ok: true }) },
-    offscreen: { createDocument: vi.fn().mockResolvedValue(), closeDocument: vi.fn().mockResolvedValue() },
+    offscreen: { createDocument: vi.fn(async () => { documentOpen = true; }), closeDocument: vi.fn(async () => { documentOpen = false; }) },
     tabCapture: { getMediaStreamId: vi.fn().mockResolvedValue('stream') },
     scripting: { executeScript: vi.fn().mockResolvedValue([]) },
   };
@@ -116,6 +117,32 @@ function fixture() {
   const token = () => api.tabs.sendMessage.mock.calls.find(([, message]) => message.kind === 'watch')[1].token;
   return { api, session, owner, sync, token };
 }
+it('hands off thirty sources with one offscreen document and rejects every retired owner', async () => {
+  const f = fixture();
+  for (let index = 0; index < 30; index++) {
+    const session = { ...f.session, id: `song-${index}`, tabId: 12 + index };
+    await f.sync.start(session, f.owner, `subscription-${index}`);
+    await vi.waitFor(() => expect(f.sync.status(session).mode).toBe('capture'));
+    if (index) await f.sync.stop(f.owner, `subscription-${index - 1}`);
+    expect(f.sync.status(session).mode).toBe('capture');
+  }
+  expect(f.api.offscreen.createDocument).toHaveBeenCalledOnce();
+  expect(f.api.offscreen.closeDocument).not.toHaveBeenCalled();
+  expect(f.api.runtime.sendMessage.mock.calls.filter(([message]) => message.kind === 'stop')).toHaveLength(29);
+  await f.sync.stop(); expect(f.api.offscreen.closeDocument).toHaveBeenCalledOnce();
+});
+it('bounds an unresponsive old stop so the serialized source handoff can continue', async () => {
+  const f = fixture();
+  await f.sync.start(f.session, f.owner, 'first');
+  await vi.waitFor(() => expect(f.sync.status(f.session).mode).toBe('capture'));
+  const send = f.api.runtime.sendMessage.getMockImplementation();
+  f.api.runtime.sendMessage.mockImplementation(message => message.kind === 'stop' ? new Promise(() => {}) : send(message));
+  const next = { ...f.session, id: 'next-song' };
+  await f.sync.start(next, f.owner, 'next');
+  await vi.waitFor(() => expect(f.sync.status(next).mode).toBe('capture'));
+  f.api.runtime.sendMessage.mockImplementation(send);
+  await f.sync.stop();
+});
 it('automatically asks Chrome for capture and creates a USER_MEDIA offscreen document', async () => {
   const f = fixture();
   await f.sync.start(f.session, f.owner, 'subscription');

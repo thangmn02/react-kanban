@@ -82,6 +82,8 @@ it.each([0, 8, 16, 24])('gives an actual hit an immediate cell in every pattern 
   await act(async () => { await vi.advanceTimersByTimeAsync(0); });
   const cells = [...view.container.querySelectorAll<HTMLElement>('[data-channel="hat"] .onset')];
   expect(cells.some(cell => cell.style.getPropertyValue('--pulse-delay') === '0ms')).toBe(true);
+  // The semantic overlay starts bright, even when the decorative wave rises later.
+  expect(view.container.querySelectorAll('[data-channel="hat"] .semantic-beat-flash')).toHaveLength(1);
   expect(view.container.querySelectorAll('[data-channel="bass"] .onset')).toHaveLength(0);
 });
 

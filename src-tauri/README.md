@@ -168,6 +168,16 @@ For each update, bump both native version fields, build with the same signing
 key, run `npm run desktop:package`, and deploy the installer and feed together.
 Do not publish a mock-auth demo feed as a connected-app update.
 
+For the 0.1.29 release, the existing Netlify CLI checkout is linked to
+`kanthangboard` (site ID `0c8406d3-9d2e-4afd-8351-140813bfbaf9`), serving
+`koraspace.online` and the retained Netlify updater host. Read the site's
+production `VITE_*` build variables through the authenticated CLI into the build
+process, without saving or printing their values. Build/stage the signed native
+installer first, then build the connected web artifact and deploy its `dist`
+directory and current Netlify functions together. Verify public installer and
+Companion hashes against the staged artifacts; a pushed commit alone is not
+deployment evidence. CLI linking is local metadata, not a DNS or auth change.
+
 ## Validation
 
 - Frontend/native/companion regression tests and Rust bridge-origin tests.

@@ -26,6 +26,7 @@ reasons.add('schedule-reset'); reasons.add('schedule-late'); reasons.add('clock-
 reasons.add('buffering');
 reasons.add('tempo-selected');
 reasons.add('semantic-duplicate'); reasons.add('priority');
+reasons.add('worker-stalled');
 const finite = (n) => typeof n === 'number' && Number.isFinite(n);
 const opaque = (s) => typeof s === 'string' && /^[a-zA-Z0-9:_-]{1,160}$/.test(s);
 const canonical = (band) => ({ clap: 'snare', melody: 'melodic' })[band] || band;

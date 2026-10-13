@@ -259,7 +259,8 @@ export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessio
       catch { telemetry.record('LEASE_EXPIRED', undefined, { captureId, reason: 'transport' }); /* The watchdog removes stale capture state. */ }
       finally { renewing = false; }
     }
-    const stop = () => {
+    const stop = (immediate = false) => {
+      if (cancelled) return;
       cancelled = true;
       unsubscribeAudio?.(); audioBuffer?.reset();
       if (capturedAudio.current === audioBuffer) capturedAudio.current = undefined;
@@ -269,8 +270,13 @@ export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessio
       clearTimeout(melodyLease);
       clearInterval(interval);
       clearInterval(watchdog);
-      void sendBeatRequest('dock.beat.sync.stop', sessionId, subscriptionId).catch(() => {});
+      const release = () => { void sendBeatRequest('dock.beat.sync.stop', sessionId, subscriptionId).catch(() => {}); };
+      // A replacement's start takes ownership first; the old subscription's stop
+      // is then harmless. Unmount still releases it, and pagehide releases immediately.
+      if (immediate) release();
+      else setTimeout(release, 0);
     };
+    const hide = () => stop(true);
     const interval = setInterval(() => { void renew(); }, 2000);
     const watchdog = setInterval(() => {
       if (Date.now() - lastLiveState <= 3500) return;
@@ -283,9 +289,9 @@ export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessio
           leadAvailability: current.sessionId === selectedSessionId ? current.leadAvailability : undefined });
       void renew();
     }, 500);
-    window.addEventListener('pagehide', stop);
+    window.addEventListener('pagehide', hide);
     void renew();
-    return () => { unsubscribe(); window.removeEventListener('pagehide', stop); stop(); };
+    return () => { unsubscribe(); window.removeEventListener('pagehide', hide); stop(); };
   }, [sessionId, onClock, eventOptions]);
   return state.sessionId === sessionId ? state : { sessionId: sessionId || '', mode: 'clock', onsets: {} };
 }

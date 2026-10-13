@@ -1,5 +1,40 @@
 # Beat sync validation
 
+## Companion 0.3.22 / Kora 0.1.29 — recovery and flash timing (2026-10-13)
+
+The normal product retains four rows and the existing learned percussion model,
+thresholds, Bass detector/holds and decorative effects. Failed or stalled
+initialization/inference now recovers inside the current capture with bounded
+backoff. Every drum attack has an immediately bright semantic overlay; accepted
+drum events no longer wait for the FFT timer. Source replacement releases the
+old stream/worker while reusing the empty offscreen document. Token-scoped clock
+stops reject delayed old-source cleanup.
+
+Production builds emit real worklet URLs, their relative feature dependency and
+explicit ONNX loader/MJS/WASM assets. Desktop CSP permits the existing WASM
+runtime. Missing rows are not repaired with acoustic drum proposals.
+
+`node scripts/verify-beat-runtime.mjs` verified the actual production model,
+worklet and normal renderer with local 44.1 kHz stereo PCM in isolated Edge.
+Eight-second drums/mix/vocals runs had 159 completed batches each, no worker
+failure, zero waiting blocks, and zero percussion events for the vocal control.
+Measured visible-flash p95 was 248.87 ms for drums and 250.61 ms for the mixture.
+These are browser audio-clock/DOM brightness samples, not physical speaker
+latency, independent note labels, or guaranteed accuracy on other music.
+The 30-minute local PCM run completed 35,993 batches without failures or waiting
+blocks. Its last 2,000 visible attacks had p95 250.39 ms and maximum 311.50 ms.
+A fresh final-build short run measured p95 238.10 / 238.07 ms for drums/mixture.
+This variation and the remaining live listening gate are preserved in the report.
+
+Fault and lifecycle tests cover post-ready failure, stalled fetch/worklet/worker,
+silent progressing inference, bounded retries, late callbacks, thirty handoffs,
+unresponsive stop, delayed old clock stops and pane-demand changes. Final
+release results and user acceptance limits are recorded in
+[the release report](../../plans/reports/validation-261013-1920-beat-grid-release.md).
+
+The versioned sections below are historical measurements. Their older five-row,
+Spleeter and delayed-playback behavior does not describe this release.
+
 ## Version 0.3.13 / Kora 0.1.14 — automatic native capture
 
 Windows captures only the browser process tree owning the accepted Companion

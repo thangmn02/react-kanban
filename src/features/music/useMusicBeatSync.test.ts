@@ -36,7 +36,25 @@ it('keeps one audible subscription and its counters when analysis demand changes
   expect(bridge.send.mock.calls.filter(([kind]) => kind === 'dock.beat.sync.start')).toHaveLength(1);
   expect(bridge.send.mock.calls.filter(([kind]) => kind === 'dock.beat.sync.stop')).toHaveLength(0);
   unmount();
+  await act(async () => { await vi.advanceTimersByTimeAsync(0); });
   expect(bridge.send.mock.calls.filter(([kind]) => kind === 'dock.beat.sync.stop')).toHaveLength(1);
+});
+it('starts a replacement before releasing the old subscription and releases immediately on pagehide', async () => {
+  const onClock = vi.fn();
+  const { rerender, unmount } = renderHook(({ source }) => useMusicBeatSync(source, onClock), { initialProps: { source: 'first' } });
+  await act(async () => {});
+  const oldReceive = bridge.receive;
+  rerender({ source: 'second' });
+  await act(async () => {});
+  await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+  expect(bridge.send.mock.calls.map(([kind, source]) => [kind, source])).toEqual([
+    ['dock.beat.sync.start', 'first'], ['dock.beat.sync.start', 'second'], ['dock.beat.sync.stop', 'first'],
+  ]);
+  act(() => { oldReceive?.({ kind: 'onset', captureId: 'old', sequence: 1, bands: ['kick'] }); });
+  act(() => { window.dispatchEvent(new Event('pagehide')); });
+  expect(bridge.send.mock.calls.at(-1)?.slice(0, 2)).toEqual(['dock.beat.sync.stop', 'second']);
+  unmount(); await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+  expect(bridge.send.mock.calls.filter(([kind]) => kind === 'dock.beat.sync.stop')).toHaveLength(2);
 });
 it('preserves validated Lead cache readiness when a paused capture lease expires', async () => {
   const asset = { provider: 'youtube' as const, id: 'abcdefghijk' };
