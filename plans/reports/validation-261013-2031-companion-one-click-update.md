@@ -1,7 +1,7 @@
 # Companion one-click update delivery
 
 Date: 2026-10-13, Asia/Saigon. Desktop 0.1.30 / Companion 0.3.23.
-Status: reviewed, tested and built; public verification/publication in progress.
+Status: implemented, reviewed, published and verified for the user's installed-browser test.
 
 ## Diagnosis and repair
 
@@ -60,7 +60,17 @@ Installer: 15,514,390 bytes, SHA-256
 `38f43d159dd0f7de56347a08c3157539b4426fee9ff607245a9602865224d2a4`.
 Companion ZIP: 16,306,858 bytes, SHA-256
 `2b45e1c0f04ab1e5decd98eaab79f274db84bab85d2f87bd4f9b7178f133c9d2`.
-Deployment ID and public-file verification are recorded after publication.
+Draft deployment `6ace396c2b7f871ce703cc43` served byte-identical app entry,
+instruction JavaScript, updater manifest, signed installer and both archive
+aliases. Its HTML guide differs only by Netlify's privacy-link pretty-URL
+rewrite. The function redirect returns the expected absent-asset JSON 400.
+Production deployment `6ace3ac10a7f8b8689700aea` is ready at
+[koraspace.online](https://koraspace.online). Both public domains serve the exact
+signed installer, both ZIP aliases, updater manifest, app entry JavaScript and
+instruction JavaScript with HTTP 200 and matching SHA-256. HTML differs only by
+the verified hosting comment/pretty-URL rewrite. Both function redirects pass.
+The verified deployment remained active after the automatic Git build finished.
+Implementation commit: `1a91fed709e8201a0b980ef0a18026d67c69f10a`.
 The existing native-before-Web release route and connected production
 configuration are retained. Detection, thresholds, playback and previous lag
 repairs are unchanged. An optional final browser check initially could not start
@@ -79,4 +89,5 @@ signed installer; arbitrary extracted ZIP paths remain a manual fallback.
 The button uses the Companion included in installed Kora; it does not
 independently fetch a newer ZIP or publish a store listing. No installed user
 files were modified during development. All isolated test browsers/servers
-exited. The user's original installed-browser test remains the acceptance check.
+exited; ports 47636, 1431 and 5173 have no listener. The user's original
+installed-browser test remains the acceptance check.

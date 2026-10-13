@@ -1,6 +1,6 @@
 # One-click Desktop Companion update
 
-Status: implemented, reviewed and tested; signed release/public checks in progress.
+Status: implemented, reviewed, published and verified; user's installed-browser test pending.
 User authorized implementation after the stale-folder diagnosis.
 
 ## Outcome and boundaries
