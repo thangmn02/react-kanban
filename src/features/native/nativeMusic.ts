@@ -56,4 +56,11 @@ export function subscribeNativeMusic(receive: (value: unknown) => void) {
   void ensureFeed().catch(() => {});
   return () => { receivers.delete(receive); };
 }
-export const openNativeMusicSetup = () => invoke<void>('native_music_setup');
+export interface CompanionSetupResult {
+  version: string;
+  folder: string;
+  status: 'ready' | 'reload-required' | 'install-required';
+  browsersReady: number;
+  folderOpened: boolean;
+}
+export const openNativeMusicSetup = () => invoke<CompanionSetupResult>('native_music_setup');

@@ -97,6 +97,15 @@ Document Picture-in-Picture must be supported by the browser. The browser-owned 
 
 ## Updating an existing installation
 
+Desktop 0.1.30 / Companion 0.3.23 adds **Install or update Companion** as a real
+file update. The signed Desktop payload is verified and placed in the stable
+app-data folder, preserving older installations at that path. Connected updated
+Companions check their own disk version, acknowledge, reload and reconnect;
+Kora confirms the loaded version before reporting ready. Old extensions need
+one manual reload, and disconnected/differently located copies show manual
+instructions. This uses the existing loopback bridge only; public Web messages
+cannot reload the extension. The browser's first Load unpacked consent remains.
+
 The current release packages the matching percussion model, configuration,
 worklet, worker, ONNX runtime and model notice in both public Companion archives
 and the Desktop resource folder. The packaging inventory in

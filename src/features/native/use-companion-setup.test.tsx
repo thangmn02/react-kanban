@@ -1,0 +1,33 @@
+import { act, renderHook } from '@testing-library/react';
+import { expect, it, vi } from 'vitest';
+import { I18nProvider } from '../../i18n';
+import { useCompanionSetup } from './use-companion-setup';
+const invoke = vi.hoisted(() => vi.fn());
+vi.mock('@tauri-apps/api/core', () => ({ invoke }));
+vi.mock('@tauri-apps/api/event', () => ({ listen: vi.fn() }));
+const wrapper = ({ children }: { children: React.ReactNode }) => <I18nProvider>{children}</I18nProvider>;
+it('prevents duplicate clicks and distinguishes confirmed reload from manual installation', async () => {
+  const result = { version: '0.3.23', folder: 'C:\\Companion\\extension', browsersReady: 0, folderOpened: true, status: 'reload-required' };
+  let finish!: (value: typeof result) => void;
+  invoke.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+  const view = renderHook(useCompanionSetup, { wrapper });
+  let pending!: Promise<void>;
+  act(() => { pending = view.result.current.run(); });
+  expect(view.result.current.updating).toBe(true);
+  await act(() => view.result.current.run()); expect(invoke).toHaveBeenCalledTimes(1);
+  await act(async () => { finish(result); await pending; });
+  expect(view.result.current.message).toContain('click Reload'); expect(view.result.current.message).toContain(result.folder);
+  expect(view.result.current.message).toContain('0.3.23');
+  invoke.mockResolvedValueOnce({ ...result, status: 'ready', browsersReady: 1 });
+  await act(() => view.result.current.run()); expect(view.result.current.message).toContain('ready in your connected browsers');
+  invoke.mockResolvedValueOnce({ ...result, status: 'install-required' });
+  await act(() => view.result.current.run()); expect(view.result.current.message).toContain('Load unpacked');
+});
+it('shows native update failure instead of silently opening an old folder', async () => {
+  invoke.mockRejectedValueOnce('Your Companion is newer than this Kora build.');
+  const view = renderHook(useCompanionSetup, { wrapper });
+  await act(() => view.result.current.run());
+  expect(view.result.current.updating).toBe(false);
+  expect(view.result.current.message).toContain('Companion update failed.');
+  expect(view.result.current.message).toContain('newer than this Kora build');
+});

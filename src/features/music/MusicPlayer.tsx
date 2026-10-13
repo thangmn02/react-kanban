@@ -6,7 +6,7 @@ import type { BrowserMusicController } from './useBrowserMusic';
 import { patternAt } from './beatVisuals';
 import type { BeatColorMode, BeatPalette } from './beatVisuals';
 import BeatPattern from './BeatPattern';
-import { openNativeMusicSetup } from '../native/nativeMusic';
+import { useCompanionSetup } from '../native/use-companion-setup';
 import { isNativeWidget } from '../native/runtime';
 import { beatRowDiagnostics, fourRowBaseline } from './beat-row-diagnostics';
 import { beatTelemetry } from '../../../extensions/kanban-music/beat-telemetry.js';
@@ -146,14 +146,17 @@ export default function MusicPlayer({ music, colorMode = 'random', palette = 'bl
 
 export function MusicSetup({ music }: { music: BrowserMusicController }) {
   const { t, language } = useI18n();
+  const companion = useCompanionSetup();
   if (music.connected || music.checking) return null;
   return <div className="music-setup">
     {music.error && <p className="muted" role="status">{music.error}</p>}
     <div className="music-connect-actions">
       {isNativeWidget()
-        ? <button className="install-button solid" type="button" onClick={() => void openNativeMusicSetup().catch(() => {})}>{t('music.addControls')}</button>
+        ? <button className="install-button solid" type="button" disabled={companion.updating} onClick={() => void companion.run()}>
+          {t(companion.updating ? 'music.companionUpdating' : 'music.addControls')}</button>
         : <a className="install-button solid" href={getMusicInstallUrl(language)} target="_blank" rel="noopener noreferrer">{t('music.addControls')}</a>}
       <button type="button" className="text-button" onClick={music.refresh}>{t('music.checkAgain')}</button>
     </div>
+    {companion.message && <p className="muted" role="status" style={{ overflowWrap: 'anywhere' }}>{companion.message}</p>}
   </div>;
 }

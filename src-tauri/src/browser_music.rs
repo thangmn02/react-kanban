@@ -9,7 +9,7 @@ use std::{
     sync::{Arc, Mutex},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter, State};
 use tokio::{
     net::TcpListener,
     sync::{mpsc, oneshot},
@@ -328,6 +328,31 @@ impl BrowserMusic {
         self.connections.lock().map_err(|_| "Music connection unavailable")?
             .get(peer).copied().ok_or_else(|| "Companion disconnected".into())
     }
+    pub fn connected_companions(&self) -> usize {
+        self.peers.lock().unwrap().len()
+    }
+    pub async fn reload_companions(&self, version: &str) -> (usize, bool) {
+        let peers: Vec<_> = self.peers.lock().unwrap().keys().cloned().collect();
+        if peers.is_empty() { return (0, false); }
+        let responses = join_all(peers.iter().map(|peer| self.ask(peer,
+            json!({"action":"companion.reload","expectedVersion":version})))).await;
+        let accepted = responses.iter().filter(|response| response.as_ref().is_ok_and(|v|
+            v["ok"] == true && v["version"].as_str() == Some(version))).count();
+        if accepted == 0 { return (0, false); }
+        let mut ready = 0;
+        let complete = timeout(Duration::from_secs(6), async {
+            loop {
+                tokio::time::sleep(Duration::from_millis(200)).await;
+                let current: Vec<_> = self.peers.lock().unwrap().keys().cloned().collect();
+                let responses = join_all(current.iter().map(|peer| self.ask(peer, json!({"action":"companion.status"})))).await;
+                ready = responses.iter().filter(|response| response.as_ref().is_ok_and(|v|
+                    v["ok"] == true && v["version"].as_str() == Some(version))).count();
+                if ready >= peers.len() && ready == current.len() { return true; }
+                if accepted < peers.len() && ready >= accepted { return false; }
+            }
+        }).await.unwrap_or(false);
+        (ready, complete)
+    }
 }
 
 #[tauri::command]
@@ -416,27 +441,6 @@ pub async fn native_music_request(
         }
     }
     Ok(result)
-}
-
-#[tauri::command]
-pub fn native_music_setup(app: AppHandle) -> Result<(), String> {
-    let bundled = app.path().resolve("music-companion", tauri::path::BaseDirectory::Resource)
-        .map_err(|_| "Could not locate the included Companion".to_owned())?;
-    // Non-commercial releases now bundle the learned ONNX weights.
-    // An optional private installation path remains supported for developers.
-    let private = app.path().app_local_data_dir().ok().map(|path| path.join("music-companion"));
-    let folder = private.filter(|path| path.join("extension/manifest.json").is_file()
-        && path.join("extension/generated/percussion/percussion.onnx").is_file())
-        .unwrap_or(bundled);
-    if !folder.join("extension/manifest.json").is_file() {
-        return Err("The included Companion is missing. Reinstall Kora to restore it.".into());
-    }
-    #[cfg(windows)]
-    std::process::Command::new("explorer.exe")
-        .arg(folder)
-        .spawn()
-        .map_err(|_| "Could not open the Companion folder".to_owned())?;
-    Ok(())
 }
 
 #[cfg(test)]

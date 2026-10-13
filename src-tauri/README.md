@@ -94,14 +94,28 @@ and WebView2. Use `npm run tauri dev` (Vite port 1420), or
 `npm run tauri build`. Installer output is `target/release/bundle/nsis/`.
 Use the installer for the WebView2 prerequisite bootstrap. It includes the
 matching unpacked Music Companion and an offline installation guide. In dock
-settings choose **Install or update Companion** to open its resource folder,
-then use the browser's **Load unpacked** action for its `extension` folder.
-Browser installation remains a one-time user action.
+settings choose **Install or update Companion**. Kora 0.1.30 stages and verifies
+the signed app's matching Companion in the stable
+`%LOCALAPPDATA%\app.kanthangboard.focus\music-companion\extension` folder.
+It preserves the loaded path, keeps previous files in a sibling backup, rejects
+newer installed versions, and restores previous files if replacement fails.
+First installation still requires the browser's **Load unpacked** consent.
+Old Companions require one manual **Reload** to gain the 0.3.23 update handler.
+Later clicks request reload through the existing native bridge and confirm the
+loaded version after reconnecting; no browser profile is edited. Disconnected,
+unsupported or differently located installations show explicit manual steps.
+Only nonce-bound native bridge requests can ask for reload, and the extension
+checks its own on-disk manifest before acknowledging. Web requests cannot reload it.
+The matching payload comes from the updated Kora installer; the button does not
+download an independently newer ZIP. Packaging generates `package-files.json`
+as the native copy/verification inventory. Repeated identical updates retain
+the current folder without creating another backup.
 
 Browser **Reload** rereads the installed files; it does not fetch new Companion
 code. When an app update cannot complete, users can independently download the
 [public Companion ZIP and update instructions](https://koraspace.online/music-companion.html#update-companion).
-Replace the contents of `%LOCALAPPDATA%\Kora\music-companion\extension`, keeping
+Replace files in the folder actually loaded by your browser (the stable path above
+for new installations; older copies may use `%LOCALAPPDATA%\Kora\music-companion\extension`), keeping
 `manifest.json` directly in that folder, then reload the extension and music
 tabs. A repository checkout is unnecessary. The offline guide links to this
 route. Updating these files does not update the Kora executable.

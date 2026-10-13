@@ -1,20 +1,22 @@
 // Only metadata and validated beat events cross this loopback connection.
 // No PCM, microphone, desktop audio or arbitrary page commands.
 import { beatTelemetry } from './beat-telemetry.js';
+import { companionUpdate, validCompanionUpdate } from './companion-update.js';
 const telemetry = beatTelemetry.at('widget-bridge');
-export function createWidgetBridge({ api, handle, disconnected, Socket = WebSocket }) {
+export function createWidgetBridge({ api, handle, disconnected, Socket = WebSocket, update = companionUpdate }) {
   let socket;
   let nonce;
   let heartbeat;
   let retry;
   let stopped = false;
+  let reloadTimer;
   const send = (value) => {
     if (!nonce || socket?.readyState !== 1) return false;
     socket.send(JSON.stringify({ ...value, nonce })); return true;
   };
   const valid = (request) => request?.type === 'request' && request.nonce === nonce
     && typeof request.requestId === 'string' && request.requestId.length <= 100
-    && (request.action === 'sessions.get'
+    && (validCompanionUpdate(request) || request.action === 'sessions.get'
       || (['media.play', 'media.pause', 'media.focus', 'media.previous', 'media.next'].includes(request.action)
         || request.action === 'media.seek' && Number.isFinite(request.value) && request.value >= 0 && request.value <= 864000
         || request.action === 'media.volume' && Number.isFinite(request.value) && request.value >= 0 && request.value <= 1)
@@ -40,9 +42,12 @@ export function createWidgetBridge({ api, handle, disconnected, Socket = WebSock
       if (!valid(request)) return;
       const owner = nonce;
       let result;
-      try { result = await handle(request, { native: owner }); }
+      try { result = validCompanionUpdate(request) ? await update(api, request) : await handle(request, { native: owner }); }
       catch { result = { ok: false, error: 'unavailable' }; }
-      if (current === socket && owner === nonce) send({ ...result, type: 'response', requestId: request.requestId });
+      if (current === socket && owner === nonce && send({ ...result, type: 'response', requestId: request.requestId })
+        && request.action === 'companion.reload' && result.ok === true && result.version === request.expectedVersion && !reloadTimer) {
+        reloadTimer = setTimeout(() => { if (!stopped) api.runtime.reload(); }, 100);
+      }
     };
     current.onclose = () => {
       if (current !== socket) return;
@@ -67,6 +72,6 @@ export function createWidgetBridge({ api, handle, disconnected, Socket = WebSock
       telemetry.mark(sent ? 'EVENT_SENT' : 'EVENT_DROPPED', event.telemetry, sent ? {} : { reason: 'transport' });
       return sent;
     },
-    close() { stopped = true; clearTimeout(retry); clearInterval(heartbeat); socket?.close(); },
+    close() { stopped = true; clearTimeout(retry); clearTimeout(reloadTimer); clearInterval(heartbeat); socket?.close(); },
   };
 }

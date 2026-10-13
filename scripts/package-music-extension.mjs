@@ -83,6 +83,7 @@ function zip(files) {
 await mkdir(join(extension, 'icons'), { recursive: true });
 for (const size of [16, 48, 128]) await writeFile(join(extension, 'icons', `${size}.png`), icon(size));
 const names = ['manifest.json', 'background.js', 'widget-bridge.js', 'sites.js', 'companion-action.js', 'media.js', 'media-observer.js', 'discovery-diagnostics.js', 'protocol.js', 'relay.js', 'clock.js', 'beat-sync.js', 'beat-detector.js', 'tempo-tracker.js', 'capture-engine.js', 'beat-telemetry.js', 'beat-timing.js', 'media-asset.js', 'offscreen.html', 'offscreen.js', 'setup.html', 'setup.js', 'setup.css', 'icons/16.png', 'icons/48.png', 'icons/128.png'];
+names.push('companion-update.js');
 const files = await Promise.all(names.map(async (name) => ({ name, bytes: await readFile(join(extension, name)) })));
 for (const name of ['percussion-capability.js', 'percussion-classifier.js', 'causal-percussion-classifier.js', 'percussion-features.js', 'percussion-worklet.js',
   'percussion-worker.js', 'percussion-runtime.js', 'lead-audio-authorization.js', 'lead-audio-tap.js', 'lead-audio-worklet.js']) files.push({ name, bytes: await readFile(join(extension, name)) });
@@ -115,4 +116,7 @@ for (const { name, bytes } of files) {
 const manifest = JSON.parse(files.find((file) => file.name === 'manifest.json').bytes.toString());
 const setup = await readFile(join(root, 'src-tauri', 'companion-setup.html'), 'utf8');
 await writeFile(join(bundledCompanion, 'Install Music Companion.html'), setup.replaceAll('__COMPANION_VERSION__', manifest.version));
+await writeFile(join(bundledCompanion, 'package-files.json'), JSON.stringify([
+  ...files.map(({ name }) => `extension/${name}`), 'Install Music Companion.html',
+], null, 2) + '\n');
 console.log(`Music companion packaged: ${files.length} files → public/downloads/kanban-music-companion.zip`);

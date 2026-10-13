@@ -114,7 +114,10 @@ it('matches compositor corners without clearing the native frost on legacy Windo
   expect(document.documentElement.style.getPropertyValue('--native-dock-radius')).toBe('');
   nativeInvoke.mockResolvedValue(undefined);
 });
-it('opens the included Companion from dock settings even while already connected', async () => {
+it('updates Companion from dock settings and shows progress and the confirmed version', async () => {
+  let finish!: (value: unknown) => void;
+  nativeInvoke.mockImplementation((command) => command === 'native_music_setup'
+    ? new Promise(resolve => { finish = resolve; }) : Promise.resolve(22));
   const view = render(<I18nProvider><NativeSurface dock focusProps={props}>Workspace</NativeSurface></I18nProvider>);
   await act(async () => {});
   const shadow = view.container.querySelector('.native-dock-host')!.shadowRoot!;
@@ -123,6 +126,13 @@ it('opens the included Companion from dock settings even while already connected
   expect(setup).toBeDefined();
   fireEvent.click(setup!);
   await waitFor(() => expect(nativeInvoke).toHaveBeenCalledWith('native_music_setup'));
+  expect(setup).toBeDisabled();
+  expect(setup).toHaveTextContent('Updating Companion');
+  fireEvent.click(setup!);
+  expect(nativeInvoke.mock.calls.filter(([command]) => command === 'native_music_setup')).toHaveLength(1);
+  await act(async () => { finish({ version: '0.3.23', status: 'ready', folder: 'C:\\Companion\\extension', browsersReady: 1, folderOpened: false }); });
+  await waitFor(() => expect(shadow.querySelector('[role="status"]')).toHaveTextContent('Companion 0.3.23 is ready'));
+  expect(setup).not.toBeDisabled();
 });
 it('does not let dock auto-sizing undo maximize, and restores before swapping surfaces', async () => {
   const swap = vi.fn();

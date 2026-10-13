@@ -8,7 +8,7 @@ import nativeDockCss from './nativeDock.css?inline';
 import { useI18n } from '../../i18n';
 import './nativeSurface.css';
 import NativeUpdateDialog from './NativeUpdateDialog';
-import { openNativeMusicSetup } from './nativeMusic';
+import { useCompanionSetup } from './use-companion-setup';
 
 async function updateNativeShape(rounded: boolean) {
   const radius = await invoke<number>('native_dock_shape', { rounded });
@@ -55,6 +55,7 @@ export default function NativeSurface({ dock, onToggle, focusProps, children }: 
   const [error, setError] = useState('');
   const [maximized, setMaximized] = useState(false);
   const [updateOpen, setUpdateOpen] = useState(false);
+  const companion = useCompanionSetup();
   const effectQueue = useRef(Promise.resolve());
   useEffect(() => {
     // Serialize surface changes so an older backdrop request cannot overwrite
@@ -122,7 +123,9 @@ export default function NativeSurface({ dock, onToggle, focusProps, children }: 
       <div className="native-dock-scroll"><NativeDock props={{ ...focusProps, onReturnToTab: onToggle ? switchSurface : undefined,
         returnLabel: vi ? 'Công việc' : 'Tasks',
         onDragStart: () => action(() => getCurrentWindow().startDragging()),
-        onMusicSetup: () => action(openNativeMusicSetup),
+        onMusicSetup: () => void companion.run(),
+        musicSetupPending: companion.updating,
+        musicSetupMessage: companion.message,
         nativeControls: <>
           <button className="dock-icon-button" type="button" aria-label={vi ? 'Cập nhật Kora' : 'Update Kora'} title={vi ? 'Cập nhật Kora' : 'Update Kora'} onClick={() => setUpdateOpen(true)}>↓</button>
           <button className="dock-icon-button" type="button" aria-label={vi ? 'Thu nhỏ' : 'Minimize'} onClick={() => action(() => getCurrentWindow().minimize())}>−</button>

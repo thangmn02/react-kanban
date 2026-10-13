@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { createWidgetBridge } from './widget-bridge.js';
 
 afterEach(() => vi.useRealTimers());
-function fixture() {
+function fixture(options = {}) {
   vi.useFakeTimers();
   const sockets = [];
   class Socket {
@@ -13,7 +13,7 @@ function fixture() {
   }
   const handle = vi.fn().mockResolvedValue({ ok: true, sessions: [] });
   const disconnected = vi.fn();
-  const bridge = createWidgetBridge({ Socket, handle, disconnected });
+  const bridge = createWidgetBridge({ Socket, handle, disconnected, ...options });
   bridge.connect();
   const socket = sockets[0];
   const nonce = 'abcdefghijklmnopabcdefghijklmnop1234';
@@ -67,4 +67,33 @@ it('keeps the service worker awake and reconnects after widget restart without a
   await vi.advanceTimersByTimeAsync(3000);
   expect(f.sockets).toHaveLength(2);
   f.bridge.close();
+});
+it('acknowledges a verified update before reloading once and rejects stale or malformed requests', async () => {
+  const reload = vi.fn(); const update = vi.fn().mockResolvedValue({ ok: true, version: '0.3.23' });
+  const f = fixture({ api: { runtime: { reload } }, update });
+  await f.receive({ type: 'hello', protocol: 'kora-widget-v1', nonce: f.nonce });
+  const request = { type: 'request', nonce: f.nonce, requestId: 'update', action: 'companion.reload', expectedVersion: '0.3.23' };
+  await f.receive({ ...request, nonce: 'old' });
+  await f.receive({ ...request, expectedVersion: undefined });
+  expect(update).not.toHaveBeenCalled();
+  await f.receive(request); await f.receive(request);
+  expect(f.handle).not.toHaveBeenCalled(); expect(reload).not.toHaveBeenCalled();
+  expect(JSON.parse(f.socket.send.mock.calls.at(-1)[0])).toMatchObject({ type: 'response', requestId: 'update', ok: true, version: '0.3.23' });
+  await vi.advanceTimersByTimeAsync(100); expect(reload).toHaveBeenCalledOnce();
+  f.bridge.close();
+});
+it('does not reload after file rejection, a late reply or explicit bridge shutdown', async () => {
+  const reload = vi.fn(); const update = vi.fn().mockResolvedValue({ ok: false, error: 'update-version-mismatch' });
+  const f = fixture({ api: { runtime: { reload } }, update });
+  await f.receive({ type: 'hello', protocol: 'kora-widget-v1', nonce: f.nonce });
+  const request = { type: 'request', nonce: f.nonce, requestId: 'update', action: 'companion.reload', expectedVersion: '0.3.23' };
+  await f.receive(request); await vi.advanceTimersByTimeAsync(100); expect(reload).not.toHaveBeenCalled();
+  let finish; update.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  const waiting = f.receive(request); f.socket.close(); finish({ ok: true, version: '0.3.23' }); await waiting;
+  await vi.advanceTimersByTimeAsync(100); expect(reload).not.toHaveBeenCalled();
+  f.bridge.close();
+  const g = fixture({ api: { runtime: { reload } }, update: async () => ({ ok: true, version: '0.3.23' }) });
+  await g.receive({ type: 'hello', protocol: 'kora-widget-v1', nonce: g.nonce });
+  await g.receive({ ...request, nonce: g.nonce }); g.bridge.close();
+  await vi.advanceTimersByTimeAsync(100); expect(reload).not.toHaveBeenCalled();
 });
