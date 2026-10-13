@@ -1,7 +1,8 @@
 # Spotify timeline and audio handoff validation
 
 Date: 2026-10-14, Asia/Saigon. Baseline: fcc6a4c.
-Versions: Kora 0.1.31 / Companion 0.3.24. Draft verification in progress.
+Versions: Kora 0.1.31 / Companion 0.3.24. Published and byte-verified;
+installed listening acceptance pending.
 
 ## Observed defects and repairs
 
@@ -94,7 +95,14 @@ that generated helper. The model SHA-256 remains
 `c571062d76c322d54c2808c95339ea2dadd2f6ab99f9d83163d0f5311cd0f80a`.
 Main web entry is 705.5 KiB, within the 976.6 KiB budget.
 
-Draft: `6aceb59df3f3b961207dc24c`; final public verification pending.
+Source: `095b320fa6a006ec23addf57b37c585e273b5cdd`.
+Draft: `6aceb59df3f3b961207dc24c`. The automatic build completed before publishing
+the exact verified artifacts as production deploy `6aceb65d7544427364f295f3`.
+Both `https://koraspace.online` and `https://kanthangboard.netlify.app` serve
+byte-identical installer, both archive aliases, updater feed, guide script and
+nine entry JS/CSS assets. The public ONNX hash matches the unchanged model.
+Owned browsers and servers exited; ports 1431, 5173 and 47636 have no listeners.
+
 Update Kora, use Install or update Companion, confirm loaded Companion 0.3.24 in
 each browser/profile, then pause/close YouTube and play Spotify without a toolbar
 click. Compare Kora's song duration/time, pause/seek/next behavior, flashes and
@@ -102,4 +110,4 @@ audible sound through the first seconds and a full song. Repeat in Chrome,
 Brave and Edge. Web capture may still require its normal toolbar permission.
 
 Rollback uses the previous signed 0.1.30 release and retained Companion update
-backup. All owned browser/test-server processes must be closed before delivery.
+backup. No owned browser/test-server process remains running.

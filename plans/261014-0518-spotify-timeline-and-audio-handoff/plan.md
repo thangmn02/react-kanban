@@ -1,6 +1,7 @@
 # Spotify timeline and audio handoff
 
-Status: implemented, reviewed and packaged; draft/public verification in progress.
+Status: implemented, reviewed, published and byte-verified; installed listening
+acceptance pending.
 Baseline: main at fcc6a4c.
 
 ## Outcome and boundaries
