@@ -19,6 +19,30 @@ const setup = (client: EventTrackClient, config = options) => {
   engine.accept({ kind: 'clock', clock: clock() });
   return { events, engine, recover };
 };
+it('preserves distinct rapid local attacks while rejecting retransmission by sequence', async () => {
+  const client: EventTrackClient = { manifest: vi.fn().mockResolvedValue(undefined), chunk: vi.fn(), requestAnalysis: vi.fn().mockResolvedValue('unavailable') };
+  const { engine, events } = setup(client);
+  engine.accept({ kind: 'sync.state', mode: 'capture', captureId: 'rapid' });
+  const times = [10.2, 10.22, 10.5, 10.53, 10.8, 10.85, 11.1, 11.2];
+  times.forEach((time, index) => engine.accept({ kind: 'onset', captureId: 'rapid', sequence: index + 1,
+    bands: ['hat'], targetPlaybackTime: time, playbackClock: clock() }));
+  engine.accept({ kind: 'onset', captureId: 'rapid', sequence: times.length,
+    bands: ['hat'], targetPlaybackTime: 11.21, playbackClock: clock() });
+  await vi.advanceTimersByTimeAsync(1300);
+  expect(semantic(events).filter(event => event.kind === 'onset')).toHaveLength(times.length);
+  expect(semantic(events).map(event => event.targetPlaybackTime)).toEqual(times);
+});
+it('reconciles quantized same-row attacks without suppressing simultaneous other rows', async () => {
+  const client: EventTrackClient = { manifest: vi.fn().mockResolvedValue(undefined), chunk: vi.fn(), requestAnalysis: vi.fn().mockResolvedValue('unavailable') };
+  const { engine, events } = setup(client);
+  engine.accept({ kind: 'sync.state', mode: 'capture', captureId: 'overlap' });
+  for (const [sequence, band, time] of [[1, 'kick', 10.2], [2, 'kick', 10.2005], [3, 'clap', 10.2], [4, 'hat', 10.2]] as const) {
+    engine.accept({ kind: 'onset', captureId: 'overlap', sequence,
+      bands: [band], targetPlaybackTime: time, playbackClock: clock() });
+  }
+  await vi.advanceTimersByTimeAsync(300);
+  expect(semantic(events).map(event => event.kind === 'onset' && event.bands[0])).toEqual(['kick', 'clap', 'hat']);
+});
 it('ends and resumes analysis demand without replacing local playback ownership', async () => {
   const client: EventTrackClient = { manifest: vi.fn().mockResolvedValue(undefined), chunk: vi.fn(),
     requestAnalysis: vi.fn().mockResolvedValue('pending'), endDemand: vi.fn().mockResolvedValue(undefined) };
@@ -222,7 +246,7 @@ it('does not reflash already delivered local events when a cache hit arrives jus
   const { engine, events } = setup(client);
   engine.accept({ kind: 'sync.state', mode: 'capture', captureId: 'local' });
   engine.accept({ kind: 'onset', captureId: 'local', sequence: 1, bands: ['kick'], targetPlaybackTime: 10.25, playbackClock: clock() });
-  await vi.advanceTimersByTimeAsync(250); resolveChunk(chunk(0, 10.25)); await vi.advanceTimersByTimeAsync(20);
+  await vi.advanceTimersByTimeAsync(250); resolveChunk(chunk(0, 10.275)); await vi.advanceTimersByTimeAsync(20);
   expect(semantic(events)).toHaveLength(1);
 });
 it('bounds chunk memory across long media and cancels old requests and targets on small seeks', async () => {

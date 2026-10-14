@@ -12,7 +12,10 @@ import type { LeadAvailability } from './lead-feature';
 export type BeatEventPath = 'cache' | 'local' | 'degraded';
 export interface BeatEventOptions { asset?: MediaAsset; duration?: number; capabilities: BeatCapabilities; initialClock?: MusicClock; demand?: boolean; capturedInput?: boolean; onLeadAvailability?: (state: LeadAvailability) => void }
 const telemetry = beatTelemetry.at('beat-event-engine');
-const tolerance = .04;
+const crossSourceTolerance = .04;
+// Same-source attacks this close share a quantized onset. Wider reconciliation
+// is only for independently produced cache/local views of one acoustic hit.
+const quantizedOnsetTolerance = .001;
 interface Candidate { row: EventRow; time: number; rank: number; key: string }
 type ScheduledEvent = Extract<BeatEvent, { kind: 'onset' | 'melody.state' | 'tempo.state' | 'tempo.tick' }>;
 
@@ -95,10 +98,12 @@ export function createBeatEventEngine(options: BeatEventOptions, emit: (event: B
     analysis = 'checking'; reportAvailability();
   };
   const add = (event: ScheduledEvent, row: EventRow, time: number, rank: number) => {
-    if (delivered.some(item => item.row === row && Math.abs(item.time - time) <= tolerance)) {
+    const overlaps = (item: Candidate) => item.row === row
+      && Math.abs(item.time - time) <= (item.rank === rank ? quantizedOnsetTolerance : crossSourceTolerance);
+    if (delivered.some(overlaps)) {
       telemetry.mark('EVENT_DROPPED', event.telemetry, { reason: 'semantic-duplicate' }); return;
     }
-    const previous = [...pending.values()].find(item => item.row === row && Math.abs(item.time - time) <= tolerance);
+    const previous = [...pending.values()].find(overlaps);
     if (previous) {
       if (previous.rank >= rank) { telemetry.mark('EVENT_DROPPED', event.telemetry, { reason: 'semantic-duplicate' }); return; }
       scheduler.cancelSemantic(previous.key); pending.delete(previous.key);

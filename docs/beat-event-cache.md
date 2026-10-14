@@ -74,9 +74,12 @@ cached events can continue against the fresh media clock.
 
 Within cached ranges, complete cached data is authoritative, including empty
 quiet ranges. Before release, cached events replace lower-priority local events.
-A 40 ms row/time merge tolerance and bounded delivered ledger prevent duplicate
-flashes when a cache arrives immediately after a local event. Outside cached
-ranges, local analysis retains its existing normalization and detectors.
+A 40 ms row/time merge tolerance reconciles independently produced cache and
+local views of an attack. Events from the same source use a 1 ms quantized-onset
+tolerance so nearby independent attacks survive; local retransmissions are
+rejected by sequence, and repeated cached events by event ID. The delivered
+ledger remains bounded. Outside cached ranges, local analysis retains its
+existing normalization and detectors.
 Browser output-clock-capable capture, estimated native monitoring and
 clock-only playback are explicit capability tiers; permission/live feed still
 requires actual capture proof. Legacy untimed local events keep their arrival
