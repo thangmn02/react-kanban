@@ -19,6 +19,8 @@ export function temporalMatch(reference, predicted, tolerance = .05) {
 
 export function scoreAnnotations(annotations, predictions) {
   return annotations.map(a=> {
+    // A wrong-flash marker is not a complete list of audible onsets.
+    if(a.purpose!=='audible-onset-reference') return {input:a.input,status:'not-complete-onset-reference'};
     if(a.verified!==true || a.origin!=='human') return {input:a.input,status:'awaiting-independent-annotation'};
     const prediction=predictions.find(p=>p.input===a.input);
     if(!prediction || !Number.isFinite(a.start) || !Number.isFinite(a.end) || a.start<0 || a.end<=a.start || a.end>prediction.duration) throw new Error('Invalid annotated range');
