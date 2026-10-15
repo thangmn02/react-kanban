@@ -15,6 +15,37 @@ vi.mock('./mediaBridge', () => ({
 beforeEach(() => { vi.useFakeTimers(); bridge.send.mockResolvedValue(undefined); });
 afterEach(() => { cleanup(); beatTelemetry.enable(false); beatTelemetry.clear(); vi.useRealTimers(); vi.clearAllMocks(); vi.restoreAllMocks(); });
 const emit = (event: BeatEvent) => act(() => { bridge.receive?.(event); });
+it.each([false,true])('preserves 20/30/50/100 ms local attacks through controller (event engine %s)',async withEngine=>{
+  beatTelemetry.enable();
+  const options=withEngine?{demand:false,capabilities:{tier:'tab-capture' as const,captureClock:'output-clock-capable' as const}}:undefined;
+  const onClock=vi.fn();
+  const {result}=renderHook(()=>useMusicBeatSync('rapid-song',onClock,options));
+  const clock={currentTime:9.8,sampledAt:Date.now(),playbackRate:1,playing:true,paused:false};
+  emit({kind:'clock',clock});
+  emit({kind:'sync.state',mode:'capture',captureId:'rapid'});
+  const times=[10,10.02,10.3,10.33,10.6,10.65,10.9,11];
+  for(const [index,time] of times.entries())emit({kind:'onset',captureId:'rapid',sequence:index+1,
+    bands:['hat'],targetPlaybackTime:time,playbackClock:clock,
+    telemetry:beatTelemetry.events('onset',['hat'])});
+  await act(async()=>{await vi.advanceTimersByTimeAsync(1300);});
+  expect(result.current.onsets.hat).toBe(times.length);
+  expect(beatTelemetry.snapshot().records.filter(r=>r.reason==='debounce')).toHaveLength(0);
+});
+it.each([false,true])('still rejects a sub-20 ms local duplicate (event engine %s)',async withEngine=>{
+  beatTelemetry.enable();
+  const options=withEngine?{demand:false,capabilities:{tier:'tab-capture' as const,captureClock:'output-clock-capable' as const}}:undefined;
+  const onClock=vi.fn();
+  const {result}=renderHook(()=>useMusicBeatSync('close-song',onClock,options));
+  const clock={currentTime:9.8,sampledAt:Date.now(),playbackRate:1,playing:true,paused:false};
+  emit({kind:'clock',clock});
+  emit({kind:'sync.state',mode:'capture',captureId:'close'});
+  for(const [index,time] of [10,10.01,10.02].entries())emit({kind:'onset',captureId:'close',sequence:index+1,
+    bands:['hat'],targetPlaybackTime:time,playbackClock:clock,
+    telemetry:beatTelemetry.events('onset',['hat'])});
+  await act(async()=>{await vi.advanceTimersByTimeAsync(400);});
+  expect(result.current.onsets.hat).toBe(2);
+  expect(beatTelemetry.snapshot().records.filter(r=>r.reason==='debounce')).toHaveLength(1);
+});
 it('keeps one audible subscription and its counters when analysis demand changes', async () => {
   const onClock = vi.fn();
   const options = { capabilities: { tier: 'tab-capture' as const, captureClock: 'output-clock-capable' as const } };

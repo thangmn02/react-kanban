@@ -160,7 +160,8 @@ export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessio
           const target = ['kick', 'clap', 'hat'].includes(band) && Number.isFinite(event.targetPlaybackTime)
             ? event.targetPlaybackTime! : undefined;
           const duplicate = target === undefined ? now - lastAccepted[band] < 20
-            : target - (lastPercussionTarget[band] ?? -Infinity) < .02;
+            // Allow floating-point roundoff at the existing 20 ms boundary.
+            : target - (lastPercussionTarget[band] ?? -Infinity) < .02 - 1e-9;
           if (event.eventSource !== 'cache' && duplicate) {
             telemetry.mark('EVENT_DROPPED', event.telemetry?.filter((t) => t.type === (band === 'clap' ? 'snare' : band === 'melody' ? 'melodic' : band)), { reason: 'debounce' }); return false;
           }

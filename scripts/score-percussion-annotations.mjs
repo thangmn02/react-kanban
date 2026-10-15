@@ -19,15 +19,33 @@ export function temporalMatch(reference, predicted, tolerance = .05) {
 
 export function scoreAnnotations(annotations, predictions) {
   return annotations.map(a=> {
+    if(a.referenceStatus==='provisional-human-reference' || a.purpose==='investigation-only')
+      return {input:a.input,status:'provisional-human-reference',scoringEligible:false};
     // A wrong-flash marker is not a complete list of audible onsets.
     if(a.purpose!=='audible-onset-reference') return {input:a.input,status:'not-complete-onset-reference'};
     if(a.verified!==true || a.origin!=='human') return {input:a.input,status:'awaiting-independent-annotation'};
+    // A review-page completeness checkbox cannot establish timing accuracy or
+    // independence. Official scoring needs a separate, source-bound review.
+    if(a.referenceStatus!=='verified-ground-truth') return {input:a.input,status:'awaiting-separate-verification'};
+    const verification=a.verification;
+    if(verification?.coverage!=='complete-all-rows' || verification.independentOfPredictions!==true
+      || !Number.isFinite(verification.onsetUncertaintyMs) || verification.onsetUncertaintyMs<0 || verification.onsetUncertaintyMs>10
+      || typeof verification.reviewer!=='string' || !verification.reviewer.trim()
+      || typeof verification.method!=='string' || !verification.method.trim()
+      || !/^[a-f0-9]{64}$/.test(a.sourceSha256||'') || !/^[a-f0-9]{64}$/.test(a.pcmSha256||'')
+      || a.ambiguous!==undefined && !Array.isArray(a.ambiguous)
+      || a.ambiguousIntervals!==undefined && !Array.isArray(a.ambiguousIntervals)
+      || a.ambiguous?.length || a.ambiguousIntervals?.length)
+      return {input:a.input,status:'incomplete-verification-evidence'};
     const prediction=predictions.find(p=>p.input===a.input);
+    if(!prediction || prediction.sourceSha256!==a.sourceSha256 || prediction.pcmSha256!==a.pcmSha256)
+      throw new Error('Reference and prediction audio identities must match');
     if(!prediction || !Number.isFinite(a.start) || !Number.isFinite(a.end) || a.start<0 || a.end<=a.start || a.end>prediction.duration) throw new Error('Invalid annotated range');
     const rows={};
     for(const row of ['kick','snare','hat']) {
       const reference=a.rows?.[row];
-      if(!Array.isArray(reference)||!reference.every(t=>Number.isFinite(t)&&t>=a.start&&t<a.end)) throw new Error('Complete typed annotations required');
+      if(!Array.isArray(reference)||!reference.every(t=>Number.isFinite(t)&&t>=a.start&&t<a.end)
+        || new Set(reference).size!==reference.length) throw new Error('Complete unique typed annotations required');
       const events=prediction.events.filter(e=>e.type===row && e.time>=a.start && e.time<a.end);
       rows[row]={...temporalMatch(reference,events.map(e=>e.time)),
         falseEventsPerAbsentMinute:reference.length===0?events.length/((a.end-a.start)/60):null};

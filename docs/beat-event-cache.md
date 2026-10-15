@@ -80,6 +80,10 @@ tolerance so nearby independent attacks survive; local retransmissions are
 rejected by sequence, and repeated cached events by event ID. The delivered
 ledger remains bounded. Outside cached ranges, local analysis retains its
 existing normalization and detectors.
+The controller separately retains a 20 ms same-row local-event floor, using
+media targets for percussion and arrival times for legacy events/Bass. Its
+comparison allows arithmetic roundoff at the exact 20 ms boundary so a valid
+boundary hit is not discarded. Cached events keep their existing bypass.
 Browser output-clock-capable capture, estimated native monitoring and
 clock-only playback are explicit capability tiers; permission/live feed still
 requires actual capture proof. Legacy untimed local events keep their arrival

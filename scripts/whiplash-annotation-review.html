@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Private Whiplash reference review</title>
+<style>
+body{font:16px system-ui;background:#171a23;color:#eef1f8;margin:24px auto;padding:0 20px;max-width:1000px;line-height:1.5}button,input,select,textarea{font:inherit;padding:8px;border:1px solid #737d95;border-radius:5px;background:#242a38;color:inherit}button{cursor:pointer;margin:4px}textarea{width:95%;min-height:70px}audio,canvas{width:100%}canvas{height:120px;background:#242a38;cursor:crosshair}.rows{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}small,p{color:#c6ccdc}label{display:block;margin:8px 0}#status{color:#ffe299;white-space:pre-wrap}code{overflow-wrap:anywhere}section{margin:20px 0;padding:16px;border:1px solid #48526b;border-radius:8px}
+</style>
+<h1>Provisional percussion annotation review</h1>
+<p>Mark the Kick, Snare/Clap and Hat/Cymbal attacks you can identify, and leave completeness unchecked when coverage is uncertain. No detector suggestions are shown. W1/W2/W3 are provisional windows. Waveform peaks are navigation aids, not drum labels.</p>
+<label>Excerpt <select id="excerpt"></select></label><p id="identity"></p>
+<audio id="audio" controls preload="metadata"></audio>
+<label>Speed <select id="speed"><option>1</option><option>0.75</option><option>0.5</option><option>0.25</option></select></label>
+<canvas id="waveform" width="1200" height="160" aria-label="Waveform; click to seek, or use the time field below"></canvas>
+<label>Exact excerpt time (seconds) <input id="time" type="number" min="0" step="0.001" value="0"><button id="seek">Seek</button></label>
+<p>All labels use excerpt-relative seconds. Click the waveform and inspect at slow speed, then use exact time to refine. Marking during playback includes human reaction delay.</p>
+<div id="rows" class="rows"></div>
+<section>
+<label>Cymbal subtypes, when audible: JSON array of {"time":1.234,"subtype":"ride"}. Allowed: hi-hat, ride, crash, cymbal. Times must also appear in the combined Hat/Cymbal row.<textarea id="subtypes">[]</textarea></label>
+<label>Ambiguous or masked events: JSON array of {"time":1.234,"row":"snare","reason":"masked by brass"}. Do not convert brass accents into snare labels. Unresolved ambiguity prevents freezing.<textarea id="ambiguous">[]</textarea></label>
+<label>Ambiguous intervals: JSON array of {"start":1,"end":2,"rows":["snare","hat"],"reason":"overlapping instruments"}.<textarea id="ambiguous-intervals">[]</textarea></label>
+<label>Optional confidence per row: unassessed, low, medium or high. This is an uncalibrated self-report, not evidence of accuracy.<textarea id="confidence">{"kick":"unassessed","snare":"unassessed","hat":"unassessed"}</textarea></label>
+<label>Estimated onset uncertainty in milliseconds, if known. Leave blank when unknown. This does not establish official timing verification.<input id="uncertainty" type="number" min="0" step="1"></label>
+<label>Coverage notes: ensemble/brass interference for W1; fastest suitable drum passage, flams/rolls actually heard for W2; confirmed irregular meter, rests and transitions for W3. Say if a different window is needed.<textarea id="notes"></textarea></label>
+<label><input id="coverage" type="checkbox"> I checked that this window covers its stated purpose.</label>
+<label><input id="identity-check" type="checkbox"> I confirmed the source recording identity for this excerpt.</label>
+<label><input id="verify" type="checkbox"> I completed a preliminary review of all three rows. A separate review is required for verified ground truth.</label>
+</section>
+<label>Reviewer name or initials <input id="reviewer"></label>
+<button id="export">Export reviewed references</button>
+<label>Restore a previously exported file <input id="import" type="file" accept=".json"></label>
+<p id="status">Every export from this page is a provisional-human-reference. No checkbox promotes it to verified ground truth. Export saves all excerpts; save drafts before closing this page.</p>
+<script>
+const manifest = __BENCHMARK_MANIFEST__;
+const $ = id => document.getElementById(id);
+const rowNames = {kick:'Kick', snare:'Snare / Clap', hat:'Hat / Cymbal'};
+const drafts = new Map(); let active;
+for(const [key, name] of Object.entries(rowNames)) {
+ const label=document.createElement('label'); label.textContent=name+' times, separated by spaces or commas';
+ const field=document.createElement('textarea'); field.id=key; field.setAttribute('aria-label',name+' timestamps');label.append(field);
+ const button=document.createElement('button'); button.textContent='Mark exact time'; button.onclick=()=>{field.value=(field.value+' '+Number($('time').value).toFixed(3)).trim();invalidate();};label.append(button);
+ const check=document.createElement('input');check.type='checkbox';check.id=key+'-complete';label.append(check,document.createTextNode(' Complete row, including all rests'));$('rows').append(label);
+}
+const fields=['kick','snare','hat','subtypes','ambiguous','ambiguous-intervals','confidence','uncertainty','notes','coverage','identity-check','verify','kick-complete','snare-complete','hat-complete'];
+function snapshot(){if(active)drafts.set(active.input,Object.fromEntries(fields.map(k=>[k,$(k).type==='checkbox'?$(k).checked:$(k).value])));}
+function invalidate(){$('verify').checked=false;for(const r of Object.keys(rowNames))$(r+'-complete').checked=false;}
+for(const id of fields)$(id).addEventListener('input',()=>{if(['kick','snare','hat','subtypes','ambiguous','ambiguous-intervals','confidence','uncertainty','notes'].includes(id))invalidate();snapshot();});
+function draw(){if(!active)return;const c=$('waveform'),g=c.getContext('2d');g.clearRect(0,0,c.width,c.height);g.strokeStyle='#90b7ff';g.beginPath();active.peaks.forEach((p,i)=>{const x=i/active.peaks.length*c.width;g.moveTo(x,80-p*70);g.lineTo(x,80+p*70);});g.stroke();g.strokeStyle='#ffe299';g.beginPath();const x=$('audio').currentTime/active.duration*c.width;g.moveTo(x,0);g.lineTo(x,160);g.stroke();}
+function select(){snapshot();active=manifest.excerpts[Number($('excerpt').value)];const state=drafts.get(active.input)||{};for(const k of fields){if($(k).type==='checkbox')$(k).checked=state[k]||false;else $(k).value=state[k]??(['subtypes','ambiguous','ambiguous-intervals'].includes(k)?'[]':k==='confidence'?'{"kick":"unassessed","snare":"unassessed","hat":"unassessed"}':'');}$('audio').src=active.file;$('time').max=active.duration;$('time').value=0;$('identity').textContent=`${active.input}: source ${active.sourceStart}–${active.sourceEnd} seconds; ${active.role}. Source SHA-256 ${active.sourceSha256}. PCM SHA-256 ${active.pcmSha256}.`;draw();}
+manifest.excerpts.forEach((e,i)=>{const o=document.createElement('option');o.value=i;o.textContent=e.input+' · '+e.role;$('excerpt').append(o);});$('excerpt').onchange=select;
+$('waveform').onclick=e=>{const rect=e.currentTarget.getBoundingClientRect();$('time').value=((e.clientX-rect.left)/rect.width*active.duration).toFixed(3);$('seek').click();};
+$('seek').onclick=()=>{const t=Number($('time').value);if(Number.isFinite(t)&&t>=0&&t<active.duration){$('audio').currentTime=t;draw();}};
+$('audio').ontimeupdate=()=>{if(document.activeElement!==$('time'))$('time').value=$('audio').currentTime.toFixed(3);draw();};$('speed').onchange=()=>{$('audio').playbackRate=Number($('speed').value);};
+function download(name,text){const url=URL.createObjectURL(new Blob([text],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+function parseTimes(text,duration){const values=text.trim()?text.trim().split(/[\s,]+/).map(Number):[];if(values.some(t=>!Number.isFinite(t)||t<0||t>=duration)||new Set(values).size!==values.length)throw Error('Times must be unique finite seconds inside the excerpt.');return values.sort((a,b)=>a-b);}
+$('export').onclick=()=>{
+ try{
+  snapshot();
+  const data=manifest.excerpts.map(e=>{
+   const d=drafts.get(e.input)||{};
+   const provisionalRows=Object.fromEntries(Object.keys(rowNames).map(r=>{
+    const values=(d[r]||'').trim()?d[r].trim().split(/[\s,]+/).map(Number):null;
+    if(values?.some(t=>!Number.isFinite(t)))throw Error('Provisional timestamps must be finite; original text remains in the draft.');
+    return[r,values];
+   }));
+   const rows=Object.fromEntries(Object.keys(rowNames).map(r=>[r,d[r+'-complete']?parseTimes(d[r]||'',e.duration):null]));
+   const ambiguous=JSON.parse(d.ambiguous||'[]'),subtypes=JSON.parse(d.subtypes||'[]');
+   const ambiguousIntervals=JSON.parse(d['ambiguous-intervals']||'[]');
+   const rowConfidence=JSON.parse(d.confidence||'{"kick":"unassessed","snare":"unassessed","hat":"unassessed"}');
+   const onsetUncertaintyMs=d.uncertainty?.trim()?Number(d.uncertainty):null;
+   if(onsetUncertaintyMs!==null&&(!Number.isFinite(onsetUncertaintyMs)||onsetUncertaintyMs<0))throw Error('Uncertainty must be a nonnegative estimate or blank for unknown.');
+   if(Object.keys(rowNames).some(r=>!['unassessed','low','medium','high'].includes(rowConfidence?.[r])))throw Error('Set each row confidence to unassessed, low, medium or high.');
+   if(!Array.isArray(ambiguous)||!Array.isArray(subtypes)||!Array.isArray(ambiguousIntervals))throw Error('Ambiguity and subtype fields must be JSON arrays.');
+   for(const a of ambiguous)if(!Number.isFinite(a.time)||a.time<0||a.time>=e.duration||!Object.keys(rowNames).includes(a.row)||!a.reason?.trim())throw Error('Each ambiguous event needs a valid time, row and reason.');
+   for(const a of ambiguousIntervals)if(!Number.isFinite(a.start)||!Number.isFinite(a.end)||a.start<0||a.end>e.duration||a.end<=a.start||!Array.isArray(a.rows)||!a.rows.length||a.rows.some(r=>!Object.keys(rowNames).includes(r))||!a.reason?.trim())throw Error('Each ambiguous interval needs valid bounds, rows and a reason.');
+   for(const s of subtypes)if(!['hi-hat','ride','crash','cymbal'].includes(s.subtype)||!provisionalRows.hat?.includes(s.time))throw Error('Each subtype needs a valid type and matching combined-row timestamp.');
+   const requested=Boolean(d.verify);
+   const reviewComplete=requested&&Boolean($('reviewer').value.trim())&&d.coverage&&d['identity-check']&&Boolean(d.notes?.trim())&&Object.values(rows).every(Array.isArray)&&ambiguous.length===0&&ambiguousIntervals.length===0;
+   if(requested&&!reviewComplete)throw Error(e.input+': complete all rows, identity, coverage notes and reviewer; resolve all ambiguity before verification of preliminary review.');
+   return{input:e.input,start:0,end:e.duration,origin:'human',purpose:'investigation-only',referenceStatus:'provisional-human-reference',verified:false,scoringEligible:false,
+    reviewComplete,rows,provisionalRows,ambiguous,ambiguousIntervals,subtypes,rowConfidence,onsetUncertaintyMs,uncertaintyStatus:'provisional-self-report',
+    coverageNotes:d.notes||'',coverageVerified:Boolean(d.coverage),recordingIdentityVerified:Boolean(d['identity-check']),reviewer:$('reviewer').value.trim(),
+    sourceSha256:e.sourceSha256,pcmSha256:e.pcmSha256,sourceStart:e.sourceStart,sourceEnd:e.sourceEnd,reviewedAt:new Date().toISOString(),draft:d};
+  });
+  download('whiplash-onset-references.json',JSON.stringify(data,null,2));
+  $('status').textContent=`Exported ${data.length} provisional references (${data.filter(e=>e.reviewComplete).length} preliminarily complete). Official accuracy scoring requires a separate verified subset.`;
+ }catch(e){$('status').textContent=e.message;}
+};
+$('import').onchange=async()=>{try{const data=JSON.parse(await $('import').files[0].text());if(!Array.isArray(data))throw Error('Expected a reference array.');const pending=[];for(const a of data){const e=manifest.excerpts.find(e=>e.input===a.input);if(!e||e.sourceSha256!==a.sourceSha256||e.pcmSha256!==a.pcmSha256||!a.draft)throw Error('Source identity or draft mismatch.');pending.push([a.input,a.draft]);}for(const [id,d] of pending)drafts.set(id,d);active=undefined;select();$('reviewer').value=data[0]?.reviewer||'';$('status').textContent='Restored matching drafts. Recheck before freezing.';}catch(e){$('status').textContent=e.message;}};
+select();
+</script></html>
