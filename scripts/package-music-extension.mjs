@@ -91,7 +91,7 @@ if(privateCandidate) {
   const candidate=files.find(file=>file.name==='beat-candidate.js');
   candidate.bytes=Buffer.from(candidate.bytes.toString().replace('privateBeatCandidate = false','privateBeatCandidate = true'));
   const manifest=files.find(file=>file.name==='manifest.json');
-  const value=JSON.parse(manifest.bytes.toString());value.name+=' Private';value.version_name=value.version+' browser-first-v1 private';
+  const value=JSON.parse(manifest.bytes.toString());value.name+=' Private';value.version_name=value.version+' browser-first-v2 live preview private';
   manifest.bytes=Buffer.from(JSON.stringify(value,null,2)+'\n');
 }
 for (const name of ['percussion-capability.js', 'percussion-classifier.js', 'causal-percussion-classifier.js', 'percussion-features.js', 'percussion-worklet.js',
@@ -133,6 +133,7 @@ if(privateCandidate)await writeFile(join(output,'Private listening guide.html'),
 <li>In the repository, run <code>node scripts/prepare-beat-corpus.mjs</code> then <code>node scripts/verify-private-companion.mjs --serve</code>. Keep that terminal open; Ctrl+C stops the local server.</li>
 <li>Open <a href="http://127.0.0.1:5173">the private grid</a> and <a href="http://127.0.0.1:5174">the audio-only review tab</a>. Choose authorized local audio, press Play, and click Companion's toolbar icon on that source tab.</li>
 <li>In the grid, wait for calibration, pause the source, open Private candidate and complete the consent checks. Enable the bounded delay and optional unverified instrument preview, then resume. The mode shows the actual intentional delay.</li>
+<li>For YouTube or another supported captured tab, play it, click Companion on that source tab, then select it in the grid. Under Live preview, complete the three checks and click Enable live preview (no audio delay) while playback continues. No calibration is required. The mode is experimental-live; model flashes can be late or incorrect. Pause, seek or source changes end preview; enable it again while playing. Reload the private extension and grid after updating this package.</li>
 <li>Use pause, seek and source changes to investigate. A source/generation change revokes the experiment. Video, uncertain output, native capture and Spotify cannot enable this buffer.</li>
 <li>Report the approximate song time, row and observed failure. Provisional annotations remain investigation-only. Generic degraded visuals make no instrument claim.</li></ol>
 <p>No web deployment, extension-store update or installer publication is included. Model weights remain local evaluation assets.</p></body>`);

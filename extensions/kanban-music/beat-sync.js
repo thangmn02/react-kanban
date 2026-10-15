@@ -40,7 +40,7 @@ export function createBeatSync(api, nativePublish) {
       active:current.captureReady===true,audible:current.audioDetected===true,
       output:current.owner.native?'native-monitor':'tab-replacement',originalSuppressed:current.captureReady===true&&current.originalSuppressed===true&&!current.owner.native},
     clock:{...current.clock,generation:current.clock?.generation||0},detector:candidateDetector,
-    timing:current.experiment?.enabled?current.experiment.calibration:current.calibration||{},health:current.health||{},experiment:current.experiment||{}});
+    timing:current.experiment?.enabled&&!current.experiment.live?current.experiment.calibration:current.calibration||{},health:current.health||{},experiment:current.experiment||{}});
   const capability = current => privateBeatCandidate?decideBeatMode(modeFacts(current)):undefined;
   const pauseRetainsCapture = current => privateBeatCandidate&&current.captureReady&&current.audioDetected
     &&!current.owner.native&&current.clock?.mediaFacts?.kind==='audio-only'&&current.clock.mediaFacts.noVideo===true;
@@ -55,6 +55,14 @@ export function createBeatSync(api, nativePublish) {
   function publishState(current) {
     publish(current, { kind: 'sync.state', mode: current.mode, reason: clockReason(current), captureId: current.mode === 'capture' ? current.captureId : undefined,
       ...(privateBeatCandidate?{capability:capability(current)}:{}) });
+  }
+
+  function revokeLivePreview(current) {
+    if(!current.experiment?.live)return;
+    current.experiment=undefined;current.synchronizationEpoch=crypto.randomUUID();
+    void offscreenMessage({kind:'synchronization',captureId:current.captureId,
+      settings:{bufferMs:0,eligible:false,allowTypedPreview:false,live:true,flush:true,epoch:current.synchronizationEpoch}}).catch(()=>{});
+    publishState(current);
   }
 
   function confirmCapture(current) {
@@ -251,6 +259,7 @@ export function createBeatSync(api, nativePublish) {
           }
           if (current.tabMuted) cancelCapture(current);
           else void capture(current);
+          if(current.experiment?.live&&!capability(current).livePreviewEligible)revokeLivePreview(current);
           publishState(current);
           return;
         }
@@ -272,22 +281,29 @@ export function createBeatSync(api, nativePublish) {
         if(!privateBeatCandidate||!current||!sameOwner(current.owner,owner)||owner.native
           ||current.session.id!==session.id||current.session.src!==session.src
           ||!validSyncConfiguration(configuration)||configuration.captureId!==current.captureId
-          ||configuration.generation!==(current.clock?.generation||0)||current.clock?.playing
+          ||configuration.generation!==(current.clock?.generation||0)
+          ||configuration.live&&current.delaySeconds>0||current.clock?.playing&&!configuration.live
           ||current.clock?.seeking||current.clock?.buffering) return false;
         const available=capability(current);
-        if(configuration.enabled&&!available.bufferEligible)return false;
-        const experiment={...configuration,bufferMs:configuration.enabled?available.requiredBufferMs:0,
+        if(configuration.enabled&&(configuration.live?!available.livePreviewEligible||!current.clock?.playing:!available.bufferEligible))return false;
+        const experiment={...configuration,bufferMs:configuration.enabled&&!configuration.live?available.requiredBufferMs:0,
           calibration:{...current.calibration}};
         const next=decideBeatMode({...modeFacts(current),experiment});
-        if(configuration.enabled&&next.mode!=='experimental-buffered')return false;
+        const expectedMode=configuration.live?'experimental-live':'experimental-buffered';
+        if(configuration.enabled&&next.mode!==expectedMode)return false;
         const epoch=crypto.randomUUID();current.synchronizationEpoch=epoch;
         const result=await offscreenMessage({kind:'synchronization',captureId:current.captureId,
-          settings:{bufferMs:next.bufferMs,allowTypedPreview:next.allowTypedPreview,eligible:next.mode==='experimental-buffered',paused:true,epoch}}).catch(()=>undefined);
-        if(state!==current||result?.ok!==true||current.clock?.playing
-          ||configuration.generation!==(current.clock?.generation||0)) {
+          settings:{bufferMs:next.bufferMs,allowTypedPreview:next.allowTypedPreview,eligible:next.mode===expectedMode,
+            paused:!current.clock?.playing,live:configuration.live===true,epoch}}).catch(()=>undefined);
+        if(state!==current||result?.ok!==true||current.captureId!==configuration.captureId||current.synchronizationEpoch!==epoch
+          ||current.clock?.playing&&!configuration.live
+          ||configuration.enabled&&configuration.live&&!current.clock?.playing
+          ||configuration.generation!==(current.clock?.generation||0)
+          ||configuration.enabled&&decideBeatMode({...modeFacts(current),experiment}).mode!==expectedMode) {
           if(state===current){current.experiment=undefined;current.delaySeconds=0;publishState(current);}
           void offscreenMessage({kind:'synchronization',captureId:configuration.captureId,
-            settings:{bufferMs:0,eligible:false,allowTypedPreview:false,flush:true}}).catch(()=>{});
+            settings:{bufferMs:0,eligible:false,allowTypedPreview:false,flush:true,live:configuration.live===true,
+              epoch:crypto.randomUUID()}}).catch(()=>{});
           return false;
         }
         current.experiment=experiment;current.delaySeconds=next.bufferMs/1000;
@@ -330,6 +346,7 @@ export function createBeatSync(api, nativePublish) {
       telemetry.record('EVENT_RECEIVED', undefined, { captureId: current.captureId });
       if (resumed) current.retryAt = 0;
       if (discontinuity) { current.retryAt = 0; cancelCapture(current); }
+      if(privateBeatCandidate&&current.experiment?.live&&(!clock.playing||!capability(current).livePreviewEligible))revokeLivePreview(current);
       if(privateBeatCandidate&&current.delaySeconds&&((!clock.playing&&previous?.playing)||!capability(current).bufferEligible)) {
         // Empty the old DelayNode on pause/unsafe source changes. A fresh node
         // retains the fixed delay only for the same paused, eligible source.

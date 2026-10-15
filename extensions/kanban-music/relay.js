@@ -37,6 +37,7 @@ if (allowedOrigins.has(location.origin)) {
           generation: message.configuration?.generation, intentionalDelay: message.configuration?.intentionalDelay===true,
           outputHeard: message.configuration?.outputHeard===true, authorizedAudio: message.configuration?.authorizedAudio===true,
           preview: message.configuration?.preview===true,
+          live: message.configuration?.live===true, latencyAccepted: message.configuration?.latencyAccepted===true,
         } } : {}),
         ...(message.action === 'dock.beat.sync.start' && typeof message.telemetryEnabled === 'boolean' ? { telemetryEnabled: message.telemetryEnabled } : {}),
         ...(message.value !== undefined ? { value: message.value } : {}),

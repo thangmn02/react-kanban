@@ -5,6 +5,7 @@ import {createServer} from 'node:http';
 import {build} from 'vite';
 import {chromium} from '@playwright/test';
 import {createHash} from 'node:crypto';
+import {verifyPlatformLivePreview} from './verify-platform-live-preview.mjs';
 const root=process.cwd(),folder=resolve(root,'scratch/browser-first-candidate'),built=resolve(folder,'listening');
 const channel=process.env.KORA_CANDIDATE_BROWSER||'chrome';
 assert(['chrome','msedge'].includes(channel));
@@ -12,6 +13,8 @@ const duration=Number(process.env.KORA_CANDIDATE_SECONDS||90),serve=process.argv
 const reuseServer=process.env.KORA_CANDIDATE_REUSE_SERVER==='1';
 const lifecycle=process.env.KORA_CANDIDATE_LIFECYCLE==='1';
 const music=process.env.KORA_CANDIDATE_MUSIC==='1';
+const review=process.env.KORA_CANDIDATE_REVIEW==='1';
+const live=process.env.KORA_CANDIDATE_LIVE==='1';
 assert(Number.isFinite(duration)&&duration>=0&&duration<=1900);
 await mkdir(folder,{recursive:true});
 await writeFile(resolve(folder,'index.html'),'<html><head><meta charset="utf-8"><title>Private Beat Grid</title></head><body style="margin:0"><div id="root"></div><script type="module" src="../../scripts/browser-beat-candidate.tsx"></script></body></html>');
@@ -60,7 +63,7 @@ let context,app;
 let interrupted=false;
 process.once('SIGINT',()=>{interrupted=true;});process.once('SIGTERM',()=>{interrupted=true;});
 const result={channel,startedAt:new Date().toISOString(),physicalVerified:false,listeningAccepted:false,steps:[],samples:[],errors:[]};
-const save=()=>writeFile(resolve(folder,`real-${channel}${lifecycle?'-lifecycle':music?'-music':''}.json`),JSON.stringify(result,null,2));
+const save=()=>writeFile(resolve(folder,`real-${channel}${live?'-live-preview':review?'-review':lifecycle?'-lifecycle':music?'-music':''}.json`),JSON.stringify(result,null,2));
 try {
   if(serve)await new Promise(resolve=>{process.once('SIGINT',resolve);process.once('SIGTERM',resolve);});
   else {
@@ -79,26 +82,97 @@ try {
     await app.goto('http://127.0.0.1:5173');
     await app.waitForFunction(()=>window.candidate?.selected,{timeout:15000});
     await app.waitForFunction(()=>window.candidate?.selected?.syncState?.reason==='capture-permission'||window.candidate?.selected?.syncState?.mode==='capture');
+    if(review) {
+      assert.match(await app.getByRole('region',{name:'Capture and preview status'}).innerText(),/Capture is not enabled/);
+      await app.evaluate(()=>{
+        window.privateVisualCheck={semantic:0,decorative:0};
+        document.addEventListener('animationstart',event=>{
+          const cell=event.target;
+          const visible=()=>{const style=getComputedStyle(cell),rect=cell.getBoundingClientRect();
+            return cell.isConnected&&style.display!=='none'&&style.visibility==='visible'&&Number(style.opacity)>.1
+              &&rect.width>0&&rect.height>0&&rect.top>=0&&rect.bottom<=innerHeight&&rect.left>=0&&rect.right<=innerWidth;};
+          if(cell.classList.contains('semantic-beat-flash')&&visible()) {
+            const style=getComputedStyle(cell),rect=cell.getBoundingClientRect();
+            window.privateVisualCheck.semantic++;
+            window.privateVisualCheck.semanticStyle={background:style.backgroundColor,width:rect.width,height:rect.height};
+          }
+          if(cell.classList.contains('decorative-tempo-pulse')) {
+            const started=performance.now();
+            const inspect=()=>{
+              if(visible())window.privateVisualCheck.decorative++;
+              else if(cell.isConnected&&performance.now()-started<220)requestAnimationFrame(inspect);
+            };requestAnimationFrame(inspect);
+          }
+        });
+      });
+      await app.waitForFunction(()=>window.candidate.beat.tickCount>1);
+      assert.equal(await app.evaluate(()=>window.privateVisualCheck.decorative),0);
+      assert.equal(await app.evaluate(()=>window.privateVisualCheck.semantic),0);
+      result.reviewBeforeCapture=await app.getByRole('region',{name:'Capture and preview status'}).innerText();
+      await app.screenshot({path:resolve(folder,`review-${channel}-before.png`)});
+    }
     const targets=await cdp.send('Target.getTargets',{filter:[{type:'tab'}]});
     const targetId=targets.targetInfos.find(target=>target.url==='http://127.0.0.1:5174/')?.targetId;
     assert(targetId,'Source tab target unavailable');
     await sourcePage.bringToFront();
     await cdp.send('Extensions.triggerAction',{id,targetId});
     await app.waitForFunction(()=>window.candidate?.selected?.syncState?.mode==='capture',{timeout:20000});
+    if(review) {
+      await app.bringToFront();await app.locator('.candidate-grid').scrollIntoViewIfNeeded();
+      await app.waitForFunction(()=>window.privateVisualCheck.decorative>1);
+      assert.equal(await app.evaluate(()=>window.privateVisualCheck.semantic),0);
+    }
     result.steps.push({stage:'actual-tab-capture',at:new Date().toISOString(),status:await app.evaluate(()=>window.candidate.selected.syncState)});await save();
     const worker=context.serviceWorkers().find(worker=>worker.url().endsWith('/background.js'));
     result.captureStatus=await worker.evaluate(async()=> (await chrome.tabCapture.getCapturedTabs()).map(({status})=>({status})));
     await save();
+    if(live)await verifyPlatformLivePreview({context,cdp,app,sourcePage,extensionId:id,worker,folder,result,save});
+    else {
     await app.waitForFunction(()=>window.candidate?.selected?.syncState?.capability?.bufferEligible,{timeout:60000});
-    await sourcePage.locator('audio').evaluate(audio=>audio.pause());
-    await app.waitForFunction(()=>window.candidate.selected.paused&&window.candidate.selected.syncState?.captureId,{timeout:10000});
+    if(review) {
+      assert.match(await app.getByRole('region',{name:'Capture and preview status'}).innerText(),/Instrument preview is off/);
+      assert(await app.getByLabel('Private Beat Grid candidate',{exact:true}).evaluate(details=>details.open));
+      assert.equal(await app.evaluate(()=>window.privateVisualCheck.semantic),0);
+    }
     // Automation opts into a generated CC0 signal to exercise routing only.
     // This does not certify human hearing, listening acceptance or speaker timing.
-    await app.evaluate(async()=>{const session=window.candidate.selected;await window.configureExperimentalSynchronization(session.id,
+    if(review) {
+      for(const name of ['I have permission to use this audio in the buffered experiment.','I heard the captured output with no echo or second playback.',
+        'I accept intentional audio delay for this experiment.','Show unverified instrument predictions during buffered playback.'])
+        await app.getByRole('checkbox',{name,exact:true}).check();
+      assert(await app.getByRole('button',{name:/Enable calibrated/}).isDisabled());
+      assert.match(await app.getByRole('status',{name:'Delay activation status'}).innerText(),/Pause the selected source/);
+      await app.getByRole('button',{name:'Pause',exact:true}).click();
+      await app.waitForFunction(()=>window.candidate.selected.paused&&window.candidate.selected.syncState?.captureId,null,{timeout:10000});
+      // Cover multiple six-second capture leases while a person reads the form.
+      const captureId=await app.evaluate(()=>window.candidate.selected.syncState.captureId);
+      await new Promise(resolve=>setTimeout(resolve,15000));
+      result.reviewActivation={captureRetained:await app.evaluate(id=>window.candidate.selected.syncState?.captureId===id,captureId),
+        status:await app.getByRole('status',{name:'Delay activation status'}).innerText()};
+      assert(result.reviewActivation.captureRetained,'Paused capture expired while completing consent');
+      assert(await app.getByRole('button',{name:/Enable calibrated/}).isEnabled(),result.reviewActivation.status);
+      await app.getByRole('button',{name:/Enable calibrated/}).click();
+    } else {
+      await sourcePage.locator('audio').evaluate(audio=>audio.pause());
+      await app.waitForFunction(()=>window.candidate.selected.paused&&window.candidate.selected.syncState?.captureId,{timeout:10000});
+      await app.evaluate(async()=>{const session=window.candidate.selected;await window.configureExperimentalSynchronization(session.id,
       {enabled:true,captureId:session.syncState.captureId,generation:session.syncState.capability.generation,
         intentionalDelay:true,authorizedAudio:true,outputHeard:true,preview:true});window.refreshCandidate();});
+    }
     await app.waitForFunction(()=>window.candidate.selected.syncState?.capability?.mode==='experimental-buffered');
     await sourcePage.locator('audio').evaluate(audio=>audio.play());
+    if(review) {
+      await app.locator('.candidate-grid').scrollIntoViewIfNeeded();
+      await app.waitForFunction(()=>window.privateVisualCheck.semantic>=3,null,{timeout:20000});
+      result.reviewVisuals=await app.evaluate(()=>({...window.privateVisualCheck,
+        mode:window.candidate.selected.syncState.capability.mode,onsets:window.candidate.beat.onsets,
+        gridWidth:document.querySelector('.music-pattern').getBoundingClientRect().width,
+        reducedMotion:matchMedia('(prefers-reduced-motion: reduce)').matches}));
+      assert(result.reviewVisuals.gridWidth<=760);
+      assert.equal(result.reviewVisuals.mode,'experimental-buffered');
+      await app.screenshot({path:resolve(folder,`review-${channel}-preview.png`)});
+      await save();
+    }
     result.steps.push({stage:'automation-routing-consent-generated-signal',at:new Date().toISOString(),status:await app.evaluate(()=>window.candidate.selected.syncState)});
     const started=Date.now();let baseline;
     while(!interrupted&&Date.now()-started<duration*1000) {
@@ -277,6 +351,7 @@ try {
           captureDiagnostics:await worker.evaluate(()=>chrome.runtime.sendMessage({target:'beat-offscreen',kind:'diagnostics'}))};
         await video.close();
       });
+    }
     }
   }
 }catch(error){result.errors.push(error.message);

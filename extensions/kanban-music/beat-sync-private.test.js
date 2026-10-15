@@ -53,6 +53,51 @@ it('blocks Spotify capture before obtaining a stream ID',async()=>{
   expect(f.sync.status(f.session).capability.support).toBe('policy-blocked');
   expect(f.api.tabCapture.getMediaStreamId).not.toHaveBeenCalled();await f.sync.stop();
 });
+it('opts into live video while playing, publishes only its epoch, and revokes on pause',async()=>{
+  const f=fixture();Object.assign(f.session.mediaFacts,{kind:'video',noVideo:false,noFrames:false});
+  f.setCalibration({});await f.sync.start(f.session,f.owner,'sub');
+  await vi.waitFor(()=>expect(f.sync.status(f.session).mode).toBe('capture'));
+  const captureId=f.sync.status(f.session).captureId;
+  const config={enabled:true,captureId,generation:1,live:true,latencyAccepted:true,
+    intentionalDelay:false,authorizedAudio:true,outputHeard:true,preview:true};
+  expect(await f.sync.configure(f.session,f.owner,{...config,latencyAccepted:false})).toBe(false);
+  expect(await f.sync.configure(f.session,{...f.owner,documentId:'other'},config)).toBe(false);
+  expect(await f.sync.configure(f.session,f.owner,config)).toBe(true);
+  expect(f.sync.status(f.session).capability).toMatchObject({mode:'experimental-live',allowTypedPreview:true,bufferMs:0,allowSemantic:false});
+  const epoch=f.api.runtime.sendMessage.mock.calls.filter(([message])=>message.kind==='synchronization').at(-1)[0].settings.epoch;
+  const onsetCount=()=>f.api.tabs.sendMessage.mock.calls.filter(([,message])=>message.kind==='onset').length;
+  const send=token=>f.sync.offscreen({kind:'onset',captureId,bands:['clap'],synchronizationEpoch:token},{url:'chrome-extension://private/offscreen.html'});
+  send('old');expect(onsetCount()).toBe(0);send(epoch);expect(onsetCount()).toBe(1);
+  f.clock({playing:false,paused:true});send(epoch);expect(onsetCount()).toBe(1);
+  expect(f.sync.status(f.session).capability).toMatchObject({allowTypedPreview:false,bufferMs:0});
+  await f.sync.stop();
+});
+it('revokes a live preview when another source starts in the captured tab',async()=>{
+  const f=fixture();await f.sync.start(f.session,f.owner,'sub');
+  await vi.waitFor(()=>expect(f.sync.status(f.session).mode).toBe('capture'));
+  const captureId=f.sync.status(f.session).captureId;
+  expect(await f.sync.configure(f.session,f.owner,{enabled:true,captureId,generation:1,live:true,latencyAccepted:true,
+    intentionalDelay:false,authorizedAudio:true,outputHeard:true,preview:true})).toBe(true);
+  f.clock({mediaFacts:{kind:'audio-only',singleSource:false,noVideo:true,noFrames:true}});
+  expect(f.sync.status(f.session).capability).toMatchObject({allowTypedPreview:false,bufferMs:0});
+  expect(f.api.runtime.sendMessage.mock.calls.filter(([message])=>message.kind==='synchronization').at(-1)[0].settings)
+    .toMatchObject({bufferMs:0,allowTypedPreview:false,flush:true,live:true});await f.sync.stop();
+});
+it('cancels a raced live activation without replacing its zero-delay output graph',async()=>{
+  const f=fixture();await f.sync.start(f.session,f.owner,'sub');
+  await vi.waitFor(()=>expect(f.sync.status(f.session).mode).toBe('capture'));
+  const captureId=f.sync.status(f.session).captureId,send=f.api.runtime.sendMessage.getMockImplementation();
+  let finish;
+  f.api.runtime.sendMessage.mockImplementation(message=>message.kind==='synchronization'&&!message.settings.flush
+    ?new Promise(resolve=>{finish=resolve;}):send(message));
+  const activation=f.sync.configure(f.session,f.owner,{enabled:true,captureId,generation:1,live:true,latencyAccepted:true,
+    intentionalDelay:false,authorizedAudio:true,outputHeard:true,preview:true});
+  await vi.waitFor(()=>expect(finish).toBeTypeOf('function'));
+  f.clock({playing:false,paused:true});finish({ok:true});expect(await activation).toBe(false);
+  expect(f.api.runtime.sendMessage.mock.calls.filter(([message])=>message.kind==='synchronization').at(-1)[0].settings)
+    .toMatchObject({bufferMs:0,eligible:false,allowTypedPreview:false,flush:true,live:true});
+  expect(f.sync.status(f.session).capability).toMatchObject({allowTypedPreview:false,bufferMs:0});await f.sync.stop();
+});
 it.each(['frames','multiple-sources','ownership-loss'])('flushes actual output when %s revokes eligibility during playback',async(reason)=>{
   const f=fixture();await f.sync.start(f.session,f.owner,'sub');
   await vi.waitFor(()=>expect(f.sync.status(f.session).mode).toBe('capture'));

@@ -1,4 +1,4 @@
-const modes=new Set(['verified-cache','live-qualified','experimental-buffered','degraded','unsupported']);
+const modes=new Set(['verified-cache','live-qualified','experimental-buffered','experimental-live','degraded','unsupported']);
 const hash=value=>typeof value==='string'&&/^[a-f0-9]{64}$/.test(value);
 const opaque=value=>typeof value==='string'&&/^[a-zA-Z0-9:_-]{1,160}$/.test(value);
 
@@ -34,6 +34,12 @@ export function decideBeatMode(facts={},now=Date.now()) {
     &&facts.surface==='web'&&capture.output==='tab-replacement'&&capture.originalSuppressed===true;
   const bufferEligible=Boolean(sourceEligible&&captureHealthy&&clockHealthy&&clock.playbackRate===1
     &&requirement!==undefined&&detector.privateUseAllowed===true);
+  const liveSource=privateMode&&!policyBlocked&&source.protectedMedia!==true&&facts.surface==='web'
+    &&['audio-only','video'].includes(source.kind)&&source.singleSource===true
+    &&capture.output==='tab-replacement'&&capture.originalSuppressed===true;
+  const livePreviewEligible=Boolean(liveSource&&captureHealthy&&clockHealthy&&clock.playing===true&&clock.paused===false&&detector.privateUseAllowed===true);
+  const livePreviewReason=livePreviewEligible?'eligible':!liveSource?'source-or-output-unproven':!captureHealthy?'capture-unproven'
+    :!clockHealthy?'clock-unreliable':clock.playing!==true||clock.paused!==false?'not-playing':'detector-rights-unavailable';
   const requested=experiment.enabled===true;
   const consent=experiment.intentionalDelay===true&&experiment.outputHeard===true&&experiment.authorizedAudio===true
     &&experiment.captureId===capture.id&&experiment.generation===clock.generation;
@@ -49,7 +55,7 @@ export function decideBeatMode(facts={},now=Date.now()) {
     detectorVersion:typeof detector.version==='string'?detector.version.slice(0,100):'unknown',
     clockHealthy,captureHealthy,allowCapture:!policyBlocked&&source.protectedMedia!==true,
     allowAnalysis:privateMode&&!policyBlocked&&source.protectedMedia!==true&&detector.privateUseAllowed===true,
-    allowSemantic:false,allowTypedPreview:false,bufferEligible,requiredBufferMs:requirement||0,bufferMs:0,
+    allowSemantic:false,allowTypedPreview:false,bufferEligible,livePreviewEligible,livePreviewReason,requiredBufferMs:requirement||0,bufferMs:0,
     latencySamples:Number.isInteger(timing.samples)?timing.samples:0,
     measuredP95Ms:Number.isFinite(timing.p95Ms)?timing.p95Ms:null,
     measuredP99Ms:Number.isFinite(timing.p99Ms)?timing.p99Ms:null,
@@ -63,6 +69,13 @@ export function decideBeatMode(facts={},now=Date.now()) {
   if(detector.trained===true&&detector.accuracyQualified===true&&detector.browserBudgetQualified===true
     &&Number.isFinite(detector.endToEndP95Ms)&&detector.endToEndP95Ms<=50)
     return {...result,mode:'live-qualified',reason:'validated-detector',allowSemantic:true,support:'supported',physicalVerified:detector.physicalVerified===true};
+  if(requested&&experiment.live===true) {
+    const liveConsent=experiment.authorizedAudio===true&&experiment.outputHeard===true&&experiment.latencyAccepted===true
+      &&experiment.preview===true&&experiment.captureId===capture.id&&experiment.generation===clock.generation;
+    return livePreviewEligible&&liveConsent&&experiment.bufferMs===0
+      ?{...result,mode:'experimental-live',reason:'unverified-late-preview',allowTypedPreview:true}
+      :{...result,reason:liveConsent?'live-preview-unavailable':'live-consent-required'};
+  }
   if(requested&&bufferEligible&&consent&&activeBuffer&&activeBuffer>=requirement)
     return {...result,mode:'experimental-buffered',reason:'unverified-detector-preview',bufferMs:activeBuffer,
       allowTypedPreview:experiment.preview===true};
@@ -76,8 +89,9 @@ export function parseBeatMode(value) {
   const result={version:1,mode:value.mode,support:value.support,reason:value.reason.slice(0,100),
     sourceKind:['audio-only','video'].includes(value.sourceKind)?value.sourceKind:'unknown',
     bufferReason:typeof value.bufferReason==='string'?value.bufferReason.slice(0,100):'unavailable',
+    livePreviewReason:typeof value.livePreviewReason==='string'?value.livePreviewReason.slice(0,100):'unavailable',
     detectorId:String(value.detectorId||'unavailable').slice(0,100),detectorVersion:String(value.detectorVersion||'unknown').slice(0,100)};
-  for(const key of ['privateCandidate','outputOwned','singleSource','noVideo','noFrames','clockHealthy','captureHealthy','allowCapture','allowAnalysis','allowSemantic','allowTypedPreview','bufferEligible','physicalVerified'])
+  for(const key of ['privateCandidate','outputOwned','singleSource','noVideo','noFrames','clockHealthy','captureHealthy','allowCapture','allowAnalysis','allowSemantic','allowTypedPreview','bufferEligible','livePreviewEligible','physicalVerified'])
     result[key]=value[key]===true;
   for(const key of ['bufferMs','requiredBufferMs','latencySamples','measuredP95Ms','measuredP99Ms','generation','droppedSemanticEvents'])
     result[key]=Number.isFinite(value[key])&&value[key]>=0?value[key]:key.startsWith('measured')?null:0;
@@ -88,6 +102,9 @@ export function parseBeatMode(value) {
 export function validSyncConfiguration(value) {
   return Boolean(value&&typeof value.enabled==='boolean'&&opaque(value.captureId)
     &&Number.isSafeInteger(value.generation)&&value.generation>=0
-    &&(!value.enabled||value.intentionalDelay===true&&value.outputHeard===true&&value.authorizedAudio===true)
+    &&(value.live===undefined||typeof value.live==='boolean')
+    &&(value.latencyAccepted===undefined||typeof value.latencyAccepted==='boolean')
+    &&(!value.enabled||value.outputHeard===true&&value.authorizedAudio===true
+      &&(value.live===true?value.latencyAccepted===true&&value.preview===true:value.intentionalDelay===true))
     &&typeof value.preview==='boolean');
 }

@@ -24,10 +24,24 @@ audio selected in the review tab stays in that browser.
 | Exact source with independently verified EventTrack, matching recording bytes/version and fresh clock | Predictive verified cache; no model-cache promotion | Experimental contract; no verified natural track provisioned |
 | Captured source with independently qualified trained detector and measured end-to-end p95 ≤50 ms | Live semantic events | Supported only after qualification; current detector fails this gate |
 | One audio-only browser source, no video/frames, active audio-only tab capture, replaced original output, fresh rate-1 clock, calibrated bounded delay and explicit consent | Immediate analysis plus intentionally delayed output; optional unverified typed preview | Experimental |
-| YouTube video or any visible video | Zero independent audio delay; degraded generic visuals with the current unqualified detector | Experimental fallback; semantic synchronization unsupported |
+| YouTube video or another supported, owned captured tab with one identified active media source | Zero intentional audio delay; explicit opt-in can enable unverified, potentially late instrument predictions | Private `experimental-live`; accuracy and semantic synchronization unqualified |
 | Unknown media/output ownership, multiple active media sources, embedded frames or native monitoring | Buffer denied; no qualified typed claim | Unsupported buffering |
 | Spotify | New private capture/analysis/buffering denied; frontend submits no Spotify cloud-analysis request | Policy-blocked pending permission/scope review |
 | Protected source | Capture/analysis/buffering denied in the private path | Unsupported |
+
+Private live preview is separate from the calibrated audio-only buffer. Keep
+the source playing, invoke Companion on that tab, select it in the grid, then
+complete the Live preview authorization, audible-output and late-prediction
+checks. Enable **live preview (no audio delay)** while playback continues.
+Calibration is not required. The explicit `live` configuration keeps the
+output buffer at zero and preserves the existing undelayed audio graph,
+including failed activation cleanup. The current detector remains unqualified;
+original event timestamps and the existing stale-event rejection remain intact.
+Pause, seek, source/generation/rate changes, or lost capture/clock/ownership
+proof revoke the preview. Re-enable it explicitly while playing. Video never
+becomes eligible for the audio buffer. Spotify and protected-source restrictions
+remain in force. See the [live configuration and eligibility contracts](../extensions/kanban-music/beat-mode.js)
+and [private UI](../src/features/music/experimental-live-preview-control.tsx).
 
 The private ADTOF refinement remains noncausal and unqualified. It preserves two
 accepted activation impulses separated by a deep valley at 20 ms without

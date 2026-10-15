@@ -306,13 +306,15 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
       const state=active;
       if(!state?.candidate||state.captureId!==captureId||monitorOnly
         ||!Number.isFinite(settings?.bufferMs)||settings.bufferMs<0||settings.bufferMs>500
+        ||settings.live===true&&(settings.bufferMs!==0||state.bufferMs!==0)
         ||settings.bufferMs>0&&(!settings.eligible||settings.paused!==true)
-        ||settings.flush!==true&&settings.paused!==true)return false;
+        ||settings.flush!==true&&settings.paused!==true&&settings.live!==true)return false;
       state.events.length=0;
       state.synchronizationEpoch=typeof settings.epoch==='string'&&/^[a-zA-Z0-9:_-]{1,160}$/.test(settings.epoch)
         ?settings.epoch:crypto.randomUUID();
       state.acceptAfter=state.context.currentTime;
       state.typedPreview=settings.eligible===true&&settings.allowTypedPreview===true;
+      if(settings.live===true)return true;
       return setOutput(state,settings.bufferMs);
     },
     get lastFailure() { return lastFailure && { ...lastFailure }; },

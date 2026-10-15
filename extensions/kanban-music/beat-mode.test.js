@@ -57,3 +57,34 @@ it('bounds calibration and rejects forged controls',()=>{
   expect(validSyncConfiguration(facts().experiment)).toBe(true);
   expect(validSyncConfiguration({...facts().experiment,captureId:'http://source-secret'})).toBe(false);
 });
+it('admits an explicitly consented unbuffered video preview without calibration',()=>{
+  const f=facts();f.source.kind='video';f.source.noVideo=false;f.source.noFrames=false;f.timing={};
+  Object.assign(f.clock,{playing:true,paused:false});
+  Object.assign(f.experiment,{live:true,latencyAccepted:true,bufferMs:0,intentionalDelay:false});
+  const mode=decideBeatMode(f,10000);
+  expect(mode).toMatchObject({mode:'experimental-live',allowTypedPreview:true,allowSemantic:false,
+    bufferMs:0,bufferEligible:false,livePreviewEligible:true,physicalVerified:false});
+  expect(parseBeatMode(mode)).toMatchObject({mode:'experimental-live',livePreviewEligible:true});
+  expect(validSyncConfiguration(f.experiment)).toBe(true);
+  f.experiment.latencyAccepted=false;
+  expect(validSyncConfiguration(f.experiment)).toBe(false);
+  expect(decideBeatMode(f,10000).allowTypedPreview).toBe(false);
+});
+it.each(['private','provider','protected','owner','source','clock','capture','rights','delay','generation'])('rejects live preview with invalid %s proof',field=>{
+  const f=facts();Object.assign(f.clock,{playing:true,paused:false});Object.assign(f.experiment,{live:true,latencyAccepted:true,bufferMs:0});
+  if(field==='private')f.privateCandidate=false;
+  if(field==='provider')f.source.provider='spotify';
+  if(field==='protected')f.source.protectedMedia=true;
+  if(field==='owner')f.capture.owner='other';
+  if(field==='source')f.source.kind='unknown';
+  if(field==='clock')f.clock.sampledAt=0;
+  if(field==='capture')f.capture.active=false;
+  if(field==='rights')f.detector.privateUseAllowed=false;
+  if(field==='delay')f.experiment.bufferMs=300;
+  if(field==='generation')f.experiment.generation=2;
+  expect(decideBeatMode(f,10000).allowTypedPreview).toBe(false);
+});
+it.each([{playing:false,paused:true},{playing:false,paused:false},{playing:true,paused:true}])('rejects live preview unless its clock is actively playing (%j)',clock=>{
+  const f=facts();Object.assign(f.experiment,{live:true,latencyAccepted:true,bufferMs:0});Object.assign(f.clock,clock);
+  expect(decideBeatMode(f,10000)).toMatchObject({livePreviewEligible:false,livePreviewReason:'not-playing',allowTypedPreview:false,bufferMs:0});
+});

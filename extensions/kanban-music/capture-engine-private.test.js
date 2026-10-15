@@ -60,3 +60,16 @@ it('drops in-flight pre-enable and pre-pause inference after a synchronization b
   f.advance(.2);f.event(1.6);expect(f.engine.health.queuedEvents).toBe(1);
   f.engine.stop();await vi.advanceTimersByTimeAsync(20);
 });
+it('enables a zero-delay live preview without rebuilding output and drops prior inference',async()=>{
+  const f=fixture();await f.engine.start('stream','owner',{candidate:true});
+  const connections=f.source.connect.mock.calls.length,nodes=f.nodes.length;
+  expect(f.engine.configureSynchronization('owner',{bufferMs:0,eligible:true,paused:false,live:true,allowTypedPreview:true,epoch:'live'})).toBe(true);
+  expect(f.engine.delaySeconds).toBe(0);expect(f.source.connect).toHaveBeenCalledTimes(connections);expect(f.nodes).toHaveLength(nodes);
+  f.event(.9);expect(f.engine.health.queuedEvents).toBe(0);
+  f.advance(.5);f.event(1.4);expect(f.engine.health.queuedEvents).toBe(1);
+  expect(f.engine.configureSynchronization('owner',{bufferMs:100,eligible:true,paused:false,live:true,allowTypedPreview:true})).toBe(false);
+  expect(f.engine.configureSynchronization('owner',{bufferMs:0,eligible:false,paused:false,live:true,allowTypedPreview:false,flush:true,epoch:'off'})).toBe(true);
+  expect(f.source.connect).toHaveBeenCalledTimes(connections);expect(f.nodes).toHaveLength(nodes);
+  f.advance(.5);f.event();expect(f.engine.health.queuedEvents).toBe(0);
+  f.engine.stop();await vi.advanceTimersByTimeAsync(20);
+});

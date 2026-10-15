@@ -11,6 +11,16 @@ function harness(origin = 'https://kanthangboard.netlify.app') {
   return { sendMessage, postMessage, page, receive: (data, options = {}) => receive?.({ source: page, origin, data, ...options }) };
 }
 const request = { channel: 'kanban-music-v1', direction: 'app-to-extension', requestId: 'request-1', action: 'sessions.get' };
+it('preserves explicit live-preview consent and strips unrelated configuration fields',()=>{
+  const h=harness();
+  h.receive({...request,action:'beat.experimental.configure',sessionId:'song',configuration:{enabled:true,
+    captureId:'capture',generation:1,live:true,latencyAccepted:true,preview:true,authorizedAudio:true,outputHeard:true,
+    bufferMs:900,accuracyQualified:true}});
+  const configuration=h.sendMessage.mock.calls[0][0].configuration;
+  expect(configuration).toMatchObject({enabled:true,live:true,latencyAccepted:true,preview:true,
+    authorizedAudio:true,outputHeard:true,intentionalDelay:false});
+  expect(configuration).not.toHaveProperty('bufferMs');expect(configuration).not.toHaveProperty('accuracyQualified');
+});
 it('preserves seek and volume values while rejecting invalid control input', () => {
   const h = harness();
   h.receive({ ...request, action: 'media.seek', sessionId: 'song', value: 90 });
