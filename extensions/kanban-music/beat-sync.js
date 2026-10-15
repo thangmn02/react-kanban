@@ -333,7 +333,7 @@ export function createBeatSync(api, nativePublish) {
       if(privateBeatCandidate&&current.delaySeconds&&((!clock.playing&&previous?.playing)||!capability(current).bufferEligible)) {
         // Empty the old DelayNode on pause/unsafe source changes. A fresh node
         // retains the fixed delay only for the same paused, eligible source.
-        const retain=pauseRetainsCapture(current)&&!clock.seeking&&!clock.buffering&&clock.playbackRate===1;
+        const retain=!clock.playing&&capability(current).bufferEligible&&pauseRetainsCapture(current);
         const epoch=crypto.randomUUID();current.synchronizationEpoch=epoch;
         void offscreenMessage({kind:'synchronization',captureId:current.captureId,
           settings:{bufferMs:retain?current.delaySeconds*1000:0,allowTypedPreview:retain&&current.experiment?.preview===true,

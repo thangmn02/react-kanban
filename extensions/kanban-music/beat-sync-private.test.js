@@ -53,3 +53,20 @@ it('blocks Spotify capture before obtaining a stream ID',async()=>{
   expect(f.sync.status(f.session).capability.support).toBe('policy-blocked');
   expect(f.api.tabCapture.getMediaStreamId).not.toHaveBeenCalled();await f.sync.stop();
 });
+it.each(['frames','multiple-sources','ownership-loss'])('flushes actual output when %s revokes eligibility during playback',async(reason)=>{
+  const f=fixture();await f.sync.start(f.session,f.owner,'sub');
+  await vi.waitFor(()=>expect(f.sync.status(f.session).mode).toBe('capture'));
+  await f.sync.start(f.session,f.owner,'sub');f.clock({playing:false,paused:true});
+  const captureId=f.sync.status(f.session).captureId;
+  expect(await f.sync.configure(f.session,f.owner,{enabled:true,captureId,generation:1,
+    intentionalDelay:true,authorizedAudio:true,outputHeard:true,preview:true})).toBe(true);
+  f.clock({playing:true,paused:false});
+  if(reason==='ownership-loss') {
+    f.api.tabCapture.getCapturedTabs.mockResolvedValue([{tabId:12,status:'stopped'}]);
+    await f.sync.start(f.session,f.owner,'sub');f.clock({});
+  }else f.clock({mediaFacts:{kind:'audio-only',noVideo:true,noFrames:reason!=='frames',singleSource:reason!=='multiple-sources'}});
+  expect(f.sync.status(f.session).capability).toMatchObject({bufferMs:0,allowTypedPreview:false});
+  expect(f.api.runtime.sendMessage.mock.calls.filter(([message])=>message.kind==='synchronization').at(-1)[0].settings)
+    .toMatchObject({bufferMs:0,eligible:false,flush:true});
+  await f.sync.stop();
+});
