@@ -53,7 +53,8 @@ self.onmessage = async ({ data }) => {
   if (data.kind === 'init') {
     try {
       config = data.config;
-      classifier = config.classifier === 'causal' ? new CausalPercussionClassifier() : new PercussionClassifier();
+      classifier = config.classifier === 'causal' ? new CausalPercussionClassifier()
+        : new PercussionClassifier(config.thresholds, { onsetGuided: config.classifier === 'onset-guided' });
       // Keep ORT's loader intact and emit its exact assets in production builds.
       const runtimeUrl = new URL('./vendor/percussion/ort.wasm.min.mjs', import.meta.url).href;
       ort = await import(/* @vite-ignore */ runtimeUrl);

@@ -20,7 +20,7 @@ if (allowedOrigins.has(location.origin)) {
     if (event.source !== window || event.origin !== location.origin || !message
       || message.channel !== channel || message.direction !== 'app-to-extension'
       || typeof message.requestId !== 'string' || message.requestId.length > 100
-      || !['sessions.get', 'diagnostics.get', 'media.play', 'media.pause', 'media.focus', 'media.seek', 'media.volume', 'media.previous', 'media.next', 'dock.beat.sync.start', 'dock.beat.sync.stop', 'dock.audio.read'].includes(message.action) || pending >= 4) return;
+      || !['sessions.get', 'diagnostics.get', 'beat.experimental.configure', 'media.play', 'media.pause', 'media.focus', 'media.seek', 'media.volume', 'media.previous', 'media.next', 'dock.beat.sync.start', 'dock.beat.sync.stop', 'dock.audio.read'].includes(message.action) || pending >= 4) return;
     if (message.action === 'media.seek' && (!Number.isFinite(message.value) || message.value < 0 || message.value > 864000)) return;
     if (message.action === 'media.volume' && (!Number.isFinite(message.value) || message.value < 0 || message.value > 1)) return;
     if (!['sessions.get', 'diagnostics.get'].includes(message.action) && (typeof message.sessionId !== 'string' || message.sessionId.length > 250)) return;
@@ -32,6 +32,12 @@ if (allowedOrigins.has(location.origin)) {
     };
     try {
       chrome.runtime.sendMessage({ protocol: channel, action: message.action, sessionId: message.sessionId,
+        ...(message.action === 'beat.experimental.configure' ? { configuration: {
+          enabled: message.configuration?.enabled, captureId: String(message.configuration?.captureId || '').slice(0,160),
+          generation: message.configuration?.generation, intentionalDelay: message.configuration?.intentionalDelay===true,
+          outputHeard: message.configuration?.outputHeard===true, authorizedAudio: message.configuration?.authorizedAudio===true,
+          preview: message.configuration?.preview===true,
+        } } : {}),
         ...(message.action === 'dock.beat.sync.start' && typeof message.telemetryEnabled === 'boolean' ? { telemetryEnabled: message.telemetryEnabled } : {}),
         ...(message.value !== undefined ? { value: message.value } : {}),
         ...(message.subscriptionId ? { subscriptionId: message.subscriptionId } : {}) }, (response) => {

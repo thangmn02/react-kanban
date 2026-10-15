@@ -1,6 +1,8 @@
 const offscreenPath = 'offscreen.html';
 import { beatTelemetry, parseBeatTraces } from './beat-telemetry.js';
 import { audibleClock, playbackTiming, playbackTraces, parsePlaybackClock, clockDiscontinuity } from './beat-timing.js';
+import { privateBeatCandidate, candidateDetector } from './beat-candidate.js';
+import { decideBeatMode, validSyncConfiguration } from './beat-mode.js';
 const telemetry = beatTelemetry.at('beat-sync');
 const validBands = new Set(['kick', 'bass', 'clap', 'hat']);
 const sameOwner = (a, b) => a.native === b.native && a.tabId === b.tabId && a.documentId === b.documentId;
@@ -29,6 +31,19 @@ export function createBeatSync(api, nativePublish) {
   let queue = Promise.resolve();
   const serialize = (fn) => { queue = queue.catch(() => {}).then(fn); return queue; };
   const offscreenMessage = (message) => api.runtime.sendMessage({ target: 'beat-offscreen', ...message });
+  const modeFacts = current => ({privateCandidate:privateBeatCandidate,surface:current.owner.native?'desktop':'web',
+    source:{...(current.clock?.mediaFacts||current.session.mediaFacts||{kind:'unknown'}),
+      id:current.session.id,version:current.session.src,
+      provider:current.session.asset?.provider||(current.session.source==='open.spotify.com'?'spotify':'other'),
+      protectedMedia:current.clock?.protectedMedia===true||current.session.protectedMedia===true},
+    capture:{id:current.captureId,owner:current.token,expectedOwner:current.token,
+      active:current.captureReady===true,audible:current.audioDetected===true,
+      output:current.owner.native?'native-monitor':'tab-replacement',originalSuppressed:current.captureReady===true&&current.originalSuppressed===true&&!current.owner.native},
+    clock:{...current.clock,generation:current.clock?.generation||0},detector:candidateDetector,
+    timing:current.experiment?.enabled?current.experiment.calibration:current.calibration||{},health:current.health||{},experiment:current.experiment||{}});
+  const capability = current => privateBeatCandidate?decideBeatMode(modeFacts(current)):undefined;
+  const pauseRetainsCapture = current => privateBeatCandidate&&current.captureReady&&current.audioDetected
+    &&!current.owner.native&&current.clock?.mediaFacts?.kind==='audio-only'&&current.clock.mediaFacts.noVideo===true;
 
   function clockReason(current) {
     if (current.mode === 'capture') return undefined;
@@ -38,7 +53,8 @@ export function createBeatSync(api, nativePublish) {
   }
 
   function publishState(current) {
-    publish(current, { kind: 'sync.state', mode: current.mode, reason: clockReason(current), captureId: current.mode === 'capture' ? current.captureId : undefined });
+    publish(current, { kind: 'sync.state', mode: current.mode, reason: clockReason(current), captureId: current.mode === 'capture' ? current.captureId : undefined,
+      ...(privateBeatCandidate?{capability:capability(current)}:{}) });
   }
 
   function confirmCapture(current) {
@@ -85,6 +101,9 @@ export function createBeatSync(api, nativePublish) {
     current.captureReady = false;
     current.audioDetected = false;
     current.delaySeconds = 0;
+    current.experiment = undefined;
+    current.calibration = undefined;
+    current.originalSuppressed = false;
     current.mode = 'clock';
     publishState(current);
     if (captureId) void offscreenMessage({ kind: 'stop', captureId }).catch(() => {});
@@ -93,6 +112,7 @@ export function createBeatSync(api, nativePublish) {
   async function capture(current, force = false) {
     if (current.owner.nativeAudio) { current.fallbackReason = 'native-audio'; publishState(current); return; }
     if (state !== current) return;
+    if (privateBeatCandidate && !capability(current).allowCapture) { current.fallbackReason='provider-policy'; publishState(current); return; }
     // Every allowlisted service uses the same browser-approved tab stream.
     // A host name or mediaKeys flag is not evidence that output is silent.
     // Only audible analyser proof can confirm capture; browser restrictions
@@ -117,7 +137,8 @@ export function createBeatSync(api, nativePublish) {
         const streamId = await api.tabCapture.getMediaStreamId({ targetTabId: current.session.tabId });
         if (state !== current || current.captureId !== captureId) return;
         stage = 'capture-stream';
-        const response = await timeout(offscreenMessage({ kind: 'start', captureId, streamId, telemetryEnabled: telemetryEnabled(current) }), 4500);
+        const response = await timeout(offscreenMessage({ kind: 'start', captureId, streamId, telemetryEnabled: telemetryEnabled(current),
+          ...(privateBeatCandidate?{candidate:true,sourceProvider:modeFacts(current).source.provider}: {}) }), 4500);
         if (state !== current || current.captureId !== captureId) {
           void offscreenMessage({ kind: 'stop', captureId }).catch(() => {}); return;
         }
@@ -128,6 +149,11 @@ export function createBeatSync(api, nativePublish) {
         current.captureError = undefined;
         current.delaySeconds = Number.isFinite(response.delaySeconds) && response.delaySeconds >= 0 && response.delaySeconds <= 5 ? response.delaySeconds : 0;
         current.captureReady = true;
+        if(privateBeatCandidate) {
+          const captures=await api.tabCapture.getCapturedTabs().catch(()=>[]);
+          if(state!==current||current.captureId!==captureId)return;
+          current.originalSuppressed=captures.some(item=>item.tabId===current.session.tabId&&item.status==='active');
+        }
         // An open stream can still be silent/protected. Wait for analyser proof.
         confirmCapture(current);
       } catch (error) {
@@ -190,7 +216,8 @@ export function createBeatSync(api, nativePublish) {
     status(session) {
       if (state?.session.id === session.id) return { mode: state.mode, reason: clockReason(state),
         ...(state.captureError ? { captureError: { ...state.captureError } } : {}),
-        ...(state.mode === 'capture' ? { captureId: state.captureId } : {}) };
+        ...(state.mode === 'capture' || privateBeatCandidate&&state.captureId ? { captureId: state.captureId } : {}),
+        ...(privateBeatCandidate?{capability:capability(state)}:{}) };
       return { mode: 'clock', reason: !session.playing ? 'not-playing'
         : session.muted || session.tabMuted ? 'muted' : 'not-selected' };
     },
@@ -207,6 +234,13 @@ export function createBeatSync(api, nativePublish) {
           if (current.captureId && current.captureReady) {
             const captureId = current.captureId;
             const captureLease = await timeout(offscreenMessage({ kind: 'lease', captureId, telemetryEnabled: telemetryEnabled(current) }), 1000).catch(() => undefined);
+            if(privateBeatCandidate&&captureLease?.calibration)current.calibration=captureLease.calibration;
+            if(privateBeatCandidate&&captureLease?.health)current.health=captureLease.health;
+            if(privateBeatCandidate&&!current.owner.native) {
+              const captures=await api.tabCapture.getCapturedTabs().catch(()=>[]);
+              if(state!==current||current.captureId!==captureId)return;
+              current.originalSuppressed=captures.some(item=>item.tabId===current.session.tabId&&item.status==='active');
+            }
             telemetry.record(captureLease?.ok ? 'LEASE_RENEW' : 'LEASE_EXPIRED', undefined, { captureId });
             if (!captureLease?.ok && current.captureId === captureId) {
               current.retryAt = 0;
@@ -232,6 +266,34 @@ export function createBeatSync(api, nativePublish) {
       });
     },
     stop,
+    configure(session,owner,configuration) {
+      return serialize(async()=>{
+        const current=state;
+        if(!privateBeatCandidate||!current||!sameOwner(current.owner,owner)||owner.native
+          ||current.session.id!==session.id||current.session.src!==session.src
+          ||!validSyncConfiguration(configuration)||configuration.captureId!==current.captureId
+          ||configuration.generation!==(current.clock?.generation||0)||current.clock?.playing
+          ||current.clock?.seeking||current.clock?.buffering) return false;
+        const available=capability(current);
+        if(configuration.enabled&&!available.bufferEligible)return false;
+        const experiment={...configuration,bufferMs:configuration.enabled?available.requiredBufferMs:0,
+          calibration:{...current.calibration}};
+        const next=decideBeatMode({...modeFacts(current),experiment});
+        if(configuration.enabled&&next.mode!=='experimental-buffered')return false;
+        const epoch=crypto.randomUUID();current.synchronizationEpoch=epoch;
+        const result=await offscreenMessage({kind:'synchronization',captureId:current.captureId,
+          settings:{bufferMs:next.bufferMs,allowTypedPreview:next.allowTypedPreview,eligible:next.mode==='experimental-buffered',paused:true,epoch}}).catch(()=>undefined);
+        if(state!==current||result?.ok!==true||current.clock?.playing
+          ||configuration.generation!==(current.clock?.generation||0)) {
+          if(state===current){current.experiment=undefined;current.delaySeconds=0;publishState(current);}
+          void offscreenMessage({kind:'synchronization',captureId:configuration.captureId,
+            settings:{bufferMs:0,eligible:false,allowTypedPreview:false,flush:true}}).catch(()=>{});
+          return false;
+        }
+        current.experiment=experiment;current.delaySeconds=next.bufferMs/1000;
+        publishState(current);return true;
+      });
+    },
     async readAudio(session, owner, subscriptionId) {
       const current = state;
       if (!current || !sameOwner(current.owner, owner) || current.subscriptionId !== subscriptionId
@@ -268,8 +330,18 @@ export function createBeatSync(api, nativePublish) {
       telemetry.record('EVENT_RECEIVED', undefined, { captureId: current.captureId });
       if (resumed) current.retryAt = 0;
       if (discontinuity) { current.retryAt = 0; cancelCapture(current); }
+      if(privateBeatCandidate&&current.delaySeconds&&((!clock.playing&&previous?.playing)||!capability(current).bufferEligible)) {
+        // Empty the old DelayNode on pause/unsafe source changes. A fresh node
+        // retains the fixed delay only for the same paused, eligible source.
+        const retain=pauseRetainsCapture(current)&&!clock.seeking&&!clock.buffering&&clock.playbackRate===1;
+        const epoch=crypto.randomUUID();current.synchronizationEpoch=epoch;
+        void offscreenMessage({kind:'synchronization',captureId:current.captureId,
+          settings:{bufferMs:retain?current.delaySeconds*1000:0,allowTypedPreview:retain&&current.experiment?.preview===true,
+            eligible:retain,paused:!clock.playing,flush:true,epoch}}).catch(()=>{});
+        if(!retain){current.delaySeconds=0;current.experiment=undefined;}
+      }
       publish(current, { kind: 'clock', clock: audibleClock(clock, clock.playing ? current.delaySeconds || 0 : 0) || clock });
-      if (!clock.playing || clock.muted || current.tabMuted) cancelCapture(current);
+      if ((!clock.playing&&!pauseRetainsCapture(current)) || clock.muted || current.tabMuted) cancelCapture(current);
       else void capture(current);
     },
     offscreen(message, sender) {
@@ -290,7 +362,11 @@ export function createBeatSync(api, nativePublish) {
       if (message.kind === 'onset' && current.mode === 'capture' && current.clock?.playing
         && Array.isArray(message.bands) && message.bands.length <= 4 && message.bands.every((band) => validBands.has(band))) {
         delivered = true;
-        publish(current, { kind: 'onset', captureId: current.captureId, sequence: ++current.sequence, bands: [...new Set(message.bands)], ...diagnostic });
+        const permission=capability(current);
+        if(!privateBeatCandidate||(permission.allowSemantic||permission.allowTypedPreview)
+          &&message.synchronizationEpoch===current.synchronizationEpoch)
+          publish(current, { kind: 'onset', captureId: current.captureId, sequence: ++current.sequence, bands: [...new Set(message.bands)], ...diagnostic });
+        else telemetry.mark('EVENT_DROPPED',trace,{reason:'disabled'});
       }
       if (message.kind === 'tempo.state' && current.mode === 'capture' && current.clock?.playing
         && typeof message.tempo?.locked === 'boolean' && Number.isFinite(message.tempo.confidence)
@@ -323,7 +399,13 @@ export function createBeatSync(api, nativePublish) {
     invoke(tabId) {
       // This click can grant browser permission. It is not our own permission
       // flag: automatic attempts always ask Chrome, including after reloads.
-      if (state?.session.tabId === tabId) void capture(state, true);
+      const current=state;
+      if(current?.session.tabId===tabId) {
+        // A click may arrive while the initial uninvoked request is failing.
+        // Retry after it settles so that request cannot consume the new grant.
+        if(current.captureTask)void current.captureTask.finally(()=>{if(state===current)void capture(current,true);});
+        else void capture(current,true);
+      }
     },
     tabClosed(tabId) {
       if (state && (state.session.tabId === tabId || state.owner.tabId === tabId)) void stopIfCurrent(state);

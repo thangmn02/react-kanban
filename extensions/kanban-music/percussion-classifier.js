@@ -2,8 +2,9 @@
 const classes = ['kick', 'clap', null, 'hat', 'hat'];
 
 export class PercussionClassifier {
-  constructor(thresholds = [.22, .24, .32, .22, .30]) {
+  constructor(thresholds = [.22, .24, .32, .22, .30], { onsetGuided = false } = {}) {
     this.thresholds = thresholds;
+    this.onsetGuided = onsetGuided;
     this.reset();
   }
 
@@ -38,7 +39,10 @@ export class PercussionClassifier {
     if (frame >= 0) for (let c = 0; c < 5; c++) {
       if (!classes[c]) continue;
       const value = this.noveltyAt(c, frame);
-      const peak = value >= this.thresholds[c] && value >= this.noveltyAt(c, frame - 2)
+      const prior = this.pending[c];
+      const separateRise = this.onsetGuided && prior && frame - prior.lastFrame >= 2
+        && this.scoreAt(c, frame - 1) < Math.min(prior.best.confidence, this.scoreAt(c, frame)) * .5;
+      const peak = value >= this.thresholds[c] && (separateRise || value >= this.noveltyAt(c, frame - 2))
         && value >= this.noveltyAt(c, frame - 1) && value >= this.noveltyAt(c, frame + 1);
       if (peak) {
         const source = this.frames[frame - this.base];
@@ -51,8 +55,10 @@ export class PercussionClassifier {
           audioTime: source.audioTime,
           scores: source.scores,
         };
-        const prior = this.pending[c];
-        if (prior && frame - prior.lastFrame > 2) { events.push(prior.best); this.pending[c] = null; }
+        // A new activation rise after a deep intervening valley is a distinct
+        // proposal, even when the preceding peak is still awaiting finalization.
+        // Wide/flat peaks retain the existing group and produce only one event.
+        if (prior && (frame - prior.lastFrame > 2 || separateRise)) { events.push(prior.best); this.pending[c] = null; }
         const group = this.pending[c];
         if (group) { if (value > group.best.value) group.best = candidate; group.lastFrame = frame; }
         else this.pending[c] = { best: candidate, lastFrame: frame };

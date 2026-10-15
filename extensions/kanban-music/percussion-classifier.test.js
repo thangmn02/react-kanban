@@ -28,3 +28,17 @@ it('rejects malformed/non-model evidence and flushes pending attacks on clock di
   for (let frame = 0; frame <= 20; frame++) classifier.push([frame === 20 ? .9 : 0, 0, 0, 0, 0], frame / 100);
   for (let frame = 0; frame < 20; frame++) expect(classifier.push([0, 0, 0, 0, 0], 10 + frame / 100).events).toEqual([]);
 });
+it('preserves distinct 20 ms activation rises with one bounded onset-guided refinement',()=>{
+  const run=onsetGuided=>{
+    const classifier=new PercussionClassifier(undefined,{onsetGuided}),events=[];
+    for(let frame=0;frame<60;frame++)events.push(...classifier.push([0,[20,22].includes(frame)?.9:0,0,0,0],frame/100).events);
+    return events.map(e=>e.audioTime);
+  };
+  expect(run(false)).toEqual([.2]);
+  expect(run(true)).toEqual([.2,.22]);
+});
+it('does not turn wide or sustained activation peaks into multiple attacks in the refinement',()=>{
+  const classifier=new PercussionClassifier(undefined,{onsetGuided:true}),events=[];
+  for(let frame=0;frame<100;frame++)events.push(...classifier.push([0,frame>=20&&frame<=24?.9:0,0,0,0],frame/100).events);
+  expect(events).toHaveLength(1);
+});

@@ -32,7 +32,8 @@ export function readMedia() {
       duration: Number.isFinite(media.duration) && media.duration > 0 ? media.duration : undefined,
       volume: media.volume, canSeek: Number.isFinite(media.duration) && media.duration > 0 && media.seekable.length > 0,
       canPrevious: Boolean(previous), canNext: Boolean(next),
-      assetUrl: assetUrl?.slice(0, 2048), protectedMedia: Boolean(media.mediaKeys), observed: Boolean(globalThis.__kanbanMusicMedia) }];
+      assetUrl: assetUrl?.slice(0, 2048), protectedMedia: Boolean(media.mediaKeys), observed: Boolean(globalThis.__kanbanMusicMedia),
+      mediaFacts: globalThis.__kanbanMusicMedia?.sourceFacts?.(media) || { kind:'unknown' } }];
   });
 }
 

@@ -5,11 +5,12 @@ import { deflateSync } from 'node:zlib';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const extension = join(root, 'extensions', 'kanban-music');
-const output = join(root, 'public', 'downloads');
+const privateCandidate = process.argv.includes('--private');
+const output = privateCandidate ? join(root,'scratch','browser-first-candidate') : join(root, 'public', 'downloads');
 
 // Rebuild release resources; the explicit inventory excludes private/retired
 // models without deleting an existing developer's optional inference assets.
-for (const path of ['public/music-analysis', 'src-tauri/generated/music-companion']) {
+for (const path of privateCandidate ? [] : ['public/music-analysis', 'src-tauri/generated/music-companion']) {
   const target = join(root, path);
   if (!target.startsWith(root)) throw new Error('Generated resource outside project');
   await rm(target, { recursive: true, force: true });
@@ -84,11 +85,19 @@ await mkdir(join(extension, 'icons'), { recursive: true });
 for (const size of [16, 48, 128]) await writeFile(join(extension, 'icons', `${size}.png`), icon(size));
 const names = ['manifest.json', 'background.js', 'widget-bridge.js', 'sites.js', 'companion-action.js', 'media.js', 'media-observer.js', 'discovery-diagnostics.js', 'protocol.js', 'relay.js', 'clock.js', 'beat-sync.js', 'beat-detector.js', 'tempo-tracker.js', 'capture-engine.js', 'beat-telemetry.js', 'beat-timing.js', 'media-asset.js', 'offscreen.html', 'offscreen.js', 'setup.html', 'setup.js', 'setup.css', 'icons/16.png', 'icons/48.png', 'icons/128.png'];
 names.push('companion-update.js', 'spotify-player.js');
+names.push('beat-mode.js','beat-candidate.js');
 const files = await Promise.all(names.map(async (name) => ({ name, bytes: await readFile(join(extension, name)) })));
+if(privateCandidate) {
+  const candidate=files.find(file=>file.name==='beat-candidate.js');
+  candidate.bytes=Buffer.from(candidate.bytes.toString().replace('privateBeatCandidate = false','privateBeatCandidate = true'));
+  const manifest=files.find(file=>file.name==='manifest.json');
+  const value=JSON.parse(manifest.bytes.toString());value.name+=' Private';value.version_name=value.version+' browser-first-v1 private';
+  manifest.bytes=Buffer.from(JSON.stringify(value,null,2)+'\n');
+}
 for (const name of ['percussion-capability.js', 'percussion-classifier.js', 'causal-percussion-classifier.js', 'percussion-features.js', 'percussion-worklet.js',
   'percussion-worker.js', 'percussion-runtime.js', 'lead-audio-authorization.js', 'lead-audio-tap.js', 'lead-audio-worklet.js']) files.push({ name, bytes: await readFile(join(extension, name)) });
 // Reject broken runtime imports before writing either the ZIP or desktop bundle.
-// Note: Kora is non-commercial. Pretrained assets and dependencies are public.
+// MODEL-NOTICE records restrictions; inclusion does not establish release rights.
 for (const name of ['generated/percussion/percussion.json', 'generated/percussion/percussion.onnx',
   'vendor/percussion/ort.wasm.min.mjs', 'vendor/percussion/ort-wasm-simd-threaded.mjs',
   'vendor/percussion/ort-wasm-simd-threaded.wasm', 'MODEL-NOTICE.txt']) {
@@ -107,7 +116,7 @@ await writeFile(join(output, 'kanban-music-companion.zip'), archive);
 await writeFile(join(output, 'kora-music-companion.zip'), archive);
 
 // Ship only runtime files with Windows, already unpacked for Load unpacked.
-const bundledCompanion = join(root, 'src-tauri', 'generated', 'music-companion');
+const bundledCompanion = privateCandidate ? output : join(root, 'src-tauri', 'generated', 'music-companion');
 for (const { name, bytes } of files) {
   const target = join(bundledCompanion, 'extension', name);
   await mkdir(join(target, '..'), { recursive: true });
@@ -116,7 +125,17 @@ for (const { name, bytes } of files) {
 const manifest = JSON.parse(files.find((file) => file.name === 'manifest.json').bytes.toString());
 const setup = await readFile(join(root, 'src-tauri', 'companion-setup.html'), 'utf8');
 await writeFile(join(bundledCompanion, 'Install Music Companion.html'), setup.replaceAll('__COMPANION_VERSION__', manifest.version));
+if(privateCandidate)await writeFile(join(output,'Private listening guide.html'),`<!doctype html><meta charset="utf-8"><title>Private Beat Grid candidate</title>
+<body style="max-width:850px;margin:50px auto;font:18px/1.6 system-ui"><h1>Private Beat Grid candidate</h1>
+<p>Local experiment. Accuracy, model release rights, physical synchronization and user listening acceptance remain unverified. Do not publish this package.</p>
+<ol><li>In Chrome or Edge, open the Extensions page, enable developer mode, choose Load unpacked and select the adjacent <b>extension</b> folder. Check version ${manifest.version}, name Kora Music Companion Private.</li>
+<li>In the repository, run <code>node scripts/prepare-beat-corpus.mjs</code> then <code>node scripts/verify-private-companion.mjs --serve</code>. Keep that terminal open; Ctrl+C stops the local server.</li>
+<li>Open <a href="http://127.0.0.1:5173">the private grid</a> and <a href="http://127.0.0.1:5174">the audio-only review tab</a>. Choose authorized local audio, press Play, and click Companion's toolbar icon on that source tab.</li>
+<li>In the grid, wait for calibration, pause the source, open Private candidate and complete the consent checks. Enable the bounded delay and optional unverified instrument preview, then resume. The mode shows the actual intentional delay.</li>
+<li>Use pause, seek and source changes to investigate. A source/generation change revokes the experiment. Video, uncertain output, native capture and Spotify cannot enable this buffer.</li>
+<li>Report the approximate song time, row and observed failure. Provisional annotations remain investigation-only. Generic degraded visuals make no instrument claim.</li></ol>
+<p>No web deployment, extension-store update or installer publication is included. Model weights remain local evaluation assets.</p></body>`);
 await writeFile(join(bundledCompanion, 'package-files.json'), JSON.stringify([
   ...files.map(({ name }) => `extension/${name}`), 'Install Music Companion.html',
 ], null, 2) + '\n');
-console.log(`Music companion packaged: ${files.length} files → public/downloads/kanban-music-companion.zip`);
+console.log(`Music companion packaged: ${files.length} files → ${output}`);

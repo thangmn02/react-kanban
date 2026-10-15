@@ -6,6 +6,60 @@ Without usable capture, Music reports decorative timing instead of instrument
 detections. Explicit detected silence and paused/stale clocks remain dark.
 Cache delivery itself requires a fresh authoritative media clock.
 
+## Private browser-first candidate
+
+The private candidate uses [one capability decision](../extensions/kanban-music/beat-mode.js)
+for provider restrictions, capture/output ownership, media facts, clock health,
+detector qualification and intentional-delay consent. Its source flag is off in
+ordinary packages. `node scripts/package-music-extension.mjs --private` writes an
+isolated package and listening guide under ignored `scratch/browser-first-candidate/`.
+It does not update release downloads or the desktop bundle. The standalone
+[private listening harness](../scripts/verify-private-companion.mjs) serves the
+production bridge, event engine, scheduler, controller and renderer on local
+ports 5173/5174. Its `--serve` mode has no automated consent. Authorized local
+audio selected in the review tab stays in that browser.
+
+| Source/mode | Private behavior | Classification |
+| --- | --- | --- |
+| Exact source with independently verified EventTrack, matching recording bytes/version and fresh clock | Predictive verified cache; no model-cache promotion | Experimental contract; no verified natural track provisioned |
+| Captured source with independently qualified trained detector and measured end-to-end p95 ≤50 ms | Live semantic events | Supported only after qualification; current detector fails this gate |
+| One audio-only browser source, no video/frames, active audio-only tab capture, replaced original output, fresh rate-1 clock, calibrated bounded delay and explicit consent | Immediate analysis plus intentionally delayed output; optional unverified typed preview | Experimental |
+| YouTube video or any visible video | Zero independent audio delay; degraded generic visuals with the current unqualified detector | Experimental fallback; semantic synchronization unsupported |
+| Unknown media/output ownership, multiple active media sources, embedded frames or native monitoring | Buffer denied; no qualified typed claim | Unsupported buffering |
+| Spotify | New private capture/analysis/buffering denied; frontend submits no Spotify cloud-analysis request | Policy-blocked pending permission/scope review |
+| Protected source | Capture/analysis/buffering denied in the private path | Unsupported |
+
+The private ADTOF refinement remains noncausal and unqualified. It preserves two
+accepted activation impulses separated by a deep valley at 20 ms without
+splitting a broad plateau, but does not establish acoustic accuracy. An optional
+manifest `verification` binds independently reviewed annotations to exact source
+identity/version/content SHA-256 and the manifest revision; the private engine
+requires the separately bound source fingerprint. Model-generated cache chunks
+cannot pass that check. Ordinary provider route IDs alone do not prove recording
+bytes, and no verified natural EventTrack is bundled.
+
+The Companion obtains capture through the browser's toolbar invocation and
+checks active `getCapturedTabs()` ownership. The private graph requests audio
+only: stopping an unnecessary video track was observed to mark Chrome capture
+stopped while its audio remained live. The source connects independently to
+analysis and one output branch. Model failure cannot close the output branch.
+Configure delay only while paused after calibration (at least 32 events); size
+is observed p99 plus 40 ms headroom, rounded to 10 ms and bounded to 80–500 ms.
+Freeze that calibration for the enabled experiment. Later worker stalls do not
+increase output delay. Output changes use a short fade with no simultaneous
+full-gain bypass. Pause empties queued events and replaces the DelayNode;
+seek/source/generation/rate/unsafe-source changes revoke the experiment. A
+replacement capture awaits release of the old output graph. Native capture
+never enables this branch.
+
+Diagnostics expose the detector/version, actual intentional delay, calibration,
+source/output proof flags, capture/clock health and withheld prediction count.
+Optional local trace snapshots are bounded and contain no PCM, URLs or media
+metadata. Speaker/pixel timing, glitches and listening acceptance remain separate
+physical checks. Software DOM timing and passing unit tests cannot close them.
+Provisional human annotations remain investigation-only; the scorer refuses
+official metrics until independent timing, completeness and identity checks pass.
+
 ## Serving real precomputed data
 
 `GET /api/beat-events?provider=youtube&id=<video-id>` reads a manifest;

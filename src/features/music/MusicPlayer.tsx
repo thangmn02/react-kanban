@@ -1,6 +1,7 @@
 import { useI18n } from '../../i18n';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { getMusicInstallUrl } from './mediaBridge';
+import ExperimentalBeatControl from './experimental-beat-control';
 import MusicPlaybackControls from './music-playback-controls';
 import type { BrowserMusicController } from './useBrowserMusic';
 import { patternAt } from './beatVisuals';
@@ -50,6 +51,7 @@ export function MusicTrack({ music }: { music: BrowserMusicController }) {
       </span>
     </div>
     <MusicPlaybackControls key={selected?.id} music={music} />
+    {selected&&<ExperimentalBeatControl key={`experimental:${selected.id}`} session={selected} refresh={music.refresh}/>}
     {sessions.length > 1 && <select className="music-sessions" aria-label={t('music.choose')} value={selected?.id || ''} onChange={(event) => setSelectedId(event.target.value)}>{sessions.map((session) => <option key={session.id} value={session.id}>{session.title} · {session.source}</option>)}</select>}
   </>;
 }

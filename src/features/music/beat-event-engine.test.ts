@@ -19,6 +19,21 @@ const setup = (client: EventTrackClient, config = options) => {
   engine.accept({ kind: 'clock', clock: clock() });
   return { events, engine, recover };
 };
+it('keeps private predictions degraded until the capture policy permits an experimental preview',async()=>{
+  const client: EventTrackClient={manifest:vi.fn().mockResolvedValue(manifest),chunk:vi.fn().mockResolvedValue(chunk(0,10.2)),requestAnalysis:vi.fn().mockResolvedValue('ready')};
+  const {engine,events}=setup(client,{...options,privateCandidate:true});
+  engine.accept({kind:'sync.state',mode:'capture',captureId:'private'});
+  engine.accept({kind:'onset',captureId:'private',bands:['kick'],sequence:1,targetPlaybackTime:10.2,playbackClock:clock()});
+  await vi.advanceTimersByTimeAsync(400);
+  expect(semantic(events)).toHaveLength(0);expect(client.chunk).not.toHaveBeenCalled();expect(engine.stats().path).toBe('degraded');
+});
+it('allows only independently verified exact-source cache data in the private engine',async()=>{
+  const verified={...manifest,verification:{status:'independently-verified' as const,sourceId:'recording',sourceVersion:'v1',
+    sourceSha256:'a'.repeat(64),annotationSha256:'b'.repeat(64),revision:'r'}};
+  const client: EventTrackClient={manifest:vi.fn().mockResolvedValue(verified),chunk:vi.fn().mockResolvedValue(chunk(0,10.2)),requestAnalysis:vi.fn().mockResolvedValue('ready')};
+  const {engine,events}=setup(client,{...options,privateCandidate:true,verifiedSource:{id:'recording',version:'v1',contentSha256:'a'.repeat(64)}});
+  await vi.advanceTimersByTimeAsync(400);expect(engine.stats().path).toBe('cache');expect(semantic(events)).toHaveLength(1);
+});
 it('preserves distinct rapid local attacks while rejecting retransmission by sequence', async () => {
   const client: EventTrackClient = { manifest: vi.fn().mockResolvedValue(undefined), chunk: vi.fn(), requestAnalysis: vi.fn().mockResolvedValue('unavailable') };
   const { engine, events } = setup(client);

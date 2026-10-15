@@ -73,6 +73,9 @@ async function handle(message, sender) {
   }
   const session = sessions.find((item) => item.id === message.sessionId);
   if (!session) return { ok: false, error: 'unavailable' };
+  if (message.action === 'beat.experimental.configure') {
+    return { ok: await beats.configure(session, owner, message.configuration) };
+  }
   if (message.action === 'dock.audio.read') {
     const { leadAudioTestScope } = await chrome.storage.local.get('leadAudioTestScope');
     if (!authorizedLeadAudio(leadAudioTestScope, session, sender)) return { ok: false, error: 'unavailable' };

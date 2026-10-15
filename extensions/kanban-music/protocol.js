@@ -1,3 +1,4 @@
+import { validSyncConfiguration } from './beat-mode.js';
 export const appOrigins = new Set([
   'https://kanthangboard.netlify.app',
   'https://koraspace.online',
@@ -12,6 +13,8 @@ export function allowedRequest(message, sender) {
     return message?.protocol === 'kanban-music-v1' && (
       message.action === 'sessions.get'
       || message.action === 'diagnostics.get'
+      || (message.action === 'beat.experimental.configure' && validSyncConfiguration(message.configuration)
+        && typeof message.sessionId === 'string' && message.sessionId.length < 250)
       || ((['media.play', 'media.pause', 'media.focus', 'media.previous', 'media.next'].includes(message.action)
         || message.action === 'media.seek' && Number.isFinite(message.value) && message.value >= 0 && message.value <= 864000
         || message.action === 'media.volume' && Number.isFinite(message.value) && message.value >= 0 && message.value <= 1)

@@ -5,6 +5,7 @@ import { parsePlaybackTiming, parsePlaybackClock, playbackDeadline, type Playbac
 import { parseMediaAsset, type MediaAsset } from '../../../extensions/kanban-music/media-asset.js';
 import type { BeatEventPath } from './beat-event-engine';
 import type { LeadProvenance } from './lead-events';
+import { parseBeatMode, validSyncConfiguration, type BeatMode, type SyncConfiguration } from '../../../extensions/kanban-music/beat-mode.js';
 const telemetry = beatTelemetry.at('media-bridge');
 
 export interface BrowserMusicSession {
@@ -30,7 +31,7 @@ export interface BrowserMusicSession {
   buffering?: boolean;
   seeking?: boolean;
   generation?: number;
-  syncState?: { mode: 'clock' | 'capture'; reason?: string; captureId?: string; captureError?: { stage: string; code: string } };
+  syncState?: { mode: 'clock' | 'capture'; reason?: string; captureId?: string; capability?: BeatMode; captureError?: { stage: string; code: string } };
 }
 
 export type MusicClock = PlaybackClock;
@@ -38,7 +39,7 @@ export type BeatBand = 'kick' | 'clap' | 'hat' | 'bass' | 'melody';
 export interface MelodyState { active: boolean; level: number; note: number }
 export type BeatEvent = ({ kind: 'clock'; clock: MusicClock }
   | { kind: 'sync.recover' }
-  | { kind: 'sync.state'; mode: 'clock' | 'capture'; reason?: string; captureId?: string; eventPath?: BeatEventPath }
+  | { kind: 'sync.state'; mode: 'clock' | 'capture'; reason?: string; captureId?: string; eventPath?: BeatEventPath; capability?: BeatMode }
   | { kind: 'onset'; bands: BeatBand[]; captureId?: string; sequence?: number; duration?: number }
   | { kind: 'melody.state'; captureId: string; melody: MelodyState; lead?: LeadProvenance }
   | { kind: 'tempo.state'; captureId: string; tempo: { locked: boolean; bpm: number | null; confidence: number } }
@@ -92,11 +93,12 @@ function isSyncState(value: unknown): boolean {
   const state = value as Record<string, unknown>;
   return (state.mode === 'clock' || state.mode === 'capture')
     && (state.reason === undefined || (typeof state.reason === 'string' && state.reason.length <= 80))
-    && (state.captureId === undefined || (typeof state.captureId === 'string' && state.captureId.length <= 100));
+    && (state.captureId === undefined || (typeof state.captureId === 'string' && state.captureId.length <= 100))
+    && (state.capability === undefined || Boolean(parseBeatMode(state.capability)));
 }
 
-function requestBridge(action: MusicAction | BeatAction | AudioAction, sessionId?: string, subscriptionId?: string, value?: number): Promise<Record<string, unknown>> {
-  if (action === 'dock.audio.read' && isNativeWidget()) return Promise.reject(new MusicBridgeError('unavailable'));
+function requestBridge(action: MusicAction | BeatAction | AudioAction | 'beat.experimental.configure', sessionId?: string, subscriptionId?: string, value?: number, configuration?: SyncConfiguration): Promise<Record<string, unknown>> {
+  if ((action === 'dock.audio.read' || action === 'beat.experimental.configure') && isNativeWidget()) return Promise.reject(new MusicBridgeError('unavailable'));
   if (isNativeWidget()) return requestNativeMusic(action as MusicAction | BeatAction, sessionId, subscriptionId, value).then((response) => {
     if (response.ok !== true) throw new MusicBridgeError(response.error === 'not-installed' ? 'not-installed' : 'unavailable');
     return response;
@@ -118,6 +120,7 @@ function requestBridge(action: MusicAction | BeatAction | AudioAction, sessionId
     const timeout = window.setTimeout(() => { cleanup(); reject(new MusicBridgeError('not-installed')); }, 2500);
     window.addEventListener('message', receive);
     window.postMessage({ channel, direction: 'app-to-extension', requestId, action, sessionId,
+      ...(configuration ? { configuration } : {}),
       ...(action === 'dock.beat.sync.start' ? { telemetryEnabled: beatTelemetry.enabled } : {}),
       ...(value !== undefined ? { value } : {}),
       ...(subscriptionId ? { subscriptionId } : {}) }, window.location.origin);
@@ -134,6 +137,11 @@ export async function sendMusicRequest(action: MusicAction, sessionId?: string, 
 
 export async function sendBeatRequest(action: BeatAction, sessionId: string, subscriptionId: string): Promise<void> {
   await requestBridge(action, sessionId, subscriptionId);
+}
+
+export async function configureExperimentalSynchronization(sessionId: string, configuration: SyncConfiguration): Promise<void> {
+  if (!validSyncConfiguration(configuration)) throw new MusicBridgeError('playback');
+  await requestBridge('beat.experimental.configure', sessionId, undefined, undefined, configuration);
 }
 
 export async function readCompanionAudio(sessionId: string, subscriptionId: string): Promise<unknown> {
@@ -222,6 +230,7 @@ export function subscribeBeatEvents(sessionId: string, subscriptionId: string, c
       kind: 'sync.state', mode: message.mode,
       reason: typeof (message.reason ?? message.fallbackReason) === 'string' ? String(message.reason ?? message.fallbackReason).slice(0, 80) : undefined,
       captureId: typeof message.captureId === 'string' ? message.captureId.slice(0, 100) : undefined,
+      ...(parseBeatMode(message.capability) ? { capability: parseBeatMode(message.capability) } : {}),
     });
     if (message.kind === 'onset' && Array.isArray(message.bands) && message.bands.length <= 5
       && message.bands.every((band: unknown) => typeof band === 'string' && supportedBands.includes(band))) receive({

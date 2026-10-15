@@ -4,6 +4,7 @@ import { beatTelemetry } from './beat-telemetry.js';
 import { outputTiming } from './beat-timing.js';
 import { createPercussionRuntime } from './percussion-runtime.js';
 import { createLeadAudioTap } from './lead-audio-tap.js';
+import { privateBeatCandidate } from './beat-candidate.js';
 const telemetry = beatTelemetry.at('capture-engine');
 const percussionTelemetry = beatTelemetry.at('percussion-classifier');
 
@@ -24,42 +25,81 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
   let active;
   let requestedId;
   let lastFailure;
+  let teardown = Promise.resolve();
+  const setOutput = (state, bufferMs = 0) => {
+    if(!state.candidate||monitorOnly||!state.source||!state.context.createGain)return false;
+    const previous=state.output;
+    clearTimeout(state.outputSwap);
+    state.retiringOutput?.delay?.disconnect();state.retiringOutput?.gain.disconnect();
+    const gain=state.context.createGain();gain.gain.value=previous?0:1;gain.connect(state.context.destination);
+    const delay=bufferMs?state.context.createDelay(.5):undefined;
+    if(delay){delay.delayTime.value=bufferMs/1000;state.source.connect(delay);delay.connect(gain);}
+    else state.source.connect(gain);
+    state.output={gain,delay};state.bufferMs=bufferMs;
+    if(previous){
+      previous.gain.gain.setTargetAtTime?.(0,state.context.currentTime,.003);
+      state.retiringOutput=previous;
+      state.outputSwap=setTimeout(()=>{
+        try{state.source.disconnect(previous.delay||previous.gain);}catch{/* Replaced graph. */}
+        previous.delay?.disconnect();previous.gain.disconnect();state.retiringOutput=undefined;
+        if(active===state)gain.gain.setTargetAtTime?.(1,state.context.currentTime,.003);
+      },16);
+    }
+    return true;
+  };
+  const calibration = state => {
+    const sorted=(state?.latencies||[]).slice().sort((a,b)=>a-b);
+    return {samples:sorted.length,p95Ms:sorted[Math.ceil(sorted.length*.95)-1]??null,
+      p99Ms:sorted[Math.ceil(sorted.length*.99)-1]??null};
+  };
 
   function stop(reason = 'stopped') {
     generation++;
     requestedId = undefined;
     const previous = active;
     active = undefined;
-    if (!previous) return;
+    if (!previous) return teardown;
     telemetry.record('CAPTURE_STOP', undefined, { captureId: previous.captureId, reason });
     previous.events?.forEach((event) => telemetry.mark('EVENT_DROPPED', event.telemetry, { reason: 'stopped' }));
     cancel(previous.interval);
     previous.percussionOwner?.abort.abort();
     previous.percussionOwner?.runtime?.stop();
     previous.audioTap?.stop();
-    previous.stream?.getTracks().forEach((track) => track.stop());
-    previous.source?.disconnect();
-    previous.analyser?.disconnect();
-    previous.monitor?.disconnect();
-    void previous.context?.close().catch(() => {});
-    onStop(previous.captureId, reason);
+    clearTimeout(previous.outputSwap);
+    const release=()=>{
+      previous.stream?.getTracks().forEach((track) => track.stop());
+      previous.source?.disconnect();previous.analyser?.disconnect();previous.monitor?.disconnect();
+      previous.output?.delay?.disconnect();previous.output?.gain?.disconnect();
+      previous.retiringOutput?.delay?.disconnect();previous.retiringOutput?.gain.disconnect();
+      void previous.context?.close().catch(() => {});onStop(previous.captureId, reason);
+    };
+    if(previous.candidate&&previous.output?.gain.gain.setTargetAtTime){
+      previous.output.gain.gain.setTargetAtTime(0,previous.context.currentTime,.003);
+      teardown=new Promise(resolve=>setTimeout(()=>{release();resolve();},16));
+    }else{release();teardown=Promise.resolve();}
+    return teardown;
   }
 
-  async function start(streamId, captureId) {
+  async function start(streamId, captureId, requestOptions = {}) {
     stop('replaced');
     const request = ++generation;
     requestedId = captureId;
+    if(privateBeatCandidate)await teardown;
+    if(request!==generation)return false;
     let stream;
     let failureStage = 'audio-context';
     lastFailure = undefined;
     try {
-      const state = { captureId, leaseUntil: now() + 6000, lastAudio: now(), interval: undefined };
+      const state = { captureId, leaseUntil: now() + 6000, lastAudio: now(), interval: undefined,
+        candidate:privateBeatCandidate&&requestOptions.candidate===true,bufferMs:0,latencies:[],typedPreview:false,
+        acceptAfter:Infinity,droppedSemanticEvents:0 };
       active = state;
+      if(state.candidate&&requestOptions.sourceProvider==='spotify')throw new Error('Provider analysis blocked');
       telemetry.record('CAPTURE_START', undefined, { captureId });
       state.context = createAudioContext();
       state.events = []; state.eventOrder = 0;
       const enqueue = (kind, payload, at = (state.context.currentTime ?? now() / 1000), producerTrace, immediate = false) => {
-        const target = at + (monitorOnly ? 0 : (state.context.baseLatency || 0) + (state.context.outputLatency || 0));
+        const target = at + (monitorOnly ? 0 : (state.context.baseLatency || 0) + (state.context.outputLatency || 0) + state.bufferMs/1000);
         const traces = producerTrace?.map((trace) => ({ ...trace, origin: monitorOnly ? 'native-audio-engine' : 'capture-engine', captureId, targetTime: target, targetClock: 'audio-seconds' }))
           || telemetry.events(kind === 'tempo' || kind === 'tick' ? 'tempo' : 'onset', kind === 'beat' ? payload : ['generic'],
             { captureId, origin: monitorOnly ? 'native-audio-engine' : 'capture-engine', targetTime: target, targetClock: 'audio-seconds', confidence: kind === 'tempo' ? payload.confidence : undefined });
@@ -90,6 +130,7 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
           }
           telemetry.mark('EVENT_SENT', event.telemetry, { audioTime, delayMs: (audioTime - event.at) * 1000 });
           const timing = outputTiming(state.context, event.at, monitorOnly);
+          if(timing&&state.candidate)timing.synchronizationEpoch=state.synchronizationEpoch;
           const metadata = timing ? [event.telemetry, timing] : event.telemetry ? [event.telemetry] : [];
           if (event.kind === 'beat') onBeat(captureId, event.payload, ...metadata);
           if (event.kind === 'tempo') onTempo(captureId, event.payload, ...metadata);
@@ -97,7 +138,10 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
         }
       };
       failureStage = 'stream-open';
-      stream = await getUserMedia(tabConstraints(streamId));
+      const constraints=tabConstraints(streamId);
+      // The private audio graph needs no video track. Stopping a companion
+      // video track can mark Chrome's capture registry stopped while audio lives.
+      stream = await getUserMedia(state.candidate?{audio:constraints.audio}:constraints);
       if (request !== generation) { stream.getTracks().forEach((track) => track.stop()); return false; }
       state.stream = stream;
       stream.getVideoTracks().forEach((track) => track.stop());
@@ -112,7 +156,7 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
       if (monitorOnly) {
         state.monitor = state.context.createGain(); state.monitor.gain.value = 0;
         state.source.connect(state.monitor); state.monitor.connect(state.context.destination);
-      } else state.source.connect(state.context.destination);
+      } else if(!state.candidate||!setOutput(state,0))state.source.connect(state.context.destination);
       failureStage = 'audio-resume';
       await state.context.resume();
       if (request !== generation) return false;
@@ -143,6 +187,7 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
           telemetry.record('EVENT_DROPPED', undefined, { captureId, reason });
         };
         void createPercussion({ context: state.context, source: state.source, signal: owner.abort.signal,
+          ...(state.candidate?{classifier:'onset-guided'}:{}),
           onFailure: failed,
           onProgress() {
             if (active !== state || state.percussionOwner !== owner) return;
@@ -156,12 +201,17 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
             if (active !== state || state.percussionOwner !== owner || !['kick', 'clap', 'hat'].includes(event.band)
               || !Number.isFinite(event.audioTime) || !Number.isFinite(event.confidence)
               || event.confidence < 0 || event.confidence > 1 || !Number.isFinite(event.classMargin) || event.classMargin < 0) return;
+            if(state.candidate){
+              const latency=(state.context.currentTime-event.audioTime)*1000;
+              if(Number.isFinite(latency)&&latency>=0){state.latencies.push(latency);if(state.latencies.length>512)state.latencies.shift();}
+              if(!state.typedPreview||event.audioTime<state.acceptAfter){state.droppedSemanticEvents++;return;}
+            }
             const at = now() + (event.audioTime - state.context.currentTime) * 1000;
             if (event.band === 'kick') tempo.snapToBeat(at);
             drumHits.push(at);
             const trace = telemetry.events('onset', [event.band], { captureId,
               origin: 'local-detector', confidence: event.confidence, targetTime: event.audioTime, targetClock: 'audio-seconds' });
-            percussionTelemetry.mark('EVENT_DETECTED', trace, { semantic: true });
+            percussionTelemetry.mark('EVENT_DETECTED', trace, { semantic: true, audioTime:event.audioTime });
             enqueue('beat', [event.band], event.audioTime, trace, true);
           },
         }).then(runtime => {
@@ -208,7 +258,7 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
         }
         // Quiet audio is not an ended stream. The owner lease still bounds its
         // lifetime; sampling continues so returning audio needs no new capture.
-        if (result.hits.includes('bass')) enqueue('beat', ['bass']);
+        if (result.hits.includes('bass')&&(!state.candidate||state.typedPreview)) enqueue('beat', ['bass']);
         if (rhythm.updated) enqueue('tempo', { locked: tempoLocked, bpm: tempoLocked ? rhythm.bpm : null, confidence: rhythm.confidence });
         if (tempoLocked && rhythm.tick) enqueue('tick', rhythm.tick);
         flushEvents();
@@ -247,10 +297,27 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
       const timing = outputTiming(owner.context, packet.endTime);
       return timing ? { pcm: packet.pcm, sequence: packet.sequence, sampleRate: 44100, ...timing } : undefined;
     },
-    get delaySeconds() { return 0; },
+    get delaySeconds() { return (active?.bufferMs||0)/1000; },
+    get calibration(){return calibration(active);},
+    get health(){return active?{context:active.context?.state,bufferMs:active.bufferMs,
+      queuedEvents:active.events.length,droppedSemanticEvents:active.droppedSemanticEvents,
+      dropReason:active.typedPreview?'none':'detector-unqualified',workerFailures:active.percussionFailures||0}:undefined;},
+    configureSynchronization(captureId,settings){
+      const state=active;
+      if(!state?.candidate||state.captureId!==captureId||monitorOnly
+        ||!Number.isFinite(settings?.bufferMs)||settings.bufferMs<0||settings.bufferMs>500
+        ||settings.bufferMs>0&&(!settings.eligible||settings.paused!==true)
+        ||settings.flush!==true&&settings.paused!==true)return false;
+      state.events.length=0;
+      state.synchronizationEpoch=typeof settings.epoch==='string'&&/^[a-zA-Z0-9:_-]{1,160}$/.test(settings.epoch)
+        ?settings.epoch:crypto.randomUUID();
+      state.acceptAfter=state.context.currentTime;
+      state.typedPreview=settings.eligible===true&&settings.allowTypedPreview===true;
+      return setOutput(state,settings.bufferMs);
+    },
     get lastFailure() { return lastFailure && { ...lastFailure }; },
     stopCapture(captureId) {
-      if (requestedId === captureId) stop();
+      if (requestedId === captureId) return stop();
     },
     renew(captureId) {
       if (active?.captureId !== captureId || active.context?.state !== 'running'

@@ -1,7 +1,7 @@
 import { beatTelemetry } from './beat-telemetry.js';
 const telemetry = beatTelemetry.at('percussion-classifier');
 
-export async function createPercussionRuntime({ context, source, onEvent, signal, onDiagnostic, onFailure = () => {}, onProgress = () => {} }) {
+export async function createPercussionRuntime({ context, source, onEvent, signal, onDiagnostic, classifier, onFailure = () => {}, onProgress = () => {} }) {
   if (signal?.aborted || !context.audioWorklet || typeof AudioWorkletNode === 'undefined') return null;
   let live = true, worker, node, watchdog, timeout, pendingSince;
   let submittedTime = -Infinity;
@@ -34,6 +34,7 @@ export async function createPercussionRuntime({ context, source, onEvent, signal
     const response = await fetch(new URL('./generated/percussion/percussion.json', import.meta.url), { signal: loadingAbort.signal });
     if (!live || !response.ok) return null;
     const config = await response.json();
+    if (classifier === 'onset-guided') config.classifier = classifier;
     if (!live || context.sampleRate !== config.sampleRate || config.version !== 1 || config.bins !== 84) return null;
     // Raw activations are private, explicitly requested diagnostics only.
     config.diagnostics = typeof onDiagnostic === 'function';

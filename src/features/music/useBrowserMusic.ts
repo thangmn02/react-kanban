@@ -80,9 +80,10 @@ export function useBrowserMusic(beatDemand = false) {
   }, []);
   const provider = selected?.asset?.provider, mediaId = selected?.asset?.id;
   const canAnalyze = selected?.canAnalyze, duration = selected?.duration;
-  const eventOptions = useMemo(() => ({ asset: provider && mediaId ? { provider, id: mediaId } : undefined,
-    capturedInput: isNativeWidget() ? !leadPulseEnabled() || leadProcessingEnabled()
-      : companionLeadInputEnabled(provider && mediaId ? { provider, id: mediaId } : undefined),
+  const eventOptions = useMemo(() => ({ asset: provider && mediaId && provider !== 'spotify' ? { provider, id: mediaId } : undefined,
+    privateCandidate: import.meta.env.VITE_PRIVATE_BEAT_CANDIDATE === 'true',
+    capturedInput: provider !== 'spotify' && (isNativeWidget() ? !leadPulseEnabled() || leadProcessingEnabled()
+      : companionLeadInputEnabled(provider && mediaId ? { provider, id: mediaId } : undefined)),
     duration, capabilities: beatCapabilities(isNativeWidget(), canAnalyze !== false),
   }), [provider, mediaId, duration, canAnalyze]);
   const beat = useMusicBeatSync(selected?.id, updateClock, eventOptions, beatDemand);

@@ -81,7 +81,7 @@ const receive = (message, sender, respond) => {
         playbackRate: media.playbackRate, sampledAt: Date.now(), paused: media.paused,
         playing: valid && !media.paused && !media.seeking && !state.buffering && media.readyState >= 3,
         seeking: media.seeking, buffering: state.buffering || media.readyState < 3, generation: state.generation,
-        muted: media.muted || media.volume === 0, protectedMedia: Boolean(media.mediaKeys) } }).catch(() => { if (watcher === state) stopClock(); });
+        muted: media.muted || media.volume === 0, protectedMedia: Boolean(media.mediaKeys), mediaFacts:{kind:'unknown'} } }).catch(() => { if (watcher === state) stopClock(); });
     if (!valid) stopClock();
   };
   watcher = state;

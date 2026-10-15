@@ -9,6 +9,7 @@ export type EventRow = 'kick' | 'snare' | 'hat' | 'bass' | 'melody';
 export interface TrackManifest {
   version: 1; asset: MediaAsset; revision: string; analysisVersion: string;
   duration: number; chunkSeconds: 30; melodyPolicy: 'dominant-monophonic';
+  verification?: {status:'independently-verified';sourceId:string;sourceVersion:string;sourceSha256:string;annotationSha256:string;revision:string};
 }
 export interface TrackOnset { id: string; time: number; row: EventRow; confidence: number; duration?: number; lead?: LeadProvenance }
 export interface TrackChunk { version: 1; revision: string; index: number; events: TrackOnset[] }
@@ -24,8 +25,14 @@ export function parseManifest(value: unknown, asset: MediaAsset, duration?: numb
     || !identifier(value.revision) || !identifier(value.analysisVersion) || value.chunkSeconds !== CHUNK_SECONDS
     || value.melodyPolicy !== 'dominant-monophonic' || !finite(value.duration) || value.duration <= 0 || value.duration > 864000
     || duration && Math.abs(duration - value.duration) > Math.max(2, duration * .02)) return;
+  const v=value.verification;
+  if(v!==undefined && (!object(v)||v.status!=='independently-verified'||!identifier(v.sourceId)
+    ||typeof v.sourceVersion!=='string'||v.sourceVersion.length>1000||!v.sourceVersion
+    ||!identifier(v.revision)||v.revision!==value.revision
+    ||!['sourceSha256','annotationSha256'].every(key=>typeof v[key]==='string'&&/^[a-f0-9]{64}$/.test(v[key] as string))))return;
   return { version: 1, asset: parsed, revision: value.revision, analysisVersion: value.analysisVersion,
-    duration: value.duration, chunkSeconds: CHUNK_SECONDS, melodyPolicy: 'dominant-monophonic' };
+    duration: value.duration, chunkSeconds: CHUNK_SECONDS, melodyPolicy: 'dominant-monophonic',
+    ...(v ? {verification:v as TrackManifest['verification']} : {}) };
 }
 
 export function parseChunk(value: unknown, manifest: TrackManifest, index: number): TrackChunk | undefined {

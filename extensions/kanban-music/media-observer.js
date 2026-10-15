@@ -1,7 +1,7 @@
 // MAIN-world, document-start hook. Some players keep new Audio() outside the
 // DOM. Observe standard media APIs, not site-specific controls or page state.
 (() => {
-  if (globalThis.__kanbanMusicMedia?.version === 2) return;
+  if (globalThis.__kanbanMusicMedia?.version === 3) return;
   globalThis.__kanbanMusicMedia?.dispose();
   const entries = new Map();
   const ids = new WeakMap();
@@ -27,6 +27,11 @@
       return [{ index, media }];
     });
   };
+  const sourceFacts = media => ({
+    kind: media?.tagName === 'AUDIO' ? 'audio-only' : media?.tagName === 'VIDEO' ? 'video' : 'unknown',
+    noVideo: !document.querySelector('video'), noFrames: !document.querySelector('iframe,frame'),
+    singleSource: list().every(entry => entry.media === media || entry.media.paused || entry.media.ended),
+  });
   const stop = () => {
     if (!watcher) return;
     clearInterval(watcher.interval);
@@ -62,7 +67,7 @@
         playbackRate: media.playbackRate, sampledAt: Date.now(), paused: media.paused,
         playing: valid && !media.paused && !media.seeking && !state.buffering && media.readyState >= 3,
         seeking: media.seeking, buffering: state.buffering || media.readyState < 3, generation: state.generation,
-        muted: media.muted || media.volume === 0, protectedMedia: Boolean(media.mediaKeys) };
+        muted: media.muted || media.volume === 0, protectedMedia: Boolean(media.mediaKeys), mediaFacts: sourceFacts(media) };
       document.dispatchEvent(new CustomEvent('kanban-music-media-clock', { detail: JSON.stringify({ token: state.token, valid, clock }) }));
       if (!valid) stop();
     };
@@ -81,7 +86,7 @@
   });
   globalThis.Audio = ObservedAudio;
   document.addEventListener('kanban-music-media-watch', receive);
-  globalThis.__kanbanMusicMedia = { version: 2, entries: list,
+  globalThis.__kanbanMusicMedia = { version: 3, entries: list, sourceFacts,
     mediaEntries: () => Array.from(entries.values()).flatMap(reference => reference.deref() ? [reference.deref()] : []),
     dispose() {
       stop();

@@ -1,6 +1,15 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { createBeatSync } from './beat-sync.js';
 afterEach(() => vi.restoreAllMocks());
+it('retries a toolbar grant after an older pending permission request settles',async()=>{
+  const f=fixture();let reject;
+  f.api.tabCapture.getMediaStreamId.mockImplementationOnce(()=>new Promise((_,fail)=>{reject=fail;}));
+  await f.sync.start(f.session,f.owner,'subscription');
+  await vi.waitFor(()=>expect(reject).toBeTypeOf('function'));
+  f.sync.invoke(f.session.tabId);reject(new Error('Permission denied before invocation'));
+  await vi.waitFor(()=>expect(f.sync.status(f.session).mode).toBe('capture'));
+  expect(f.api.tabCapture.getMediaStreamId).toHaveBeenCalledTimes(2);await f.sync.stop();
+});
 it('pulls bounded PCM only for the live capture owner and rejects a delayed result after pause', async () => {
   const f = fixture();
   f.session.src = 'https://music.example/audio.wav';
