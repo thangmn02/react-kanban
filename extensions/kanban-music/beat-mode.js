@@ -28,7 +28,11 @@ export function decideBeatMode(facts={},now=Date.now()) {
     &&capture.active===true&&capture.audible===true);
   const policyBlocked=source.provider==='spotify';
   const privateMode=facts.privateCandidate===true;
-  const requirement=bufferRequirement(timing);
+  const measuredRequirement=bufferRequirement(timing);
+  // Matched private A/B playback uses the existing ceiling, never an escape
+  // from calibration: an over-budget measured requirement remains unavailable.
+  const requirement=measuredRequirement===undefined?undefined
+    :privateMode&&detector.comparisonBufferMs===500?500:measuredRequirement;
   const sourceEligible=privateMode&&!policyBlocked&&source.protectedMedia!==true&&source.kind==='audio-only'
     &&source.singleSource===true&&source.noVideo===true&&source.noFrames===true
     &&facts.surface==='web'&&capture.output==='tab-replacement'&&capture.originalSuppressed===true;

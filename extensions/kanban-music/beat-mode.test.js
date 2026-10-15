@@ -57,6 +57,12 @@ it('bounds calibration and rejects forged controls',()=>{
   expect(validSyncConfiguration(facts().experiment)).toBe(true);
   expect(validSyncConfiguration({...facts().experiment,captureId:'http://source-secret'})).toBe(false);
 });
+it('pins private comparison playback to 500 ms only after in-budget calibration',()=>{
+  const f=facts();f.detector.comparisonBufferMs=500;f.experiment.bufferMs=500;
+  expect(decideBeatMode(f,10000)).toMatchObject({mode:'experimental-buffered',requiredBufferMs:500,bufferMs:500});
+  f.timing.p99Ms=900;
+  expect(decideBeatMode(f,10000)).toMatchObject({bufferEligible:false,requiredBufferMs:0,bufferMs:0,allowTypedPreview:false});
+});
 it('admits an explicitly consented unbuffered video preview without calibration',()=>{
   const f=facts();f.source.kind='video';f.source.noVideo=false;f.source.noFrames=false;f.timing={};
   Object.assign(f.clock,{playing:true,paused:false});

@@ -4,7 +4,7 @@ import { beatTelemetry } from './beat-telemetry.js';
 import { outputTiming } from './beat-timing.js';
 import { createPercussionRuntime } from './percussion-runtime.js';
 import { createLeadAudioTap } from './lead-audio-tap.js';
-import { privateBeatCandidate } from './beat-candidate.js';
+import { privateBeatCandidate, privatePercussionDiagnostics, privatePercussionClassifier } from './beat-candidate.js';
 const telemetry = beatTelemetry.at('capture-engine');
 const percussionTelemetry = beatTelemetry.at('percussion-classifier');
 
@@ -92,7 +92,7 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
     try {
       const state = { captureId, leaseUntil: now() + 6000, lastAudio: now(), interval: undefined,
         candidate:privateBeatCandidate&&requestOptions.candidate===true,bufferMs:0,latencies:[],typedPreview:false,
-        acceptAfter:Infinity,droppedSemanticEvents:0 };
+        acceptAfter:Infinity,droppedSemanticEvents:0,diagnosticFrames:[],diagnosticPredictions:[],diagnosticEvicted:0 };
       active = state;
       if(state.candidate&&requestOptions.sourceProvider==='spotify')throw new Error('Provider analysis blocked');
       telemetry.record('CAPTURE_START', undefined, { captureId });
@@ -187,7 +187,16 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
           telemetry.record('EVENT_DROPPED', undefined, { captureId, reason });
         };
         void createPercussion({ context: state.context, source: state.source, signal: owner.abort.signal,
-          ...(state.candidate?{classifier:'onset-guided'}:{}),
+          ...(state.candidate?{classifier:privatePercussionClassifier}:{}),
+          ...(state.candidate&&privatePercussionDiagnostics?{onDiagnostic(result){
+            if(active!==state||state.percussionOwner!==owner)return;
+            for(const frame of result.diagnostics||[]){
+              state.diagnosticFrames.push({...frame,receivedAudioTime:result.receivedAudioTime,
+                receivedAt:result.mainThreadReceivedAt,inferenceStartedAt:result.inferenceStartedAt,inferenceEndedAt:result.inferenceEndedAt,
+                ...outputTiming(state.context,frame.audioTime+(state.context.baseLatency||0)+(state.context.outputLatency||0)+state.bufferMs/1000)});
+              if(state.diagnosticFrames.length>1800){state.diagnosticFrames.shift();state.diagnosticEvicted++;}
+            }
+          }}:{}),
           onFailure: failed,
           onProgress() {
             if (active !== state || state.percussionOwner !== owner) return;
@@ -201,16 +210,23 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
             if (active !== state || state.percussionOwner !== owner || !['kick', 'clap', 'hat'].includes(event.band)
               || !Number.isFinite(event.audioTime) || !Number.isFinite(event.confidence)
               || event.confidence < 0 || event.confidence > 1 || !Number.isFinite(event.classMargin) || event.classMargin < 0) return;
+            const observed=state.candidate&&privatePercussionDiagnostics?{...event,receivedAt:Date.now(),receivedAudioTime:state.context.currentTime,
+              captureId:state.captureId,rejected:null,traceId:null}:undefined;
+            if(observed){state.diagnosticPredictions.push(observed);if(state.diagnosticPredictions.length>512)state.diagnosticPredictions.shift();}
             if(state.candidate){
               const latency=(state.context.currentTime-event.audioTime)*1000;
               if(Number.isFinite(latency)&&latency>=0){state.latencies.push(latency);if(state.latencies.length>512)state.latencies.shift();}
-              if(!state.typedPreview||event.audioTime<state.acceptAfter){state.droppedSemanticEvents++;return;}
+              if(!state.typedPreview||event.audioTime<state.acceptAfter){
+                if(observed)observed.rejected=!state.typedPreview?'typed-preview-disabled':'pre-configuration-boundary';
+                state.droppedSemanticEvents++;return;
+              }
             }
             const at = now() + (event.audioTime - state.context.currentTime) * 1000;
             if (event.band === 'kick') tempo.snapToBeat(at);
             drumHits.push(at);
             const trace = telemetry.events('onset', [event.band], { captureId,
               origin: 'local-detector', confidence: event.confidence, targetTime: event.audioTime, targetClock: 'audio-seconds' });
+            if(observed)observed.traceId=trace?.[0]?.id||null;
             percussionTelemetry.mark('EVENT_DETECTED', trace, { semantic: true, audioTime:event.audioTime });
             enqueue('beat', [event.band], event.audioTime, trace, true);
           },
@@ -302,6 +318,9 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
     get health(){return active?{context:active.context?.state,bufferMs:active.bufferMs,
       queuedEvents:active.events.length,droppedSemanticEvents:active.droppedSemanticEvents,
       dropReason:active.typedPreview?'none':'detector-unqualified',workerFailures:active.percussionFailures||0}:undefined;},
+    get percussionDiagnostics(){return active?.candidate&&privatePercussionDiagnostics?{captureId:active.captureId,
+      classifier:privatePercussionClassifier,frames:active.diagnosticFrames.slice(),predictions:active.diagnosticPredictions.slice(),
+      evictedFrames:active.diagnosticEvicted,limitFrames:1800}:undefined;},
     configureSynchronization(captureId,settings){
       const state=active;
       if(!state?.candidate||state.captureId!==captureId||monitorOnly

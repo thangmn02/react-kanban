@@ -2,9 +2,11 @@
 const classes = ['kick', 'clap', null, 'hat', 'hat'];
 
 export class PercussionClassifier {
-  constructor(thresholds = [.22, .24, .32, .22, .30], { onsetGuided = false } = {}) {
+  constructor(thresholds = [.22, .24, .32, .22, .30], { onsetGuided = false, localProminence = false, diagnostics = false } = {}) {
     this.thresholds = thresholds;
     this.onsetGuided = onsetGuided;
+    this.diagnostics = diagnostics;
+    this.localProminence = localProminence;
     this.reset();
   }
 
@@ -25,7 +27,14 @@ export class PercussionClassifier {
     const index = Math.max(0, frame);
     let average = 0;
     for (let offset = -10; offset <= 1; offset++) average += this.scoreAt(classIndex, index + offset);
-    return Math.max(0, this.scoreAt(classIndex, index) - average / 12);
+    const rolling=Math.max(0, this.scoreAt(classIndex, index) - average / 12);
+    // Private comparison: a rapid new Snare/Hat rise can retain a low valley
+    // even while earlier attacks keep the rolling activation mean elevated.
+    if(this.localProminence&&[1,3,4].includes(classIndex)) {
+      const valley=Math.min(this.scoreAt(classIndex,index-3),this.scoreAt(classIndex,index-2),this.scoreAt(classIndex,index-1));
+      return Math.max(rolling,this.scoreAt(classIndex,index)-valley);
+    }
+    return rolling;
   }
 
   push(scores, audioTime) {
@@ -36,6 +45,7 @@ export class PercussionClassifier {
     this.frames.push({ scores, audioTime });
     const frame = this.count++ - 2;
     const events = [];
+    const decisions = this.diagnostics ? [] : undefined;
     if (frame >= 0) for (let c = 0; c < 5; c++) {
       if (!classes[c]) continue;
       const value = this.noveltyAt(c, frame);
@@ -44,10 +54,17 @@ export class PercussionClassifier {
         && this.scoreAt(c, frame - 1) < Math.min(prior.best.confidence, this.scoreAt(c, frame)) * .5;
       const peak = value >= this.thresholds[c] && (separateRise || value >= this.noveltyAt(c, frame - 2))
         && value >= this.noveltyAt(c, frame - 1) && value >= this.noveltyAt(c, frame + 1);
+      const eventStart=events.length;
+      const decision=decisions&&{frame,classIndex:c,band:classes[c],audioTime:this.frames[frame-this.base].audioTime,
+        activation:this.scoreAt(c,frame),novelty:value,threshold:this.thresholds[c],peak:!!peak,separateRise:!!separateRise,
+        action:!peak?(value<this.thresholds[c]?'below-threshold':'not-local-maximum')
+          :prior&&frame-prior.lastFrame<=2&&!separateRise?'grouped-with-neighbor':'new-candidate',
+        previousGroup:prior?{lastFrame:prior.lastFrame,bestAudioTime:prior.best.audioTime,bestNovelty:prior.best.value}:null};
       if (peak) {
         const source = this.frames[frame - this.base];
         const candidate = {
           frame,
+          classIndex:c,
           value,
           band: classes[c],
           confidence: source.scores[c],
@@ -65,6 +82,7 @@ export class PercussionClassifier {
       }
       const group = this.pending[c];
       if (group && frame - group.lastFrame > 2) { events.push(group.best); this.pending[c] = null; }
+      if(decision){decision.emitted=events.slice(eventStart).map(event=>({audioTime:event.audioTime,activation:event.confidence,novelty:event.value}));decisions.push(decision);}
     }
     // Ten history frames, two preceding peaks and two future-score frames.
     while (this.frames.length > 16) { this.frames.shift(); this.base++; }
@@ -73,6 +91,6 @@ export class PercussionClassifier {
       const key = `${event.band}:${event.audioTime}`;
       if (!unique.has(key) || unique.get(key).confidence < event.confidence) unique.set(key, event);
     }
-    return { outcome: unique.size ? 'percussion' : 'non-percussion/abstain', events: [...unique.values()] };
+    return { outcome: unique.size ? 'percussion' : 'non-percussion/abstain', events: [...unique.values()],...(decisions?{decisions}:{}) };
   }
 }

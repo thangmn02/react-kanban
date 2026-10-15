@@ -34,9 +34,10 @@ async function drain() {
           if (source) {
             const classes = config.scoreClasses || 5;
             const values = Array.from(scores.slice(j * classes, (j + 1) * classes));
-            const accepted = classifier.push(values, source.time).events;
+            const decision = classifier.push(values, source.time);
+            const accepted = decision.events;
             events.push(...accepted);
-            if (config.diagnostics) diagnostics.push({ audioTime: source.time, scores: values,
+            if (config.diagnostics) diagnostics.push({ audioTime: source.time, scores: values, decisions:decision.decisions,
               events: accepted.map(event => ({ ...event, decisionAudioTime: source.time })) });
           }
         }
@@ -54,7 +55,8 @@ self.onmessage = async ({ data }) => {
     try {
       config = data.config;
       classifier = config.classifier === 'causal' ? new CausalPercussionClassifier()
-        : new PercussionClassifier(config.thresholds, { onsetGuided: config.classifier === 'onset-guided' });
+        : new PercussionClassifier(config.thresholds, { onsetGuided: ['onset-guided','local-prominence'].includes(config.classifier),
+          localProminence:config.classifier==='local-prominence',diagnostics:config.diagnostics===true });
       // Keep ORT's loader intact and emit its exact assets in production builds.
       const runtimeUrl = new URL('./vendor/percussion/ort.wasm.min.mjs', import.meta.url).href;
       ort = await import(/* @vite-ignore */ runtimeUrl);

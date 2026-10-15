@@ -42,3 +42,26 @@ it('does not turn wide or sustained activation peaks into multiple attacks in th
   for(let frame=0;frame<100;frame++)events.push(...classifier.push([0,frame>=20&&frame<=24?.9:0,0,0,0],frame/100).events);
   expect(events).toHaveLength(1);
 });
+it('explains rejected peaks and grouping without changing emitted events',()=>{
+  const plain=new PercussionClassifier(undefined,{onsetGuided:true}),traced=new PercussionClassifier(undefined,{onsetGuided:true,diagnostics:true});
+  const decisions=[];
+  for(let frame=0;frame<100;frame++){
+    const scores=[0,frame>=20&&frame<=24?.9:0,0,0,0];
+    const a=plain.push(scores,frame/100),b=traced.push(scores,frame/100);
+    expect(a.events).toEqual(b.events);decisions.push(...(b.decisions||[]));
+  }
+  expect(decisions.some(d=>d.action==='below-threshold')).toBe(true);
+  expect(decisions.some(d=>d.emitted.length>0)).toBe(true);
+});
+it('limits the private local-prominence option to Snare and Hat without splitting plateaus',()=>{
+  const a=new PercussionClassifier(undefined,{onsetGuided:true});
+  const b=new PercussionClassifier(undefined,{onsetGuided:true,localProminence:true});
+  const eventsA=[],eventsB=[];
+  for(let frame=0;frame<150;frame++){
+    const score=frame>=20&&frame<=24?.9:0;
+    const scores=[score,score,score,score,score];
+    eventsA.push(...a.push(scores,frame/100).events);eventsB.push(...b.push(scores,frame/100).events);
+  }
+  expect(eventsB.filter(e=>e.band==='kick')).toEqual(eventsA.filter(e=>e.band==='kick'));
+  for(const band of ['kick','clap','hat'])expect(eventsB.filter(e=>e.band===band)).toHaveLength(1);
+});

@@ -26,6 +26,7 @@ export function Candidate() {
   },[selected,beat,error,refresh]);
   return <main className="private-beat-candidate">
     <h1>Private Beat Grid listening candidate</h1><p>Experimental only. Model accuracy and physical synchronization remain unverified. No cloud analysis.</p>
+    {capability?.detectorVersion.startsWith('xo-')&&<p><strong>UNVERIFIED DETECTOR PREVIEW · {capability.detectorVersion==='xo-A'?'Baseline A':'Candidate B · NO-GO for adoption'}</strong></p>}
     <p role="status">{error||`${sessions.length} source(s) · ${selected&&!captured?'capture not enabled':beat.eventPath||'waiting'}`}</p>
     <p>Use Chrome or Edge with Kora Music Companion Private. Play audio in the source tab, then click Companion’s toolbar icon on that tab to enable capture.</p>
     <select aria-label="Source" value={selected?.id||''} onChange={event=>setId(event.target.value)}>

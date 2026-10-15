@@ -1,7 +1,8 @@
 import {afterEach,beforeEach,expect,it,vi} from 'vitest';
-vi.mock('./beat-candidate.js',()=>({privateBeatCandidate:true}));
+const flags=vi.hoisted(()=>({privateBeatCandidate:true,privatePercussionDiagnostics:false,privatePercussionClassifier:'onset-guided'}));
+vi.mock('./beat-candidate.js',()=>flags);
 import {createCaptureEngine} from './capture-engine.js';
-beforeEach(()=>vi.useFakeTimers());
+beforeEach(()=>{vi.useFakeTimers();flags.privatePercussionDiagnostics=false;});
 afterEach(()=>{vi.useRealTimers();vi.restoreAllMocks();});
 function fixture() {
   const nodes=[],node=()=>{const n={connect:vi.fn(),disconnect:vi.fn()};nodes.push(n);return n;};
@@ -15,8 +16,23 @@ function fixture() {
   const deps={getUserMedia:vi.fn().mockResolvedValue(stream),createAudioContext:()=>context,onBeat:vi.fn(),onStop:vi.fn(),
     createPercussion:vi.fn(async options=>{model=options;return {stop:vi.fn()};}),createAudioTap:vi.fn(async()=>({stop:vi.fn()}))};
   const engine=createCaptureEngine(deps);
-  return {engine,deps,source,nodes,track,context,event:(audioTime=time-.25)=>model.onEvent({band:'clap',audioTime,confidence:.9,classMargin:.4}),advance:value=>{time+=value;}};
+  return {engine,deps,source,nodes,track,context,model:()=>model,event:(audioTime=time-.25)=>model.onEvent({band:'clap',audioTime,confidence:.9,classMargin:.4}),advance:value=>{time+=value;}};
 }
+it('keeps diagnostic recording off by default and bounds explicit private recording',async()=>{
+  const plain=fixture();await plain.engine.start('stream','owner',{candidate:true});
+  expect(plain.model().onDiagnostic).toBeUndefined();expect(plain.engine.percussionDiagnostics).toBeUndefined();
+  plain.engine.stop();await vi.advanceTimersByTimeAsync(20);
+  flags.privatePercussionDiagnostics=true;
+  const traced=fixture();await traced.engine.start('stream','owner',{candidate:true});
+  const callback=traced.model().onDiagnostic;
+  callback({diagnostics:Array.from({length:1805},(_,i)=>({audioTime:i/100,scores:[0,0,0,0,0]})),receivedAudioTime:20});
+  for(let i=0;i<520;i++)traced.event();
+  const result=traced.engine.percussionDiagnostics;
+  expect(result.frames).toHaveLength(1800);expect(result.evictedFrames).toBe(5);
+  expect(result.predictions).toHaveLength(512);expect(result.predictions[0].rejected).toBe('typed-preview-disabled');
+  traced.engine.stop();callback({diagnostics:[{audioTime:99}]});
+  expect(traced.engine.percussionDiagnostics).toBeUndefined();await vi.advanceTimersByTimeAsync(20);
+});
 it('calibrates without typed predictions and keeps analysis outside the delayed output branch',async()=>{
   const f=fixture();expect(await f.engine.start('stream','owner',{candidate:true})).toBe(true);
   expect(f.deps.getUserMedia).toHaveBeenCalledWith({audio:{mandatory:{chromeMediaSource:'tab',chromeMediaSourceId:'stream'}}});

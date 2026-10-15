@@ -1,6 +1,6 @@
 import { createCaptureEngine } from './capture-engine.js';
 import { beatTelemetry } from './beat-telemetry.js';
-import { privateBeatCandidate } from './beat-candidate.js';
+import { privateBeatCandidate, privatePercussionDiagnostics } from './beat-candidate.js';
 const telemetry = beatTelemetry.at('offscreen');
 
 const send = (message) => { telemetry.mark('EVENT_SENT', message.telemetry); void chrome.runtime.sendMessage({ target: 'beat-worker', ...message }).catch(() => { telemetry.mark('EVENT_DROPPED', message.telemetry, { reason: 'transport' }); }); };
@@ -17,6 +17,7 @@ const engine = createCaptureEngine({
 });
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (sender.id !== chrome.runtime.id || sender.tab || message?.target !== 'beat-offscreen') return false;
+  if(privateBeatCandidate&&privatePercussionDiagnostics&&message.kind==='percussion-diagnostics') {respond(engine.percussionDiagnostics||{});return false;}
   if(privateBeatCandidate&&message.kind==='diagnostics') {respond({health:engine.health,telemetry:beatTelemetry.snapshot()});return false;}
   if (message.kind === 'start' && typeof message.streamId === 'string') {
     beatTelemetry.enable(message.telemetryEnabled === true);

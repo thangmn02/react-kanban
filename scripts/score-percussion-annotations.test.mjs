@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { scoreAnnotations } from './score-percussion-annotations.mjs';
+import { scoreAnnotations, temporalMatch } from './score-percussion-annotations.mjs';
 
 const prediction = {
   input: 'excerpt', duration: 10,
@@ -15,6 +15,14 @@ const verifiedReference = () => ({input:'excerpt',start:0,end:10,origin:'human',
   rows:{kick:[1.02],snare:[],hat:[]}});
 
 describe('independent percussion reference scoring', () => {
+  it('does not credit one prediction twice for rapid controlled pairs',()=>{
+    for(const interval of [.020,.030]){
+      const tolerance=interval/4;
+      assert.deepEqual([temporalMatch([1,1+interval],[1],tolerance).tp,temporalMatch([1,1+interval],[1],tolerance).fn],[1,1]);
+      assert.equal(temporalMatch([1,1+interval],[1+interval/2],tolerance).tp,0);
+      assert.equal(temporalMatch([1,1+interval],[1,1+interval],tolerance).tp,2);
+    }
+  });
   it('does not treat old wrong-flash markers as complete onset references', () => {
     const markers = [{ input: 'excerpt', start: 0, end: 10, origin: 'human', verified: true,
       rows: { kick: [1], snare: [], hat: [2] } }];

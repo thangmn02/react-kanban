@@ -6,7 +6,10 @@ import { deflateSync } from 'node:zlib';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const extension = join(root, 'extensions', 'kanban-music');
 const privateCandidate = process.argv.includes('--private');
-const output = privateCandidate ? join(root,'scratch','browser-first-candidate') : join(root, 'public', 'downloads');
+const xoCandidate=process.argv.find(argument=>argument.startsWith('--xo='))?.slice(5);
+if(xoCandidate&&(!privateCandidate||!['A','B'].includes(xoCandidate)))throw Error('--xo=A or --xo=B requires --private');
+const output = xoCandidate?join(root,'scratch','xo-percussion-recovery','candidate-'+xoCandidate)
+  :privateCandidate ? join(root,'scratch','browser-first-candidate') : join(root, 'public', 'downloads');
 
 // Rebuild release resources; the explicit inventory excludes private/retired
 // models without deleting an existing developer's optional inference assets.
@@ -87,11 +90,23 @@ const names = ['manifest.json', 'background.js', 'widget-bridge.js', 'sites.js',
 names.push('companion-update.js', 'spotify-player.js');
 names.push('beat-mode.js','beat-candidate.js');
 const files = await Promise.all(names.map(async (name) => ({ name, bytes: await readFile(join(extension, name)) })));
+function replaceExactlyOnce(source, before, after) {
+  if (source.split(before).length !== 2) throw new Error(`Expected one package sentinel: ${before}`);
+  return source.replace(before, after);
+}
 if(privateCandidate) {
   const candidate=files.find(file=>file.name==='beat-candidate.js');
-  candidate.bytes=Buffer.from(candidate.bytes.toString().replace('privateBeatCandidate = false','privateBeatCandidate = true'));
+  let candidateSource=replaceExactlyOnce(candidate.bytes.toString(),'privateBeatCandidate = false','privateBeatCandidate = true');
+  if(xoCandidate)for(const [before,after] of [
+    ['privatePercussionDiagnostics = false','privatePercussionDiagnostics = true'],
+    ["privatePercussionClassifier = 'onset-guided'",`privatePercussionClassifier = '${xoCandidate==='B'?'local-prominence':'onset-guided'}'`],
+    ['comparisonBufferMs:0','comparisonBufferMs:500'],
+    ["version:'1'",`version:'xo-${xoCandidate}'`],
+  ])candidateSource=replaceExactlyOnce(candidateSource,before,after);
+  candidate.bytes=Buffer.from(candidateSource);
   const manifest=files.find(file=>file.name==='manifest.json');
   const value=JSON.parse(manifest.bytes.toString());value.name+=' Private';value.version_name=value.version+' browser-first-v2 live preview private';
+  if(xoCandidate){value.name+=xoCandidate==='A'?' XO Baseline A':' XO Candidate B (NO-GO)';value.version_name=value.version+` xo-${xoCandidate} UNVERIFIED DETECTOR PREVIEW`;}
   manifest.bytes=Buffer.from(JSON.stringify(value,null,2)+'\n');
 }
 for (const name of ['percussion-capability.js', 'percussion-classifier.js', 'causal-percussion-classifier.js', 'percussion-features.js', 'percussion-worklet.js',
@@ -137,6 +152,45 @@ if(privateCandidate)await writeFile(join(output,'Private listening guide.html'),
 <li>Use pause, seek and source changes to investigate. A source/generation change revokes the experiment. Video, uncertain output, native capture and Spotify cannot enable this buffer.</li>
 <li>Report the approximate song time, row and observed failure. Provisional annotations remain investigation-only. Generic degraded visuals make no instrument claim.</li></ol>
 <p>No web deployment, extension-store update or installer publication is included. Model weights remain local evaluation assets.</p></body>`);
+if(xoCandidate){
+  const guide=`<!doctype html><html lang="en"><meta charset="utf-8"><title>XO private A/B listening</title>
+  <body style="max-width:900px;margin:40px auto;padding:20px;background:#18181c;color:#eee;font:18px/1.6 system-ui">
+  <h1>UNVERIFIED DETECTOR PREVIEW</h1><p><b>Baseline A / Candidate B — B is NO-GO for adoption.</b>
+  Controlled 50 ms Hats improve, but Snare-only false Hats increase. Natural accuracy and physical synchronization remain unverified.</p>
+  <p>Use Chrome or Edge on this computer. Enable only one Kora Music Companion extension at a time and keep one grid open.</p>
+  <ol><li>Open <code>edge://extensions</code> or <code>chrome://extensions</code>, disable the current Companion and the other comparison version,
+  enable Developer mode, then Load unpacked from <code>scratch/xo-percussion-recovery/candidate-A/extension</code> or
+  <code>scratch/xo-percussion-recovery/candidate-B/extension</code> within this repository.
+  Verify the extension name says <b>XO Baseline A</b> or <b>XO Candidate B (NO-GO)</b>. Reload it after rebuilding.</li>
+  <li>The review server uses <a href="http://127.0.0.1:5173/">the private grid</a> and
+  <a href="http://127.0.0.1:5174/">the audio-only source tab</a>. If they refuse connection, start
+  <code>node scripts/verify-private-companion.mjs --serve</code> in the repository and keep the terminal open. Reuse an existing server on these ports.</li>
+  <li>Choose <code>Lil Uzi Vert - XO Tour Llif3 (Official Lyric Video).mp3</code> from Downloads in the audio-only tab.
+  SHA-256: <code>98f15c28fc0a4641c358a9f2e728cb66f83ce74e4ebb21828a7961dfcb46ea05</code>.
+  Use the full original file, starting at zero, playback rate 1. Keep the same device, volume and browser for both runs.</li>
+  <li>Play the source, then click Companion's toolbar icon on that source tab. Select <b>Authorized audio-only review</b> in the grid.
+  Listen to the captured output. Let calibration collect enough samples, then use grid Pause before song second 45.</li>
+  <li>Open Private candidate and check all four controls: permission to use this audio; captured output audible with no echo/second playback;
+  acceptance of intentional delay; <b>Show unverified instrument predictions during buffered playback</b>.
+  Only confirm statements that are true for your session. Click <b>Enable calibrated 500 ms delay</b> while paused.
+  If disabled, follow its exact reason; incomplete/out-of-budget calibration requires more playback and another pause.</li>
+  <li>Verify <b>experimental-buffered</b>, intentional delay <b>500 ms</b>, correct A/B label and enabled instrument preview.
+  Click Play and watch Kick, Snare/Clap and Hi-hat/Cymbal during <b>45–57 seconds</b>.
+  Keep the grid visible. Do not seek after enabling; seeking/source/generation changes revoke preview.</li>
+  <li>Pause, disable A, enable B (or reverse), reload both local pages and repeat from zero using the same source/settings.
+  Do not run both extensions together. Switch back to A or the prior private package afterward; B is diagnostic only.</li></ol>
+  <p>This audio-only comparison does not authorize delaying synchronized video. Spotify and existing video/output guards remain in force.
+  For the previously implemented zero-delay platform preview, use its separate Live preview controls; it is not this matched-buffer comparison.</p>
+  <h2>Listening feedback</h2><ol><li>Are Snare/Clap hits less frequently missed?</li><li>Are repeated Hats more consistently represented?</li>
+  <li>Do audibly distinct attacks appear separately?</li><li>Are there more false Hat flashes?</li><li>Has Kick become worse?</li>
+  <li>Does playback sound normal, without echo, pops or visible timing drift?</li></ol>
+  <p>Include approximate song times and uncertain instrument identities. These observations remain provisional-human-reference, never official precision/recall.</p>
+  <p>Trace mechanism in both builds: grid <code>window.candidate.telemetry.records</code>; privileged extension diagnostic message
+  <code>{target:'beat-offscreen',kind:'percussion-diagnostics'}</code>. Generated acoustic fixtures and evidence stay in local scratch storage.
+  No publication or deployment is included.</p></body></html>`;
+  await writeFile(join(output,'Private listening guide.html'),guide);
+  await writeFile(join(root,'scratch','xo-percussion-recovery','ab-listening-guide.html'),guide);
+}
 await writeFile(join(bundledCompanion, 'package-files.json'), JSON.stringify([
   ...files.map(({ name }) => `extension/${name}`), 'Install Music Companion.html',
 ], null, 2) + '\n');
