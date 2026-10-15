@@ -36,6 +36,7 @@ async function summarize(channel) {
     maxQueueDepth:Math.max(0,...samples.map(sample=>sample.offscreen?.health?.queuedEvents||0),...all.filter(r=>r.stage==='WORKER_BATCH').map(r=>r.queueDepth||0)),
     appHeapBytes:stats(samples.map(sample=>sample.heap)),workerBatchMs:stats(all.filter(r=>r.stage==='WORKER_BATCH').map(r=>r.durationMs)),
     softwareDomTargetErrorMs:stats(rendered),softwareDomAbsoluteTargetErrorMs:stats(rendered.map(Math.abs)),
+    sampledUniqueDomEventsOver50Ms:rendered.filter(value=>Math.abs(value)>50).length,
     softwareReceiptToDomMs:stats(receiptToDom),sampledOffscreenToAppIpcMs:stats(ipc),
     observedPlaybackWallDriftMs:stats(samples.map(sample=>Math.abs((sample.playbackTime-baseline)*1000-(sample.elapsedMs-wall)))),
     browserCpuSeconds:last?.cpuSeconds??null,averageLogicalCorePercent:last?.elapsedMs?last.cpuSeconds/(last.elapsedMs/1000)*100:null,

@@ -4,12 +4,14 @@ import {resolve,extname,sep} from 'node:path';
 import {createServer} from 'node:http';
 import {build} from 'vite';
 import {chromium} from '@playwright/test';
+import {createHash} from 'node:crypto';
 const root=process.cwd(),folder=resolve(root,'scratch/browser-first-candidate'),built=resolve(folder,'listening');
 const channel=process.env.KORA_CANDIDATE_BROWSER||'chrome';
 assert(['chrome','msedge'].includes(channel));
 const duration=Number(process.env.KORA_CANDIDATE_SECONDS||90),serve=process.argv.includes('--serve');
 const reuseServer=process.env.KORA_CANDIDATE_REUSE_SERVER==='1';
 const lifecycle=process.env.KORA_CANDIDATE_LIFECYCLE==='1';
+const music=process.env.KORA_CANDIDATE_MUSIC==='1';
 assert(Number.isFinite(duration)&&duration>=0&&duration<=1900);
 await mkdir(folder,{recursive:true});
 await writeFile(resolve(folder,'index.html'),'<html><head><meta charset="utf-8"><title>Private Beat Grid</title></head><body style="margin:0"><div id="root"></div><script type="module" src="../../scripts/browser-beat-candidate.tsx"></script></body></html>');
@@ -58,7 +60,7 @@ let context,app;
 let interrupted=false;
 process.once('SIGINT',()=>{interrupted=true;});process.once('SIGTERM',()=>{interrupted=true;});
 const result={channel,startedAt:new Date().toISOString(),physicalVerified:false,listeningAccepted:false,steps:[],samples:[],errors:[]};
-const save=()=>writeFile(resolve(folder,`real-${channel}${lifecycle?'-lifecycle':''}.json`),JSON.stringify(result,null,2));
+const save=()=>writeFile(resolve(folder,`real-${channel}${lifecycle?'-lifecycle':music?'-music':''}.json`),JSON.stringify(result,null,2));
 try {
   if(serve)await new Promise(resolve=>{process.once('SIGINT',resolve);process.once('SIGTERM',resolve);});
   else {
@@ -119,6 +121,29 @@ try {
     result.steps.push({stage:'pause-flush',at:new Date().toISOString()});await sourcePage.locator('audio').evaluate(audio=>audio.pause());
     await app.waitForFunction(()=>window.candidate.selected.paused);
     result.finalStatus=await app.evaluate(()=>window.candidate.selected.syncState);
+    if(music) {
+      const benchmark=resolve(root,'scratch/whiplash-benchmark'),manifest=JSON.parse(await readFile(resolve(benchmark,'manifest.json')));
+      result.music=[];
+      for(const fixture of manifest.excerpts) {
+        const file=resolve(benchmark,fixture.file),bytes=await readFile(file);
+        assert.equal(createHash('sha256').update(bytes).digest('hex'),fixture.reviewWavSha256);
+        const previous=await app.evaluate(()=>window.candidate?.selected?.syncState?.captureId);
+        await sourcePage.locator('#file').setInputFiles(file);await sourcePage.locator('#play').click();
+        const observations=[],started=Date.now();
+        await app.waitForFunction(previous=>{const id=window.candidate?.selected?.syncState?.captureId;return id&&id!==previous;},previous,{timeout:8000});
+        while(Date.now()-started<(fixture.duration+.5)*1000) {
+          const state=await app.evaluate(()=>({status:window.candidate?.selected?.syncState,onsets:window.candidate?.beat?.onsets}));
+          const health=await worker.evaluate(()=>chrome.runtime.sendMessage({target:'beat-offscreen',kind:'diagnostics'})).catch(()=>undefined);
+          observations.push({elapsedMs:Date.now()-started,...state,health:health?.health});
+          assert(!state.status?.capability?.bufferMs,'Source change retained an old audio buffer');
+          assert(!Object.values(state.onsets||{}).some(count=>count>0),'Unqualified music emitted typed events');
+          await new Promise(resolve=>setTimeout(resolve,2000));
+        }
+        result.music.push({input:fixture.input,wavSha256:fixture.reviewWavSha256,referenceStatus:'provisional-human-reference',
+          officialMetricsCalculated:false,observations});await save();
+        console.log(JSON.stringify({channel,music:fixture.input,snapshots:observations.length,mode:'degraded'}));
+      }
+    }
     if(lifecycle) {
       const check=async(stage,operation)=>{
         try{await operation();result.steps.push({stage,ok:true,status:await app.evaluate(()=>window.candidate?.selected?.syncState)});}
@@ -129,6 +154,27 @@ try {
       await check('pause-resume',async()=>{
         await sourcePage.locator('audio').evaluate(audio=>audio.play());await capture();
         await app.waitForFunction(()=>window.candidate.selected.syncState?.capability?.mode==='experimental-buffered');
+      });
+      const reenable=async()=>{
+        await sourcePage.locator('audio').first().evaluate(audio=>audio.pause());
+        await app.waitForFunction(()=>window.candidate.selected.paused&&window.candidate.selected.syncState?.capability?.bufferEligible);
+        await app.evaluate(async()=>{const session=window.candidate.selected;await window.configureExperimentalSynchronization(session.id,
+          {enabled:true,captureId:session.syncState.captureId,generation:session.syncState.capability.generation,
+            intentionalDelay:true,authorizedAudio:true,outputHeard:true,preview:true});window.refreshCandidate();});
+        await sourcePage.locator('audio').first().evaluate(audio=>audio.play());
+      };
+      await check('frame-appearance-flushes-output',async()=>{
+        await sourcePage.evaluate(()=>{const frame=document.createElement('iframe');frame.id='unsafe-frame';frame.src='about:blank';document.body.append(frame);});
+        await app.waitForFunction(()=>window.candidate.selected.syncState?.capability?.noFrames===false&&window.candidate.selected.syncState.capability.bufferMs===0);
+        const diagnostic=await worker.evaluate(()=>chrome.runtime.sendMessage({target:'beat-offscreen',kind:'diagnostics'}));assert.equal(diagnostic.health.bufferMs,0);
+        await sourcePage.locator('#unsafe-frame').evaluate(frame=>frame.remove());
+      });
+      await check('second-media-flushes-output',async()=>{
+        await reenable();
+        await sourcePage.evaluate(()=>{const audio=document.createElement('audio');audio.id='second-media';audio.src='/endurance.wav?secondary=1';document.body.append(audio);return audio.play();});
+        await app.waitForFunction(()=>window.candidate.selected.syncState?.capability?.singleSource===false&&window.candidate.selected.syncState.capability.bufferMs===0);
+        const diagnostic=await worker.evaluate(()=>chrome.runtime.sendMessage({target:'beat-offscreen',kind:'diagnostics'}));assert.equal(diagnostic.health.bufferMs,0);
+        await sourcePage.locator('#second-media').evaluate(audio=>{audio.pause();audio.remove();});
       });
       await check('seek-revokes-buffer',async()=>{
         await sourcePage.locator('audio').evaluate(audio=>{audio.currentTime+=3;});
@@ -186,13 +232,16 @@ try {
       });
       await check('competing-app-ownership',async()=>{
         const competing=await context.newPage();await competing.goto('http://127.0.0.1:5173/?competing=1');
+        try {
         await competing.waitForFunction(()=>window.candidate?.selected?.syncState?.mode==='capture');
         const counts=[];
         for(let i=0;i<3;i++){
           counts.push(await worker.evaluate(async()=>(await chrome.tabCapture.getCapturedTabs()).filter(capture=>capture.status==='active').length));
           await new Promise(resolve=>setTimeout(resolve,1200));
         }
-        result.competingCaptureCounts=counts;assert(counts.every(count=>count<=1));await competing.close();await capture();
+        result.competingCaptureCounts=counts;assert(counts.every(count=>count<=1));
+        }finally{await competing.close();}
+        await capture();
       });
       await check('source-tab-switch',async()=>{
         const previous=await app.evaluate(()=>window.candidate.selected.id),second=await context.newPage();
@@ -219,9 +268,13 @@ try {
         await video.waitForFunction(()=>{const media=document.querySelector('video');return media&&!media.paused&&media.currentTime>.2&&media.readyState>=3;},null,{timeout:15000});
         await app.waitForFunction(()=>{const c=window.candidate;return c?.selected?.source?.endsWith('youtube.com')
           &&c.beat.sessionId===c.selected.id&&c.beat.eventPath==='degraded'&&c.selected.syncState?.capability?.clockHealthy;},null,{timeout:15000});
+        const target=(await cdp.send('Target.getTargets',{filter:[{type:'tab'}]})).targetInfos.find(target=>target.url.startsWith('https://www.youtube.com/watch'));
+        await video.bringToFront();await cdp.send('Extensions.triggerAction',{id,targetId:target.targetId});
+        await capture();await new Promise(resolve=>setTimeout(resolve,2000));
         const state=await app.evaluate(()=>window.candidate.selected.syncState.capability);
         assert.equal(state.bufferMs,0);assert.equal(state.allowTypedPreview,false);assert.equal(state.allowSemantic,false);
-        result.youtube={media:await video.locator('video').first().evaluate(media=>({playing:!media.paused,currentTime:media.currentTime,muted:media.muted,volume:media.volume,readyState:media.readyState})),capability:state};
+        result.youtube={actualCapture:true,media:await video.locator('video').first().evaluate(media=>({playing:!media.paused,currentTime:media.currentTime,muted:media.muted,volume:media.volume,readyState:media.readyState})),capability:state,
+          captureDiagnostics:await worker.evaluate(()=>chrome.runtime.sendMessage({target:'beat-offscreen',kind:'diagnostics'}))};
         await video.close();
       });
     }

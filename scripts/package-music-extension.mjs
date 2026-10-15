@@ -128,6 +128,7 @@ await writeFile(join(bundledCompanion, 'Install Music Companion.html'), setup.re
 if(privateCandidate)await writeFile(join(output,'Private listening guide.html'),`<!doctype html><meta charset="utf-8"><title>Private Beat Grid candidate</title>
 <body style="max-width:850px;margin:50px auto;font:18px/1.6 system-ui"><h1>Private Beat Grid candidate</h1>
 <p>Local experiment. Accuracy, model release rights, physical synchronization and user listening acceptance remain unverified. Do not publish this package.</p>
+<p>Use one Kora Music grid owner in this browser while testing. Close other Music grids; simultaneous ownership is not qualified.</p>
 <ol><li>In Chrome or Edge, open the Extensions page, enable developer mode, choose Load unpacked and select the adjacent <b>extension</b> folder. Check version ${manifest.version}, name Kora Music Companion Private.</li>
 <li>In the repository, run <code>node scripts/prepare-beat-corpus.mjs</code> then <code>node scripts/verify-private-companion.mjs --serve</code>. Keep that terminal open; Ctrl+C stops the local server.</li>
 <li>Open <a href="http://127.0.0.1:5173">the private grid</a> and <a href="http://127.0.0.1:5174">the audio-only review tab</a>. Choose authorized local audio, press Play, and click Companion's toolbar icon on that source tab.</li>
