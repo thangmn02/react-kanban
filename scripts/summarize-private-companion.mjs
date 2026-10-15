@@ -43,6 +43,7 @@ async function summarize(channel) {
     finalCaptureHealth:last?.offscreen?.health,finalTraceCounters:last?.telemetry?.counts,
     sampledDropRecords:drops,uniqueSampledTraceIds:ids.size,
     limitations:['Bounded periodic trace windows are sampled, not a complete musical event ledger.',
+      'The earliest retained render record for an ID may be later than its first visible flash.',
       'DOM timestamps and elapsed-clock drift do not measure speaker-to-pixel synchronization.',
       'No sensor validates output glitches or echo; user listening acceptance is pending.']};
 }
