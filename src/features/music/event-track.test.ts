@@ -9,6 +9,14 @@ it('rejects mismatched assets, versions and media durations without trusting nam
   expect(parseManifest(manifest, { ...asset, id: 'other-video' })).toBeUndefined();
   expect(parseManifest(manifest, asset, 30)).toBeUndefined();
 });
+it('preserves independently reviewed provenance only when bound to the manifest revision',()=>{
+  const verification={status:'independently-verified' as const,sourceId:'recording',sourceVersion:'v1',
+    sourceSha256:'a'.repeat(64),annotationSha256:'b'.repeat(64),revision:manifest.revision};
+  expect(parseManifest({...manifest,verification},asset)?.verification).toEqual(verification);
+  expect(parseManifest({...manifest,verification:{...verification,revision:'stale'}},asset)).toBeUndefined();
+  expect(parseManifest({...manifest,verification:{...verification,annotationSha256:'unverified'}},asset)).toBeUndefined();
+  expect(parseManifest({...manifest,verification:{...verification,status:'model-generated'}},asset)).toBeUndefined();
+});
 it('bounds chunks and rejects unsorted, duplicate, out-of-range and overlapping lead events', () => {
   const note = { id: 'n', time: 30.25, row: 'melody', confidence: .8, duration: .2 };
   const chunk = { version: 1, revision: 'revision', index: 1, events: [note] };
