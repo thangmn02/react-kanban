@@ -1,5 +1,32 @@
 # Beat sync validation
 
+## Private XO detector comparison (2026-10-16)
+
+`node scripts/package-music-extension.mjs --private --xo=A` and `--xo=B`
+create isolated local packages under `scratch/xo-percussion-recovery/` with
+an explicit UNVERIFIED DETECTOR PREVIEW label. A retains the existing private
+peak picker; B alone enables Snare/Hat local-valley prominence. B is NO-GO for
+adoption because the controlled Snare-only false-Hat count increases.
+Neither option changes the normal package's detector defaults.
+
+Both comparison packages require the existing eligibility/calibration/consent
+checks and use the same intentional 500 ms audio-only delay. A measurement
+over the existing ceiling still blocks buffering. Video and Spotify guards
+remain effective. The generated `ab-listening-guide.html` gives exact source,
+installation and listening controls; it is local diagnostic material.
+
+The explicit comparison builds also expose bounded score/decision diagnostics
+through a same-extension offscreen message, with at most 1,800 frames and 512
+predictions. This is disabled in ordinary builds and contains no PCM. The
+actual-browser verifier checks classifier/version identity, preview mode,
+output delay and viewport-visible percussion within the selected passage.
+DOM visibility does not establish physical timing or auditory acceptance.
+
+See the [focused investigation report](../../plans/reports/engineering-261016-0215-xo-percussion-recovery.md)
+for acoustic controls, exact source identities, delivery losses and the
+BLOCKED independent natural-accuracy gate. Provisional human marks never
+qualify that gate.
+
 ## Companion 0.3.22 / Kora 0.1.29 — recovery and flash timing (2026-10-13)
 
 The normal product retains four rows and the existing learned percussion model,
