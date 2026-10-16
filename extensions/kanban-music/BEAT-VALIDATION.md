@@ -1,5 +1,28 @@
 # Beat sync validation
 
+## Private Hat playback discrepancy (2026-10-16)
+
+`node scripts/package-music-extension.mjs --private --hat=A` or `--hat=R`
+creates exactly the current comparison pair under `scratch/hat-playback-discrepancy/`.
+Both use the unchanged onset-guided detector, model, thresholds and eligible
+500 ms audio-only buffer. R is a private visualization experiment: a 40 ms Hat
+transient replaces the longer semantic envelope and underlying Hat onset fill.
+It does not create notes or repair missing learned predictions. Reduced motion
+uses sustained activity instead of rapid flashes. Prior detector B remains NO-GO.
+
+The private diagnostic endpoint additionally retains at most 400 feature blocks
+and exposes owned AudioContext/output timestamp samples. It is same-extension
+only, disabled in ordinary builds, bounded in memory and contains no PCM.
+Source/capture feature fitting and captured-input model replay distinguish
+input phase/context differences from downstream event loss. Renderer-only
+generated events are explicitly excluded from recognition evidence.
+
+The generated `ar-listening-guide.html` gives exact source/control steps.
+The [discrepancy report](../../plans/reports/engineering-261016-0447-hat-playback-discrepancy.md)
+keeps recognition, CPU-load robustness, perceptual acceptance and physical
+synchronization gates separate. A bounded load can expire/reacquire capture
+and revoke typed buffering; no indefinite delay or qualification is implied.
+
 ## Private XO detector comparison (2026-10-16)
 
 `node scripts/package-music-extension.mjs --private --xo=A` and `--xo=B`
