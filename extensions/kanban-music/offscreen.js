@@ -18,6 +18,7 @@ const engine = createCaptureEngine({
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (sender.id !== chrome.runtime.id || sender.tab || message?.target !== 'beat-offscreen') return false;
   if(privateBeatCandidate&&privatePercussionDiagnostics&&message.kind==='percussion-diagnostics') {respond(engine.percussionDiagnostics||{});return false;}
+  if(privateBeatCandidate&&privatePercussionDiagnostics&&message.kind==='percussion-clock') {respond(engine.percussionClock||{});return false;}
   if(privateBeatCandidate&&message.kind==='diagnostics') {respond({health:engine.health,telemetry:beatTelemetry.snapshot()});return false;}
   if (message.kind === 'start' && typeof message.streamId === 'string') {
     beatTelemetry.enable(message.telemetryEnabled === true);

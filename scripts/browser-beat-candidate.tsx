@@ -7,6 +7,7 @@ import ExperimentalBeatControl from '../src/features/music/experimental-beat-con
 import {beatTelemetry} from '../extensions/kanban-music/beat-telemetry.js';
 import '../src/components/focus/floatingFocus.css';
 import './browser-beat-candidate.css';
+import './browser-hat-transient.css';
 beatTelemetry.enable();
 const options={privateCandidate:true,demand:false,capturedInput:false,capabilities:{tier:'tab-capture' as const,captureClock:'output-clock-capable' as const}};
 export function Candidate() {
@@ -24,9 +25,11 @@ export function Candidate() {
     Object.assign(window,{candidate:{selected,beat,error,telemetry:beatTelemetry.snapshot()},
       configureExperimentalSynchronization,selectCandidate:setId,refreshCandidate:refresh});
   },[selected,beat,error,refresh]);
-  return <main className="private-beat-candidate">
+  return <main className={`private-beat-candidate ${capability?.detectorVersion==='hat-R'?'hat-transient-preview':''}`} data-visual-experiment={capability?.detectorVersion==='hat-R'?'hat-transient-40ms':'baseline-150ms'}>
     <h1>Private Beat Grid listening candidate</h1><p>Experimental only. Model accuracy and physical synchronization remain unverified. No cloud analysis.</p>
     {capability?.detectorVersion.startsWith('xo-')&&<p><strong>UNVERIFIED DETECTOR PREVIEW · {capability.detectorVersion==='xo-A'?'Baseline A':'Candidate B · NO-GO for adoption'}</strong></p>}
+    {capability?.detectorVersion.startsWith('hat-')&&<p><strong>UNVERIFIED DETECTOR PREVIEW · {capability.detectorVersion==='hat-A'?'Baseline A · existing visuals':'Recovery R · Hat visualization only; detector unchanged'}</strong></p>}
+    {capability?.detectorVersion==='hat-R'&&<p>Hat flashes use a shorter transient. Dense 20–30 ms activity may still fuse. Reduced motion shows sustained activity rather than separate flashes.</p>}
     <p role="status">{error||`${sessions.length} source(s) · ${selected&&!captured?'capture not enabled':beat.eventPath||'waiting'}`}</p>
     <p>Use Chrome or Edge with Kora Music Companion Private. Play audio in the source tab, then click Companion’s toolbar icon on that tab to enable capture.</p>
     <select aria-label="Source" value={selected?.id||''} onChange={event=>setId(event.target.value)}>

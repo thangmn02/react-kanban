@@ -1,0 +1,18 @@
+/* Explicit private visual prototype. Recognition and source clocks are unchanged. */
+.hat-transient-preview [data-channel='hat'] .beat-square.onset {
+  animation: none;
+  background: var(--ci);
+  transform: none;
+  box-shadow: none;
+}
+.hat-transient-preview [data-channel='hat'] .shape-beat-flash { display: none; }
+.hat-transient-preview [data-channel='hat'] .semantic-beat-flash {
+  --semantic-flash-duration: 40ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hat-transient-preview [data-channel='hat'] .semantic-beat-flash {
+    animation: none;
+    transform: none;
+    opacity: .35;
+  }
+}

@@ -52,6 +52,17 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
     return {samples:sorted.length,p95Ms:sorted[Math.ceil(sorted.length*.95)-1]??null,
       p99Ms:sorted[Math.ceil(sorted.length*.99)-1]??null};
   };
+  const diagnosticClock=state=>{
+    if(!state?.candidate||!privatePercussionDiagnostics)return undefined;
+    const context=state.context;let outputTimestamp;
+    try{outputTimestamp=context.getOutputTimestamp?.();}catch{/* Unsupported output clock. */}
+    const lastFrame=state.diagnosticFrames.at(-1);
+    return {sampledAt:Date.now(),performanceNow:performance.now(),timeOrigin:performance.timeOrigin,
+      currentAudioTime:context.currentTime,contextState:context.state,baseLatency:context.baseLatency,outputLatency:context.outputLatency,
+      outputTimestamp,bufferMs:state.bufferMs,lastModelAudioTime:lastFrame?.audioTime,
+      analysisLagMs:lastFrame?(context.currentTime-lastFrame.audioTime)*1000:null,
+      lastInferenceMs:lastFrame?lastFrame.inferenceEndedAt-lastFrame.inferenceStartedAt:null};
+  };
 
   function stop(reason = 'stopped') {
     generation++;
@@ -92,7 +103,7 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
     try {
       const state = { captureId, leaseUntil: now() + 6000, lastAudio: now(), interval: undefined,
         candidate:privateBeatCandidate&&requestOptions.candidate===true,bufferMs:0,latencies:[],typedPreview:false,
-        acceptAfter:Infinity,droppedSemanticEvents:0,diagnosticFrames:[],diagnosticPredictions:[],diagnosticEvicted:0 };
+        acceptAfter:Infinity,droppedSemanticEvents:0,diagnosticFrames:[],diagnosticPredictions:[],diagnosticEvicted:0,diagnosticFeatures:[] };
       active = state;
       if(state.candidate&&requestOptions.sourceProvider==='spotify')throw new Error('Provider analysis blocked');
       telemetry.record('CAPTURE_START', undefined, { captureId });
@@ -190,6 +201,10 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
           ...(state.candidate?{classifier:privatePercussionClassifier}:{}),
           ...(state.candidate&&privatePercussionDiagnostics?{onDiagnostic(result){
             if(active!==state||state.percussionOwner!==owner)return;
+            if(result.kind==='features'){
+              state.diagnosticFeatures.push(result);
+              if(state.diagnosticFeatures.length>400)state.diagnosticFeatures.shift();
+            }
             for(const frame of result.diagnostics||[]){
               state.diagnosticFrames.push({...frame,receivedAudioTime:result.receivedAudioTime,
                 receivedAt:result.mainThreadReceivedAt,inferenceStartedAt:result.inferenceStartedAt,inferenceEndedAt:result.inferenceEndedAt,
@@ -318,9 +333,13 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
     get health(){return active?{context:active.context?.state,bufferMs:active.bufferMs,
       queuedEvents:active.events.length,droppedSemanticEvents:active.droppedSemanticEvents,
       dropReason:active.typedPreview?'none':'detector-unqualified',workerFailures:active.percussionFailures||0}:undefined;},
-    get percussionDiagnostics(){return active?.candidate&&privatePercussionDiagnostics?{captureId:active.captureId,
-      classifier:privatePercussionClassifier,frames:active.diagnosticFrames.slice(),predictions:active.diagnosticPredictions.slice(),
-      evictedFrames:active.diagnosticEvicted,limitFrames:1800}:undefined;},
+    get percussionDiagnostics(){
+      if(!active?.candidate||!privatePercussionDiagnostics)return undefined;
+      return {captureId:active.captureId,classifier:privatePercussionClassifier,frames:active.diagnosticFrames.slice(),
+        predictions:active.diagnosticPredictions.slice(),featureBlocks:active.diagnosticFeatures.slice(),
+        clock:diagnosticClock(active),evictedFrames:active.diagnosticEvicted,limitFrames:1800,limitFeatureBlocks:400};
+    },
+    get percussionClock(){return diagnosticClock(active);},
     configureSynchronization(captureId,settings){
       const state=active;
       if(!state?.candidate||state.captureId!==captureId||monitorOnly

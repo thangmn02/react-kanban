@@ -21,14 +21,18 @@ function fixture() {
 it('keeps diagnostic recording off by default and bounds explicit private recording',async()=>{
   const plain=fixture();await plain.engine.start('stream','owner',{candidate:true});
   expect(plain.model().onDiagnostic).toBeUndefined();expect(plain.engine.percussionDiagnostics).toBeUndefined();
+  expect(plain.engine.percussionClock).toBeUndefined();
   plain.engine.stop();await vi.advanceTimersByTimeAsync(20);
   flags.privatePercussionDiagnostics=true;
   const traced=fixture();await traced.engine.start('stream','owner',{candidate:true});
   const callback=traced.model().onDiagnostic;
   callback({diagnostics:Array.from({length:1805},(_,i)=>({audioTime:i/100,scores:[0,0,0,0,0]})),receivedAudioTime:20});
+  for(let i=0;i<405;i++)callback({kind:'features',times:[i/100],data:[0]});
   for(let i=0;i<520;i++)traced.event();
   const result=traced.engine.percussionDiagnostics;
   expect(result.frames).toHaveLength(1800);expect(result.evictedFrames).toBe(5);
+  expect(result.featureBlocks).toHaveLength(400);expect(result.featureBlocks[0].times).toEqual([.05]);
+  expect(traced.engine.percussionClock).toMatchObject({contextState:'running',currentAudioTime:1,bufferMs:0});
   expect(result.predictions).toHaveLength(512);expect(result.predictions[0].rejected).toBe('typed-preview-disabled');
   traced.engine.stop();callback({diagnostics:[{audioTime:99}]});
   expect(traced.engine.percussionDiagnostics).toBeUndefined();await vi.advanceTimersByTimeAsync(20);

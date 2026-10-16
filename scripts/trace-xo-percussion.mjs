@@ -8,18 +8,19 @@ import {resolve,sep,extname} from 'node:path';
 import {chromium} from '@playwright/test';
 import {temporalMatch} from './score-percussion-annotations.mjs';
 
-const root=process.cwd(),folder=resolve(root,'scratch/xo-percussion-recovery');
+const root=process.cwd(),folder=resolve(root,process.env.KORA_XO_BENCHMARK_DIR||'scratch/xo-percussion-recovery');
 const manifest=JSON.parse(await readFile(resolve(folder,'manifest.json'),'utf8'));
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 const config=JSON.parse(await readFile(resolve(root,'extensions/kanban-music/generated/percussion/percussion.json'),'utf8'));
 assert.equal(digest(await readFile(resolve(root,'extensions/kanban-music/generated/percussion/percussion.onnx'))),config.sha256);
 const ids=(process.env.KORA_XO_INPUTS||manifest.fixtures.map(f=>f.id).join(',')).split(',');
+const featuresOnly=process.env.KORA_XO_FEATURES_ONLY==='1';
 await mkdir(resolve(folder,'baseline-offline'),{recursive:true});
 const server=createServer(async(request,response)=>{
   try{
     const pathname=decodeURIComponent(new URL(request.url,'http://127.0.0.1').pathname);let file;
     if(pathname==='/'){response.setHeader('Content-Type','text/html');response.end('<!doctype html><title>Private XO model trace</title>');return;}
-    if(pathname.startsWith('/pcm/')){const fixture=manifest.fixtures.find(f=>f.id===pathname.slice(5));assert(fixture);file=resolve(folder,fixture.pcm);}
+    if(pathname.startsWith('/pcm/')){const fixture=manifest.fixtures.find(f=>f.id===pathname.slice(5));assert(fixture);file=['audio','features'].includes(fixture.inputEncoding)?resolve(fixture.sourcePath):resolve(folder,fixture.pcm);}
     else{file=resolve(root,'.'+pathname);assert(file.startsWith(resolve(root,'extensions/kanban-music')+sep));}
     response.setHeader('Content-Type',({'.js':'text/javascript','.mjs':'text/javascript','.json':'application/json','.wasm':'application/wasm'})[extname(file)]||'application/octet-stream');
     response.end(await readFile(file));
@@ -39,17 +40,28 @@ try{
     const config=await (await fetch(base+'generated/percussion/percussion.json')).json();
     const session=await ort.InferenceSession.create(base+'generated/percussion/percussion.onnx',{executionProviders:['wasm']});
     const {PercussionFeatures}=await import(base+'percussion-features.js'),{PercussionClassifier}=await import(base+'percussion-classifier.js');
-    window.tracePcm=async id=>{
-      const pcm=new Float32Array(await (await fetch('/pcm/'+id)).arrayBuffer());
+    window.tracePcm=async fixture=>{
+      const id=fixture.id,bytes=await (await fetch('/pcm/'+id)).arrayBuffer();let pcm,decodedPcmSha256;
+      if(fixture.inputEncoding==='audio'){
+        const context=new AudioContext({sampleRate:config.sampleRate}),audio=await context.decodeAudioData(bytes.slice(0));
+        const samples=Math.min(audio.length,Math.round(fixture.duration*config.sampleRate));pcm=new Float32Array(samples*2);
+        const left=audio.getChannelData(0),right=audio.getChannelData(Math.min(1,audio.numberOfChannels-1));
+        for(let i=0;i<samples;i++){pcm[i*2]=left[i];pcm[i*2+1]=right[i];}
+        decodedPcmSha256=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',pcm.buffer)),b=>b.toString(16).padStart(2,'0')).join('');
+        await context.close();
+      }else if(fixture.inputEncoding!=='features')pcm=new Float32Array(bytes);
       const extractor=new PercussionFeatures(config),blocks=[],frames=[],activations=[],events=[],decisions=[],costs=[];
       const classifier=new PercussionClassifier(config.thresholds,{onsetGuided:true,diagnostics:true});
       const began=performance.now();
-      for(let offset=0;offset<pcm.length/2;offset+=128){
+      if(fixture.inputEncoding==='features')for(const block of JSON.parse(new TextDecoder().decode(bytes)).featureBlocks)
+        blocks.push({times:block.times,data:new Float32Array(block.data)});
+      for(let offset=0;pcm&&offset<pcm.length/2;offset+=128){
         const length=Math.min(128,pcm.length/2-offset),left=new Float32Array(length),right=new Float32Array(length);
         for(let i=0;i<length;i++){left[i]=pcm[(offset+i)*2];right[i]=pcm[(offset+i)*2+1];}
         extractor.push([left,right],offset/config.sampleRate,block=>blocks.push(block));
       }
       const featureMs=performance.now()-began;let count=0;
+      if(fixture.featuresOnly)return {id,decodedPcmSha256,featureMs,featureBlocks:blocks.map(b=>({times:b.times,data:Array.from(b.data)}))};
       for(const block of blocks)for(let i=0;i<block.times.length;i++){
         frames.push({data:block.data.slice(i*config.bins,(i+1)*config.bins),time:block.times[i]});
         if(frames.length>config.windowFrames)frames.shift();if(++count%config.stepFrames)continue;
@@ -66,15 +78,23 @@ try{
           decisions.push(...(decision.decisions||[]));
         }
       }
-      return {id,featureMs,inferenceMs:costs.reduce((sum,value)=>sum+value,0),inferenceCalls:costs.length,
+      return {id,decodedPcmSha256,featureMs,inferenceMs:costs.reduce((sum,value)=>sum+value,0),inferenceCalls:costs.length,
         inferenceMaxMs:Math.max(...costs),features:blocks.length*config.stepFrames,activations,events,decisions};
     };
   });
   const summary=[];
   for(const id of ids){
-    const fixture=manifest.fixtures.find(f=>f.id===id);assert(fixture);assert.equal(digest(await readFile(resolve(folder,fixture.pcm))),fixture.pcmSha256);
-    const result=await page.evaluate(id=>window.tracePcm(id),id);
+    const fixture=manifest.fixtures.find(f=>f.id===id);assert(fixture);
+    const encodedInput=['audio','features'].includes(fixture.inputEncoding);
+    const input=encodedInput?resolve(fixture.sourcePath):resolve(folder,fixture.pcm);
+    assert.equal(digest(await readFile(input)),encodedInput?fixture.sourceSha256:fixture.pcmSha256);
+    const result=await page.evaluate(fixture=>window.tracePcm(fixture),{...fixture,featuresOnly});
     result.sourceSha256=fixture.sourceSha256||null;result.pcmSha256=fixture.pcmSha256;result.modelSha256=config.sha256;
+    if(featuresOnly){
+      await mkdir(resolve(folder,'source-features'),{recursive:true});
+      await writeFile(resolve(folder,'source-features',id+'.json'),JSON.stringify(result));
+      console.log(JSON.stringify({id,featuresOnly:true,blocks:result.featureBlocks.length,decodedPcmSha256:result.decodedPcmSha256}));continue;
+    }
     const start=fixture.analysisStart||0,end=fixture.analysisEnd||fixture.duration;
     result.selectedEvents=result.events.filter(e=>e.audioTime>=start&&e.audioTime<end);
     const rows=Object.fromEntries(['kick','snare','hat'].map(row=>[row,result.selectedEvents.filter(e=>e.band===(row==='snare'?'clap':row)).length]));

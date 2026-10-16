@@ -8,7 +8,9 @@ const extension = join(root, 'extensions', 'kanban-music');
 const privateCandidate = process.argv.includes('--private');
 const xoCandidate=process.argv.find(argument=>argument.startsWith('--xo='))?.slice(5);
 if(xoCandidate&&(!privateCandidate||!['A','B'].includes(xoCandidate)))throw Error('--xo=A or --xo=B requires --private');
-const output = xoCandidate?join(root,'scratch','xo-percussion-recovery','candidate-'+xoCandidate)
+const hatCandidate=process.argv.find(argument=>argument.startsWith('--hat='))?.slice(6);
+if(hatCandidate&&(!privateCandidate||xoCandidate||!['A','R'].includes(hatCandidate)))throw Error('--hat=A or --hat=R requires --private and cannot combine with --xo');
+const output = hatCandidate?join(root,'scratch','hat-playback-discrepancy','candidate-'+hatCandidate):xoCandidate?join(root,'scratch','xo-percussion-recovery','candidate-'+xoCandidate)
   :privateCandidate ? join(root,'scratch','browser-first-candidate') : join(root, 'public', 'downloads');
 
 // Rebuild release resources; the explicit inventory excludes private/retired
@@ -97,16 +99,17 @@ function replaceExactlyOnce(source, before, after) {
 if(privateCandidate) {
   const candidate=files.find(file=>file.name==='beat-candidate.js');
   let candidateSource=replaceExactlyOnce(candidate.bytes.toString(),'privateBeatCandidate = false','privateBeatCandidate = true');
-  if(xoCandidate)for(const [before,after] of [
+  if(xoCandidate||hatCandidate)for(const [before,after] of [
     ['privatePercussionDiagnostics = false','privatePercussionDiagnostics = true'],
     ["privatePercussionClassifier = 'onset-guided'",`privatePercussionClassifier = '${xoCandidate==='B'?'local-prominence':'onset-guided'}'`],
     ['comparisonBufferMs:0','comparisonBufferMs:500'],
-    ["version:'1'",`version:'xo-${xoCandidate}'`],
+    ["version:'1'",`version:'${hatCandidate?'hat-'+hatCandidate:'xo-'+xoCandidate}'`],
   ])candidateSource=replaceExactlyOnce(candidateSource,before,after);
   candidate.bytes=Buffer.from(candidateSource);
   const manifest=files.find(file=>file.name==='manifest.json');
   const value=JSON.parse(manifest.bytes.toString());value.name+=' Private';value.version_name=value.version+' browser-first-v2 live preview private';
   if(xoCandidate){value.name+=xoCandidate==='A'?' XO Baseline A':' XO Candidate B (NO-GO)';value.version_name=value.version+` xo-${xoCandidate} UNVERIFIED DETECTOR PREVIEW`;}
+  if(hatCandidate){value.name+=hatCandidate==='A'?' Hat Baseline A':' Hat Visual Recovery R';value.version_name=value.version+` hat-${hatCandidate} UNVERIFIED DETECTOR PREVIEW`;}
   manifest.bytes=Buffer.from(JSON.stringify(value,null,2)+'\n');
 }
 for (const name of ['percussion-capability.js', 'percussion-classifier.js', 'causal-percussion-classifier.js', 'percussion-features.js', 'percussion-worklet.js',
@@ -152,6 +155,41 @@ if(privateCandidate)await writeFile(join(output,'Private listening guide.html'),
 <li>Use pause, seek and source changes to investigate. A source/generation change revokes the experiment. Video, uncertain output, native capture and Spotify cannot enable this buffer.</li>
 <li>Report the approximate song time, row and observed failure. Provisional annotations remain investigation-only. Generic degraded visuals make no instrument claim.</li></ol>
 <p>No web deployment, extension-store update or installer publication is included. Model weights remain local evaluation assets.</p></body>`);
+if(hatCandidate){
+ const guide=`<!doctype html><html lang="en"><meta charset="utf-8"><title>Hat playback A/R listening</title>
+ <body style="max-width:900px;margin:40px auto;padding:20px;background:#18181c;color:#eee;font:18px/1.6 system-ui">
+ <h1>UNVERIFIED DETECTOR PREVIEW — A / R</h1>
+ <p><b>A:</b> current baseline detector and visuals. <b>R:</b> the same detector with a 40 ms Hat visual transient.
+ R changes visualization only. It cannot recover a Hat/Snare that the model never predicts, and does not certify accurate or physically synchronized music detection.
+ Previous detector B remains rejected and disabled.</p>
+ <ol><li>In Chrome or Edge, open Extensions, disable all other Kora Music Companions, enable Developer mode and Load unpacked from
+ <code>scratch/hat-playback-discrepancy/candidate-A/extension</code> or <code>scratch/hat-playback-discrepancy/candidate-R/extension</code> in this repository.
+ Verify the name <b>Kora Music Companion Private Hat Baseline A</b> or <b>Hat Visual Recovery R</b>. Enable only one version and keep one grid open.</li>
+ <li>Use the existing local server, <code>node scripts/verify-private-companion.mjs --serve</code>, on fixed ports 5173/5174.
+ Reuse it if running. Open <a href="http://127.0.0.1:5173/">Private Grid</a> and <a href="http://127.0.0.1:5174/">authorized audio-only source</a> in the same browser.</li>
+ <li>Choose Downloads/<code>Lil Uzi Vert - XO Tour Llif3 (Official Lyric Video).mp3</code>.
+ SHA-256 <code>98f15c28fc0a4641c358a9f2e728cb66f83ce74e4ebb21828a7961dfcb46ea05</code>.
+ Start the original full file at zero, rate 1, using the same device/volume for A and R. Play and click Companion's toolbar icon on that source tab.</li>
+ <li>Select <b>Authorized audio-only review</b> in the grid. Listen to captured output, let calibration collect samples, and Pause before source second 45.</li>
+ <li>Open Private candidate. Confirm all four checks only if true: authorization; captured output audible with no echo/second playback;
+ intentional delay accepted; <b>Show unverified instrument predictions during buffered playback</b>.
+ Enable <b>calibrated 500 ms delay</b> while paused. Incomplete or over-budget calibration remains blocked.</li>
+ <li>Confirm the expected A/R heading, <b>experimental-buffered</b>, intentional delay <b>500 ms</b>, and enabled typed preview.
+ Resume through <b>45–57 seconds</b>, keeping the grid visible. Do not seek after enabling; source/generation changes revoke preview.
+ Keep heavy builds and other CPU-intensive work stopped during this clean comparison.</li>
+ <li>Pause, switch extensions, reload both local pages and repeat from zero with identical settings.
+ R only shortens the Hat flash and removes underlying Hat decorative fill that can obscure retriggers.
+ Twenty-to-thirty ms activity can still fuse; reduced motion intentionally shows sustained activity instead of rapid flashes.</li></ol>
+ <p>For the same passage, report which applies: several audible Hats but continuous brightness; audible Hat without a flash;
+ flash without a confidently audible Hat; flash late relative to sound; instrument identity uncertain.
+ An approximate moment is enough. No millisecond-complete labels are needed, and listening observations are not official onset-scoring ground truth.</p>
+ <p>Timing and recognition remain experimental. The bounded CPU test expired and reacquired capture, reset the output clock and revoked buffered typed preview.
+ Audio continuity during that transition is unverified. Pause and re-establish capture/calibration after degradation; this comparison does not qualify tracking under load.
+ Spotify and synchronized-video buffering restrictions remain unchanged. The goal of R is clearer representation of accepted activity, not more predicted notes.</p>
+ <p>No public release or deployment. The local evidence and technical report retain FAIL/BLOCKED gates.</p></body></html>`;
+ await writeFile(join(output,'Private listening guide.html'),guide);
+ await writeFile(join(root,'scratch','hat-playback-discrepancy','ar-listening-guide.html'),guide);
+}
 if(xoCandidate){
   const guide=`<!doctype html><html lang="en"><meta charset="utf-8"><title>XO private A/B listening</title>
   <body style="max-width:900px;margin:40px auto;padding:20px;background:#18181c;color:#eee;font:18px/1.6 system-ui">

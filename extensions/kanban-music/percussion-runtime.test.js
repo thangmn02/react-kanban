@@ -116,8 +116,12 @@ it('requests raw timing diagnostics only explicitly and keeps delivery alive whe
   expect(worker.postMessage.mock.calls[0][0].config.diagnostics).toBe(true);
   worker.onmessage({ data: { kind: 'ready' } });
   const runtime = await loading;
+  const features={times:[1],data:new Float32Array(84).fill(.5)};
+  f.nodes[0].port.onmessage({data:features});
+  expect(onDiagnostic).toHaveBeenCalledWith(expect.objectContaining({kind:'features',times:[1],data:Array(84).fill(.5)}));
+  expect(worker.postMessage).toHaveBeenLastCalledWith(features,[features.data.buffer]);
   const event = { band: 'hat', audioTime: 1, confidence: .8, classMargin: .3 };
   worker.onmessage({ data: { kind: 'result', events: [event], diagnostics: [], durationMs: 10, queueDepth: 0 } });
-  expect(onDiagnostic).toHaveBeenCalledOnce(); expect(onEvent).toHaveBeenCalledExactlyOnceWith(event);
+  expect(onDiagnostic).toHaveBeenCalledTimes(2); expect(onEvent).toHaveBeenCalledExactlyOnceWith(event);
   runtime.stop();
 });

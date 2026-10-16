@@ -4,20 +4,24 @@ import {createHash} from 'node:crypto';
 import {mkdir,mkdtemp,readFile,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {chromium} from '@playwright/test';
+import {installHatVisibilityObserver} from './hat-visibility-observer.js';
+import {spawn} from 'node:child_process';
 
-const root=process.cwd(),folder=resolve(root,'scratch/xo-percussion-recovery');
+const root=process.cwd(),comparison=process.env.KORA_XO_COMPARISON||'xo';assert(['xo','hat'].includes(comparison));
+const folder=resolve(root,process.env.KORA_XO_BENCHMARK_DIR||(comparison==='hat'?'scratch/hat-playback-discrepancy':'scratch/xo-percussion-recovery'));
 const manifest=JSON.parse(await readFile(resolve(folder,'manifest.json'),'utf8'));
-const variants=(process.env.KORA_XO_VARIANTS||'A,B').split(','),inputs=(process.env.KORA_XO_TRANSPORT_INPUTS||'xo').split(',');
+const variants=(process.env.KORA_XO_VARIANTS||(comparison==='hat'?'A,R':'A,B')).split(','),inputs=(process.env.KORA_XO_TRANSPORT_INPUTS||'xo').split(',');
+const loaded=process.env.KORA_XO_CPU_LOAD==='1';
 const channel=process.env.KORA_XO_BROWSER||'msedge';assert(['chrome','msedge'].includes(channel));
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
-const result={baselineRevision:'d5b28b1',sourceSha256:manifest.sourceSha256,outputConfiguration:{mode:'experimental-buffered',bufferMs:500},
+const result={baselineRevision:manifest.baselineRevision||'d5b28b1',comparison,sourceSha256:manifest.sourceSha256,outputConfiguration:{mode:'experimental-buffered',bufferMs:500},
   referenceStatus:'provisional-human-reference',officialNaturalMetricsCalculated:false,physicalVerified:false,results:[],errors:[]};
-const output=resolve(folder,`actual-${channel}-${inputs.join('-')}.json`);
+const output=resolve(folder,`actual-${channel}-${inputs.join('-')}${loaded?'-load':''}.json`);
 const transports=inputs.some(input=>input!=='xo')?JSON.parse(await readFile(resolve(folder,'transport-manifest.json'),'utf8')).fixtures:[];
 const save=()=>writeFile(output,JSON.stringify(result,null,2));
 console.log(JSON.stringify({pid:process.pid,command:'node scripts/verify-xo-companion.mjs',ports:[5173,5174],channel,variants,inputs}));
 for(const variant of variants)for(const input of inputs){
-  assert(['A','B'].includes(variant));let context,app;
+  assert((comparison==='hat'?['A','R']:['A','B']).includes(variant));let context,app,loadFinished;
   const run={variant,input,records:[],flashes:[],frames:[],predictions:[],samples:[]};
   result.results.push(run);
   try{
@@ -31,6 +35,9 @@ for(const variant of variants)for(const input of inputs){
     run.analysisStart=input==='xo'?45:transport.analysisStart;
     run.analysisEnd=input==='xo'?57:transport.analysisEnd;
     const extension=resolve(folder,'candidate-'+variant,'extension');
+    run.assetHashes={};for(const file of ['generated/percussion/percussion.onnx','percussion-features.js','percussion-classifier.js','beat-candidate.js'])
+      run.assetHashes[file]=hash(await readFile(resolve(extension,file)));
+    assert.equal(run.assetHashes['generated/percussion/percussion.onnx'],manifest.modelSha256);
     const profile=await mkdtemp(resolve(folder,`actual-${variant}-${input}-`));run.profile=profile;
     context=await chromium.launchPersistentContext(profile,{channel,headless:true,ignoreDefaultArgs:['--disable-extensions','--mute-audio'],
       args:['--enable-unsafe-extension-debugging','--no-first-run']});
@@ -38,6 +45,7 @@ for(const variant of variants)for(const input of inputs){
     const {id}=await cdp.send('Extensions.loadUnpacked',{path:extension});run.extensionId=id;
     const setup=await context.newPage();await setup.goto(`chrome-extension://${id}/setup.html`);
     run.manifest=await setup.evaluate(()=>chrome.runtime.getManifest());
+    run.packageSha256=hash(await readFile(resolve(folder,'candidate-'+variant,'kanban-music-companion.zip')));
     const source=await context.newPage();await source.goto('http://127.0.0.1:5174/');
     await source.locator('#file').setInputFiles(path);await source.locator('#play').click();
     app=await context.newPage();app.on('pageerror',error=>result.errors.push(error.message));
@@ -57,6 +65,7 @@ for(const variant of variants)for(const input of inputs){
     const worker=context.serviceWorkers().find(w=>w.url().endsWith('/background.js'));assert(worker);
     const before=await worker.evaluate(()=>chrome.runtime.sendMessage({target:'beat-offscreen',kind:'diagnostics'}));
     assert.equal(before.health.bufferMs,500);run.outputBefore=before.health;
+    if(comparison==='hat')await app.evaluate(installHatVisibilityObserver);
     await app.evaluate(()=>{
       window.xoFlashLog=[];window.xoOpacityLog=[];window.xoHatVisibilityLog=[];const seen=new Set();
       const observe=()=>{
@@ -83,17 +92,31 @@ for(const variant of variants)for(const input of inputs){
     await app.locator('.candidate-grid').scrollIntoViewIfNeeded();
     const processInfo=await cdp.send('SystemInfo.getProcessInfo');
     const cpuAt=processInfo.processInfo.reduce((sum,item)=>sum+item.cpuTime,0),wallAt=Date.now();
-    const records=new Map();let clock;
+    const records=new Map();let clock,loadTriggered=false;
     while(Date.now()-wallAt<100000){
       const observed=await app.evaluate(()=>({session:window.candidate.selected,beat:window.candidate.beat,records:window.candidate.telemetry.records}));
       clock=observed.session;
+      if(loaded&&!loadTriggered&&clock.currentTime>=47){
+        const browserPid=(await cdp.send('SystemInfo.getProcessInfo')).processInfo.find(p=>p.type==='browser')?.id;assert(browserPid);
+        run.load={sourceTime:clock.currentTime,requestedAt:Date.now(),durationMs:8000,busyMs:70,periodMs:85,target:'owned browser CPU budget'};
+        const helper=spawn('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-File',resolve(root,'scripts/hat-bounded-cpu-load.ps1'),
+          '-BrowserPid',String(browserPid),'-ProfilePath',profile],{windowsHide:true,stdio:['ignore','pipe','pipe']});
+        let stdout='',stderr='';helper.stdout.on('data',chunk=>{stdout+=chunk;});helper.stderr.on('data',chunk=>{stderr+=chunk;});
+        loadFinished=new Promise((done,fail)=>{helper.on('error',fail);helper.on('exit',code=>code===0?done(JSON.parse(stdout)):fail(Error('CPU load failed: '+stderr)));});
+        loadFinished.catch(()=>{});
+        loadTriggered=true;
+      }
       if(clock.currentTime>=run.analysisStart-3){
         const offscreen=await worker.evaluate(()=>chrome.runtime.sendMessage({target:'beat-offscreen',kind:'diagnostics'}));
+        const sourceClock=await source.locator('audio').evaluate(audio=>({sampledAt:Date.now(),performanceNow:performance.now(),timeOrigin:performance.timeOrigin,
+          currentTime:audio.currentTime,paused:audio.paused,playbackRate:audio.playbackRate,readyState:audio.readyState,ended:audio.ended}));
+        const outputClock=comparison==='hat'?await worker.evaluate(()=>chrome.runtime.sendMessage({target:'beat-offscreen',kind:'percussion-clock'})):undefined;
         for(const entry of [...observed.records,...(offscreen.telemetry?.records||[])]){
           const key=JSON.stringify(entry);records.set(key,entry);
         }
         run.samples.push({at:Date.now(),clock:{currentTime:clock.currentTime,sampledAt:clock.sampledAt,playing:clock.playing},
-          mode:clock.syncState?.capability?.mode,bufferMs:offscreen.health?.bufferMs,onsets:observed.beat.onsets});
+          mode:clock.syncState?.capability?.mode,bufferMs:offscreen.health?.bufferMs,onsets:observed.beat.onsets,sourceClock,outputClock,
+          generation:clock.generation??clock.syncState?.capability?.generation,visualExperiment:await app.locator('main').getAttribute('data-visual-experiment')});
       }
       if(clock.currentTime>=run.analysisEnd+1)break;
       await new Promise(done=>setTimeout(done,250));
@@ -102,8 +125,13 @@ for(const variant of variants)for(const input of inputs){
     const diagnostic=await worker.evaluate(()=>chrome.runtime.sendMessage({target:'beat-offscreen',kind:'percussion-diagnostics'}));
     assert(diagnostic.frames?.length,'Packaged classifier diagnostics unavailable');
     run.classifier=diagnostic.classifier;
-    assert.equal(run.classifier,variant==='B'?'local-prominence':'onset-guided','Wrong packaged classifier');
+    assert.equal(run.classifier,comparison==='xo'&&variant==='B'?'local-prominence':'onset-guided','Wrong packaged classifier');
     run.frames=diagnostic.frames;run.predictions=diagnostic.predictions;run.evictedWarmupFrames=diagnostic.evictedFrames;
+    if(comparison==='hat'){
+      assert(diagnostic.featureBlocks?.length,'Capture feature provenance unavailable');
+      assert(diagnostic.featureBlocks.every(b=>b.data.length===b.times.length*84),'Malformed captured feature block');
+      run.featureBlocks=diagnostic.featureBlocks;run.outputClockAtEnd=diagnostic.clock;run.compositeHatSamples=await app.evaluate(()=>window.hatSamples);
+    }
     run.clockAtSnapshot=clock;run.records=[...records.values()];
     Object.assign(run,await app.evaluate(()=>({flashes:window.xoFlashLog,opacitySamples:window.xoOpacityLog,hatVisibilitySamples:window.xoHatVisibilityLog})));
     const targets=new Map(run.records.filter(r=>Number.isFinite(r.targetPlaybackTime)).map(r=>[r.id,r.targetPlaybackTime]));
@@ -112,9 +140,17 @@ for(const variant of variants)for(const input of inputs){
     const processes=(await cdp.send('SystemInfo.getProcessInfo')).processInfo;
     run.cpu={seconds:processes.reduce((sum,item)=>sum+item.cpuTime,0)-cpuAt,wallSeconds:(Date.now()-wallAt)/1000};
     run.cpu.percentOfOneLogicalCore=run.cpu.seconds/run.cpu.wallSeconds*100;
-    run.finalMode=clock.syncState.capability;assert.equal(run.finalMode.allowTypedPreview,true);assert.equal(run.finalMode.bufferMs,500);
-    assert.equal(run.finalMode.detectorVersion,'xo-'+variant,'Wrong packaged detector version');
-    assert(run.samples.every(s=>s.bufferMs===500&&s.mode==='experimental-buffered'),'Output or typed mode changed during the selected passage');
+    run.finalMode=clock.syncState.capability;
+    assert.equal(run.finalMode.detectorVersion,comparison+'-'+variant,'Wrong packaged detector version');
+    if(loaded){
+      assert(loadTriggered);run.load.completed=await loadFinished;assert(run.load.completed.restored);
+      run.load.maxObservedLagMs=Math.max(...run.samples.map(s=>s.outputClock?.analysisLagMs||0));
+      run.load.degraded=run.samples.some(s=>s.mode!=='experimental-buffered'||s.bufferMs!==500);
+      assert(run.load.maxObservedLagMs>500,'Bounded CPU test did not challenge the processing deadline');
+    }else{
+      assert.equal(run.finalMode.allowTypedPreview,true);assert.equal(run.finalMode.bufferMs,500);
+      assert(run.samples.every(s=>s.bufferMs===500&&s.mode==='experimental-buffered'),'Output or typed mode changed during the selected passage');
+    }
     await app.screenshot({path:resolve(folder,`actual-${channel}-${variant}-${input}.png`)});
     await source.locator('audio').evaluate(audio=>audio.pause());
     run.finishedAt=new Date().toISOString();await save();
@@ -122,6 +158,6 @@ for(const variant of variants)for(const input of inputs){
   }catch(error){run.error=error.message;result.errors.push(`${variant}/${input}: ${error.message}`);
     if(app)run.failure=await app.evaluate(()=>({candidate:window.candidate,activation:[...document.querySelectorAll('[role=status]')].map(e=>e.textContent)})).catch(()=>null);
     await save();throw error;
-  }finally{await context?.close();}
+  }finally{if(loadFinished){try{run.load.completed=await loadFinished;}catch(error){run.load.cleanupError=error.message;}}await context?.close();}
 }
 await save();

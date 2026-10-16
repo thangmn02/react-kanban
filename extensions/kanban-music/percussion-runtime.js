@@ -67,6 +67,12 @@ export async function createPercussionRuntime({ context, source, onEvent, signal
       if (!live || !data.times?.length || !data.data?.buffer) return;
       submittedTime = data.times.at(-1);
       pendingSince ??= performance.now();
+      if(config.diagnostics){
+        try{onDiagnostic({kind:'features',times:data.times,data:Array.from(data.data),
+          postedAt:data.postedAt,availableAudioTime:data.availableAudioTime,
+          receivedAt:Date.now(),receivedAudioTime:context.currentTime});}
+        catch{/* Private observers cannot block inference. */}
+      }
       worker.postMessage(data, [data.data.buffer]);
     };
     source.connect(node); node.connect(context.destination);
