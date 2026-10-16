@@ -15,7 +15,11 @@ complete pipeline against prior Kora runs. Conversions and repackaging do not cr
 an independent detector; an ADTOF-dependent pipeline remains labeled as such.
 Reuse valid matching evidence and skip duplicate experiments. Unknown weight
 equivalence stays unresolved instead of being called new technology. The bounded
-[V2 sprint](../plans/261016-1459-beat-grid-v2-sprint/plan.md) owns the current matrix.
+[V2 sprint](../plans/261016-1459-beat-grid-v2-sprint/plan.md) records the bounded matrix.
+Its [completed decision](../plans/reports/engineering-261016-1459-beat-grid-v2-sprint.md)
+is NO-GO for replacement: no evaluated candidate qualifies on natural public-row
+accuracy. Keep the current baseline/fallback and do not admit a new adapter merely
+because native inference is fast or cached model predictions are available.
 
 The private candidate uses [one capability decision](../extensions/kanban-music/beat-mode.js)
 for provider restrictions, capture/output ownership, media facts, clock health,

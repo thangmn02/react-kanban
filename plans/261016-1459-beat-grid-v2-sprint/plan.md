@@ -1,8 +1,19 @@
 # Beat Grid V2: one coordinated technology evaluation
 
-Status: historical/source/checkpoint acquisition complete; minimal inference passed
-for C1/C2/C3/C4 and the first separator. The standardized 63-input corpus is frozen.
-Preparing the single benchmark round; no quality benchmark has started.
+Status: coordinated evaluation complete; architecture decision **NO-GO** for
+replacement. All 357 results across 65 frozen inputs validated, including the
+corrected OAF output contract and 32 separated full mixes. No runnable replacement
+passes the independent natural Snare/Hat gates; no new detector is integrated.
+Provisional human references remain unscored. Final review passed; the delivery
+revision and check hashes are recorded in the private `final-revision.json` receipt.
+The requested baseline listening server stays on ports 5173/5174.
+
+Completed: novelty/reuse inventory, acquisition and blockers, inference, raw/PCM/
+reference guards, dependency fingerprint migration without neural repeats, strict
+scoring, 208-case provisional ledger, matched runtime comparison, one architecture
+decision, 912 app tests, 22 Node tests, 15 Python tests, lint, typecheck, build and
+bundle guard. Original C4 batch-eight identities and actual parity-probe execution
+fingerprint remain preserved. See the [final report](../reports/engineering-261016-1459-beat-grid-v2-sprint.md).
 Frozen base: `c93046ad262db21577792eed0ee61c3452525328` on
 `codex/beat-grid-quality-recovery`. Timebox: five working days, finishing sooner
 where feasible. No deployment, new training, broad threshold search or repeated
