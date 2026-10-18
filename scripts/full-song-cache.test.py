@@ -1,5 +1,6 @@
 import importlib.util,json,tempfile,unittest,sys
 from pathlib import Path
+from unittest.mock import patch
 sys.dont_write_bytecode=True
 spec=importlib.util.spec_from_file_location('full_song','scripts/prepare-full-song.py');module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
 class CacheContracts(unittest.TestCase):
@@ -39,7 +40,8 @@ class CacheContracts(unittest.TestCase):
     def test_damaged_source_metadata_is_archived_before_numerical_preparation(self):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder);path=root/'source.json'
-            for value in ['{','null','[]','{}',json.dumps({'decodedPcmSha256':'missing-other-hash'})]:
-                path.write_text(value);module.recover_source_metadata(root);self.assertFalse(path.exists())
+            with patch.object(module.time,'time_ns',return_value=1):
+                for value in ['{','null','[]','{}',json.dumps({'decodedPcmSha256':'missing-other-hash'})]:
+                    path.write_text(value);module.recover_source_metadata(root);self.assertFalse(path.exists())
             self.assertEqual(len(list(root.glob('source-invalid-*.json'))),5)
 if __name__=='__main__':unittest.main()

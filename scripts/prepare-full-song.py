@@ -1,5 +1,5 @@
 """Private full-recording preparation, reusing the frozen model implementations."""
-import argparse,hashlib,importlib.util,json,os,random,sys,threading,time
+import argparse,hashlib,importlib.util,json,os,random,sys,threading,time,uuid
 from pathlib import Path
 import numpy as np
 import soundfile as sf
@@ -39,7 +39,7 @@ def recover_source_metadata(folder):
         value=read(path)
         if not isinstance(value,dict) or not all(isinstance(value.get(k),str) and len(value[k])==64 for k in ['decodedPcmSha256','canonicalWavSha256']):raise ValueError('Incomplete source cache identity')
     except (OSError,ValueError,TypeError):
-        os.replace(path,folder/('source-invalid-'+str(time.time_ns())+'.json'))
+        os.replace(path,folder/('source-invalid-'+uuid.uuid4().hex+'.json'))
 def contracts():
     inference=module('frozen_inference','scripts/run-beat-v2-inference.py')
     identities={k:inference.evidence.identity(v) for k,v in {'A':'BASE','B':'C1','C':'C2-separated','separator':'first-separator'}.items()}
