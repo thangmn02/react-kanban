@@ -8,6 +8,74 @@ remains in force. Implementation and measured results are recorded in the
 The [full-song upgrade report](../plans/reports/engineering-261018-1010-full-song-listening-lab.md)
 records complete-song preparation and listening checks.
 
+## Frozen H0 full-song listening
+
+The private [Full-Song Lab](http://127.0.0.1:5173/lab/) offers primary A/B/H
+comparisons and C as a diagnostic reference. **H — Hybrid ADTOF + CNN** is
+marked **PRIVATE RESEARCH — PRECOMPUTED HYBRID**. It reuses
+`H0-frozen-routing-diagnostic-v1` from `hat-recovery-core.py` through a local
+JSON bridge: A's original Kick/Snare and B's original Hat only. A Hat/Cymbal,
+B Kick/Snare and invented Bass/Melody are excluded. IDs, timestamps, classes
+and simultaneous different instruments survive unchanged. Each H event carries
+its original model, checkpoint SHA, result SHA and cache key; the source panel
+and exports include the complete component contracts.
+
+Use **Retained exact recordings** in the Song selector to choose an already
+prepared recording by filename and displayed SHA. This does not upload again,
+rename a recording or reassign an existing user slot. The original Rằng, HSKT,
+Nujabes and Chinese recordings remain available even after slot replacement.
+Uploading requires choosing a normal slot. H is explicitly incomplete until
+both matching frozen A/B records are ready; there is no fallback. A's missing
+raw-frame intervals remain unavailable for H Kick/Snare; B's coverage governs
+H Hat independently.
+
+H's router requires checkpoint A
+`c571062d76c322d54c2808c95339ea2dadd2f6ab99f9d83163d0f5311cd0f80a`
+and B `785c9b7a8640d78066598bc9da4bba54a2c67464a4b3ae125e322770e9d704db`.
+Every clip request validates the persisted A/B hashes and source/PCM contract
+before selecting a cached H result. The in-memory routing key additionally binds
+canonical WAV, algorithm SHA and both component contracts; concurrent requests
+share one computation. Restarting the server reroutes saved events once per
+requested binding, without neural inference or rewriting A/B results.
+
+Full-song listening initially uses **Short Attack**; **Original** remains
+selectable. A/B/H and renderer switches change event/render inputs only and
+preserve the same native audio element, source, clock, speed and position.
+Neither renderer choice nor H implies improved detection or physical timing.
+The detailed excerpt view retains its existing Original default and blind
+A/B/C reference contract. All saved markers remain inspectable by zooming the
+bounded timeline.
+
+Rằng **[26,44)** retains all **21** frozen B Hat predictions in H (A has 8 Hat
+and 2 Cymbal). The user's Hat-negative report remains provisional. The Chinese
+**[200,220)** case remains available; the described rhythm was illustrative,
+not a verified transcription. No threshold increase or Snare veto enters H.
+
+Quick feedback supports H, missed Kick, visual merging and H-versus-A/B
+preferences as qualitative observations. Select H for the two comparison
+buttons; the server rejects other selected tracks and records the compared
+pair. Source time, source/canonical hashes, selected track, renderer, component
+provenance, reviewer and note are retained. Old notes are preserved. Reviewing
+a note restores its track and renderer. Notes never establish official
+precision/recall/F1 or become independent blind references.
+
+Hướng dẫn: chọn đúng tệp trong **Retained exact recordings**, chọn **H · Hybrid
+ADTOF + CNN**, giữ **Short Attack** rồi bấm **Play full song**. Đổi A/B/H ngay
+khi đang nghe; dùng Seek hoặc Loop để nghe lại đoạn cần kiểm tra. Ghi nhận xét
+ở phần 4, hoặc xuất feedback để lưu toàn bộ ghi chú. HSKT ở danh sách lưu trữ
+là bản gốc theo SHA, không phụ thuộc nội dung ô HSKT hiện tại.
+
+Launch from the repository with `node scripts/serve-acoustic-visual-lab.mjs`;
+reuse the owned process on ports 5173/5174 instead of starting a duplicate.
+Verification: `node --test scripts/full-song-hybrid.test.mjs` and
+`node scripts/verify-full-song-hybrid.mjs` (includes complete three-minute 1x
+playback in an isolated browser). See the
+[H0 listening report](../plans/reports/engineering-261018-1449-h0-full-song-listening.md).
+H0 is authorized for private listening only. CNN centered context/global dB
+normalization, causal operation, live synchronization, physical speaker-to-pixel
+timing, AGPL-3.0 integration and weight distribution remain unresolved gates.
+Production deployment is not authorized.
+
 ## Targeted Hi-Hat investigation
 
 Open [the private Hat investigation](http://127.0.0.1:5173/lab/?mode=hat-recovery)
@@ -31,7 +99,9 @@ may select different original raw frame times. They add no fitted time shift,
 debounce or generated hits. `cnn-hat-snare-dominance-v1` is a rejected same-frame
 Snare/Hat score veto; it loses independently referenced Hats. H0 routes frozen A
 Kick/Snare plus frozen B Hat, with exact provenance and unavailable intervals.
-It is an unqualified routing diagnostic, not an accepted hybrid or live route.
+It remains acoustically unqualified. The later H0 listening authorization above
+permits the unchanged route in private full-song evaluation; rejected correction
+experiments remain rejected. It is not a qualified live route.
 Original model outputs, renderer envelopes and Companion behavior stay frozen.
 
 Hướng dẫn: chọn **Case**, bấm **Play investigation**, đổi **Event track** A/B để
@@ -93,7 +163,7 @@ sample count. Startup marks obsolete contracts STALE; retry verifies them.
 
 Playback uses one native streaming audio element, with bounded HTTP range reads;
 the browser does not load full neural tensors or repeatedly decode on model
-switch. A/C/B and original/short switches change prediction/render inputs only.
+switch. A/B/H/C and original/short switches change prediction/render inputs only.
 The media/waveform binding includes original SHA, analysis revision, canonical
 WAV and decoded PCM identities; a changed canonical source is reloaded explicitly.
 The overview has at most 2,048 envelope bins, detail envelopes use 10 ms bins,
@@ -221,7 +291,8 @@ Controls with no saved separated OAF input show N/A, rather than inferred output
 
 ## Visual and live diagnosis
 
-The original renderer is the default. One private short-attack prototype uses a
+The detailed excerpt view defaults to Original; full-song listening defaults
+to Short Attack. One private short-attack prototype uses a
 40 ms marker and a separate 130 ms soft trail. Neither changes event labels,
 timestamps or production behavior. Rapid-repeat tests inject six constructed
 Hat references, bypassing the detector and production controller. Their report

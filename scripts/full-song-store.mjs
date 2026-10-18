@@ -6,10 +6,12 @@ import {createHash,randomUUID} from 'node:crypto';
 import {spawn} from 'node:child_process';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
-import {frameCoverage} from './full-song-core.ts';
+import {frameCoverage,feedbackTypes} from './full-song-core.ts';
+import {createHybridRouter} from './full-song-hybrid.mjs';
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
-export const feedbackTypes=['Missed Snare','Missed Hi-Hat','False Snare','False Hi-Hat','Flash too early','Flash too late','Consecutive hits visually merged','This passage seems correct','Unsure / needs review'];
+export {feedbackTypes};
 export async function createFullSongStore(root){
+ const hybridRoute=await createHybridRouter();
  const {stdout}=await promisify(execFile)(resolve('scratch/beat-grid-v2/.venv/Scripts/python.exe'),['scripts/prepare-full-song.py','--identity'],{windowsHide:true,maxBuffer:1024*1024});const currentContract=JSON.parse(stdout).contractSha256;
  await mkdir(root,{recursive:true});const indexPath=resolve(root,'songs.json'),jobs=new Map(),queue=[];let running;
  const read=async path=>JSON.parse(await readFile(path,'utf8'));
@@ -71,22 +73,24 @@ export async function createFullSongStore(root){
   const dir=folder(id),s=await status(id);if(!s.source)return null;const source=s.source;
   await verifyAudio(id,s);
   // Ready results are accepted only when their exact persisted event hash and contract match.
-  const predictions={A:null,B:null,C:null},coverage={};for(const m of ['A','B','C'])if(s.models[m]?.state==='READY'){
+  const predictions={A:null,B:null,C:null,H:null},coverage={},records={};for(const m of ['A','B','C'])if(s.models[m]?.state==='READY'){
    const bytes=await readFile(resolve(dir,m+'.json')),record=JSON.parse(bytes);if(digest(bytes)!==s.models[m].resultSha256||record.cacheKey!==s.models[m].cacheKey||record.sourceSha256!==id||record.pcmSha256!==source.decodedPcmSha256||s.contractSha256!==currentContract)throw Error('Stale or changed prediction source/model binding');
-   predictions[m]=record.events;
+   predictions[m]=record.events;records[m]={...record,resultSha256:s.models[m].resultSha256};
    const coverageKey=id+':'+m+':'+s.models[m].resultSha256;
    if(!verifiedCoverage.has(coverageKey)){
     if(!/^models\/[a-f0-9]{64}\/raw\.json$/.test(record.rawFile))throw Error('Invalid raw cache path');const rawBytes=await readFile(resolve(dir,record.rawFile));if(digest(rawBytes)!==record.rawSha256)throw Error('Raw activation cache changed; retry preparation');const raw=JSON.parse(rawBytes);const observed={...frameCoverage(raw.times,m==='B'?256/22050:.01,source.duration),derivedFromRawSha256:record.rawSha256,derivationVersion:1};verifiedCoverage.set(coverageKey,observed);await atomic(resolve(dir,'coverage-'+m+'.json'),observed);
    }coverage[m]=verifiedCoverage.get(coverageKey);
   }
-  return {id:'full-'+id,title:index.sources[id].filename,originalSourceSha256:id,canonicalWavSha256:source.canonicalWavSha256,decodedPcmSha256:source.decodedPcmSha256,sampleRate:44100,duration:source.duration,sourceOffset:0,start:0,end:source.duration,natural:true,mapping:source.transforms,audioUrl:'/lab/full/audio/'+id,predictions,coverage,raw:{A:null,B:null,C:null},constructedReferences:[],fullSong:true,source};
+  const hybrid=await hybridRoute({originalSourceSha256:id,canonicalWavSha256:source.canonicalWavSha256,decodedPcmSha256:source.decodedPcmSha256},records,coverage);predictions.H=hybrid.events;
+  return {id:'full-'+id,title:index.sources[id].filename,originalSourceSha256:id,canonicalWavSha256:source.canonicalWavSha256,decodedPcmSha256:source.decodedPcmSha256,sampleRate:44100,duration:source.duration,sourceOffset:0,start:0,end:source.duration,natural:true,mapping:source.transforms,audioUrl:'/lab/full/audio/'+id,predictions,coverage,hybrid:hybrid.metadata,raw:{A:null,B:null,C:null},constructedReferences:[],fullSong:true,source};
  }
  async function handle(request,response,url){
   const path=url.pathname;if(!path.startsWith('/lab/full/'))return false;
   const json=value=>{response.setHeader('Content-Type','application/json');response.end(JSON.stringify(value));};
   if(request.method==='POST'&&!['http://127.0.0.1:5173','http://localhost:5173'].includes(request.headers.origin))throw Error('Same-origin local preparation required');
   if(path==='/lab/full/songs'&&request.method==='GET'){
-   const songs={};for(const [slot,id] of Object.entries(index.slots))songs[slot]=id?{...index.sources[id],source:undefined,status:await status(id)}:null;json({version:1,songs,limits:{uploadMiB:256,maxDurationSeconds:720,workerGiB:6,concurrency:1}});return true;
+   const retained={};for(const [id,entry] of Object.entries(index.sources))retained[id]={...entry,source:undefined,status:await status(id)};
+   const songs={};for(const [slot,id] of Object.entries(index.slots))songs[slot]=id?retained[id]:null;json({version:1,songs,retained,limits:{uploadMiB:256,maxDurationSeconds:720,workerGiB:6,concurrency:1}});return true;
   }
   if(path==='/lab/full/upload'&&request.method==='POST'){
    const filename=decodeURIComponent(String(request.headers['x-audio-filename']||''));if(!filename||filename.length>250||/[\\/\x00-\x1f]/.test(filename)||!['.mp3','.wav','.flac'].includes(extname(filename).toLowerCase()))throw Error('Choose a local MP3, WAV or FLAC file');
@@ -115,8 +119,9 @@ export async function createFullSongStore(root){
    if(request.method==='GET')json(notes);
    else if(request.method==='POST'){
     let body='';for await(const chunk of request){body+=chunk;if(body.length>8000)throw Error('Feedback too large');}const note=JSON.parse(body),c=await clip(id);
-    if(!c||note.sourceSha256!==id||!Number.isFinite(note.sourceTime)||note.sourceTime<0||note.sourceTime>c.end||!['A','B','C'].includes(note.model)||!['original','short'].includes(note.renderer)||!feedbackTypes.includes(note.type)||typeof note.note!=='string'||note.note.length>1000)throw Error('Invalid source-bound qualitative note');
-    const entry={version:1,id:randomUUID(),sourceSha256:id,canonicalWavSha256:c.canonicalWavSha256,sourceTime:note.sourceTime,model:note.model,renderer:note.renderer,type:note.type,note:note.note,reviewer:key,provenance:'model-exposed-qualitative-feedback',referenceStatus:'NOT_ACOUSTIC_GROUND_TRUTH',createdAt:new Date().toISOString(),analysisRevision:c.source.analysisRevision,nearbyPredictions:Object.fromEntries(['A','B','C'].map(m=>[m,(c.predictions[m]||[]).filter(e=>Math.abs(e.sourceTime-note.sourceTime)<=2)]))};
+    if(!c||note.sourceSha256!==id||!Number.isFinite(note.sourceTime)||note.sourceTime<0||note.sourceTime>c.end||!['A','B','C','H'].includes(note.model)||!c.predictions[note.model]||!['original','short'].includes(note.renderer)||!feedbackTypes.includes(note.type)||typeof note.note!=='string'||note.note.length>1000)throw Error('Invalid source-bound qualitative note');
+    const comparison=note.type.startsWith('H feels better than ');if(comparison&&note.model!=='H')throw Error('Select H before recording an H comparison');
+    const entry={version:1,id:randomUUID(),sourceSha256:id,canonicalWavSha256:c.canonicalWavSha256,sourceTime:note.sourceTime,model:note.model,renderer:note.renderer,type:note.type,note:note.note,reviewer:key,provenance:'model-exposed-qualitative-feedback',referenceStatus:'NOT_ACOUSTIC_GROUND_TRUTH',createdAt:new Date().toISOString(),analysisRevision:c.source.analysisRevision,...(note.model==='H'?{hybrid:c.hybrid}:{}),...(comparison?{comparisonTracks:['H',note.type.slice(-1)]}:{}),nearbyPredictions:Object.fromEntries(['A','B','C','H'].map(m=>[m,(c.predictions[m]||[]).filter(e=>Math.abs(e.sourceTime-note.sourceTime)<=2)]))};
     // Serialize appends per source/namespace so rapid clicks never overwrite notes.
     const prior=feedbackWrites.get(file)||Promise.resolve();const operation=prior.then(async()=>{let latest=[];try{latest=await read(file);}catch(error){if(error.code!=='ENOENT')throw error;}if(latest.length>=10000)throw Error('Feedback limit reached; export before starting a separate review');latest.push(entry);await atomic(file,latest);});const settled=operation.catch(()=>{});feedbackWrites.set(file,settled);try{await operation;}finally{if(feedbackWrites.get(file)===settled)feedbackWrites.delete(file);}json(entry);
    }else throw Error('Unsupported feedback method');

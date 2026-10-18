@@ -68,3 +68,9 @@ def cycle_metrics(references,predictions,start,end,match,cap=.04):
             'pairs':matches,'tolerances':[tolerances[i] for i in sorted(selected)],
             'acceptedMatchedTimes':[preds[p['predictionIndex']] for p in matches],
             'unmatchedPredictionTimes':false}
+
+if __name__=='__main__':
+    # Local JSON bridge reuses the same frozen router as the targeted diagnostics.
+    import json,sys
+    tracks=json.load(sys.stdin)
+    json.dump(hypothetical_hybrid(tracks['A'],tracks['B']),sys.stdout,ensure_ascii=True,allow_nan=False)
