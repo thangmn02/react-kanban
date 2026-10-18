@@ -4,7 +4,9 @@ import {resolve,sep,extname} from 'node:path';
 import {createHash} from 'node:crypto';
 import {build} from 'vite';
 import {validateReview,validateReviewTransition,blankReview} from './acoustic-visual-lab-core.ts';
+import {createFullSongStore} from './full-song-store.mjs';
 const folder=resolve('scratch/acoustic-visual-lab');
+const fullSongs=await createFullSongStore(resolve(folder,'full-songs'));
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 const bytes=await readFile(resolve(folder,'lab-data.json'));
 const reuse=JSON.parse(await readFile(resolve(folder,'reuse-verification.json'),'utf8'));
@@ -41,16 +43,20 @@ for(const port of [5173,5174]){
   try{
    if(!['127.0.0.1:'+port,'localhost:'+port].includes(request.headers.host))throw Error('Local host required');
    const url=new URL(request.url,'http://127.0.0.1:'+port),path=decodeURIComponent(url.pathname);
+   if(port===5173&&await fullSongs.handle(request,response,url))return;
    if(port===5173&&path.startsWith('/lab/review/')){
-    const id=path.slice('/lab/review/'.length),clip=data.clips.find(c=>c.id===id);if(!clip)throw Error('Unknown source');
+    const id=path.slice('/lab/review/'.length),clip=data.clips.find(c=>c.id===id)||(id.startsWith('full-')?await fullSongs.clip(id.slice(5)):null);if(!clip)throw Error('Unknown source');
     const reviewKey=url.searchParams.get('review')||'listener';if(!/^[a-zA-Z0-9_-]{1,80}$/.test(reviewKey))throw Error('Invalid review namespace');
+    const exposedReview=id.startsWith('full-')&&reviewKey.startsWith('full-exposed-');
+    const protectExposure=review=>exposedReview?{...review,modelsRevealed:true,referenceSelectionExposed:true,frozen:false,referenceStatus:'provisional-human-reference'}:review;
     const file=resolve(folder,'annotations',id+'-'+reviewKey+'.json');
     if(request.method==='POST'){
      if(request.headers.origin!=='http://127.0.0.1:5173'&&request.headers.origin!=='http://localhost:5173')throw Error('Same-origin review required');
      let body='';for await(const chunk of request){body+=chunk;if(body.length>2000000)throw Error('Review too large');}
      const submitted=validateReview(JSON.parse(body),clip);
+     if(exposedReview&&(!submitted.modelsRevealed||!submitted.referenceSelectionExposed||submitted.frozen))throw Error('Feedback-linked review must remain model-exposed and provisional');
      const operation=(reviewWrites.get(file)||Promise.resolve()).then(async()=>{
-      let prior;try{prior=validateReview(JSON.parse(await readFile(file,'utf8')),clip);}catch(error){if(error.code!=='ENOENT')throw error;prior=blankReview(clip);}
+      let prior;try{prior=validateReview(protectExposure(JSON.parse(await readFile(file,'utf8'))),clip);}catch(error){if(error.code!=='ENOENT')throw error;prior=protectExposure(blankReview(clip));}
       if(submitted.revision!==prior.revision){const conflict=Error('Annotation revision conflict. Reload the latest review before saving.');conflict.status=409;throw conflict;}
       validateReviewTransition(prior,submitted);
       submitted.revision=prior.revision+1;
@@ -62,7 +68,7 @@ for(const port of [5173,5174]){
      response.setHeader('Content-Type','application/json');response.end(JSON.stringify(review));return;
     }
     if(request.method!=='GET')throw Error('Unsupported method');
-    let review;try{review=validateReview(JSON.parse(await readFile(file,'utf8')),clip);}catch(error){if(error.code!=='ENOENT')throw error;review=blankReview(clip);}
+    let review;try{review=validateReview(protectExposure(JSON.parse(await readFile(file,'utf8'))),clip);}catch(error){if(error.code!=='ENOENT')throw error;review=protectExposure(blankReview(clip));}
     response.setHeader('Content-Type','application/json');response.end(JSON.stringify(review));return;
    }
    if(request.method!=='GET')throw Error('Read-only route');
@@ -81,4 +87,4 @@ for(const port of [5173,5174]){
 }
 const processReceipt={pid:process.pid,ports:[5173,5174],command:'node scripts/serve-acoustic-visual-lab.mjs',worktree:process.cwd(),startedAt:new Date().toISOString()};
 await writeFile(resolve(folder,'server-process.json'),JSON.stringify(processReceipt,null,2));console.log(JSON.stringify(processReceipt));
-const stop=()=>Promise.all(servers.map(s=>new Promise(done=>s.close(done))));process.once('SIGINT',stop);process.once('SIGTERM',stop);
+const stop=async()=>{await fullSongs.stop();await Promise.all(servers.map(s=>new Promise(done=>s.close(done))));};process.once('SIGINT',stop);process.once('SIGTERM',stop);

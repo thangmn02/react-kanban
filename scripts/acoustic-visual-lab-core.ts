@@ -5,7 +5,7 @@ export type Instrument = typeof instruments[number];
 export type Cause = typeof causes[number];
 export type Model = 'A' | 'B' | 'C';
 export interface Prediction { id: string; sourceTime: number; time: number; instrument: string; rawClass: string | number; confidence?: number; rawIndex: number; recordSha256: string }
-export interface Clip { id: string; title: string; originalSourceSha256: string; canonicalWavSha256: string; decodedPcmSha256: string; sampleRate: number; duration: number; sourceOffset: number; start: number; end: number; natural: boolean; mapping: Record<string, unknown>; audioUrl: string; predictions: Record<Model, Prediction[] | null>; raw: Record<Model, { classes: string[]; times: number[]; scores: number[][]; scope: string } | null>; constructedReferences: { row: string; time: number }[] }
+export interface Clip { id: string; title: string; originalSourceSha256: string; canonicalWavSha256: string; decodedPcmSha256: string; sampleRate: number; duration: number; sourceOffset: number; start: number; end: number; natural: boolean; mapping: Record<string, unknown>; audioUrl: string; coverage?: Partial<Record<Model,{uncoveredIntervals:{start:number;end:number;reason:string}[];completeRawCoverage:boolean}>>; predictions: Record<Model, Prediction[] | null>; raw: Record<Model, { classes: string[]; times: number[]; scores: number[][]; scope: string } | null>; constructedReferences: { row: string; time: number }[] }
 export interface Failure { model: Model; primary: Cause; secondary: Cause[]; evidenceRefs: string[]; confirmed: boolean }
 export interface Mark { id: string; sourceTime: number; instrument: Instrument; audibility: 'high' | 'medium' | 'low'; overlap: boolean; ambiguous: boolean; uncertaintyMs: number | null; verified: boolean; reviewer: string; origin: 'blind-waveform-review'; modelVisibleWhenMarked: boolean; notes: string; failures: Failure[] }
 export interface Review { version: 1; revision: number; clipId: string; sourceSha256: string; canonicalWavSha256: string; reviewer: string; modelsRevealed: boolean; referenceSelectionExposed: boolean; referenceStatus: 'provisional-human-reference' | 'human-reviewed-subset'; frozen: boolean; start: number; end: number; complete: Record<'kick' | 'snare' | 'hat', boolean>; ambiguousIntervals: { start: number; end: number; reason: string }[]; events: Mark[] }
@@ -107,6 +107,7 @@ export function compareReview(d: Review, clip: Clip, frames: FrameTrace[] = []) 
   const metrics: Record<string, unknown> = {};
   if (official) for (const model of ['A', 'B', 'C'] as Model[]) for (const instrument of ['kick', 'snare', 'hat'] as const) {
     if (!clip.predictions[model]) { metrics[`${model}:${instrument}`] = { status: 'NO_SAVED_INPUT' }; continue; }
+    if (clip.coverage?.[model]?.uncoveredIntervals.some(i => i.start < d.end && i.end > d.start)) { metrics[`${model}:${instrument}`] = { status: 'UNAVAILABLE_ANALYSIS_GAP', intervals: clip.coverage[model]!.uncoveredIntervals }; continue; }
     if (model === 'C' && instrument === 'hat') { metrics[`${model}:${instrument}`] = { status: 'COARSE_GROUP_NOT_TRUE_HAT' }; continue; }
     const refs = d.events.filter(e => e.instrument === instrument && included(e.sourceTime, d));
     const preds = clip.predictions[model]!.filter(p => p.instrument === instrument && included(p.sourceTime, d));

@@ -13,7 +13,7 @@ await page.addInitScript(()=>{
  AudioContext.prototype.createBufferSource=function(){const node=create.call(this),start=node.start;node.start=function(...args){window.audioProbe.starts++;return start.apply(this,args);};return node;};
 });
 try{
- await page.goto('http://127.0.0.1:5173/lab/?review=automated-ui-'+Date.now());await page.getByText('WAV and browser-decoded float PCM hashes match.',{exact:false}).waitFor();
+ await page.goto('http://127.0.0.1:5173/lab/?mode=detail&review=automated-ui-'+Date.now());await page.getByText('WAV and browser-decoded float PCM hashes match.',{exact:false}).waitFor();
  assert.equal(await page.getByRole('button',{name:'A · Frozen ADTOF baseline',exact:true}).count(),0);result.checks.push('Initial acoustic review hides all model predictions');
  await page.evaluate(()=>{window.audioProbe.delayResume=true;});await page.getByRole('button',{name:'Play',exact:true}).click();await page.waitForFunction(()=>window.audioProbe.pending);
  await page.getByLabel('Passage',{exact:true}).selectOption('W1');await page.waitForFunction(()=>document.querySelector('[aria-label="Authoritative source time"]').dataset.audioSource==='W1'&&!window.audioProbe.pending);

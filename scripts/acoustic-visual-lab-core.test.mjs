@@ -69,3 +69,8 @@ test('frozen strict misses retain navigation proposals without a fabricated matc
  assert.equal(result.rows[0].candidates.A.timeErrorMs,null);
  assert.equal(describeCandidate(result.rows[0].candidates.A,true),'No strict matched prediction.');
 });
+test('a reviewed reference cannot score a model window with unavailable raw-frame coverage',()=>{
+ const d={...blankReview(clip),frozen:true,referenceStatus:'human-reviewed-subset',complete:{kick:true,snare:true,hat:true},events:[mark(46,'first')]};
+ const result=compareReview(d,{...clip,coverage:{A:{uncoveredIntervals:[{start:56.9,end:57,reason:'EOF context'}],completeRawCoverage:false}}});
+ assert.equal(result.metrics['A:hat'].status,'UNAVAILABLE_ANALYSIS_GAP');assert.equal(result.rows[0].candidates.A.outcome,'UNAVAILABLE_ANALYSIS_GAP');assert.equal(result.metrics['B:hat'].fn,1);
+});

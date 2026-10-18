@@ -1,10 +1,100 @@
 # Private acoustic and visual listening lab
 
-This research interface replays saved predictions against exact local audio. It
+This research interface prepares full local recordings and replays saved predictions against exact local audio. It
 does not qualify a detector or establish physical audio/display synchronization.
 The prior [V2 replacement NO-GO](../plans/reports/engineering-261016-1459-beat-grid-v2-sprint.md)
 remains in force. Implementation and measured results are recorded in the
 [diagnostic report](../plans/reports/engineering-261018-0809-acoustic-visual-diagnostic.md).
+The [full-song upgrade report](../plans/reports/engineering-261018-1010-full-song-listening-lab.md)
+records complete-song preparation and listening checks.
+
+## Full-Song Listening Test
+
+The default `/lab/` page is the full-song view. It has two named slots, **Rằng Em
+Mãi Ở Bên** and **HSKT**, plus Local file. Names are user labels, not audio
+identity. Select the exact authorized MP3, WAV or FLAC using the file picker;
+no renaming or hard-coded Downloads path is required. Upload means a transfer
+to this loopback server on the same computer, not a cloud service. Original
+bytes, SHA-256, decoded PCM, decoder/resampling details, duration and numerical
+preparation revision are retained locally. HSKT is not expanded or inferred.
+
+Preparation runs one CPU4 worker at a time, A then C then secondary B. The UI
+shows per-model state and stage progress, errors, cancellation and retry. Limits
+are 256 MiB input, mono/stereo, 1–720 seconds, 6 GiB worker-tree resident memory
+and one hour per job. Exceeding a limit reports BLOCKED; there is no substitute
+detector. A partially ready song shows its actual per-model readiness. A/C must
+both say READY for a complete A/C comparison; B may be used as a secondary control.
+
+The exact existing model loaders, feature extraction and thresholds are reused.
+ADTOF processes its original overlapping feature context; C1 computes its global
+normalization/frontend on the complete recording before published batched
+inference; corrected OAF receives the entire HTDemucs drum stem in one call,
+retaining bidirectional context. There are no independent external detector
+chunks or joins. HTDemucs retains official shifts=1, split=true, overlap=.25,
+CPU4, mono mean/std normalization and decoded-PCM-derived seed. Its load,
+separation and serialization cost is included in C preparation. Sample-length
+parity is checked. No onset time shifts are fitted to a song.
+
+Processing the complete file does not create missing EOF context. Raw frame
+coverage is checked separately: the unchanged ADTOF extractor leaves a short
+uncomputed tail (about 0.12–0.16 seconds on the initial songs). The UI marks its
+exact interval unavailable, preserves the original output, and refuses official
+model metrics for review windows intersecting it. No silence padding or fake
+hits are added to conceal that boundary. C1/OAF raw coverage is reported separately.
+
+The source clock starts at the first sample returned by the pinned libsndfile
+decoder. MP3 codec delay/padding is handled by that decoder; Kora adds no guessed
+correction, trim or silence. Canonical playback and every model use that same
+44.1 kHz stereo float recording. Mono is duplicated and other sample rates use
+the recorded soxr_hq resampling transform. Source-relative time is sample/44100.
+
+Successful evidence is versioned at
+`scratch/acoustic-visual-lab/full-songs/<original-sha>/models/<contract-key>/`.
+Keys bind original/PCM identities, verified model weights/pipelines, decoder
+versions and automatically hashed numerical code in
+[`full-song-numerics.py`](../scripts/full-song-numerics.py). Worker/status
+serialization is separate; changing it alone cannot create a new detector
+experiment. Each model record preserves its producing worker hash. Retry reuses
+valid completed lanes, recomputes damaged/mismatched lanes, and preserves other
+cache versions. Separator cache checks include content, seed, contract and
+sample count. Startup marks obsolete contracts STALE; retry verifies them.
+
+Playback uses one native streaming audio element, with bounded HTTP range reads;
+the browser does not load full neural tensors or repeatedly decode on model
+switch. A/C/B and original/short switches change prediction/render inputs only.
+The media/waveform binding includes original SHA, analysis revision, canonical
+WAV and decoded PCM identities; a changed canonical source is reloaded explicitly.
+The overview has at most 2,048 envelope bins, detail envelopes use 10 ms bins,
+and event lanes show at most 160 markers per class. Zoom to inspect dense input.
+No individual event is removed from saved evidence because of that DOM bound.
+
+Quick feedback captures actual current source time, song hash, selected model,
+renderer, note, observation ID/version and nearby A/B/C predictions. It remains
+**model-exposed qualitative feedback**, stored in a separate
+`feedback-<reviewer>.json` from blind annotations. It cannot produce P/R/F1 or
+become an acoustic reference. Listening continues when flagging. **Review
+passage** pauses and opens the adjustable ±2-second context; **Detailed
+annotation** opens the existing strict workflow. Its `full-exposed-*` namespace
+is forced exposed/provisional on the server, even after removing URL parameters.
+For a separately independent blind review, use a separate reviewer and the
+existing blind protocol rather than converting impression notes.
+
+The renderer trace separates saved predictions, bounded deliveries, observed
+frame IDs, shared-row computed-brightness attack proxies and human notes.
+Computed frames are not perceived attacks or physical timing. Background tabs
+can undersample. The original/short choices receive identical prediction IDs,
+classes and timestamps; neither creates missing drum hits. Reduced motion
+remains honored.
+
+### Hướng dẫn ngắn
+
+1. Mở [lab](http://127.0.0.1:5173/lab/), chọn bài và chọn tệp nếu chưa có.
+2. Chờ **A** và **C** báo **READY**, rồi bấm **Play full song**.
+3. Đổi A/C khi đang nghe; chú ý Snare và Hi-Hat. Có thể thử Original/Short Attack.
+4. Bấm một nhận xét như **Missed Snare**, **False Hi-Hat**, **Flash too late**
+   hoặc **Unsure / needs review**. Nhạc vẫn tiếp tục; ghi chú là tùy chọn.
+5. Xem lại bằng **Review passage**, hoặc bấm **Export listening feedback** để
+   gửi kết quả. Không cần gắn nhãn từng tiếng trống để bắt đầu nghe.
 
 ## Start and stop
 
@@ -32,7 +122,10 @@ result records. The owning documentation may link this lab; its old Git blob is
 verified against the frozen receipt and the current documentation hash is
 recorded separately. No predictions are recomputed by preparation.
 
-## Listen and mark XO first
+## Detailed blind annotation and original excerpts
+
+Open [detailed acoustic review](http://127.0.0.1:5173/lab/?mode=detail) for the
+original excerpt workflow. Full-song feedback does not populate these references.
 
 1. Leave predictions hidden. XO starts at source time 45.000 seconds and loops
    through 57.000. Play, pause, seek or replay the passage. Set a reviewer ID.
