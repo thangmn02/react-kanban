@@ -6,6 +6,14 @@ Without usable capture, Music reports decorative timing instead of instrument
 detections. Explicit detected silence and paused/stale clocks remain dark.
 Cache delivery itself requires a fresh authoritative media clock.
 
+The explicitly enabled private [local Hybrid Beta](private-acoustic-visual-lab.md#hybrid-beta-in-the-actual-application)
+injects an exact-source saved EventTrack client and one owned audio transport
+into this same engine. Only that route exempts the existing local Bass row from
+percussion-cache precedence. Saved Lead revisions participate in its cache
+identity; unknown references emit no substitute notes. Its development-only
+loopback bridge is separate from the authenticated provider cache below and
+does not qualify model events as independently verified references.
+
 ## Private browser-first candidate
 
 Model evaluation must establish novelty from learned weights and detection

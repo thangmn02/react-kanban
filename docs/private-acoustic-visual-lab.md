@@ -8,6 +8,59 @@ remains in force. Implementation and measured results are recorded in the
 The [full-song upgrade report](../plans/reports/engineering-261018-1010-full-song-listening-lab.md)
 records complete-song preparation and listening checks.
 
+## Hybrid Beta in the actual application
+
+Run `node scripts/serve-hybrid-beta.mjs` from the repository, then open
+<http://127.0.0.1:1420/music>. This explicit private development command also
+serves the existing Tauri debug application's development URL. Reuse the one
+tracked server on port 1420; its process receipt is in ignored
+`scratch/hybrid-beta/server-process.json`. Research output and browser profiles
+are excluded from its watcher because Windows locks active profile files.
+
+Enable **Beat Grid Hybrid — Beta**, choose a prepared recording by filename and
+SHA, press **Play music**, then select **Beat grid**. **Local recording and
+visual envelope** contains the Original/Short Attack selector. Changing its
+envelope preserves the audio element and clock. Disable Beta to pause its
+owned local audio and return to the existing provider discovery path.
+
+This is the existing Music/Focus grid, event engine, scheduler and controller.
+H0 supplies frozen ADTOF Kick/Snare and CNN Hat. The unchanged browser Bass
+detector owns Bass independently on both Web and Desktop local playback; this
+differs from native monitored-system-audio Bass. One owned WebAudio graph
+provides output and analysis without intentional delay. Complete matching A/B
+results are reused without inference; first-time selected files are prepared
+on the loopback computer. Missing analysis and known EOF coverage gaps remain
+explicit. Predictions are unverified; this does not pass an accuracy gate.
+
+**Melody / Lead (saved analysis)** is available only for an exact saved Lead
+reference. Those short reference recordings are separate catalog entries:
+matching titles do not bind them to full songs. The bridge retains pitched-note
+versus vocal-articulation provenance and dominant-monophonic validation. Its
+150–450 ms duration-sensitive trail produces one attack per saved event.
+Missing percussion stays unavailable on Lead-only references; independent Bass
+can still run. New full-song and live Lead inference are unavailable in this
+checkout; see [the runtime audit](server-beat-analysis.md#current-checkout-availability).
+
+Optional **Developer / research diagnostics** reports row counters, source/cache
+identity, software DOM lateness and audio-clock information, and exports a
+technical trace. Software measurements and AudioContext output-latency estimates
+do not measure speaker-to-pixel synchronization. Natural listening notes remain
+provisional; unmatched predictions are not established false positives.
+
+For the separate private live A baseline, load the private Companion package,
+play an authorized source tab and invoke its toolbar action. Select that source
+in Music and use **Private candidate → Live preview**. The explicit local app
+origin 1420 is recognized alongside 5173/5174. Live CNN remains unavailable;
+offline H0 playback does not demonstrate live CNN operation. Simultaneous Web
+and Desktop capture clients share Companion's existing single owner and can
+replace each other; test one capture client at a time. No public rollout,
+installer publication, cloud analysis or model-rights clearance follows from
+this development command. Ordinary builds keep the local Beta disabled and
+contain no local preparation server.
+
+Measured evidence and remaining gates:
+[Hybrid Beta integration report](../plans/reports/engineering-261018-1525-hybrid-beta-melody.md).
+
 ## Frozen H0 full-song listening
 
 The private [Full-Song Lab](http://127.0.0.1:5173/lab/) offers primary A/B/H
