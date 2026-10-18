@@ -1,0 +1,1 @@
+{"extends":"../tsconfig.app.json","compilerOptions":{"tsBuildInfoFile":"../node_modules/.tmp/acoustic-lab.tsbuildinfo","allowJs":true,"checkJs":false,"noUnusedLocals":true,"noUnusedParameters":true},"include":["acoustic-visual-lab.tsx","acoustic-visual-lab-audio.ts","acoustic-visual-lab-core.ts"],"exclude":["../scratch","../node_modules"]}

@@ -21,6 +21,11 @@ is NO-GO for replacement: no evaluated candidate qualifies on natural public-row
 accuracy. Keep the current baseline/fallback and do not admit a new adapter merely
 because native inference is fast or cached model predictions are available.
 
+The [private acoustic and visual listening lab](private-acoustic-visual-lab.md)
+replays three frozen prediction tracks against one exact local audio clock,
+supports blind provisional annotation and separates acoustic, live-pipeline and
+renderer evidence. It does not change the replacement decision or qualify a track.
+
 The private candidate uses [one capability decision](../extensions/kanban-music/beat-mode.js)
 for provider restrictions, capture/output ownership, media facts, clock health,
 detector qualification and intentional-delay consent. Its source flag is off in

@@ -1,0 +1,248 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Private acoustic review, not automatic ground truth",
+  "type": "object",
+  "description": "Runtime source binding, review-window bounds, duplicate onset rejection and freeze eligibility are enforced by acoustic-visual-lab-core.ts in addition to this structural schema.",
+  "required": [
+    "version",
+    "revision",
+    "clipId",
+    "sourceSha256",
+    "canonicalWavSha256",
+    "reviewer",
+    "modelsRevealed",
+    "referenceStatus",
+    "frozen",
+    "start",
+    "end",
+    "complete",
+    "ambiguousIntervals",
+    "events",
+    "referenceSelectionExposed"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "clipId": {
+      "type": "string"
+    },
+    "sourceSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "canonicalWavSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "reviewer": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "modelsRevealed": {
+      "type": "boolean"
+    },
+    "referenceStatus": {
+      "enum": [
+        "provisional-human-reference",
+        "human-reviewed-subset"
+      ]
+    },
+    "frozen": {
+      "type": "boolean"
+    },
+    "start": {
+      "type": "number"
+    },
+    "end": {
+      "type": "number"
+    },
+    "complete": {
+      "type": "object",
+      "required": [
+        "kick",
+        "snare",
+        "hat"
+      ],
+      "properties": {
+        "kick": {
+          "type": "boolean"
+        },
+        "snare": {
+          "type": "boolean"
+        },
+        "hat": {
+          "type": "boolean"
+        }
+      }
+    },
+    "ambiguousIntervals": {
+      "type": "array",
+      "maxItems": 1000,
+      "items": {
+        "type": "object",
+        "required": [
+          "start",
+          "end",
+          "reason"
+        ],
+        "properties": {
+          "start": {
+            "type": "number"
+          },
+          "end": {
+            "type": "number"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500
+          }
+        }
+      }
+    },
+    "events": {
+      "type": "array",
+      "maxItems": 5000,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "sourceTime",
+          "instrument",
+          "audibility",
+          "overlap",
+          "ambiguous",
+          "uncertaintyMs",
+          "verified",
+          "reviewer",
+          "origin",
+          "modelVisibleWhenMarked",
+          "notes",
+          "failures"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9:_-]{1,160}$"
+          },
+          "sourceTime": {
+            "type": "number"
+          },
+          "instrument": {
+            "enum": [
+              "kick",
+              "snare",
+              "hat",
+              "cymbal",
+              "grouped-percussion",
+              "tom",
+              "unknown"
+            ]
+          },
+          "audibility": {
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ]
+          },
+          "overlap": {
+            "type": "boolean"
+          },
+          "ambiguous": {
+            "type": "boolean"
+          },
+          "uncertaintyMs": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 500
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "reviewer": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "origin": {
+            "const": "blind-waveform-review"
+          },
+          "modelVisibleWhenMarked": {
+            "type": "boolean"
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "failures": {
+            "type": "array",
+            "maxItems": 3,
+            "items": {
+              "type": "object",
+              "required": [
+                "model",
+                "primary",
+                "secondary",
+                "evidenceRefs",
+                "confirmed"
+              ],
+              "properties": {
+                "model": {
+                  "enum": [
+                    "A",
+                    "B",
+                    "C"
+                  ]
+                },
+                "primary": {
+                  "enum": [
+                    "UNKNOWN",
+                    "MODEL_MISS",
+                    "MODEL_FALSE_POSITIVE",
+                    "CLASS_CONFUSION",
+                    "POSTPROCESS_SUPPRESSION",
+                    "TRANSPORT_LOSS",
+                    "SCHEDULER_LATE",
+                    "CONTROLLER_SUPPRESSION",
+                    "VISUAL_FUSION",
+                    "SOURCE_TIME_MISMATCH",
+                    "ANNOTATION_UNCERTAIN"
+                  ]
+                },
+                "secondary": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "evidenceRefs": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "maxLength": 500
+                  }
+                },
+                "confirmed": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "referenceSelectionExposed": {
+      "type": "boolean"
+    }
+  }
+}

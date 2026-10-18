@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {writeFile} from 'node:fs/promises';
+const base='http://127.0.0.1:5173',review='api-check-'+Date.now();
+const result={checks:[],humanAnnotations:false};
+const doc=await (await fetch(`${base}/lab/review/hat-only?review=${review}`)).json();
+const post=(value,origin=base)=>fetch(`${base}/lab/review/hat-only?review=${review}`,{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify(value)});
+assert.equal((await post(doc,'https://unrelated.invalid')).status,400);result.checks.push('Cross-origin review write rejected');
+assert.equal((await post({...doc,sourceSha256:'wrong'})).status,400);result.checks.push('Wrong source identity rejected');
+const writes=await Promise.all([post({...doc,reviewer:'automated-api-test-only'}),post({...doc,reviewer:'automated-api-test-only'})]);
+assert.deepEqual(writes.map(r=>r.status).sort(),[200,409]);result.checks.push('Concurrent stale revisions produce one success and one conflict');
+const saved=await (await fetch(`${base}/lab/review/hat-only?review=${review}`)).json();assert.equal(saved.revision,1);
+const exposed=await (await post({...saved,modelsRevealed:true})).json();assert.equal((await post({...exposed,modelsRevealed:false})).status,400);result.checks.push('Persisted model exposure cannot be reset');
+assert.equal((await post({...exposed,start:exposed.start+.1})).status,400);result.checks.push('Post-reveal review-window selection cannot erase exposure provenance');
+const bad=await fetch(base+'/lab/audio/../../package.json');assert.notEqual(bad.status,200);result.checks.push('Audio route cannot read arbitrary files');
+const range=await fetch(base+'/lab/audio/hat-only.wav',{headers:{Range:'bytes=0-15'}});assert.equal(range.status,206);assert.equal((await range.arrayBuffer()).byteLength,16);result.checks.push('Exact audio supports bounded range playback');
+result.status='PASS';await writeFile('scratch/acoustic-visual-lab/api-verification.json',JSON.stringify(result,null,2));console.log(JSON.stringify(result));
