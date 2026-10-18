@@ -56,3 +56,14 @@ it('reports a calibration blocker when pause and consent are already satisfied',
   expect(screen.getByRole('button',{name:/Enable calibrated/})).toBeDisabled();
   expect(screen.getByRole('status',{name:'Delay activation status'})).toHaveTextContent('Calibration is incomplete or exceeds the 500 ms limit');
 });
+it.each(['protected-source','provider-policy'])('keeps %s guidance independent of pause, calibration and capture recovery',reason=>{
+  const current=session();delete current.syncState!.captureId;
+  Object.assign(current.syncState!.capability!,{reason,mode:'unsupported',bufferEligible:false});
+  render(<ExperimentalBeatControl session={current} refresh={vi.fn()} initiallyOpen/>);
+  const status=screen.getByRole('status',{name:'Delay activation status'});
+  expect(status).toHaveTextContent('Playback controls remain available');
+  expect(status).not.toHaveTextContent('click Companion');
+  expect(status).not.toHaveTextContent('Pause the selected source');
+  expect(screen.getByRole('button',{name:/Enable calibrated/})).toBeDisabled();
+  expect(configureExperimentalSynchronization).not.toHaveBeenCalled();
+});

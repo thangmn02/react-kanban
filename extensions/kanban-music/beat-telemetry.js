@@ -7,6 +7,7 @@ const sources = new Set(['onset', 'tempo', 'random', 'lifecycle']);
 ['CACHE_HIT', 'CACHE_MISS', 'ANALYSIS_REQUESTED', 'EVENT_PATH', 'EVENT_REPLACED', 'LEAD_EVENT'].forEach(stage => stages.add(stage));
 stages.add('PREVIEW_REVOKED');
 stages.add('CAPTURE_REPLACED');
+stages.add('DETECTOR_TIMING');
 const types = new Set(['kick', 'snare', 'hat', 'bass', 'melodic', 'generic']);
 const origins = new Set(['event-track-cache', 'local-detector', 'capture-engine', 'native-audio-engine', 'visual-decoration']);
 const components = new Set(['capture-engine', 'offscreen', 'beat-sync', 'widget-bridge',
@@ -84,6 +85,13 @@ export function createBeatTelemetry({ now = Date.now, limit = 2048 } = {}) {
         if (typeof details.semantic === 'boolean') entry.semantic = details.semantic;
         if (reasons.has(details.reason)) entry.reason = details.reason;
         if (['cache', 'local', 'degraded'].includes(details.eventSource)) entry.eventSource = details.eventSource;
+        if (stage === 'WORKER_BATCH' || stage === 'DETECTOR_TIMING') {
+          for (const key of ['peakFeatureAvailableAudioTime', 'modelInputAudioTime', 'modelInputAvailableAudioTime',
+            'featurePostedAt', 'workerReceivedAt', 'inferenceStartedAt', 'inferenceEndedAt',
+            'decisionAudioTime', 'decisionAt', 'receivedAt', 'featureComputeMs']) {
+            if (finite(details[key]) && details[key] >= 0) entry[key] = details[key];
+          }
+        }
         if(stage==='PREVIEW_REVOKED') {
           if(['clock','renewal'].includes(details.trigger))entry.trigger=details.trigger;
           if(['source-or-output-unproven','capture-unproven','clock-unreliable','not-playing','detector-rights-unavailable'].includes(details.previewReason))entry.previewReason=details.previewReason;

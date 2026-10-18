@@ -243,6 +243,9 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
               origin: 'local-detector', confidence: event.confidence, targetTime: event.audioTime, targetClock: 'audio-seconds' });
             if(observed)observed.traceId=trace?.[0]?.id||null;
             percussionTelemetry.mark('EVENT_DETECTED', trace, { semantic: true, audioTime:event.audioTime });
+            if (event.timing) percussionTelemetry.mark('DETECTOR_TIMING', trace, {
+              ...event.timing, audioTime: event.audioTime, receivedAt: Date.now(),
+            });
             enqueue('beat', [event.band], event.audioTime, trace, true);
           },
         }).then(runtime => {

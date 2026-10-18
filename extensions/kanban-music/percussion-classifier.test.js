@@ -1,5 +1,23 @@
 import { expect, it } from 'vitest';
 import { PercussionClassifier } from './percussion-classifier.js';
+it('retains peak-frame timing through delayed finalization without changing learned decisions', () => {
+  const plain = new PercussionClassifier(undefined, { onsetGuided: true });
+  const timed = new PercussionClassifier(undefined, { onsetGuided: true });
+  const emitted = [];
+  for (let frame = 0; frame < 120; frame++) {
+    const scores = [frame === 20 ? .9 : 0, [30, 32, 70].includes(frame) ? .9 : 0, 0,
+      frame >= 50 && frame <= 54 ? .9 : 0, 0];
+    const expected = plain.push(scores, frame / 100).events;
+    const actual = timed.push(scores, frame / 100, { inferenceEndedAt: frame }).events;
+    expect(actual.map(({ timing: _timing, ...event }) => event)).toEqual(expected);
+    for (const event of actual) {
+      expect(event.timing.inferenceEndedAt).toBeCloseTo(event.audioTime * 100);
+      expect(event.timing.inferenceEndedAt).toBeLessThan(frame);
+      emitted.push(event);
+    }
+  }
+  expect(emitted.length).toBeGreaterThan(3);
+});
 function sequence(attacks, length = 100) {
   const classifier = new PercussionClassifier(), events = [];
   for (let frame = 0; frame < length; frame++) {

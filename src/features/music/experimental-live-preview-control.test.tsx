@@ -41,3 +41,13 @@ it('explains that a connected older private extension must be reloaded',()=>{
   render(<ExperimentalLivePreviewControl session={current} refresh={vi.fn()}/>);
   expect(screen.getByRole('status',{name:'Live preview activation status'})).toHaveTextContent('Reload the updated private Companion');
 });
+it.each(['protected-source','provider-policy'])('explains %s before suggesting a capture reconnect',reason=>{
+  const current=session();delete current.syncState!.captureId;
+  Object.assign(current.syncState!.capability!,{reason,mode:'unsupported',livePreviewEligible:false});
+  render(<ExperimentalLivePreviewControl session={current} refresh={vi.fn()}/>);
+  const status=screen.getByRole('status',{name:'Live preview activation status'});
+  expect(status).toHaveTextContent('Playback controls remain available');
+  expect(status).not.toHaveTextContent('click Companion');
+  expect(screen.getByRole('button',{name:/Enable live preview/})).toBeDisabled();
+  for(const checkbox of screen.getAllByRole('checkbox'))expect(checkbox).toBeDisabled();
+});

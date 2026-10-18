@@ -38,6 +38,8 @@ export async function createPercussionRuntime({ context, source, onEvent, signal
     if (!live || context.sampleRate !== config.sampleRate || config.version !== 1 || config.bins !== 84) return null;
     // Raw activations are private, explicitly requested diagnostics only.
     config.diagnostics = typeof onDiagnostic === 'function';
+    // Timing-only instrumentation never requests raw scores or feature arrays.
+    config.telemetry = beatTelemetry.enabled;
     worker = new Worker(new URL('./percussion-worker.js', import.meta.url), { type: 'module' });
     const ready = new Promise(resolve => { resolveReady = resolve; });
     worker.onerror = () => fail();
@@ -50,7 +52,8 @@ export async function createPercussionRuntime({ context, source, onEvent, signal
         // Empty predictions prove inference is progressing through silence.
         pendingSince = data.processedAudioTime >= submittedTime ? undefined : performance.now();
         onProgress();
-        telemetry.record('WORKER_BATCH', undefined, { queueDepth: data.queueDepth, durationMs: data.durationMs });
+        telemetry.record('WORKER_BATCH', undefined, { ...data.timing, queueDepth: data.queueDepth, durationMs: data.durationMs,
+          receivedAt: config.telemetry ? Date.now() : undefined });
         if (config.diagnostics) {
           try { onDiagnostic({ ...data, mainThreadReceivedAt: Date.now(), receivedAudioTime: context.currentTime }); }
           catch { /* Diagnostic observers cannot prevent semantic delivery. */ }

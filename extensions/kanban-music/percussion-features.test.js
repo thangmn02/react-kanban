@@ -3,6 +3,21 @@ import FFT from 'fft.js';
 import { PercussionFeatures } from './percussion-features.js';
 const config = { fftSize: 2048, sampleRate: 44100, hopSize: 441, stepFrames: 10, bins: 1,
   filterbank: [{ first: 80, weights: [1] }] };
+it('adds only timing metadata when observing the same nonzero feature stream', () => {
+  const collect = telemetry => {
+    const features=new PercussionFeatures({...config,telemetry}),blocks=[];
+    for(let at=0;at<44100;at+=128) {
+      const samples=Float32Array.from({length:Math.min(128,44100-at)},(_,i)=>.2*Math.sin((at+i)*.17));
+      features.push([samples],at/44100,block=>blocks.push(block));
+    }
+    return blocks;
+  };
+  const plain=collect(false),timed=collect(true);
+  expect(timed.map(block=>block.times)).toEqual(plain.map(block=>block.times));
+  expect(timed.map(block=>Array.from(block.data))).toEqual(plain.map(block=>Array.from(block.data)));
+  expect(timed.every(block=>Number.isFinite(block.featureComputeMs)&&block.featureComputeMs>=0)).toBe(true);
+  expect(plain.every(block=>block.featureComputeMs===undefined)).toBe(true);
+});
 it('matches an independent FFT on a full causal window without magnitude/gain normalization', () => {
   const f = new PercussionFeatures(config), input = Float32Array.from({ length: 2048 }, (_, i) =>
     .2 * Math.sin(2 * Math.PI * 80 * i / 2048) + .1 * Math.cos(2 * Math.PI * 23 * i / 2048));

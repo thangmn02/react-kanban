@@ -66,7 +66,7 @@ still releases the lock after four seconds, independently of capture recovery.
 
 Developers can instead load this `extensions/kanban-music` folder after generating the icons. Keep an unpacked extension's folder; deleting it breaks the installation.
 
-The app must be at `https://kanthangboard.netlify.app`, or localhost / 127.0.0.1 on port 5173 or 5174. Production requires deploying the updated web app as well; loading the extension does not update Netlify.
+The app must be at an allowlisted deployed origin, or localhost / 127.0.0.1 on port 5173, 5174 or 1420. Companion 0.3.14 does not allow port 1420; reloading that version cannot connect to the current private development app. Update its files to the current package and refresh both tabs. Production requires deploying the updated web app as well; loading the extension does not update Netlify.
 
 ## Simple public installation
 
@@ -310,6 +310,40 @@ fabricated.
 
 See the [recovery report](../../plans/reports/diagnosis-261006-1659-beat-recovery.md)
 for tests and browser-validation limits.
+
+### Private live timing investigation
+
+The existing seven provider integrations remain the discovery/control path.
+Provider discovery is separate from successful browser capture and from the
+private semantic-preview policy. In particular, ordinary capture compatibility
+does not override private Spotify/protected-source restrictions. The owned-local
+H0 Beta does not change a provider session into a CNN live source.
+
+The private grid displays whether instrument preview is on or needs enabling
+for the selected source. Pause, seek and source changes revoke that preview;
+enable it again under **Music → Private candidate → Live preview**. Protected
+and provider-policy blocks take priority over reconnect/calibration advice.
+Metadata and playback controls can still work while analysis is unavailable.
+
+Opt-in telemetry enabled before capture now records numeric feature availability,
+worker receipt/inference boundaries and peak finalization as `DETECTOR_TIMING`
+and `WORKER_BATCH` records. It does not enable raw scores/features/PCM. Timing
+fields are locally bounded and do not alter weights, feature values, thresholds,
+accepted peaks, source timestamps or the existing scheduler. Reacquire capture
+after enabling timing if the worker was already running without diagnostics.
+
+`scripts/measure-hybrid-browser-latency.mjs` reuses the actual app and private
+Companion with the existing authorized CC0 source. Separate `--output` folders
+preserve repeated trials; `--live-ms` bounds sample length. `--full-session`
+collects five-second health/telemetry snapshots to natural EOF and assesses
+capture continuity separately from source playback. Background/full-session
+qualification together is rejected. `scripts/summarize-beat-delivery.mjs`
+separates Bass deadlines from learned percussion delay, and preserves missing
+measurements instead of treating them as zero. These tools do not measure
+physical speaker-to-pixel timing or acoustic recognition accuracy.
+
+See the [provider live report](../../plans/reports/engineering-261019-0549-provider-live-upgrade.md)
+for current observed support, repeated measurements and remaining gates.
 
 ### Playback-clock scheduling
 

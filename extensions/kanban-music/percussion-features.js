@@ -32,6 +32,7 @@ export class PercussionFeatures {
     this.data = new Float32Array(config.stepFrames * config.bins);
     this.times = [];
     this.used = 0;
+    this.computeMs = 0;
   }
 
   spectrum() {
@@ -72,15 +73,19 @@ export class PercussionFeatures {
       this.samples[this.write] = value;
       this.write = (this.write + 1) % this.samples.length;
       if (++this.received !== this.next) continue;
+      const began = this.config.telemetry ? Date.now() : 0;
       this.spectrum();
+      if (this.config.telemetry) this.computeMs += Date.now() - began;
       this.times.push(startTime + (i + 1 - this.config.fftSize / 2) / this.config.sampleRate);
       this.next += this.config.hopSize;
       if (++this.used === this.config.stepFrames) {
         emit({ kind: 'frames', data: this.data, times: this.times,
-          ...(this.config.diagnostics ? { postedAt: Date.now(), availableAudioTime: startTime + (i + 1) / this.config.sampleRate } : {}) });
+          ...(this.config.diagnostics || this.config.telemetry ? { postedAt: Date.now(), availableAudioTime: startTime + (i + 1) / this.config.sampleRate } : {}),
+          ...(this.config.telemetry ? { featureComputeMs: this.computeMs } : {}) });
         this.data = new Float32Array(this.config.stepFrames * this.config.bins);
         this.times = [];
         this.used = 0;
+        this.computeMs = 0;
       }
     }
   }

@@ -1,6 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { createPercussionRuntime } from './percussion-runtime.js';
-afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
+import { beatTelemetry } from './beat-telemetry.js';
+afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); beatTelemetry.enable(false); beatTelemetry.clear(); });
 function fixture() {
   const instances = [], nodes = [];
   class Worker {
@@ -15,6 +16,19 @@ function fixture() {
   const source = { connect: vi.fn(), disconnect: vi.fn() };
   return { instances, nodes, context, source };
 }
+it('enables timing-only worker evidence without enabling raw model data', async () => {
+  const f = fixture(); beatTelemetry.enable();
+  const loading = createPercussionRuntime({ ...f, onEvent() {} });
+  await Promise.resolve(); await Promise.resolve();
+  const worker = f.instances[0];
+  expect(worker.postMessage.mock.calls[0][0].config).toMatchObject({ telemetry: true, diagnostics: false });
+  worker.onmessage({ data: { kind: 'ready' } }); const runtime = await loading;
+  worker.onmessage({ data: { kind: 'result', events: [], queueDepth: 0, durationMs: 10,
+    timing: { inferenceStartedAt: 100, inferenceEndedAt: 110, modelInputAudioTime: 2, scores: [.9] } } });
+  expect(beatTelemetry.snapshot().records.at(-1)).toMatchObject({ stage: 'WORKER_BATCH', inferenceStartedAt: 100, inferenceEndedAt: 110 });
+  expect(JSON.stringify(beatTelemetry.snapshot())).not.toContain('scores');
+  runtime.stop();
+});
 it('reports a post-ready failure once and releases inference without accepting old results', async () => {
   vi.useFakeTimers(); const f = fixture(), onFailure = vi.fn(), onEvent = vi.fn();
   const loading = createPercussionRuntime({ ...f, onFailure, onEvent });

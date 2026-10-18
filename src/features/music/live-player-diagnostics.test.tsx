@@ -12,6 +12,21 @@ const music = {
   beat: { sessionId: 'song', mode: 'capture', eventPath: 'local', onsets: { kick: 12, clap: 1, hat: 18, bass: 3 } },
 } as BrowserMusicController;
 
+it('keeps source-bound preview readiness visible on the grid without changing normal or local Beta playback',()=>{
+  const capability={privateCandidate:true,reason:'detector-unqualified',livePreviewEligible:true,allowTypedPreview:false};
+  const controller={...music,selected:{...music.selected!,syncState:{...music.selected!.syncState!,capability}}} as BrowserMusicController;
+  const view=render(<MusicGrid music={controller}/>);
+  expect(screen.getByRole('status',{name:'Instrument preview status'})).toHaveTextContent('source changes turn preview off');
+  capability.allowTypedPreview=true;view.rerender(<MusicGrid music={controller}/>);
+  expect(screen.getByRole('status',{name:'Instrument preview status'})).toHaveTextContent('Unverified instrument preview is on');
+  capability.reason='protected-source';view.rerender(<MusicGrid music={controller}/>);
+  expect(screen.getByRole('status',{name:'Instrument preview status'})).toHaveTextContent('unavailable for this protected source');
+  view.rerender(<MusicGrid music={{...controller,beta:{enabled:true} as BrowserMusicController['beta']}}/>);
+  expect(screen.queryByRole('status',{name:'Instrument preview status'})).toBeNull();
+  view.rerender(<MusicGrid music={music}/>);
+  expect(screen.queryByRole('status',{name:'Instrument preview status'})).toBeNull();
+});
+
 it('keeps retained Lead readiness in private diagnostics without an ordinary fifth-row strip', () => {
   history.replaceState(null, '', '?musicDebug=1');
   vi.stubEnv('DEV', true); vi.stubEnv('VITE_LEAD_PULSE_PROCESSING_ENABLED', 'false');

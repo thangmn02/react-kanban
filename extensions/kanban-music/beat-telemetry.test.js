@@ -2,6 +2,19 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { beatTelemetry, createBeatTelemetry, parseBeatTraces } from './beat-telemetry.js';
 
 afterEach(() => { beatTelemetry.enable(false); beatTelemetry.clear(); vi.restoreAllMocks(); });
+it('keeps detector timing numeric, opt-in and separate from raw model diagnostics', () => {
+  const log = createBeatTelemetry();
+  log.record('DETECTOR_TIMING', undefined, { inferenceStartedAt: 10 });
+  expect(log.snapshot().records).toEqual([]);
+  log.enable();
+  log.record('DETECTOR_TIMING', undefined, {
+    peakFeatureAvailableAudioTime: 1.02, modelInputAudioTime: 1.1,
+    inferenceStartedAt: 100, inferenceEndedAt: 120, decisionAt: 170,
+    featurePostedAt: NaN, workerReceivedAt: -1, scores: [.9], samples: [.1], url: 'private', title: 'private',
+  });
+  expect(log.snapshot().records[0]).toMatchObject({ modelInputAudioTime: 1.1, inferenceStartedAt: 100, decisionAt: 170 });
+  expect(JSON.stringify(log.snapshot())).not.toMatch(/private|scores|samples|featurePostedAt|workerReceivedAt/);
+});
 it('records only bounded eligibility facts for a preview revocation',()=>{
  const log=createBeatTelemetry();log.enable();log.record('PREVIEW_REVOKED',undefined,{trigger:'clock',previewReason:'clock-unreliable',generation:2,clockAgeMs:12,playing:true,paused:false,buffering:true,sourceUrl:'https://private.test/song',subscriptionId:'private-subscription',arbitrary:'private'});
  expect(log.snapshot().records[0]).toMatchObject({stage:'PREVIEW_REVOKED',trigger:'clock',previewReason:'clock-unreliable',generation:2,clockAgeMs:12,buffering:true});

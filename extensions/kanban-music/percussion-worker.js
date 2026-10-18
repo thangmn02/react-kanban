@@ -14,17 +14,19 @@ async function drain() {
           frames = []; count = 0; classifier.reset();
         }
         lastTime = time;
-        frames.push({ data: block.data.slice(i * config.bins, (i + 1) * config.bins), time });
+        frames.push({ data: block.data.slice(i * config.bins, (i + 1) * config.bins), time,
+          ...(config.telemetry ? { availableAudioTime: block.availableAudioTime } : {}) });
         if (frames.length > config.windowFrames) frames.shift();
         if (++count % config.stepFrames) continue;
         const input = new Float32Array(config.windowFrames * config.bins);
         const offset = config.windowFrames - frames.length;
         for (let j = 0; j < frames.length; j++) input.set(frames[j].data, (offset + j) * config.bins);
         const began = performance.now();
-        const inferenceStartedAt = config.diagnostics ? Date.now() : undefined;
+        const inferenceStartedAt = config.diagnostics || config.telemetry ? Date.now() : undefined;
         const output = await session.run({ [config.input]: new ort.Tensor('float32', input,
           [1, config.windowFrames, config.bins, 1]) });
         if (stopped) return;
+        const inferenceEndedAt = config.diagnostics || config.telemetry ? Date.now() : undefined;
         const scores = output[config.output].data;
         const events = [];
         const from = config.windowFrames - config.rightContext - config.stepFrames;
@@ -34,8 +36,17 @@ async function drain() {
           if (source) {
             const classes = config.scoreClasses || 5;
             const values = Array.from(scores.slice(j * classes, (j + 1) * classes));
-            const decision = classifier.push(values, source.time);
+            const timing = config.telemetry ? {
+              peakFeatureAvailableAudioTime: source.availableAudioTime,
+              modelInputAudioTime: time, modelInputAvailableAudioTime: block.availableAudioTime,
+              featurePostedAt: block.postedAt, workerReceivedAt: block.receivedAt,
+              inferenceStartedAt, inferenceEndedAt,
+            } : undefined;
+            const decision = classifier.push(values, source.time, timing);
             const accepted = decision.events;
+            if (config.telemetry) for (const event of accepted) event.timing = {
+              ...event.timing, decisionAudioTime: source.time, decisionAt: Date.now(),
+            };
             events.push(...accepted);
             if (config.diagnostics) diagnostics.push({ audioTime: source.time, scores: values, decisions:decision.decisions,
               events: accepted.map(event => ({ ...event, decisionAudioTime: source.time })) });
@@ -43,8 +54,13 @@ async function drain() {
         }
         self.postMessage({ kind: 'result', events, outcome: events.length ? 'percussion' : 'non-percussion/abstain',
           durationMs: performance.now() - began, queueDepth: queue.length, processedAudioTime: time,
+          ...(config.telemetry ? { timing: {
+            featurePostedAt: block.postedAt, workerReceivedAt: block.receivedAt,
+            inferenceStartedAt, inferenceEndedAt, modelInputAudioTime: time,
+            modelInputAvailableAudioTime: block.availableAudioTime, featureComputeMs: block.featureComputeMs,
+          } } : {}),
           ...(config.diagnostics ? { diagnostics, postedAt: block.postedAt, workerReceivedAt: block.receivedAt,
-            availableAudioTime: block.availableAudioTime, inferenceStartedAt, inferenceEndedAt: Date.now() } : {}) });
+            availableAudioTime: block.availableAudioTime, inferenceStartedAt, inferenceEndedAt } : {}) });
       }
     }
   } catch { self.postMessage({ kind: 'failed' }); stopped = true; }
@@ -72,6 +88,6 @@ self.onmessage = async ({ data }) => {
   if (data.kind === 'frames' && !stopped && data.times?.length === config?.stepFrames
     && data.data?.length === data.times.length * config.bins) {
     if (queue.length >= 3) { queue.shift(); self.postMessage({ kind: 'backlog' }); }
-    queue.push({ ...data, ...(config.diagnostics ? { receivedAt: Date.now() } : {}) }); void drain();
+    queue.push({ ...data, ...(config.diagnostics || config.telemetry ? { receivedAt: Date.now() } : {}) }); void drain();
   }
 };

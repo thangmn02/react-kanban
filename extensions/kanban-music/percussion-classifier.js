@@ -37,12 +37,12 @@ export class PercussionClassifier {
     return rolling;
   }
 
-  push(scores, audioTime) {
+  push(scores, audioTime, timing) {
     if (!Array.isArray(scores) || scores.length !== 5 || !scores.every(n => Number.isFinite(n) && n >= 0 && n <= 1)
       || !Number.isFinite(audioTime)) return { outcome: 'abstain', events: [] };
     if (this.lastTime !== null && Math.abs(audioTime - this.lastTime - .01) > .005) this.reset();
     this.lastTime = audioTime;
-    this.frames.push({ scores, audioTime });
+    this.frames.push({ scores, audioTime, timing });
     const frame = this.count++ - 2;
     const events = [];
     const decisions = this.diagnostics ? [] : undefined;
@@ -71,6 +71,7 @@ export class PercussionClassifier {
           classMargin: value - this.thresholds[c],
           audioTime: source.audioTime,
           scores: source.scores,
+          ...(source.timing ? { timing: source.timing } : {}),
         };
         // A new activation rise after a deep intervening valley is a distinct
         // proposal, even when the preceding peak is still awaiting finalization.

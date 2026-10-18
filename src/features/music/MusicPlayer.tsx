@@ -79,8 +79,16 @@ export function MusicGrid({ music, colorMode = 'random', palette = 'bloom', orie
     <button type="button" onClick={()=>setDemo(false)}>Return to live Beat Grid</button>
     <Suspense fallback={<p>Loading private Melody comparison…</p>}><PrivateMelodyDemo /></Suspense>
   </div>;
+  const capability=music.selected?.syncState?.capability;
+  const previewStatus=!music.beta?.enabled&&capability?.privateCandidate
+    ?capability.reason==='protected-source'?'Instrument flashes are unavailable for this protected source. Music playback controls still work.'
+    :capability.reason==='provider-policy'?'Instrument flashes are unavailable for this provider under the private test policy. Music playback controls still work.'
+    :capability.allowTypedPreview?'Unverified instrument preview is on. Flashes can lag or be incorrect.'
+    :capability.livePreviewEligible?'Instrument preview is off for this source. Open Music → Private candidate → Live preview to enable it. Pause, seek and source changes turn preview off.'
+    :null:null;
   const grid=<BeatPattern key={music.selected?.id} session={music.selected} beat={music.beat} colorMode={colorMode} palette={palette} orientation={orientation} semanticOnly={music.beta?.enabled?true:undefined} melodyEnabled={music.beta?.enabled&&music.beta.melody} independentRows={music.beta?.enabled} melodyEvents={music.beta?.enabled?music.beta.clip?.lead?.events:undefined} />;
   return <>
+    {previewStatus&&<p role="status" aria-label="Instrument preview status">{previewStatus}</p>}
     {music.beta?.enabled?<div className={`hybrid-grid-frame${music.beta.renderer==='short'?' hybrid-short-attack':''}`}>{grid}</div>:grid}
     {showDebug && <details className="music-debug" open><summary>Beat debug</summary>
       {PrivateMelodyDemo&&<button type="button" onClick={()=>setDemo(true)}>Open saved Lead listening demo</button>}
