@@ -15,6 +15,13 @@ vi.mock('./mediaBridge', () => ({
 beforeEach(() => { vi.useFakeTimers(); bridge.send.mockResolvedValue(undefined); });
 afterEach(() => { cleanup(); beatTelemetry.enable(false); beatTelemetry.clear(); vi.useRealTimers(); vi.clearAllMocks(); vi.restoreAllMocks(); });
 const emit = (event: BeatEvent) => act(() => { bridge.receive?.(event); });
+it('unsubscribes an injected local transport before immediate pagehide release',async()=>{
+ const listeners=new Set<(event:BeatEvent)=>void>();let active=false;
+ const transport={subscribe:(receive:(event:BeatEvent)=>void)=>{listeners.add(receive);return()=>{listeners.delete(receive);};},start:vi.fn(async()=>{active=true;}),stop:vi.fn(async()=>{if(!listeners.size)active=false;})};
+ const options={capabilities:{tier:'tab-capture' as const,captureClock:'output-clock-capable' as const},transport};
+ const onClock=vi.fn();const {unmount}=renderHook(()=>useMusicBeatSync('owned:test',onClock,options));await act(async()=>{});expect(active).toBe(true);
+ act(()=>window.dispatchEvent(new Event('pagehide')));expect(listeners.size).toBe(0);expect(active).toBe(false);unmount();expect(transport.stop).toHaveBeenCalledOnce();
+});
 it.each([false,true])('preserves 20/30/50/100 ms local attacks through controller (event engine %s)',async withEngine=>{
   beatTelemetry.enable();
   const options=withEngine?{demand:false,capabilities:{tier:'tab-capture' as const,captureClock:'output-clock-capable' as const}}:undefined;

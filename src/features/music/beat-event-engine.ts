@@ -11,7 +11,12 @@ import type { LeadAvailability } from './lead-feature';
 import { verifiedTrackMatches, type BeatMode } from '../../../extensions/kanban-music/beat-mode.js';
 
 export type BeatEventPath = 'cache' | 'local' | 'degraded';
-export interface BeatEventOptions { asset?: MediaAsset; duration?: number; capabilities: BeatCapabilities; initialClock?: MusicClock; demand?: boolean; capturedInput?: boolean; privateCandidate?: boolean; verifiedSource?: {id:string;version:string;contentSha256:string}; onLeadAvailability?: (state: LeadAvailability) => void }
+export interface BeatEventOptions { asset?: MediaAsset; duration?: number; capabilities: BeatCapabilities; initialClock?: MusicClock; demand?: boolean; capturedInput?: boolean; privateCandidate?: boolean; verifiedSource?: {id:string;version:string;contentSha256:string}; onLeadAvailability?: (state: LeadAvailability) => void;
+  /** An owned local recording may supply an exact, private precomputed client. */
+  eventTrackClient?: EventTrackClient;
+  independentLocalRows?: readonly EventRow[];
+  transport?: {subscribe(receive:(event:BeatEvent)=>void):()=>void;start():Promise<void>;stop():Promise<void>};
+}
 const telemetry = beatTelemetry.at('beat-event-engine');
 const crossSourceTolerance = .04;
 // Same-source attacks this close share a quantized onset. Wider reconciliation
@@ -29,7 +34,7 @@ export function createBeatEventEngine(options: BeatEventOptions, emit: (event: B
   let mode: BeatMode | undefined;
   const lifetime = new AbortController();
   let range = new AbortController();
-  const client: EventTrackClient | undefined = options.asset && clientFactory(options.asset, lifetime.signal, options.duration);
+  const client: EventTrackClient | undefined = options.eventTrackClient || options.asset && clientFactory(options.asset, lifetime.signal, options.duration);
   let clock: MusicClock | undefined, manifest: TrackManifest | undefined;
   let stopped = false, epoch = 0, captureId = crypto.randomUUID(), sequence = 0, melody = 0;
   let localCapture: string | undefined, localLive = false, muted = false, silent = false, localReason: string | undefined;
@@ -138,7 +143,7 @@ export function createBeatEventEngine(options: BeatEventOptions, emit: (event: B
       if (index < currentIndex - 1 || index > currentIndex + 1) return;
       chunks.set(index, chunk);
       telemetry.record('CACHE_HIT', undefined, { queueDepth: chunks.size });
-      for (const item of pending.values()) if (item.rank < 3 && Math.floor(item.time / CHUNK_SECONDS) === index) {
+      for (const item of pending.values()) if (item.rank < 3 && !options.independentLocalRows?.includes(item.row) && Math.floor(item.time / CHUNK_SECONDS) === index) {
         scheduler.cancelSemantic(item.key); pending.delete(item.key);
         telemetry.record('EVENT_REPLACED', undefined, { reason: 'priority' });
       }
@@ -347,7 +352,7 @@ export function createBeatEventEngine(options: BeatEventOptions, emit: (event: B
       if (event.kind === 'onset' || event.kind === 'melody.state' && event.melody.active) {
         const rows: EventRow[] = event.kind === 'onset' ? event.bands.map(b => b === 'clap' ? 'snare' : b) : ['melody'];
         for (const row of rows) {
-          if (coverage(timing.targetPlaybackTime)) {
+          if (coverage(timing.targetPlaybackTime) && !options.independentLocalRows?.includes(row)) {
             telemetry.mark('EVENT_DROPPED', event.telemetry?.filter(t => t.type === (row === 'melody' ? 'melodic' : row)), { reason: 'priority' }); continue;
           }
           const split: ScheduledEvent = event.kind === 'onset' ? { ...event, bands: [row === 'snare' ? 'clap' : row] } : event;

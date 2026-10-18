@@ -57,8 +57,12 @@ export function createBeatSync(api, nativePublish) {
       ...(privateBeatCandidate?{capability:capability(current)}:{}) });
   }
 
-  function revokeLivePreview(current) {
+  function revokeLivePreview(current,trigger) {
     if(!current.experiment?.live)return;
+    const mode=capability(current),clock=current.clock||{};
+    telemetry.record('PREVIEW_REVOKED',undefined,{captureId:current.captureId,trigger,previewReason:mode.livePreviewReason,
+      generation:clock.generation||0,clockAgeMs:Date.now()-clock.sampledAt,playing:clock.playing,paused:clock.paused,seeking:clock.seeking,buffering:clock.buffering,
+      captureHealthy:mode.captureHealthy,clockHealthy:mode.clockHealthy,outputOwned:mode.outputOwned,singleSource:mode.singleSource});
     current.experiment=undefined;current.synchronizationEpoch=crypto.randomUUID();
     void offscreenMessage({kind:'synchronization',captureId:current.captureId,
       settings:{bufferMs:0,eligible:false,allowTypedPreview:false,live:true,flush:true,epoch:current.synchronizationEpoch}}).catch(()=>{});
@@ -88,7 +92,7 @@ export function createBeatSync(api, nativePublish) {
     }
     void api.tabs.sendMessage(current.owner.tabId, { protocol: 'kanban-music-v1', event: 'beat',
       sessionId: current.session.id, subscriptionId: current.subscriptionId, ...event },
-    { documentId: current.owner.documentId }).catch(() => { telemetry.mark('EVENT_DROPPED', event.telemetry, { reason: 'transport' }); void stopIfCurrent(current); });
+    { documentId: current.owner.documentId }).catch(() => { telemetry.mark('EVENT_DROPPED', event.telemetry, { reason: 'transport' }); void stopIfCurrent(current,'transport'); });
   }
 
   async function ensureOffscreen() {
@@ -181,10 +185,11 @@ export function createBeatSync(api, nativePublish) {
     await current.captureTask;
   }
 
-  async function stopCurrent(keepOffscreen = false) {
+  async function stopCurrent(keepOffscreen = false,reason='stopped') {
     const previous = state;
     state = undefined;
     if (previous) {
+      telemetry.record('CAPTURE_STOP',undefined,{captureId:previous.captureId,reason});
       void api.tabs.sendMessage(previous.session.tabId, { target: 'beat-clock', kind: 'stop', token: previous.token },
         { documentId: previous.session.documentId }).catch(() => {});
       if (previous.captureId) await timeout(offscreenMessage({ kind: 'stop', captureId: previous.captureId }), 1000).catch(() => {});
@@ -196,8 +201,8 @@ export function createBeatSync(api, nativePublish) {
     await timeout(api.offscreen.closeDocument(), 1000).catch(() => {});
   }
 
-  function stopIfCurrent(current) {
-    return serialize(async () => { if (state === current) await stopCurrent(); });
+  function stopIfCurrent(current,reason='stopped') {
+    return serialize(async () => { if (state === current) await stopCurrent(false,reason); });
   }
 
   function stop(owner, subscriptionId) {
@@ -259,11 +264,12 @@ export function createBeatSync(api, nativePublish) {
           }
           if (current.tabMuted) cancelCapture(current);
           else void capture(current);
-          if(current.experiment?.live&&!capability(current).livePreviewEligible)revokeLivePreview(current);
+          if(current.experiment?.live&&!capability(current).livePreviewEligible)revokeLivePreview(current,'renewal');
           publishState(current);
           return;
         }
-        await stopCurrent(true);
+        if(state)telemetry.record('CAPTURE_REPLACED',undefined,{captureId:state.captureId,sameOwner:sameOwner(state.owner,owner),sameNativeAudio:state.owner.nativeAudio===owner.nativeAudio,sameSubscription:state.subscriptionId===subscriptionId,sameSession:state.session.id===session.id,sameSource:state.session.src===session.src});
+        await stopCurrent(true,'replaced');
         const current = { owner, session, subscriptionId, diagnostics: diagnostics === true, token: crypto.randomUUID(), mode: 'clock', retryAt: 0,
           tabMuted: session.tabMuted, clock: session };
         state = current;
@@ -271,7 +277,7 @@ export function createBeatSync(api, nativePublish) {
         try {
           if (!await startClock(current)) throw new Error('Clock unavailable');
           void capture(current);
-        } catch { if (state === current) await stopCurrent(); }
+        } catch { if (state === current) await stopCurrent(false,'clock-disconnected'); }
       });
     },
     stop,
@@ -335,7 +341,7 @@ export function createBeatSync(api, nativePublish) {
     clock(message, sender) {
       const current = state;
       if (!current || sender.tab?.id !== current.session.tabId || sender.documentId !== current.session.documentId || message.token !== current.token) return;
-      if (!message.valid) { publish(current, { kind: 'clock', clock: { ...current.clock, playing: false, paused: true } }); void stopIfCurrent(current); return; }
+      if (!message.valid) { publish(current, { kind: 'clock', clock: { ...current.clock, playing: false, paused: true } }); void stopIfCurrent(current,'track-changed'); return; }
       const clock = message.clock;
       if (!parsePlaybackClock(clock) || current.clock && clock.sampledAt < current.clock.sampledAt) return;
       const resumed = (!current.clock?.playing || current.clock?.muted) && clock.playing && !clock.muted;
@@ -346,7 +352,7 @@ export function createBeatSync(api, nativePublish) {
       telemetry.record('EVENT_RECEIVED', undefined, { captureId: current.captureId });
       if (resumed) current.retryAt = 0;
       if (discontinuity) { current.retryAt = 0; cancelCapture(current); }
-      if(privateBeatCandidate&&current.experiment?.live&&(!clock.playing||!capability(current).livePreviewEligible))revokeLivePreview(current);
+      if(privateBeatCandidate&&current.experiment?.live&&(!clock.playing||!capability(current).livePreviewEligible))revokeLivePreview(current,'clock');
       if(privateBeatCandidate&&current.delaySeconds&&((!clock.playing&&previous?.playing)||!capability(current).bufferEligible)) {
         // Empty the old DelayNode on pause/unsafe source changes. A fresh node
         // retains the fixed delay only for the same paused, eligible source.
@@ -426,6 +432,11 @@ export function createBeatSync(api, nativePublish) {
     },
     tabClosed(tabId) {
       if (state && (state.session.tabId === tabId || state.owner.tabId === tabId)) void stopIfCurrent(state);
+    },
+    tabLoading(tabId) {
+      // Source navigation invalidates its audio immediately. App SPA URL updates
+      // keep the same document; pagehide, receiver failure and leases release it.
+      if(state?.session.tabId===tabId)void stopIfCurrent(state,'track-changed');
     },
     tabMuted(tabId, muted) {
       if (state?.session.tabId !== tabId) return;

@@ -19,6 +19,21 @@ const setup = (client: EventTrackClient, config = options) => {
   engine.accept({ kind: 'clock', clock: clock() });
   return { events, engine, recover };
 };
+it('keeps independent Bass concurrent with cached Kick and Hat',async()=>{
+ const client:EventTrackClient={manifest:async()=>manifest,chunk:async(_m,index)=>({...chunk(index,10.25),events:index===0?[{id:'kick',time:10.25,row:'kick',confidence:.9},{id:'hat',time:10.25,row:'hat',confidence:.9}]:[]}),requestAnalysis:async()=> 'unavailable'};
+ const {engine,events}=setup(client,{...options,independentLocalRows:['bass']});
+ await vi.advanceTimersByTimeAsync(100);engine.accept({kind:'sync.state',mode:'capture',captureId:'bass-owner'});
+ engine.accept({kind:'onset',captureId:'bass-owner',sequence:1,bands:['bass'],targetPlaybackTime:10.25,playbackClock:clock()});
+ await vi.advanceTimersByTimeAsync(300);expect(semantic(events).filter(e=>e.kind==='onset').map(e=>e.bands[0]).sort()).toEqual(['bass','hat','kick']);
+});
+it('does not cancel queued independent Bass when a percussion cache arrives',async()=>{
+ let resolveChunk!:(value:TrackChunk)=>void;
+ const client:EventTrackClient={manifest:async()=>manifest,chunk:async(_m,index)=>index===0?new Promise(done=>{resolveChunk=done;}):({...chunk(index),events:[]}),requestAnalysis:async()=> 'unavailable'};
+ const {engine,events}=setup(client,{...options,independentLocalRows:['bass']});
+ await vi.advanceTimersByTimeAsync(100);engine.accept({kind:'sync.state',mode:'capture',captureId:'bass-owner'});
+ engine.accept({kind:'onset',captureId:'bass-owner',sequence:1,bands:['bass'],targetPlaybackTime:10.4,playbackClock:clock()});resolveChunk(chunk(0,10.4));
+ await vi.advanceTimersByTimeAsync(400);expect(semantic(events).filter(e=>e.kind==='onset').map(e=>e.bands[0]).sort()).toEqual(['bass','kick']);
+});
 it('keeps private predictions degraded until the capture policy permits an experimental preview',async()=>{
   const client: EventTrackClient={manifest:vi.fn().mockResolvedValue(manifest),chunk:vi.fn().mockResolvedValue(chunk(0,10.2)),requestAnalysis:vi.fn().mockResolvedValue('ready')};
   const {engine,events}=setup(client,{...options,privateCandidate:true});

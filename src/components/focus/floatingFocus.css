@@ -328,3 +328,12 @@ h2 { font-size: 15px; line-height: 1.4; margin: 0; overflow-wrap: anywhere; }
 .music-skip svg,.music-mute svg { width:20px; height:20px; }
 .music-volume { display:flex; align-items:center; gap:8px; color:rgba(255,255,255,.92); }
 .music-volume input { flex:1; min-width:0; }
+
+.hybrid-beta-controls{font-size:12px;line-height:1.5;padding:12px;max-width:100%;max-height:35dvh;overflow:auto;flex-shrink:0;border:1px solid var(--app-border,#454550);border-radius:12px;margin-top:12px}
+.hybrid-grid-frame{min-height:0;overflow:auto}.hybrid-grid-frame .music-pattern.horizontal[data-melody-enabled=true]{grid-template-rows:repeat(5,clamp(12px,3cqh,20px));gap:4px}
+.semantic-only .beat-channel[data-track=melody] .beat-square.onset[style]{animation-duration:var(--melody-trail,150ms)}
+.hybrid-beta-controls label{display:flex;gap:8px;align-items:center;margin:8px 0;flex-wrap:wrap}.hybrid-beta-controls select,.hybrid-beta-controls input[type=file]{max-width:100%;min-width:0}.hybrid-beta-controls pre{max-height:200px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}.hybrid-beta-controls p{margin:8px 0;overflow-wrap:anywhere}
+.hybrid-short-attack .semantic-only .beat-channel[data-track=kick] .beat-square.onset,.hybrid-short-attack .semantic-only .beat-channel[data-track=snare] .beat-square.onset,.hybrid-short-attack .semantic-only .beat-channel[data-track=hat] .beat-square.onset{animation:hybrid-short-attack 40ms linear both}
+@keyframes hybrid-short-attack{0%{background:var(--ci,#eef0f3);box-shadow:0 0 8px var(--c,#7db4ee)}100%{background:var(--c,#7db4ee);box-shadow:none}}
+@media(prefers-reduced-motion:reduce){.hybrid-short-attack .semantic-only .beat-square.onset{animation:none}}
+@media(prefers-reduced-motion:reduce){.hybrid-grid-frame .semantic-only .beat-square.onset{animation:none!important;background:var(--c,#7db4ee);border-color:transparent;box-shadow:none;transform:none}}

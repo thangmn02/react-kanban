@@ -7,6 +7,7 @@ import { getBeatSource, isNativeWidget } from '../native/runtime';
 import { beatCapabilities } from './beat-capabilities';
 import { leadPulseEnabled, leadProcessingEnabled } from './lead-feature';
 import { companionLeadInputEnabled } from './companion-lead-audio';
+import {useLocalHybridMusic} from './use-local-hybrid-music';
 
 interface MusicSelection {
   sessions: BrowserMusicSession[];
@@ -38,6 +39,7 @@ function updateSelection(current: MusicSelection, next: BrowserMusicSession[], t
 
 // Keep discovery alive even while the music panel is hidden.
 export function useBrowserMusic(beatDemand = false) {
+  const beta=useLocalHybridMusic(beatDemand);
   const { t } = useI18n();
   const [{ sessions, selectedId }, setMusic] = useState<MusicSelection>({ sessions: [], selectedId: '', explicitSelection: false, selectionToken: '' });
   const [connected, setConnected] = useState(false);
@@ -86,7 +88,7 @@ export function useBrowserMusic(beatDemand = false) {
       : companionLeadInputEnabled(provider && mediaId ? { provider, id: mediaId } : undefined)),
     duration, capabilities: beatCapabilities(isNativeWidget(), canAnalyze !== false),
   }), [provider, mediaId, duration, canAnalyze]);
-  const beat = useMusicBeatSync(selected?.id, updateClock, eventOptions, beatDemand);
+  const beat = useMusicBeatSync(beta.enabled?undefined:selected?.id, updateClock, eventOptions, beatDemand&&!beta.enabled);
   async function toggle() {
     if (!selected || busy) return;
     setBusy(true);
@@ -116,9 +118,9 @@ export function useBrowserMusic(beatDemand = false) {
     finally { setBusy(false); }
   }
   const refresh = () => { setChecking(true); setAttempt((value) => value + 1); };
-  return { sessions, selected, setSelectedId, connected, checking, error, busy, toggle, openMusicTab, refresh, beat, control,
+  return { ...(beta.enabled?beta.controller:{ sessions, selected, setSelectedId, connected, checking, error, busy, toggle, openMusicTab, refresh, beat, control,
     source: getBeatSource(connected),
-    playing: Boolean(selected && !selected.paused && selected.playing !== false) };
+    playing: Boolean(selected && !selected.paused && selected.playing !== false) }),beta };
 }
 
 export type BrowserMusicController = ReturnType<typeof useBrowserMusic>;

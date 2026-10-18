@@ -13,6 +13,22 @@ const trace = (type: string, time: number, eventSource: 'local' | 'cache' = 'cac
   origin: eventSource === 'cache' ? 'event-track-cache' as const : 'capture-engine' as const,
 });
 afterEach(() => { cleanup(); beatRowDiagnostics.semanticOnly(false); beatTelemetry.clear(); beatTelemetry.enable(false); vi.useRealTimers(); });
+it('gives one saved Lead attack a bounded duration trail without repeated commits',async()=>{
+ vi.useFakeTimers();beatTelemetry.enable();const melodyEvents=[{id:'note',duration:2}];const view=render(<SemanticBeatPattern session={session} beat={live} melodyEnabled independentRows melodyEvents={melodyEvents}/>);
+ const note={...trace('melodic',1),eventId:'note'};view.rerender(<SemanticBeatPattern session={session} beat={{...live,telemetry:{note}}} melodyEnabled independentRows melodyEvents={melodyEvents}/>);
+ await act(async()=>{await vi.advanceTimersByTimeAsync(200);});expect(view.container.querySelector('[data-event-id="note"]')).not.toBeNull();
+ expect(beatTelemetry.snapshot().records.filter(r=>r.stage==='EVENT_COMMITTED')).toHaveLength(1);
+ await act(async()=>{await vi.advanceTimersByTimeAsync(260);});expect(view.container.querySelector('[data-event-id="note"]')).toBeNull();
+});
+
+it('preserves Bass when a later percussion batch arrives and expires each row independently',async()=>{
+ vi.useFakeTimers();beatRowDiagnostics.start();const view=render(<SemanticBeatPattern session={session} beat={live} melodyEnabled={false} independentRows/>);
+ const bass=trace('bass',1,'local'),kick=trace('kick',1.05);
+ view.rerender(<SemanticBeatPattern session={session} beat={{...live,telemetry:{bass}}} melodyEnabled={false} independentRows/>);await act(async()=>{await vi.advanceTimersByTimeAsync(50);});
+ view.rerender(<SemanticBeatPattern session={session} beat={{...live,telemetry:{bass,kick}}} melodyEnabled={false} independentRows/>);await act(async()=>{await vi.advanceTimersByTimeAsync(5);});
+ expect(view.container.querySelector('[data-track="bass"] [data-beat-trace]')).toHaveAttribute('data-beat-trace',bass.id);expect(view.container.querySelector('[data-track="kick"] [data-beat-trace]')).toHaveAttribute('data-beat-trace',kick.id);
+ await act(async()=>{await vi.advanceTimersByTimeAsync(100);});expect(view.container.querySelector('[data-track="bass"] [data-beat-trace]')).toBeNull();expect(view.container.querySelector('[data-track="kick"] [data-beat-trace]')).not.toBeNull();
+});
 
 it('keeps independent drum flashes visible when the next batch contains another row', async () => {
   vi.useFakeTimers(); beatRowDiagnostics.start();

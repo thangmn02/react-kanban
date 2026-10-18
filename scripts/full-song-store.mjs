@@ -10,7 +10,7 @@ import {frameCoverage,feedbackTypes} from './full-song-core.ts';
 import {createHybridRouter} from './full-song-hybrid.mjs';
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 export {feedbackTypes};
-export async function createFullSongStore(root){
+export async function createFullSongStore(root,{allowedOrigins=['http://127.0.0.1:5173','http://localhost:5173']}={}){
  const hybridRoute=await createHybridRouter();
  const {stdout}=await promisify(execFile)(resolve('scratch/beat-grid-v2/.venv/Scripts/python.exe'),['scripts/prepare-full-song.py','--identity'],{windowsHide:true,maxBuffer:1024*1024});const currentContract=JSON.parse(stdout).contractSha256;
  await mkdir(root,{recursive:true});const indexPath=resolve(root,'songs.json'),jobs=new Map(),queue=[];let running;
@@ -53,11 +53,11 @@ export async function createFullSongStore(root){
   if(process.platform==='win32')await new Promise(done=>{const killer=spawn('taskkill',['/PID',String(job.child.pid),'/T','/F'],{windowsHide:true,stdio:'ignore'});killer.once('exit',done);killer.once('error',done);});else job.child.kill('SIGTERM');
  }
  async function register(path,filename,slot){
-  if(!Object.hasOwn(index.slots,slot))throw Error('Unknown song entry');
+  if(slot!=='retained'&&!Object.hasOwn(index.slots,slot))throw Error('Unknown song entry');
   const hash=createHash('sha256');for await(const chunk of createReadStream(path))hash.update(chunk);const id=hash.digest('hex');
   const dir=resolve(root,id);await mkdir(dir,{recursive:true});const target=resolve(dir,'source'+extname(filename).toLowerCase());
   if(!index.sources[id]){await rename(path,target);index.sources[id]={id,filename,source:target,createdAt:new Date().toISOString()};}else await unlink(path);
-  index.slots[slot]=id;await saveIndex();const entry=index.sources[id];await writeFile(resolve(dir,'job.json'),JSON.stringify({folder:dir,source:entry.source,filename:entry.filename}));await enqueue(id);return id;
+  if(slot!=='retained')index.slots[slot]=id;await saveIndex();const entry=index.sources[id];await writeFile(resolve(dir,'job.json'),JSON.stringify({folder:dir,source:entry.source,filename:entry.filename}));await enqueue(id);return id;
  }
  const verifiedAudio=new Map();
  const verifiedCoverage=new Map();
@@ -87,14 +87,14 @@ export async function createFullSongStore(root){
  async function handle(request,response,url){
   const path=url.pathname;if(!path.startsWith('/lab/full/'))return false;
   const json=value=>{response.setHeader('Content-Type','application/json');response.end(JSON.stringify(value));};
-  if(request.method==='POST'&&!['http://127.0.0.1:5173','http://localhost:5173'].includes(request.headers.origin))throw Error('Same-origin local preparation required');
+  if(request.method==='POST'&&!allowedOrigins.includes(request.headers.origin))throw Error('Same-origin local preparation required');
   if(path==='/lab/full/songs'&&request.method==='GET'){
    const retained={};for(const [id,entry] of Object.entries(index.sources))retained[id]={...entry,source:undefined,status:await status(id)};
    const songs={};for(const [slot,id] of Object.entries(index.slots))songs[slot]=id?retained[id]:null;json({version:1,songs,retained,limits:{uploadMiB:256,maxDurationSeconds:720,workerGiB:6,concurrency:1}});return true;
   }
   if(path==='/lab/full/upload'&&request.method==='POST'){
    const filename=decodeURIComponent(String(request.headers['x-audio-filename']||''));if(!filename||filename.length>250||/[\\/\x00-\x1f]/.test(filename)||!['.mp3','.wav','.flac'].includes(extname(filename).toLowerCase()))throw Error('Choose a local MP3, WAV or FLAC file');
-   const slot=url.searchParams.get('slot');if(!Object.hasOwn(index.slots,slot))throw Error('Unknown song entry');
+   const slot=url.searchParams.get('slot');if(slot!=='retained'&&!Object.hasOwn(index.slots,slot))throw Error('Unknown song entry');
    const temp=resolve(root,'upload-'+randomUUID()+'.tmp'),file=await open(temp,'wx');let size=0;
    try{for await(const chunk of request){size+=chunk.length;if(size>256*1024**2)throw Error('Upload exceeds 256 MiB private limit');await file.write(chunk);}}catch(error){await file.close();await unlink(temp).catch(()=>{});throw error;}await file.close();if(!size){await unlink(temp);throw Error('Empty file');}
    json({id:await register(temp,filename,slot)});return true;

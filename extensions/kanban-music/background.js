@@ -121,7 +121,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     if (sender.id !== chrome.runtime.id || (sender.url !== chrome.runtime.getURL('setup.html') && !allowedRequest(message, sender))) {
       respond({ ok: false, error: 'unavailable' }); return false;
     }
-    void diagnoseDiscovery(chrome, mediaSites).then((tabs) => respond({ ok: true, tabs }), () => respond({ ok: false, error: 'unavailable' }));
+    void diagnoseDiscovery(chrome, mediaSites).then((tabs) => respond({ ok: true, tabs, ...(beatTelemetry.enabled?{telemetry:beatTelemetry.snapshot()}:{}) }), () => respond({ ok: false, error: 'unavailable' }));
     return true;
   }
   if (message?.target === 'beat-offscreen') return false;
@@ -141,7 +141,7 @@ chrome.action.onClicked.addListener((tab) => {
 });
 chrome.tabs.onRemoved.addListener((tabId) => beats.tabClosed(tabId));
 chrome.tabs.onUpdated.addListener((tabId, change) => {
-  if (change.status === 'loading') beats.tabClosed(tabId);
+  if (change.status === 'loading') beats.tabLoading(tabId);
   if (change.mutedInfo) beats.tabMuted(tabId, change.mutedInfo.muted);
 });
 

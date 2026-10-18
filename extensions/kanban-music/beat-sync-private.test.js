@@ -1,6 +1,7 @@
 import {expect,it,vi} from 'vitest';
 vi.mock('./beat-candidate.js',()=>({privateBeatCandidate:true,candidateDetector:{id:'adtof',version:'1',privateUseAllowed:true,trained:true,accuracyQualified:false}}));
 import {createBeatSync} from './beat-sync.js';
+import {beatTelemetry} from './beat-telemetry.js';
 function fixture() {
   const facts={kind:'audio-only',noVideo:true,noFrames:true,singleSource:true};
   const session={id:'source',src:'http://127.0.0.1:5174/test.wav',tabId:12,documentId:'media',index:0,
@@ -19,6 +20,21 @@ function fixture() {
     sync.clock({token,valid:true,clock:{...session,...sample,sampledAt:Date.now()}},sender);};
   return {sync,api,session,owner,clock,setCalibration:value=>{calibration=value;}};
 }
+it('records the precise transient clock reason while still revoking live preview immediately',async()=>{
+ beatTelemetry.enable();const f=fixture();try{
+  await f.sync.start(f.session,f.owner,'sub');await vi.waitFor(()=>expect(f.sync.status(f.session).mode).toBe('capture'));await f.sync.start(f.session,f.owner,'sub');
+  const captureId=f.sync.status(f.session).captureId;
+  expect(await f.sync.configure(f.session,f.owner,{enabled:true,captureId,generation:1,live:true,latencyAccepted:true,outputHeard:true,authorizedAudio:true,preview:true})).toBe(true);
+  f.clock({buffering:true});expect(f.sync.status(f.session).capability.allowTypedPreview).toBe(false);
+  expect(beatTelemetry.snapshot().records.find(r=>r.stage==='PREVIEW_REVOKED')).toMatchObject({trigger:'clock',previewReason:'clock-unreliable',buffering:true,captureId});
+ }finally{await f.sync.stop();beatTelemetry.enable(false);beatTelemetry.clear();}
+});
+it('retains consent on app SPA loading updates but releases capture on source navigation',async()=>{
+ const f=fixture();await f.sync.start(f.session,f.owner,'sub');await vi.waitFor(()=>expect(f.sync.status(f.session).mode).toBe('capture'));await f.sync.start(f.session,f.owner,'sub');const captureId=f.sync.status(f.session).captureId;
+ expect(await f.sync.configure(f.session,f.owner,{enabled:true,captureId,generation:1,live:true,latencyAccepted:true,outputHeard:true,authorizedAudio:true,preview:true})).toBe(true);
+ f.sync.tabLoading(f.owner.tabId);await Promise.resolve();expect(f.sync.status(f.session).captureId).toBe(captureId);expect(f.sync.status(f.session).capability.mode).toBe('experimental-live');
+ f.sync.tabLoading(f.session.tabId);await vi.waitFor(()=>expect(f.sync.status(f.session).captureId).toBeUndefined());await f.sync.stop();
+});
 it('freezes measured buffer sizing and revokes it when video appears',async()=>{
   const f=fixture();await f.sync.start(f.session,f.owner,'sub');
   await vi.waitFor(()=>expect(f.sync.status(f.session).mode).toBe('capture'));

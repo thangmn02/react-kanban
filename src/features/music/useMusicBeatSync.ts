@@ -225,7 +225,8 @@ export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessio
       (samples, clock) => { if (!cancelled) audioBuffer.push(samples, clock, clock.sampledAt); },
       () => audioBuffer.reset(), () => !cancelled && engine.needsCapturedAudio()) : undefined;
     if (engine && eventOptions?.initialClock) engine.accept({ kind: 'clock', clock: eventOptions.initialClock });
-    const unsubscribe = subscribeBeatEvents(sessionId, subscriptionId, (event) => {
+    const subscribe = eventOptions?.transport ? (_session:string,_subscription:string,receive:(event:BeatEvent)=>void)=>eventOptions.transport!.subscribe(receive) : subscribeBeatEvents;
+    const unsubscribe = subscribe(sessionId, subscriptionId, (event) => {
       if (event.kind === 'clock') audioBuffer?.clock(event.clock);
       if (event.kind === 'sync.state' && event.mode === 'clock') audioBuffer?.reset();
       if (engine) { engine.accept(event); return; }
@@ -254,7 +255,8 @@ export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessio
       if (renewing || cancelled) return;
       renewing = true;
       try {
-        await sendBeatRequest('dock.beat.sync.start', selectedSessionId, subscriptionId);
+        if(eventOptions?.transport)await eventOptions.transport.start();
+        else await sendBeatRequest('dock.beat.sync.start', selectedSessionId, subscriptionId);
         telemetry.record('LEASE_RENEW', undefined, { captureId });
       }
       catch { telemetry.record('LEASE_EXPIRED', undefined, { captureId, reason: 'transport' }); /* The watchdog removes stale capture state. */ }
@@ -271,13 +273,13 @@ export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessio
       clearTimeout(melodyLease);
       clearInterval(interval);
       clearInterval(watchdog);
-      const release = () => { void sendBeatRequest('dock.beat.sync.stop', sessionId, subscriptionId).catch(() => {}); };
+      const release = () => { void (eventOptions?.transport ? eventOptions.transport.stop() : sendBeatRequest('dock.beat.sync.stop', sessionId, subscriptionId)).catch(() => {}); };
       // A replacement's start takes ownership first; the old subscription's stop
       // is then harmless. Unmount still releases it, and pagehide releases immediately.
       if (immediate) release();
       else setTimeout(release, 0);
     };
-    const hide = () => stop(true);
+    const hide = () => { unsubscribe(); stop(true); };
     const interval = setInterval(() => { void renew(); }, 2000);
     const watchdog = setInterval(() => {
       if (Date.now() - lastLiveState <= 3500) return;

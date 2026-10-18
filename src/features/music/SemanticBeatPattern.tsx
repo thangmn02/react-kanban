@@ -6,7 +6,7 @@ import type { MusicBeatState } from './useMusicBeatSync';
 import type { BrowserMusicSession } from './mediaBridge';
 
 const telemetry = beatTelemetry.at('beat-renderer');
-export default function SemanticBeatPattern({ session, beat, orientation = 'horizontal', melodyEnabled = true }: { session?: BrowserMusicSession; beat: MusicBeatState; orientation?: 'horizontal' | 'vertical'; melodyEnabled?: boolean }) {
+export default function SemanticBeatPattern({ session, beat, orientation = 'horizontal', melodyEnabled = true, independentRows = false, melodyEvents }: { session?: BrowserMusicSession; beat: MusicBeatState; orientation?: 'horizontal' | 'vertical'; melodyEnabled?: boolean; independentRows?:boolean; melodyEvents?:readonly {id:string;duration:number}[] }) {
   const root = useRef<HTMLDivElement>(null);
   const owner = session?.playing && !session.paused && beat.mode === 'capture' && beat.sessionId === session.id
     ? `${session.id}:${beat.captureId}` : '';
@@ -29,22 +29,21 @@ export default function SemanticBeatPattern({ session, beat, orientation = 'hori
     if (!traces.length) return;
     const timer = setTimeout(() => { timers.current.delete(timer);
       if (gate.current.owner !== owner) return;
-      // A different row's next batch must not truncate a drum's animation.
-      // Bass and Melody retain their existing latest-batch presentation.
+      // Every semantic row owns its expiry; another row cannot truncate it.
       setFlashes(previous => ({ owner, traces: [...(previous.owner === owner ? previous.traces.filter(t =>
-        ['kick', 'snare', 'hat'].includes(t.type) && !traces.some(next => next.type === t.type)) : []), ...traces] }));
-      const ids = new Set(traces.filter(t => ['kick', 'snare', 'hat'].includes(t.type)).map(t => t.id));
-      if (ids.size) {
+        (independentRows||['kick','snare','hat'].includes(t.type))&&!traces.some(next => next.type === t.type)) : []), ...traces] }));
+      for(const trace of traces.filter(t=>independentRows||['kick','snare','hat'].includes(t.type))) {
+        const duration=independentRows&&trace.type==='melodic'?Math.max(150,Math.min(450,(melodyEvents?.find(e=>e.id===trace.eventId)?.duration||.15)*1000)):150;
         const expiry = setTimeout(() => {
           timers.current.delete(expiry);
           if (gate.current.owner === owner) setFlashes(current => current.owner === owner
-            ? { owner, traces: current.traces.filter(t => !ids.has(t.id)) } : current);
-        }, 150);
+            ? { owner, traces: current.traces.filter(t => t.id!==trace.id) } : current);
+        }, duration);
         timers.current.add(expiry);
       }
     }, 0);
     timers.current.add(timer);
-  }, [owner, beat.telemetry, melodyEnabled]);
+  }, [owner, beat.telemetry, melodyEnabled, independentRows, melodyEvents]);
   useEffect(() => {
     for (const element of root.current?.querySelectorAll<HTMLElement>('[data-beat-trace]') || []) {
       const trace = flashes.traces.find(t => t.id === element.dataset.beatTrace);
@@ -67,6 +66,7 @@ export default function SemanticBeatPattern({ session, beat, orientation = 'hori
         <span className="channel-icon">{row + 1}</span>
         {Array.from({ length: 8 }, (_, index) => <span key={`${index}:${index === cell ? trace?.id : ''}`}
           className={`beat-square${index === cell ? ' onset' : ''}`} {...flashAttributes(index === cell ? trace : undefined, row, index)}
+          style={independentRows&&type==='melody'?{'--melody-trail':`${Math.max(150,Math.min(450,(melodyEvents?.find(e=>e.id===trace?.eventId)?.duration||.15)*1000))}ms`} as CSSProperties:undefined}
           onAnimationStart={event => { if (event.target !== event.currentTarget || !trace || index !== cell) return;
             recordCellFlash(event.currentTarget, 'animation'); telemetry.record('EVENT_RENDERED', trace, { row: row + 1, cell: index + 1, semantic: true }); }} />)}
       </div>;

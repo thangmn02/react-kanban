@@ -11,6 +11,10 @@ function harness(origin = 'https://kanthangboard.netlify.app') {
   return { sendMessage, postMessage, page, receive: (data, options = {}) => receive?.({ source: page, origin, data, ...options }) };
 }
 const request = { channel: 'kanban-music-v1', direction: 'app-to-extension', requestId: 'request-1', action: 'sessions.get' };
+it('supports only the explicit local app origins on the native development port',()=>{
+ for(const origin of ['http://127.0.0.1:1420','http://localhost:1420']){const h=harness(origin);h.receive(request);expect(h.sendMessage).toHaveBeenCalledOnce();}
+ const h=harness('http://127.0.0.1:1421');h.receive(request);expect(h.sendMessage).not.toHaveBeenCalled();
+});
 it('preserves explicit live-preview consent and strips unrelated configuration fields',()=>{
   const h=harness();
   h.receive({...request,action:'beat.experimental.configure',sessionId:'song',configuration:{enabled:true,

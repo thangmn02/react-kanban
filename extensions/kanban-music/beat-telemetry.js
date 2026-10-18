@@ -5,6 +5,8 @@ const stages = new Set(['CAPTURE_START', 'CAPTURE_STOP', 'AUDIO_DETECTED', 'LOW_
   'EVENT_STATE_COMMITTED', 'EVENT_COMMITTED', 'EVENT_RENDERED', 'EVENT_SCHEDULED', 'ANALYSIS_FRAME', 'WORKER_BATCH']);
 const sources = new Set(['onset', 'tempo', 'random', 'lifecycle']);
 ['CACHE_HIT', 'CACHE_MISS', 'ANALYSIS_REQUESTED', 'EVENT_PATH', 'EVENT_REPLACED', 'LEAD_EVENT'].forEach(stage => stages.add(stage));
+stages.add('PREVIEW_REVOKED');
+stages.add('CAPTURE_REPLACED');
 const types = new Set(['kick', 'snare', 'hat', 'bass', 'melodic', 'generic']);
 const origins = new Set(['event-track-cache', 'local-detector', 'capture-engine', 'native-audio-engine', 'visual-decoration']);
 const components = new Set(['capture-engine', 'offscreen', 'beat-sync', 'widget-bridge',
@@ -15,6 +17,7 @@ components.add('beat-scheduler');
 components.add('beat-event-engine');
 components.add('percussion-classifier');
 components.add('lead-fixture');
+components.add('owned-local-audio');
 const reasons = new Set(['replaced', 'stopped', 'failed', 'expired', 'silent', 'ended',
   'reconfigured', 'queue-full', 'late', 'owner', 'sequence', 'debounce', 'invalid',
   'not-playing', 'sync-stale', 'clock-disconnected', 'audio-backlog', 'transport',
@@ -81,6 +84,14 @@ export function createBeatTelemetry({ now = Date.now, limit = 2048 } = {}) {
         if (typeof details.semantic === 'boolean') entry.semantic = details.semantic;
         if (reasons.has(details.reason)) entry.reason = details.reason;
         if (['cache', 'local', 'degraded'].includes(details.eventSource)) entry.eventSource = details.eventSource;
+        if(stage==='PREVIEW_REVOKED') {
+          if(['clock','renewal'].includes(details.trigger))entry.trigger=details.trigger;
+          if(['source-or-output-unproven','capture-unproven','clock-unreliable','not-playing','detector-rights-unavailable'].includes(details.previewReason))entry.previewReason=details.previewReason;
+          for(const key of ['playing','paused','seeking','buffering','captureHealthy','clockHealthy','outputOwned','singleSource'])if(typeof details[key]==='boolean')entry[key]=details[key];
+          if(Number.isSafeInteger(details.generation)&&details.generation>=0)entry.generation=details.generation;
+          if(finite(details.clockAgeMs))entry.clockAgeMs=details.clockAgeMs;
+        }
+        if(stage==='CAPTURE_REPLACED')for(const key of ['sameOwner','sameNativeAudio','sameSubscription','sameSession','sameSource'])if(typeof details[key]==='boolean')entry[key]=details[key];
         // Narrow Lead provenance allowlist; never log arbitrary metadata or URLs.
         if (details.policyVersion === 'lead-pulse-v1') {
           entry.policyVersion = details.policyVersion;

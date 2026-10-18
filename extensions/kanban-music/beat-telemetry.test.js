@@ -2,6 +2,11 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { beatTelemetry, createBeatTelemetry, parseBeatTraces } from './beat-telemetry.js';
 
 afterEach(() => { beatTelemetry.enable(false); beatTelemetry.clear(); vi.restoreAllMocks(); });
+it('records only bounded eligibility facts for a preview revocation',()=>{
+ const log=createBeatTelemetry();log.enable();log.record('PREVIEW_REVOKED',undefined,{trigger:'clock',previewReason:'clock-unreliable',generation:2,clockAgeMs:12,playing:true,paused:false,buffering:true,sourceUrl:'https://private.test/song',subscriptionId:'private-subscription',arbitrary:'private'});
+ expect(log.snapshot().records[0]).toMatchObject({stage:'PREVIEW_REVOKED',trigger:'clock',previewReason:'clock-unreliable',generation:2,clockAgeMs:12,buffering:true});
+ expect(JSON.stringify(log.snapshot())).not.toContain('private');
+});
 it('preserves allowlisted event provenance and row/cell observations across transport', () => {
   const log = createBeatTelemetry(); log.enable();
   const trace = { ...log.events('onset', ['melody'], { origin: 'capture-engine' })[0], eventId: 'note-5', eventSource: 'local', targetPlaybackTime: 5 };

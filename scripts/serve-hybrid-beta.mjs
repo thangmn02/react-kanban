@@ -1,0 +1,10 @@
+import {createServer} from 'vite';
+import {writeFile,mkdir} from 'node:fs/promises';
+process.env.VITE_PRIVATE_LOCAL_HYBRID='true';
+process.env.VITE_PRIVATE_BEAT_CANDIDATE='true';
+process.env.VITE_AUTH_MODE='mock';
+const server=await createServer({optimizeDeps:{entries:['index.html']},server:{host:'127.0.0.1',port:1420,strictPort:true,watch:{ignored:['**/scratch/**','**/src-tauri/target/**']}}});await server.listen();
+await mkdir('scratch/hybrid-beta',{recursive:true});
+const receipt={pid:process.pid,command:'node scripts/serve-hybrid-beta.mjs',port:1420,worktree:process.cwd(),startedAt:new Date().toISOString(),rollout:'PRIVATE_LOCAL_BETA'};
+await writeFile('scratch/hybrid-beta/server-process.json',JSON.stringify(receipt,null,2));console.log(JSON.stringify(receipt));
+for(const signal of ['SIGINT','SIGTERM'])process.once(signal,()=>void server.close().finally(()=>process.exit(0)));

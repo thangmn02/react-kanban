@@ -36,12 +36,14 @@ interface BeatPatternProps {
   semanticOnly?: boolean;
   /** Private diagnostics can explicitly restore the retained fifth row. */
   melodyEnabled?: boolean;
+  independentRows?:boolean;
+  melodyEvents?:readonly {id:string;duration:number}[];
 }
 
-export default function BeatPattern({ session, beat, colorMode = 'random', palette = 'bloom', orientation = 'horizontal', semanticOnly: requestedMode, melodyEnabled = false }: BeatPatternProps) {
+export default function BeatPattern({ session, beat, colorMode = 'random', palette = 'bloom', orientation = 'horizontal', semanticOnly: requestedMode, melodyEnabled = false, independentRows = false, melodyEvents }: BeatPatternProps) {
   const configuredMode = useSyncExternalStore(subscribeSemanticMode, getSemanticMode);
   const semanticOnly = requestedMode ?? configuredMode;
-  return semanticOnly ? <SemanticBeatPattern session={session} beat={beat} orientation={orientation} melodyEnabled={melodyEnabled} />
+  return semanticOnly ? <SemanticBeatPattern session={session} beat={beat} orientation={orientation} melodyEnabled={melodyEnabled} independentRows={independentRows} melodyEvents={melodyEvents} />
     : <NormalBeatPattern session={session} beat={beat} colorMode={colorMode} palette={palette} orientation={orientation} melodyEnabled={melodyEnabled} />;
 }
 

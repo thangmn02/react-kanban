@@ -12,6 +12,6 @@ export function isMusicUrl(value) {
   try {
     const url = new URL(value);
     return (url.protocol === 'https:' && musicHosts.includes(url.hostname))
-      || (url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname) && ['5173', '5174'].includes(url.port));
+      || (url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname) && ['5173', '5174', '1420'].includes(url.port));
   } catch { return false; }
 }

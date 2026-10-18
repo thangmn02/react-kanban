@@ -12,6 +12,8 @@ import { isNativeWidget } from '../native/runtime';
 import { beatRowDiagnostics, fourRowBaseline } from './beat-row-diagnostics';
 import { beatTelemetry } from '../../../extensions/kanban-music/beat-telemetry.js';
 import { leadPulseEnabled, leadAvailabilityText } from './lead-feature';
+import HybridBetaControl from './hybrid-beta-control';
+import {localHybridEnabled} from './use-local-hybrid-music';
 const PrivateMelodyDemo=import.meta.env.DEV ? lazy(()=>import('./diagnostics/MelodyDetectorDemo')) : null;
 
 export interface MusicVisualOptions {
@@ -77,8 +79,9 @@ export function MusicGrid({ music, colorMode = 'random', palette = 'bloom', orie
     <button type="button" onClick={()=>setDemo(false)}>Return to live Beat Grid</button>
     <Suspense fallback={<p>Loading private Melody comparison…</p>}><PrivateMelodyDemo /></Suspense>
   </div>;
+  const grid=<BeatPattern key={music.selected?.id} session={music.selected} beat={music.beat} colorMode={colorMode} palette={palette} orientation={orientation} semanticOnly={music.beta?.enabled?true:undefined} melodyEnabled={music.beta?.enabled&&music.beta.melody} independentRows={music.beta?.enabled} melodyEvents={music.beta?.enabled?music.beta.clip?.lead?.events:undefined} />;
   return <>
-    <BeatPattern key={music.selected?.id} session={music.selected} beat={music.beat} colorMode={colorMode} palette={palette} orientation={orientation} />
+    {music.beta?.enabled?<div className={`hybrid-grid-frame${music.beta.renderer==='short'?' hybrid-short-attack':''}`}>{grid}</div>:grid}
     {showDebug && <details className="music-debug" open><summary>Beat debug</summary>
       {PrivateMelodyDemo&&<button type="button" onClick={()=>setDemo(true)}>Open saved Lead listening demo</button>}
       <>
@@ -149,8 +152,9 @@ export default function MusicPlayer({ music, colorMode = 'random', palette = 'bl
 export function MusicSetup({ music }: { music: BrowserMusicController }) {
   const { t, language } = useI18n();
   const companion = useCompanionSetup();
-  if (music.connected || music.checking) return null;
-  return <div className="music-setup">
+  const beta=localHybridEnabled()&&music.beta?<HybridBetaControl beta={music.beta}/>:null;
+  if (music.connected || music.checking) return beta;
+  return <>{beta}<div className="music-setup">
     {music.error && <p className="muted" role="status">{music.error}</p>}
     <div className="music-connect-actions">
       {isNativeWidget()
@@ -160,5 +164,5 @@ export function MusicSetup({ music }: { music: BrowserMusicController }) {
       <button type="button" className="text-button" onClick={music.refresh}>{t('music.checkAgain')}</button>
     </div>
     {companion.message && <p className="muted" role="status" style={{ overflowWrap: 'anywhere' }}>{companion.message}</p>}
-  </div>;
+  </div></>;
 }
