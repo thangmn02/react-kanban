@@ -8,6 +8,38 @@ remains in force. Implementation and measured results are recorded in the
 The [full-song upgrade report](../plans/reports/engineering-261018-1010-full-song-listening-lab.md)
 records complete-song preparation and listening checks.
 
+## Targeted Hi-Hat investigation
+
+Open [the private Hat investigation](http://127.0.0.1:5173/lab/?mode=hat-recovery)
+for the Rằng [26,44) negative report, the retained Nujabes recording, the
+user-selected Chinese [200,220) interval and a labeled repeated control. The
+[investigation report](../plans/reports/engineering-261018-1347-hat-false-positive-recovery.md)
+records hashes, exact counts, raw evidence, threshold/control/holdout results and
+the NO-GO decision for advancing a corrected hybrid. Natural listening reports
+remain provisional; a missing independently reviewed positive subset is explicit.
+
+Select a case, play it and switch A/B, renderer or a clearly named experimental
+track without restarting the audio. Timestamp buttons seek and expose bounded
+frozen raw scores. Export contains event identities, the provisional ledger and
+measured delivery/frame proxies. Read-only source and snapshot checks fail closed
+if their exact bytes change. A/C/B preparation and detailed blind references are
+unaffected. The view consumes private artifacts in `scratch/hat-recovery/`; a
+clean clone has neither these recordings nor analysis results.
+
+Threshold tracks change only the rising-edge extraction threshold and therefore
+may select different original raw frame times. They add no fitted time shift,
+debounce or generated hits. `cnn-hat-snare-dominance-v1` is a rejected same-frame
+Snare/Hat score veto; it loses independently referenced Hats. H0 routes frozen A
+Kick/Snare plus frozen B Hat, with exact provenance and unavailable intervals.
+It is an unqualified routing diagnostic, not an accepted hybrid or live route.
+Original model outputs, renderer envelopes and Companion behavior stay frozen.
+
+Hướng dẫn: chọn **Case**, bấm **Play investigation**, đổi **Event track** A/B để
+nghe cùng đoạn. Bấm mốc thời gian để xem điểm thô; thử **Original / Short Attack**
+để phân biệt sự kiện bị thiếu với các flash bị nhập vào nhau. Bấm **Export
+complete investigation** để lưu bằng chứng. Các mục Experimental và H0 chỉ để
+kiểm tra; chúng chưa được chọn làm mặc định.
+
 ## Full-Song Listening Test
 
 The default `/lab/` page is the full-song view. It has two named slots, **Rằng Em

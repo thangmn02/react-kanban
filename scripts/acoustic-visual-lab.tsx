@@ -7,6 +7,7 @@ import type {BeatBand} from '../src/features/music/mediaBridge';
 import {beatTelemetry,type BeatTrace} from '../extensions/kanban-music/beat-telemetry.js';
 import {LabAudio} from './acoustic-visual-lab-audio';
 import {FullSongLab} from './full-song-lab';
+import {HatRecoveryLab} from './hat-recovery-lab';
 import {validateReview,retainReferenceExposure,freezeBlockers,compareReview,describeCandidate,causes,instruments,classifyTrace,type Clip,type Review,type Model,type Mark,type Prediction,type FrameTrace,type Cause} from './acoustic-visual-lab-core';
 import '../src/components/focus/floatingFocus.css';
 import './browser-beat-candidate.css';
@@ -153,4 +154,5 @@ export function Lab(){
     <footer>PRIVATE RESEARCH · No new detector, provider capture or permissions. Nothing is uploaded to a cloud service. Save/export your review before leaving. Decision remains inconclusive until acoustic and live evidence support a causal fraction.</footer></>}
   </main>;
 }
-createRoot(document.getElementById('root')!).render(new URLSearchParams(location.search).get('mode')==='detail'?<Lab/>:<FullSongLab/>);
+const mode=new URLSearchParams(location.search).get('mode');
+createRoot(document.getElementById('root')!).render(mode==='detail'?<Lab/>:mode==='hat-recovery'?<HatRecoveryLab/>:<><nav className="acoustic-lab lab-investigation-link"><a href="/lab/?mode=hat-recovery">Targeted Hi-Hat investigation · N1 / Nujabes / repeated patterns ↗</a></nav><FullSongLab/></>);

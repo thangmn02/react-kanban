@@ -5,6 +5,7 @@ import {createHash} from 'node:crypto';
 import {build} from 'vite';
 import {validateReview,validateReviewTransition,blankReview} from './acoustic-visual-lab-core.ts';
 import {createFullSongStore} from './full-song-store.mjs';
+import {createHatRecoveryRoutes} from './hat-recovery-routes.mjs';
 const folder=resolve('scratch/acoustic-visual-lab');
 const fullSongs=await createFullSongStore(resolve(folder,'full-songs'));
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
@@ -29,6 +30,7 @@ const htmlEscape=s=>s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll(
 const sourceHtml=`<!doctype html><html><meta charset="utf-8"><title>Private diagnostic source</title><body style="background:#171820;color:#eee;font:18px system-ui;max-width:900px;margin:40px auto"><h1>Authorized diagnostic audio</h1><p>This is the exact canonical local PCM used in the saved benchmark. No video or external provider.</p><label>Passage <select id="clip">${data.clips.map(c=>`<option value="${c.id}">${htmlEscape(c.id+' — '+c.title)}</option>`).join('')}</select></label><p id="identity"></p><audio controls></audio><p><a href="http://127.0.0.1:5173/?musicDebug=1" style="color:#b9a5ff" target="_blank">Open live baseline trace grid</a></p><p>Play here, click the private Companion toolbar icon on this tab, then enable unverified live preview in the grid. The offline lab and this live source are separate sessions; stop one before playing the other.</p><script src="/source.js"></script></body></html>`;
 const sourceJs=`const clips=${JSON.stringify(data.clips.map(c=>({id:c.id,title:c.title,sha:c.canonicalWavSha256,start:c.start-c.sourceOffset,end:c.end-c.sourceOffset,offset:c.sourceOffset}))).replaceAll('<','\\u003c')};const select=document.querySelector('#clip'),audio=document.querySelector('audio');function load(){audio.pause();const c=clips.find(c=>c.id===select.value);document.title='Kora diagnostic · '+c.id+' · '+c.sha;document.querySelector('#identity').textContent='Canonical WAV SHA-256: '+c.sha+'; source time = player time + '+c.offset+' s.';audio.src='/audio/'+c.id+'.wav';audio.onloadedmetadata=()=>audio.currentTime=c.start;}select.onchange=load;load();`;
 const servers=[],reviewWrites=new Map();
+const hatRecovery=createHatRecoveryRoutes(sendFile);
 async function sendFile(request,response,file,type){
  const size=(await stat(file)).size;const range=request.headers.range;
  let start=0,end=size-1;
@@ -43,6 +45,7 @@ for(const port of [5173,5174]){
   try{
    if(!['127.0.0.1:'+port,'localhost:'+port].includes(request.headers.host))throw Error('Local host required');
    const url=new URL(request.url,'http://127.0.0.1:'+port),path=decodeURIComponent(url.pathname);
+   if(port===5173&&await hatRecovery(request,response,url))return;
    if(port===5173&&await fullSongs.handle(request,response,url))return;
    if(port===5173&&path.startsWith('/lab/review/')){
     const id=path.slice('/lab/review/'.length),clip=data.clips.find(c=>c.id===id)||(id.startsWith('full-')?await fullSongs.clip(id.slice(5)):null);if(!clip)throw Error('Unknown source');
