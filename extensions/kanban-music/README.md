@@ -345,6 +345,15 @@ physical speaker-to-pixel timing or acoustic recognition accuracy.
 See the [provider live report](../../plans/reports/engineering-261019-0549-provider-live-upgrade.md)
 for current observed support, repeated measurements and remaining gates.
 
+`scripts/analyze-percussion-latency-floor.mjs` audits the frozen decision path
+against saved activation streams and optional `--delivery=<trace.json>` joins.
+It preserves unknown batch phase as a range and separates input age from output
+clock estimates. `scripts/verify-beat-runtime.mjs` accepts an optional
+`KORA_BEAT_PROOF_RESULT` JSON basename to retain independent proof receipts.
+The [latency checkpoint](../../plans/reports/engineering-261019-1101-low-latency-semantic.md)
+records the current structural floor, rapid-control failures and required
+architecture review. Neither tool qualifies physical synchronization.
+
 ### Playback-clock scheduling
 
 New producers publish before their existing output deadlines. Events carry

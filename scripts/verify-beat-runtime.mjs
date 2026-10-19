@@ -19,6 +19,8 @@ const inputs = process.env.KORA_BEAT_PROOF_INPUTS?.split(',').filter(Boolean)
 assert(inputs.every(name => /^[a-z0-9-]+\.f32$/i.test(name)));
 const fullInput = process.env.KORA_BEAT_PROOF_FULL_INPUT === '1';
 const candidate=process.env.KORA_BEAT_CLASSIFIER==='onset-guided'?'onset-guided':'baseline';
+const resultName=process.env.KORA_BEAT_PROOF_RESULT;
+assert(!resultName||/^[a-z0-9-]+\.json$/.test(resultName),'Result must be a local JSON filename');
 const inputFolder=process.env.KORA_BEAT_SYNTHETIC==='1'?'scratch/browser-first-corpus':'scratch/instrument-proof';
 const modelConfig = JSON.parse(await readFile(resolve(repo, 'extensions/kanban-music/generated/percussion/percussion.json'), 'utf8'));
 const modelHash = createHash('sha256').update(await readFile(resolve(repo, 'extensions/kanban-music/generated/percussion/percussion.onnx'))).digest('hex');
@@ -91,7 +93,9 @@ window.prove = async (url, requestedSeconds, fullInput) => {
         sample('workerToMain', result.mainThreadReceivedAt - result.inferenceEndedAt);
         for (const frame of result.diagnostics || []) {
           if (Number.isFinite(audioOrigin)) {
-            if (activations.length < 100000) activations.push({ ...frame, excerptTime: frame.audioTime - audioOrigin });
+            if (activations.length < 100000) activations.push({ ...frame, excerptTime: frame.audioTime - audioOrigin,
+              availableAudioTime: result.availableAudioTime, modelInputAudioTime: result.timing?.modelInputAudioTime,
+              inferenceStartedAt: result.inferenceStartedAt, inferenceEndedAt: result.inferenceEndedAt });
             else activationsTruncated = true;
           }
           for (const event of frame.events || []) {
@@ -192,6 +196,6 @@ try {
   assert.deepEqual(errors, [], 'Production runtime produced page errors');
   const { filterbank, ...model } = modelConfig;
   void filterbank;
-  await writeFile(resolve(proof, process.env.KORA_BEAT_SYNTHETIC==='1'?`synthetic-${candidate}.json`:`result-${candidate}.json`), JSON.stringify({ browser: await browser.version(), model,candidate,
+  await writeFile(resolve(proof, resultName||(process.env.KORA_BEAT_SYNTHETIC==='1'?`synthetic-${candidate}.json`:`result-${candidate}.json`)), JSON.stringify({ browser: await browser.version(), model,candidate,
     results, pageErrors: errors, scope: 'Local real PCM/model/worklet/renderer, not live services or human-scored accuracy' }, null, 2));
 } finally { await browser?.close(); if (server.listening) await new Promise(done => server.close(done)); }

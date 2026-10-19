@@ -46,7 +46,8 @@ try{
  }
  source=await context.newPage();await source.route(base+'/hybrid-capture-fixture',route=>route.fulfill({contentType:'text/html',body:`<!doctype html><title>CC0 Hybrid capture fixture</title><audio controls src="${clip.audioUrl}"></audio>`}));await source.goto(base+'/hybrid-capture-fixture');await source.locator('audio').evaluate(a=>{a.addEventListener('ended',()=>{window.sourceEndedAt=Date.now();},{once:true});return a.play();});
  const target=(await cdp.send('Target.getTargets',{filter:[{type:'tab'}]})).targetInfos.find(t=>t.url===base+'/hybrid-capture-fixture');assert(target);await cdp.send('Extensions.triggerAction',{id:extensionId,targetId:target.targetId});
- await app.getByText(/Private candidate/).first().waitFor({timeout:30000});await app.getByText(/Private candidate/).first().click();
+ const privateControl=app.locator('details[aria-label="Private Beat Grid candidate"] > summary');
+ await privateControl.waitFor({timeout:30000});await privateControl.click();
  const live=app.getByRole('region',{name:'Live instrument preview'});await live.waitFor();
  // CC0 functional consent routing; explicitly not human hearing verification.
  for(const name of ['I have permission to analyze this captured tab audio.','I can hear the captured tab normally.','I accept late or incorrect instrument flashes in this private test.'])await live.getByRole('checkbox',{name,exact:true}).check();
