@@ -1,0 +1,113 @@
+{
+  "version": 1,
+  "status": "PROPOSED_NOT_LOCKED",
+  "qualityGate": "BLOCKED_DATA_READINESS",
+  "candidate": {
+    "id": "causal-multilabel-percussion-design-v1",
+    "state": "UNTRAINED_DESIGN",
+    "weightsSha256": null,
+    "reference": "H0-frozen-routing-diagnostic-v1",
+    "semanticClasses": ["kick", "snare", "true-hat"],
+    "auxiliaryClass": "other-cymbal-onset",
+    "outputsIndependent": true,
+    "initialization": "from scratch; no teacher weights or pseudo-label training in the first bounded experiment",
+    "sampleRate": 44100,
+    "fftSize": 1024,
+    "frameTimestamp": "integer end sample of a trailing window; no centered FFT or timestamp backdating",
+    "hopSamples": 220,
+    "melBins": 80,
+    "featureChannels": ["causal log power", "backward log-power difference"],
+    "normalization": "one-second causal EMA mean/variance, initialized from training-only statistics; use prior state then update; identical training and streaming procedure",
+    "frequencyEncoder": "two frequency-only convolution stages followed by a 64-channel projection",
+    "temporalEncoder": {
+      "channels": 64,
+      "blocks": 6,
+      "kernelSize": 3,
+      "dilations": [1, 2, 4, 8, 16, 32],
+      "convolutionsPerBlock": 1,
+      "direction": "past only; depthwise temporal convolution and pointwise residual projection",
+      "pastFrames": 126,
+      "futureFrames": 0
+    },
+    "postprocessing": "one subsequent frame for local onset confirmation; class-specific calibration on development only; no extra tempo hits or generic-energy semantic substitution",
+    "modelFutureLookaheadMs": 0,
+    "maximumConfirmationFrames": 1,
+    "parameterAdmissionCap": 200000,
+    "weightsAdmissionCapMiB": 1,
+    "noveltyStatus": "same broad causal-convolution family as the old student; materially different proposed frontend, frequency encoder, objectives, classes and supervised data. No new checkpoint or benchmark novelty is claimed."
+  },
+  "referencePolicy": {
+    "officialMetricsRequire": [
+      "recording and PCM hashes",
+      "complete reviewed class coverage masks",
+      "accurate sample-bound onset labels and timing uncertainty",
+      "ambiguous intervals excluded and reported",
+      "recording-family-disjoint train, development and holdout",
+      "checkpoint and dataset overlap audit",
+      "data and evaluation rights"
+    ],
+    "publishedMdbStatus": "historical reference scoring only; completeness and checkpoint overlap unresolved",
+    "provisionalHumanReferences": "review and qualitative regression only",
+    "teacherPredictions": "not verified ground truth; excluded from first candidate training",
+    "favoriteSongs": "not training, threshold selection or candidate selection targets",
+    "holdoutPolicy": "keep existing partitions fixed; after data readiness freeze all decisions before one candidate holdout evaluation"
+  },
+  "proposedRecognitionMargins": {
+    "perClassF1DeltaPpMinimum": -3,
+    "hatRecallDeltaPpMinimum": -5,
+    "hatPrecisionDeltaPpMinimum": -3,
+    "denseHatRecallDeltaPpMinimum": -5,
+    "denseHatPrecisionDeltaPpMinimum": -3,
+    "overlapRecallDeltaPpMinimumEachClass": -5,
+    "snareOnlyHatFalseEventIncreaseMaximum": 0,
+    "cymbalOnlyAndVocalNegativeHatRateIncreaseMaximumPerMinute": 0.1,
+    "silenceAndSustainedControlSemanticEventsMaximum": 0,
+    "exactClassSampleDuplicatesMaximum": 0,
+    "staleGenerationEventsMaximum": 0,
+    "limitations": "Margins are proposals pending adequate development evidence; no new score or noninferiority pass is asserted. Matching tolerances are reused, not tuned to a candidate."
+  },
+  "statisticalDecision": {
+    "pairBy": "same recording and coverage; drum-only/full-mix variants clustered together",
+    "estimand": "Per-class pooled micro metrics within each domain separately: aggregate TP/FP/FN over recording groups, then compute candidate minus H0. Rate deltas use total false events divided by total eligible negative minutes. These are event/exposure-weighted estimands, not equally weighted per-recording metric means.",
+    "clusterSampling": "Sample original recording groups uniformly with replacement; keep candidate/H0 paired and all related assets together. Score drum-only and full-mix domains separately; never count them as independent recordings.",
+    "confidence": "one-sided 95% paired recording-cluster bounds only where sampling, event exposure and complete coverage support them",
+    "resamples": 10000,
+    "seed": 1918,
+    "benefitRule": "For F1/precision/recall noninferiority, each required lower one-sided 95% confidence bound of candidate minus H0 must be at least the predeclared negative margin",
+    "harmRule": "For natural Cymbal-only/vocal-negative Hat false-event rate increases, each upper one-sided 95% confidence bound of candidate minus H0 must be at most the proposed 0.1 event/minute tolerance. This tolerance remains unlocked until adequate development evidence is reviewed.",
+    "deterministicControls": "Exact complete generated Snare-only controls require no more false Hats than frozen H0; complete silence/sustained controls require zero semantic events; duplicate class/sample and stale-generation counts must be zero. These are deterministic assertions on the tested inputs, not confidence-bound claims about a population.",
+    "insufficientEvidenceRule": "Missing/ambiguous labels, undefined denominators, inadequate independent clusters or inadequate rare-error exposure remain BLOCKED. A degenerate all-zero bootstrap does not certify a zero population error rate; a valid rare-event uncertainty method or more exposure must be specified before locking that gate.",
+    "onsetRule": "reuse maximum-cardinality minimum-error one-to-one natural matching capped at 50ms and quarter-nearest-reference spacing; constructed cap 40ms. Also report signed/absolute errors, unmatched predictions, rapid bins and denominators",
+    "multipleClasses": "all mandatory gates must pass; no aggregate F1 substitutes for a failed row"
+  },
+  "trainingAdmission": {
+    "status": "BLOCKED",
+    "requiresSubstantialTrainingApproval": true,
+    "proposedMaximumRuns": 1,
+    "proposedSeed": 1918,
+    "proposedMaximumEpochs": 20,
+    "proposedCpuWallTimeCapHours": 2,
+    "proposedEarlyStoppingPatience": 3,
+    "hyperparameterSearch": false,
+    "checkpointSelection": "development-only class-balanced objective, fixed before training; no holdout or user-song selection",
+    "failAction": "stop and report; no compensating threshold sweep"
+  },
+  "runtimeAdmission": {
+    "modelComputeP95MsMaximum": 10,
+    "additionalComponentAverageLogicalCoresMaximum": 0.2,
+    "additionalResidentMemoryMiBMaximum": 100,
+    "durationMinutesMinimum": 30,
+    "progressiveBacklogAllowed": false,
+    "scope": "aspirational budgets, not measured feasibility; evaluate both incremental and whole combined app/browser processes",
+    "physicalSpeakerToPixelP95AbsoluteErrorMsTarget": 50,
+    "physicalStatus": "UNVERIFIED",
+    "lowerPoweredHardware": "BLOCKED_NO_DEVICE_EVIDENCE"
+  },
+  "promotion": {
+    "privateProductBetaEligible": false,
+    "publicReleaseEligible": false,
+    "requires": ["Q-recognition", "T-timing", "R-resources", "I-integration", "U-user-listening", "L-rights"],
+    "rollback": "existing L0; H0 remains exact-source offline reference",
+    "fallback": "no qualified semantic engine means explicit unavailable or existing decorative playback feedback; no fabricated semantic events"
+  }
+}
