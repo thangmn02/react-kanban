@@ -18,7 +18,7 @@ const inputs = process.env.KORA_BEAT_PROOF_INPUTS?.split(',').filter(Boolean)
   || ['fixture-0-drums.f32', 'fixture-0-mixture.f32', 'fixture-0-vocals.f32'];
 assert(inputs.every(name => /^[a-z0-9-]+\.f32$/i.test(name)));
 const fullInput = process.env.KORA_BEAT_PROOF_FULL_INPUT === '1';
-const candidate=process.env.KORA_BEAT_CLASSIFIER==='onset-guided'?'onset-guided':'baseline';
+const candidate=['onset-guided','early-finalization'].includes(process.env.KORA_BEAT_CLASSIFIER)?process.env.KORA_BEAT_CLASSIFIER:'baseline';
 const resultName=process.env.KORA_BEAT_PROOF_RESULT;
 assert(!resultName||/^[a-z0-9-]+\.json$/.test(resultName),'Result must be a local JSON filename');
 const inputFolder=process.env.KORA_BEAT_SYNTHETIC==='1'?'scratch/browser-first-corpus':'scratch/instrument-proof';

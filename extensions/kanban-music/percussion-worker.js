@@ -1,5 +1,6 @@
 import { PercussionClassifier } from './percussion-classifier.js';
 import { CausalPercussionClassifier } from './causal-percussion-classifier.js';
+import { EarlyPercussionClassifier } from './early-percussion-classifier.js';
 let session, config, ort, running = false, stopped = false, queue = [], frames = [], count = 0, lastTime;
 let classifier = new PercussionClassifier();
 async function drain() {
@@ -71,6 +72,7 @@ self.onmessage = async ({ data }) => {
     try {
       config = data.config;
       classifier = config.classifier === 'causal' ? new CausalPercussionClassifier()
+        : config.classifier === 'early-finalization' ? new EarlyPercussionClassifier(config.thresholds, { diagnostics: config.diagnostics === true })
         : new PercussionClassifier(config.thresholds, { onsetGuided: ['onset-guided','local-prominence'].includes(config.classifier),
           localProminence:config.classifier==='local-prominence',diagnostics:config.diagnostics===true });
       // Keep ORT's loader intact and emit its exact assets in production builds.

@@ -99,6 +99,7 @@ function replaceExactlyOnce(source, before, after) {
 if(privateCandidate) {
   const candidate=files.find(file=>file.name==='beat-candidate.js');
   let candidateSource=replaceExactlyOnce(candidate.bytes.toString(),'privateBeatCandidate = false','privateBeatCandidate = true');
+  if(!xoCandidate&&!hatCandidate)candidateSource=replaceExactlyOnce(candidateSource,'earlyDecisionAvailable:false','earlyDecisionAvailable:true');
   if(xoCandidate||hatCandidate)for(const [before,after] of [
     ['privatePercussionDiagnostics = false','privatePercussionDiagnostics = true'],
     ["privatePercussionClassifier = 'onset-guided'",`privatePercussionClassifier = '${xoCandidate==='B'?'local-prominence':'onset-guided'}'`],
@@ -108,12 +109,22 @@ if(privateCandidate) {
   candidate.bytes=Buffer.from(candidateSource);
   const manifest=files.find(file=>file.name==='manifest.json');
   const value=JSON.parse(manifest.bytes.toString());value.name+=' Private';value.version_name=value.version+' browser-first-v2 live preview private';
+  value.version='0.3.25';value.version_name='0.3.25 private live L0 / L1-gap0';
   if(xoCandidate){value.name+=xoCandidate==='A'?' XO Baseline A':' XO Candidate B (NO-GO)';value.version_name=value.version+` xo-${xoCandidate} UNVERIFIED DETECTOR PREVIEW`;}
   if(hatCandidate){value.name+=hatCandidate==='A'?' Hat Baseline A':' Hat Visual Recovery R';value.version_name=value.version+` hat-${hatCandidate} UNVERIFIED DETECTOR PREVIEW`;}
   manifest.bytes=Buffer.from(JSON.stringify(value,null,2)+'\n');
 }
 for (const name of ['percussion-capability.js', 'percussion-classifier.js', 'causal-percussion-classifier.js', 'percussion-features.js', 'percussion-worklet.js',
   'percussion-worker.js', 'percussion-runtime.js', 'lead-audio-authorization.js', 'lead-audio-tap.js', 'lead-audio-worklet.js']) files.push({ name, bytes: await readFile(join(extension, name)) });
+if(privateCandidate&&!xoCandidate&&!hatCandidate)files.push({name:'early-percussion-classifier.js',bytes:await readFile(join(extension,'early-percussion-classifier.js'))});
+else {
+  const worker=files.find(file=>file.name==='percussion-worker.js');
+  let source=replaceExactlyOnce(worker.bytes.toString(),"import { EarlyPercussionClassifier } from './early-percussion-classifier.js';",'');
+  source=replaceExactlyOnce(source,": config.classifier === 'early-finalization' ? new EarlyPercussionClassifier(config.thresholds, { diagnostics: config.diagnostics === true })",'');
+  worker.bytes=Buffer.from(source);
+  const runtime=files.find(file=>file.name==='percussion-runtime.js');
+  runtime.bytes=Buffer.from(replaceExactlyOnce(runtime.bytes.toString(),",'early-finalization'",''));
+}
 // Reject broken runtime imports before writing either the ZIP or desktop bundle.
 // MODEL-NOTICE records restrictions; inclusion does not establish release rights.
 for (const name of ['generated/percussion/percussion.json', 'generated/percussion/percussion.onnx',
@@ -155,6 +166,16 @@ if(privateCandidate)await writeFile(join(output,'Private listening guide.html'),
 <li>Use pause, seek and source changes to investigate. A source/generation change revokes the experiment. Video, uncertain output, native capture and Spotify cannot enable this buffer.</li>
 <li>Report the approximate song time, row and observed failure. Provisional annotations remain investigation-only. Generic degraded visuals make no instrument claim.</li></ol>
 <p>No web deployment, extension-store update or installer publication is included. Model weights remain local evaluation assets.</p></body>`);
+if(privateCandidate&&!xoCandidate&&!hatCandidate)await writeFile(join(output,'Private listening guide.html'),`<!doctype html><html lang="en"><meta charset="utf-8"><title>Kora private L0 / L1 listening</title>
+<body style="max-width:850px;margin:40px auto;padding:20px;font:18px/1.6 system-ui"><h1>Private live L0 / L1 listening</h1>
+<p>Local evaluation only. L0 remains the default. L1 is earlier ADTOF peak finalization, not offline H0 or a new model. Recognition, physical synchronization, resource qualification and user acceptance are incomplete. Do not publish.</p>
+<ol><li>Use the browser with your working Companion (Brave in this session). Reload this unpacked extension, verify <b>Kora Music Companion Private ${manifest.version}</b>, then refresh the music source and Kora. Enable only one Companion and one Kora grid.</li>
+<li>From the repository, reuse the private server on <b>127.0.0.1:1420</b>. If stopped, run <code>node scripts/serve-hybrid-beta.mjs</code> and keep the terminal open. Open <a href="http://127.0.0.1:1420/music">Kora Music</a>.</li>
+<li>Play an authorized, unprotected source. Click Companion on that source tab, select it in Kora and open <b>Music → Private candidate → Live preview</b>. Spotify and protected Apple Music remain blocked for semantic analysis.</li>
+<li>Keep playback running. Confirm the three permission, audible-output and experimental-preview statements only if true. Select <b>L0 · Frozen live ADTOF baseline</b> and enable <b>live preview (no audio delay)</b>. Calibration and intentional buffering are not required.</li>
+<li>Compare the same passage using <b>L1 · Earlier peak finalization (experimental)</b>. Confirm <b>LIVE SEMANTIC CANDIDATE — EXPERIMENTAL</b>. Switch to L0 in the same selector for rollback. The original audio is not delayed or sped up.</li>
+<li>Pause, seek or change source to revoke preview; reactivate while playing. Record approximate song time, row, missed/repeated/incorrect flashes and uncertainty. Your observations remain provisional references, never official precision/recall.</li></ol>
+<p>L1 improved software p95 by about 10–24 ms in controlled comparisons, with some worse tails. Physical speaker-to-pixel synchronization remains UNVERIFIED. No deployment, installer or store update is included.</p></body></html>`);
 if(hatCandidate){
  const guide=`<!doctype html><html lang="en"><meta charset="utf-8"><title>Hat playback A/R listening</title>
  <body style="max-width:900px;margin:40px auto;padding:20px;background:#18181c;color:#eee;font:18px/1.6 system-ui">

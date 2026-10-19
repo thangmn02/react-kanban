@@ -26,6 +26,8 @@ if (allowedOrigins.has(location.origin)) {
     if (message.action === 'media.volume' && (!Number.isFinite(message.value) || message.value < 0 || message.value > 1)) return;
     if (!['sessions.get', 'diagnostics.get'].includes(message.action) && (typeof message.sessionId !== 'string' || message.sessionId.length > 250)) return;
     if (message.action.startsWith('dock.') && (typeof message.subscriptionId !== 'string' || !message.subscriptionId.length || message.subscriptionId.length > 100)) return;
+    if (message.action === 'beat.experimental.configure' && message.configuration?.detectorVariant !== undefined
+      && !['L0', 'L1-gap0'].includes(message.configuration.detectorVariant)) return;
     pending++;
     const reply = (result) => {
       pending--;
@@ -39,6 +41,7 @@ if (allowedOrigins.has(location.origin)) {
           outputHeard: message.configuration?.outputHeard===true, authorizedAudio: message.configuration?.authorizedAudio===true,
           preview: message.configuration?.preview===true,
           live: message.configuration?.live===true, latencyAccepted: message.configuration?.latencyAccepted===true,
+          ...(message.configuration?.detectorVariant!==undefined?{detectorVariant:message.configuration.detectorVariant}:{}),
         } } : {}),
         ...(message.action === 'dock.beat.sync.start' && typeof message.telemetryEnabled === 'boolean' ? { telemetryEnabled: message.telemetryEnabled } : {}),
         ...(message.value !== undefined ? { value: message.value } : {}),

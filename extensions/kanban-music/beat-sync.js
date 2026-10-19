@@ -39,7 +39,9 @@ export function createBeatSync(api, nativePublish) {
     capture:{id:current.captureId,owner:current.token,expectedOwner:current.token,
       active:current.captureReady===true,audible:current.audioDetected===true,
       output:current.owner.native?'native-monitor':'tab-replacement',originalSuppressed:current.captureReady===true&&current.originalSuppressed===true&&!current.owner.native},
-    clock:{...current.clock,generation:current.clock?.generation||0},detector:candidateDetector,
+    clock:{...current.clock,generation:current.clock?.generation||0},
+    detector:current.experiment?.enabled&&current.experiment?.detectorVariant==='L1-gap0'
+      ?{...candidateDetector,id:'adtof-early-finalization',version:'L1-gap0'}:candidateDetector,
     timing:current.experiment?.enabled&&!current.experiment.live?current.experiment.calibration:current.calibration||{},health:current.health||{},experiment:current.experiment||{}});
   const capability = current => privateBeatCandidate?decideBeatMode(modeFacts(current)):undefined;
   const pauseRetainsCapture = current => privateBeatCandidate&&current.captureReady&&current.audioDetected
@@ -288,6 +290,7 @@ export function createBeatSync(api, nativePublish) {
           ||current.session.id!==session.id||current.session.src!==session.src
           ||!validSyncConfiguration(configuration)||configuration.captureId!==current.captureId
           ||configuration.generation!==(current.clock?.generation||0)
+          ||configuration.detectorVariant==='L1-gap0'&&candidateDetector.earlyDecisionAvailable!==true
           ||configuration.live&&current.delaySeconds>0||current.clock?.playing&&!configuration.live
           ||current.clock?.seeking||current.clock?.buffering) return false;
         const available=capability(current);
@@ -300,7 +303,8 @@ export function createBeatSync(api, nativePublish) {
         const epoch=crypto.randomUUID();current.synchronizationEpoch=epoch;
         const result=await offscreenMessage({kind:'synchronization',captureId:current.captureId,
           settings:{bufferMs:next.bufferMs,allowTypedPreview:next.allowTypedPreview,eligible:next.mode===expectedMode,
-            paused:!current.clock?.playing,live:configuration.live===true,epoch}}).catch(()=>undefined);
+            paused:!current.clock?.playing,live:configuration.live===true,epoch,
+            detectorVariant:configuration.enabled?configuration.detectorVariant||'L0':'L0'}}).catch(()=>undefined);
         if(state!==current||result?.ok!==true||current.captureId!==configuration.captureId||current.synchronizationEpoch!==epoch
           ||current.clock?.playing&&!configuration.live
           ||configuration.enabled&&configuration.live&&!current.clock?.playing

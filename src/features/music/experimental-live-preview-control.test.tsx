@@ -41,6 +41,18 @@ it('explains that a connected older private extension must be reloaded',()=>{
   render(<ExperimentalLivePreviewControl session={current} refresh={vi.fn()}/>);
   expect(screen.getByRole('status',{name:'Live preview activation status'})).toHaveTextContent('Reload the updated private Companion');
 });
+it('selects the supported private L1 and rolls back to L0 on the same live preview',async()=>{
+  const current=session();Object.assign(current.syncState!.capability!,{earlyDecisionAvailable:true});
+  const view=render(<ExperimentalLivePreviewControl session={current} refresh={vi.fn()}/>);consent();
+  fireEvent.change(screen.getByRole('combobox',{name:'Live detector'}),{target:{value:'L1-gap0'}});
+  fireEvent.click(screen.getByRole('button',{name:'Enable live preview (no audio delay)'}));
+  await waitFor(()=>expect(configureExperimentalSynchronization).toHaveBeenLastCalledWith('video',expect.objectContaining({detectorVariant:'L1-gap0',enabled:true})));
+  Object.assign(current.syncState!.capability!,{mode:'experimental-live',allowTypedPreview:true,detectorId:'adtof-early-finalization'});
+  view.rerender(<ExperimentalLivePreviewControl session={current} refresh={vi.fn()}/>);
+  expect(screen.getByText(/LIVE SEMANTIC CANDIDATE/)).toBeInTheDocument();
+  fireEvent.change(screen.getByRole('combobox',{name:'Live detector'}),{target:{value:'L0'}});
+  await waitFor(()=>expect(configureExperimentalSynchronization).toHaveBeenLastCalledWith('video',expect.objectContaining({detectorVariant:'L0',enabled:true,preview:true,live:true,intentionalDelay:false})));
+});
 it.each(['protected-source','provider-policy'])('explains %s before suggesting a capture reconnect',reason=>{
   const current=session();delete current.syncState!.captureId;
   Object.assign(current.syncState!.capability!,{reason,mode:'unsupported',livePreviewEligible:false});

@@ -103,6 +103,7 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
     try {
       const state = { captureId, leaseUntil: now() + 6000, lastAudio: now(), interval: undefined,
         candidate:privateBeatCandidate&&requestOptions.candidate===true,bufferMs:0,latencies:[],typedPreview:false,
+        percussionClassifier:privatePercussionClassifier,
         acceptAfter:Infinity,droppedSemanticEvents:0,diagnosticFrames:[],diagnosticPredictions:[],diagnosticEvicted:0,diagnosticFeatures:[] };
       active = state;
       if(state.candidate&&requestOptions.sourceProvider==='spotify')throw new Error('Provider analysis blocked');
@@ -198,7 +199,7 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
           telemetry.record('EVENT_DROPPED', undefined, { captureId, reason });
         };
         void createPercussion({ context: state.context, source: state.source, signal: owner.abort.signal,
-          ...(state.candidate?{classifier:privatePercussionClassifier}:{}),
+          ...(state.candidate?{classifier:state.percussionClassifier}:{}),
           ...(state.candidate&&privatePercussionDiagnostics?{onDiagnostic(result){
             if(active!==state||state.percussionOwner!==owner)return;
             if(result.kind==='features'){
@@ -253,6 +254,15 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
           if (runtime) owner.runtime = runtime;
           else failed();
         }).catch(() => failed());
+      };
+      state.restartPercussion=()=>{
+        const previous=state.percussionOwner;
+        state.percussionOwner=undefined;
+        previous?.abort.abort();previous?.runtime?.stop();
+        drumHits.length=0;
+        state.latencies.length=0;
+        state.diagnosticFrames.length=0;state.diagnosticPredictions.length=0;state.diagnosticFeatures.length=0;
+        startPercussion();
       };
       startPercussion();
       stream.getAudioTracks().forEach((track) => track.addEventListener('ended', () => {
@@ -338,7 +348,7 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
       dropReason:active.typedPreview?'none':'detector-unqualified',workerFailures:active.percussionFailures||0}:undefined;},
     get percussionDiagnostics(){
       if(!active?.candidate||!privatePercussionDiagnostics)return undefined;
-      return {captureId:active.captureId,classifier:privatePercussionClassifier,frames:active.diagnosticFrames.slice(),
+      return {captureId:active.captureId,classifier:active.percussionClassifier,frames:active.diagnosticFrames.slice(),
         predictions:active.diagnosticPredictions.slice(),featureBlocks:active.diagnosticFeatures.slice(),
         clock:diagnosticClock(active),evictedFrames:active.diagnosticEvicted,limitFrames:1800,limitFeatureBlocks:400};
     },
@@ -346,6 +356,8 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
     configureSynchronization(captureId,settings){
       const state=active;
       if(!state?.candidate||state.captureId!==captureId||monitorOnly
+        ||settings?.detectorVariant!==undefined&&!['L0','L1-gap0'].includes(settings.detectorVariant)
+        ||settings?.detectorVariant==='L1-gap0'&&settings.live!==true
         ||!Number.isFinite(settings?.bufferMs)||settings.bufferMs<0||settings.bufferMs>500
         ||settings.live===true&&(settings.bufferMs!==0||state.bufferMs!==0)
         ||settings.bufferMs>0&&(!settings.eligible||settings.paused!==true)
@@ -355,6 +367,13 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
         ?settings.epoch:crypto.randomUUID();
       state.acceptAfter=state.context.currentTime;
       state.typedPreview=settings.eligible===true&&settings.allowTypedPreview===true;
+      const classifier=settings.live===true&&state.typedPreview&&settings.detectorVariant==='L1-gap0'
+        ?'early-finalization':privatePercussionClassifier;
+      if(classifier!==state.percussionClassifier){
+        state.percussionClassifier=classifier;
+        state.restartPercussion();
+        telemetry.record('DETECTOR_CHANGED',undefined,{captureId,classifier});
+      }
       if(settings.live===true)return true;
       return setOutput(state,settings.bufferMs);
     },

@@ -93,3 +93,25 @@ it('enables a zero-delay live preview without rebuilding output and drops prior 
   f.advance(.5);f.event();expect(f.engine.health.queuedEvents).toBe(0);
   f.engine.stop();await vi.advanceTimersByTimeAsync(20);
 });
+it('switches only the drum worker and fences old callbacks during L1 and L0 rollback',async()=>{
+  const f=fixture();await f.engine.start('stream','owner',{candidate:true});
+  const old=f.model(),connections=f.source.connect.mock.calls.length;
+  const settings={bufferMs:0,eligible:true,paused:false,live:true,allowTypedPreview:true};
+  expect(f.engine.configureSynchronization('owner',{...settings,detectorVariant:'L1-gap0'})).toBe(true);
+  await Promise.resolve();
+  expect(f.model().classifier).toBe('early-finalization');
+  expect(old.signal.aborted).toBe(true);
+  old.onEvent({band:'clap',audioTime:1.2,confidence:.9,classMargin:.4});
+  expect(f.engine.health.queuedEvents).toBe(0);
+  f.advance(.5);f.event(1.4);expect(f.engine.health.queuedEvents).toBe(1);
+  const candidate=f.model();
+  expect(f.engine.configureSynchronization('owner',{...settings,detectorVariant:'L0'})).toBe(true);
+  await Promise.resolve();
+  expect(candidate.signal.aborted).toBe(true);expect(f.model().classifier).toBe('onset-guided');
+  expect(f.engine.health.queuedEvents).toBe(0);expect(f.engine.delaySeconds).toBe(0);
+  expect(f.source.connect).toHaveBeenCalledTimes(connections);
+  expect(f.deps.getUserMedia).toHaveBeenCalledOnce();expect(f.track.stop).not.toHaveBeenCalled();
+  expect(f.engine.configureSynchronization('owner',{...settings,detectorVariant:'unknown'})).toBe(false);
+  expect(f.engine.configureSynchronization('owner',{...settings,live:false,detectorVariant:'L1-gap0'})).toBe(false);
+  f.engine.stop();await vi.advanceTimersByTimeAsync(20);
+});

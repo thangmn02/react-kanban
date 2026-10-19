@@ -35,6 +35,17 @@ it('preserves seek and volume values while rejecting invalid control input', () 
   for (const value of [undefined, '1', NaN, Infinity, -1, 2]) h.receive({ ...request, action: 'media.volume', sessionId: 'song', value });
   expect(h.sendMessage).not.toHaveBeenCalled();
 });
+it('relays only the two bounded detector choices without accepting qualification claims',()=>{
+  const h=harness();
+  for(const detectorVariant of ['L0','L1-gap0']){
+    h.receive({...request,action:'beat.experimental.configure',sessionId:'song',configuration:{detectorVariant,accuracyQualified:true}});
+    expect(h.sendMessage.mock.calls.at(-1)[0].configuration.detectorVariant).toBe(detectorVariant);
+    expect(h.sendMessage.mock.calls.at(-1)[0].configuration).not.toHaveProperty('accuracyQualified');
+  }
+  h.sendMessage.mockClear();
+  h.receive({...request,action:'beat.experimental.configure',sessionId:'song',configuration:{detectorVariant:'L1-immediate'}});
+  expect(h.sendMessage).not.toHaveBeenCalled();
+});
 it('relays only supported messages through the internal extension connection, with no ID', () => {
   const h = harness();
   h.receive(request);

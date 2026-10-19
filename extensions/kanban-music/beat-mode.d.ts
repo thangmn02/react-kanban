@@ -6,8 +6,9 @@ export interface BeatMode {
   generation:number;physicalVerified:boolean;
   sourceKind:'audio-only'|'video'|'unknown';outputOwned:boolean;singleSource:boolean;noVideo:boolean;noFrames:boolean;
   droppedSemanticEvents:number;
+  earlyDecisionAvailable?:boolean;
 }
-export interface SyncConfiguration {enabled:boolean;captureId:string;generation:number;intentionalDelay:boolean;outputHeard:boolean;authorizedAudio:boolean;preview:boolean;live?:boolean;latencyAccepted?:boolean}
+export interface SyncConfiguration {enabled:boolean;captureId:string;generation:number;intentionalDelay:boolean;outputHeard:boolean;authorizedAudio:boolean;preview:boolean;live?:boolean;latencyAccepted?:boolean;detectorVariant?:'L0'|'L1-gap0'}
 export function parseBeatMode(value:unknown):BeatMode|undefined;
 export function validSyncConfiguration(value:unknown):value is SyncConfiguration;
 export function decideBeatMode(facts?:Record<string,unknown>,now?:number):BeatMode;

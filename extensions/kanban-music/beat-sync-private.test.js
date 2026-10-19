@@ -1,7 +1,21 @@
 import {expect,it,vi} from 'vitest';
-vi.mock('./beat-candidate.js',()=>({privateBeatCandidate:true,candidateDetector:{id:'adtof',version:'1',privateUseAllowed:true,trained:true,accuracyQualified:false}}));
+vi.mock('./beat-candidate.js',()=>({privateBeatCandidate:true,candidateDetector:{id:'adtof',version:'1',privateUseAllowed:true,trained:true,accuracyQualified:false,earlyDecisionAvailable:true}}));
 import {createBeatSync} from './beat-sync.js';
 import {beatTelemetry} from './beat-telemetry.js';
+it('labels selected L1 without qualifying semantics and returns to L0 on rollback',async()=>{
+  const f=fixture();await f.sync.start(f.session,f.owner,'sub');
+  await vi.waitFor(()=>expect(f.sync.status(f.session).mode).toBe('capture'));
+  const captureId=f.sync.status(f.session).captureId;
+  const config={enabled:true,captureId,generation:1,live:true,latencyAccepted:true,
+    intentionalDelay:false,authorizedAudio:true,outputHeard:true,preview:true};
+  expect(await f.sync.configure(f.session,f.owner,{...config,detectorVariant:'L1-gap0'})).toBe(true);
+  expect(f.sync.status(f.session).capability).toMatchObject({detectorId:'adtof-early-finalization',detectorVersion:'L1-gap0',
+    mode:'experimental-live',allowSemantic:false,physicalVerified:false,bufferMs:0});
+  expect(f.api.runtime.sendMessage.mock.calls.filter(([m])=>m.kind==='synchronization').at(-1)[0].settings.detectorVariant).toBe('L1-gap0');
+  expect(await f.sync.configure(f.session,f.owner,{...config,detectorVariant:'L0'})).toBe(true);
+  expect(f.sync.status(f.session).capability.detectorId).toBe('adtof');
+  await f.sync.stop();
+});
 function fixture() {
   const facts={kind:'audio-only',noVideo:true,noFrames:true,singleSource:true};
   const session={id:'source',src:'http://127.0.0.1:5174/test.wav',tabId:12,documentId:'media',index:0,

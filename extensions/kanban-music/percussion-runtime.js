@@ -34,7 +34,7 @@ export async function createPercussionRuntime({ context, source, onEvent, signal
     const response = await fetch(new URL('./generated/percussion/percussion.json', import.meta.url), { signal: loadingAbort.signal });
     if (!live || !response.ok) return null;
     const config = await response.json();
-    if (['onset-guided','local-prominence'].includes(classifier)) config.classifier = classifier;
+    if (['onset-guided','local-prominence','early-finalization'].includes(classifier)) config.classifier = classifier;
     if (!live || context.sampleRate !== config.sampleRate || config.version !== 1 || config.bins !== 84) return null;
     // Raw activations are private, explicitly requested diagnostics only.
     config.diagnostics = typeof onDiagnostic === 'function';

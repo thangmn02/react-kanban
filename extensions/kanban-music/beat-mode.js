@@ -50,7 +50,8 @@ export function decideBeatMode(facts={},now=Date.now()) {
   const activeBuffer=Number.isFinite(experiment.bufferMs)&&experiment.bufferMs>=80&&experiment.bufferMs<=500?experiment.bufferMs:0;
   const bufferReason=bufferEligible?'eligible':!sourceEligible?'source-or-output-unproven':!captureHealthy?'capture-unproven'
     :!clockHealthy?'clock-unreliable':clock.playbackRate!==1?'rate-unsupported':requirement===undefined?'calibration-unavailable':'detector-rights-unavailable';
-  const result={version:1,privateCandidate:privateMode,mode:'degraded',support:'experimental',reason:'detector-unqualified',bufferReason,
+  const result={version:1,privateCandidate:privateMode,earlyDecisionAvailable:privateMode&&detector.earlyDecisionAvailable===true,
+    mode:'degraded',support:'experimental',reason:'detector-unqualified',bufferReason,
     sourceKind:['audio-only','video'].includes(source.kind)?source.kind:'unknown',
     outputOwned:capture.output==='tab-replacement'&&capture.originalSuppressed===true,
     singleSource:source.singleSource===true,noVideo:source.noVideo===true,noFrames:source.noFrames===true,
@@ -95,7 +96,7 @@ export function parseBeatMode(value) {
     bufferReason:typeof value.bufferReason==='string'?value.bufferReason.slice(0,100):'unavailable',
     livePreviewReason:typeof value.livePreviewReason==='string'?value.livePreviewReason.slice(0,100):'unavailable',
     detectorId:String(value.detectorId||'unavailable').slice(0,100),detectorVersion:String(value.detectorVersion||'unknown').slice(0,100)};
-  for(const key of ['privateCandidate','outputOwned','singleSource','noVideo','noFrames','clockHealthy','captureHealthy','allowCapture','allowAnalysis','allowSemantic','allowTypedPreview','bufferEligible','livePreviewEligible','physicalVerified'])
+  for(const key of ['privateCandidate','earlyDecisionAvailable','outputOwned','singleSource','noVideo','noFrames','clockHealthy','captureHealthy','allowCapture','allowAnalysis','allowSemantic','allowTypedPreview','bufferEligible','livePreviewEligible','physicalVerified'])
     result[key]=value[key]===true;
   for(const key of ['bufferMs','requiredBufferMs','latencySamples','measuredP95Ms','measuredP99Ms','generation','droppedSemanticEvents'])
     result[key]=Number.isFinite(value[key])&&value[key]>=0?value[key]:key.startsWith('measured')?null:0;
@@ -108,6 +109,8 @@ export function validSyncConfiguration(value) {
     &&Number.isSafeInteger(value.generation)&&value.generation>=0
     &&(value.live===undefined||typeof value.live==='boolean')
     &&(value.latencyAccepted===undefined||typeof value.latencyAccepted==='boolean')
+    &&(value.detectorVariant===undefined||['L0','L1-gap0'].includes(value.detectorVariant))
+    &&(value.detectorVariant!=='L1-gap0'||value.live===true)
     &&(!value.enabled||value.outputHeard===true&&value.authorizedAudio===true
       &&(value.live===true?value.latencyAccepted===true&&value.preview===true:value.intentionalDelay===true))
     &&typeof value.preview==='boolean');

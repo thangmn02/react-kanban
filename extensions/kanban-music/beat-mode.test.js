@@ -56,6 +56,9 @@ it('bounds calibration and rejects forged controls',()=>{
   expect(bufferRequirement({samples:32,p95Ms:500,p99Ms:600})).toBeUndefined();
   expect(validSyncConfiguration(facts().experiment)).toBe(true);
   expect(validSyncConfiguration({...facts().experiment,captureId:'http://source-secret'})).toBe(false);
+  expect(validSyncConfiguration({...facts().experiment,detectorVariant:'L1-gap0'})).toBe(false);
+  expect(validSyncConfiguration({...facts().experiment,live:true,latencyAccepted:true,detectorVariant:'L1-gap0'})).toBe(true);
+  expect(validSyncConfiguration({...facts().experiment,live:true,latencyAccepted:true,detectorVariant:'L1-immediate'})).toBe(false);
 });
 it('pins private comparison playback to 500 ms only after in-budget calibration',()=>{
   const f=facts();f.detector.comparisonBufferMs=500;f.experiment.bufferMs=500;
