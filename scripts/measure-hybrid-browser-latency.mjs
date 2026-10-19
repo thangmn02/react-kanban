@@ -1,4 +1,4 @@
-// Same CC0 recording and actual Kora grid; software timing, never physical sync.
+// Hash-bound local recording and actual Kora grid; software timing, never physical sync.
 import assert from 'node:assert/strict';
 import {readFile,writeFile,mkdtemp} from 'node:fs/promises';
 import {resolve} from 'node:path';
@@ -11,7 +11,25 @@ import {promisify} from 'node:util';
 import {assessCaptureContinuity} from './summarize-beat-delivery.mjs';
 import {verifyPrivateL1Lifecycle} from './verify-private-l1-lifecycle.mjs';
 const option=name=>process.argv.find(value=>value.startsWith('--'+name+'='))?.split('=').slice(1).join('=');
-const root=resolve(option('output')||'scratch/hybrid-beta'),base='http://127.0.0.1:1420',sourceId='0bcf5f5fece49bf67804c8dbdd17099dc971a0f4295070041b31122155c941ff';
+const root=resolve(option('output')||'scratch/hybrid-beta'),base='http://127.0.0.1:1420',sourceId=option('source-id')||'0bcf5f5fece49bf67804c8dbdd17099dc971a0f4295070041b31122155c941ff';
+assert(/^[a-f0-9]{64}$/.test(sourceId));
+const labBase=option('lab-base')||base;assert([base,'http://127.0.0.1:5173'].includes(labBase));
+const auditDiagnostics=process.argv.includes('--audit-diagnostics');
+const extensionPath=resolve(option('extension-path')||'scratch/browser-first-candidate/extension');
+const audit={features:new Map(),frames:new Map(),predictions:new Map(),clocks:[],replacements:[]};
+async function collectAudit(worker){
+ if(!auditDiagnostics)return;
+ const snap=await worker.evaluate(()=>chrome.runtime.sendMessage({target:'beat-offscreen',kind:'percussion-diagnostics'}));
+ if(!snap?.clock)return;
+ const classifier=detector==='L1-gap0'?'early-finalization':'onset-guided';if(snap.classifier!==classifier)return;
+ audit.captureId??=snap.captureId;
+ if(snap.captureId!==audit.captureId){audit.replacements.push({at:Date.now(),captureId:snap.captureId});return;}
+ for(const block of snap.featureBlocks||[])audit.features.set(block.times[0],block);
+ for(const frame of snap.frames||[])audit.frames.set(frame.audioTime,frame);
+ for(const event of snap.predictions||[])audit.predictions.set(event.classIndex+':'+event.audioTime,event);
+ const playback=await source.locator('audio').evaluate(a=>({currentTime:a.currentTime,paused:a.paused,rate:a.playbackRate}));
+ audit.clocks.push({observedAt:Date.now(),captureId:snap.captureId,classifier,clock:snap.clock,playback});
+}
 const liveMs=Number(option('live-ms')||15000),fullSession=process.argv.includes('--full-session');
 assert(Number.isFinite(liveMs)&&liveMs>=1000&&liveMs<=240000,'Bound live sample duration to 1–240 seconds');
 const stress=process.argv.includes('--stress'),backgroundMode=process.argv.includes('--background'),scenario=stress?'stress':backgroundMode?'background':'foreground';
@@ -30,7 +48,7 @@ async function sampleBrowserResources(){
 }
 assert(!(backgroundMode&&fullSession),'Background full-session visibility/EOF qualification is unavailable; run these scenarios separately');
 const bridgeOpen=await new Promise(resolve=>{const socket=createConnection({host:'127.0.0.1',port:47635});socket.once('connect',()=>{socket.destroy();resolve(true);});socket.once('error',()=>resolve(false));socket.setTimeout(1000,()=>{socket.destroy();resolve(true);});});assert(!bridgeOpen,'Close Kora Desktop before this one-owner browser capture measurement.');
-const receipt={startedAt:new Date().toISOString(),scenario,fullSession,stressWorkerThreads:stress?2:0,backgroundThrottlingDisabled:true,sourceId,sourceKind:'existing generated CC0 180-second recording',humanOutputHeard:false,physicalSynchronization:'UNVERIFIED',recognitionOnsetError:'NOT MEASURED: no independent acoustic reference joined in this run',runs:[],errors:[]};
+const receipt={startedAt:new Date().toISOString(),scenario,fullSession,stressWorkerThreads:stress?2:0,backgroundThrottlingDisabled:true,sourceId,sourceKind:sourceId==='0bcf5f5fece49bf67804c8dbdd17099dc971a0f4295070041b31122155c941ff'?'existing generated CC0 180-second recording':'user-authorized exact local canonical recording',labBase,extensionPath,auditDiagnostics,humanOutputHeard:false,physicalSynchronization:'UNVERIFIED',recognitionOnsetError:'NOT MEASURED: no independent acoustic reference joined in this run',runs:[],errors:[]};
 receipt.detector=detector;
 receipt.appNavigations=[];
 const profile=await mkdtemp(resolve(root,'capture-profile-'));
@@ -40,7 +58,7 @@ const collected={app:new Map(),offscreen:new Map(),background:new Map()},health=
 function collect(name,snapshot){for(const row of snapshot?.records||[]){const key=JSON.stringify([row.component,row.stage,row.id,row.at,row.sequence]);if(collected[name].size>=100000){receipt.collectionOverflow=true;break;}collected[name].set(key,row);}}
 async function appDiagnostics(){return app.evaluate(()=>new Promise((resolve,reject)=>{const requestId=crypto.randomUUID(),channel='kanban-music-v1';const timer=setTimeout(()=>{window.removeEventListener('message',receive);reject(Error('Diagnostics timeout'));},5000);function receive(event){if(event.source!==window||event.origin!==location.origin||event.data?.requestId!==requestId||event.data.direction!=='extension-to-app')return;clearTimeout(timer);window.removeEventListener('message',receive);resolve(event.data.telemetry);}window.addEventListener('message',receive);window.postMessage({channel,direction:'app-to-extension',requestId,action:'diagnostics.get'},location.origin);}));}
 async function offscreenDiagnostics(worker){try{return await worker.evaluate(()=>chrome.runtime.sendMessage({target:'beat-offscreen',kind:'diagnostics'}));}catch(error){if(!fullSession||!await source.locator('audio').evaluate(a=>a.ended))throw error;receipt.offscreenReleasedAtEof=true;return {telemetry:{records:[]}};}}
-async function liveWindow(ms){const began=performance.now();await sampleBrowserResources();while(performance.now()-began<ms){await app.waitForTimeout(Math.max(0,Math.min(5000,ms-(performance.now()-began))));const worker=context.serviceWorkers().find(w=>w.url().endsWith('/background.js'));const snap=await offscreenDiagnostics(worker);collect('offscreen',snap.telemetry);collect('background',await appDiagnostics());collect('app',await app.evaluate(()=>window.__koraBeatTelemetry?.snapshot()));await sampleBrowserResources();const playback=await source.locator('audio').evaluate(a=>({currentTime:a.currentTime,duration:a.duration,paused:a.paused,ended:a.ended}));health.push({at:Date.now(),health:snap.health,playback});if(fullSession&&playback.ended)break;}receipt.liveSession={elapsedMs:performance.now()-began,samples:health};}
+async function liveWindow(ms){const began=performance.now();await sampleBrowserResources();while(performance.now()-began<ms){await app.waitForTimeout(Math.max(0,Math.min(5000,ms-(performance.now()-began))));const worker=context.serviceWorkers().find(w=>w.url().endsWith('/background.js'));const snap=await offscreenDiagnostics(worker);collect('offscreen',snap.telemetry);collect('background',await appDiagnostics());collect('app',await app.evaluate(()=>window.__koraBeatTelemetry?.snapshot()));await collectAudit(worker);await sampleBrowserResources();const playback=await source.locator('audio').evaluate(a=>({currentTime:a.currentTime,duration:a.duration,paused:a.paused,ended:a.ended}));health.push({at:Date.now(),health:snap.health,playback});if(fullSession&&playback.ended)break;}receipt.liveSession={elapsedMs:performance.now()-began,samples:health};}
 const stressWorkers=[],started=performance.now(),cpuStarted=process.cpuUsage();let backgroundPage;
 async function sampleWindow(ms){if(backgroundMode){backgroundPage??=await context.newPage();await backgroundPage.bringToFront();}const visibility=await app.evaluate(()=>document.visibilityState);await app.waitForTimeout(ms);await app.bringToFront();await app.waitForTimeout(100);return visibility;}
 const quantile=values=>{const a=values.filter(Number.isFinite).sort((a,b)=>a-b);return a.length?{n:a.length,median:a[Math.floor((a.length-1)*.5)],p95:a[Math.ceil((a.length-1)*.95)],worst:a.at(-1)}:null;};
@@ -49,10 +67,10 @@ function summarize(records){const unique=new Map();for(const r of records)if(r.i
 try{
  const cdp=await context.browser().newBrowserCDPSession();receipt.browser=(await cdp.send('Browser.getVersion')).product;
  resourceCdp=cdp;
- const {id:extensionId}=await cdp.send('Extensions.loadUnpacked',{path:resolve('scratch/browser-first-candidate/extension')});receipt.extensionId=extensionId;
+ const {id:extensionId}=await cdp.send('Extensions.loadUnpacked',{path:extensionPath});receipt.extensionId=extensionId;
  const background=context.serviceWorkers().find(w=>w.url().endsWith('/background.js'))||await context.waitForEvent('serviceworker');await background.evaluate(()=>chrome.storage.local.set({beatTelemetryEnabled:true}));
- const clip=await(await fetch(base+'/lab/full/clip/'+sourceId)).json();const audio=Buffer.from(await(await fetch(base+clip.audioUrl)).arrayBuffer());assert.equal(createHash('sha256').update(audio).digest('hex'),clip.canonicalWavSha256);receipt.canonicalWavSha256=clip.canonicalWavSha256;
- app=await context.newPage();app.on('framenavigated',frame=>{if(frame===app.mainFrame())receipt.appNavigations.push({at:Date.now(),url:frame.url()});});await app.addInitScript(()=>{window.captureMessages=[];window.addEventListener('message',e=>{if(e.source===window&&e.origin===location.origin&&e.data?.direction==='app-to-extension'&&['dock.beat.sync.start','dock.beat.sync.stop','beat.experimental.configure'].includes(e.data.action))window.captureMessages.push({at:Date.now(),action:e.data.action,subscriptionId:e.data.subscriptionId,sessionId:e.data.sessionId,configuration:e.data.configuration});});});app.on('pageerror',e=>receipt.errors.push(e.message));await app.goto(base+'/music?musicDebug=1&musicSemanticOnly=1');
+ const clip=await(await fetch(labBase+'/lab/full/clip/'+sourceId)).json();const audioUrl=new URL(clip.audioUrl,labBase).href;const audio=Buffer.from(await(await fetch(audioUrl)).arrayBuffer());assert.equal(createHash('sha256').update(audio).digest('hex'),clip.canonicalWavSha256);receipt.canonicalWavSha256=clip.canonicalWavSha256;
+ app=await context.newPage();app.on('framenavigated',frame=>{if(frame===app.mainFrame())receipt.appNavigations.push({at:Date.now(),url:frame.url()});});await app.addInitScript(()=>{window.captureMessages=[];window.addEventListener('message',e=>{if(e.source===window&&e.origin===location.origin&&e.data?.direction==='app-to-extension'&&['dock.beat.sync.start','dock.beat.sync.stop','beat.experimental.configure'].includes(e.data.action))window.captureMessages.push({at:Date.now(),action:e.data.action,subscriptionId:e.data.subscriptionId,sessionId:e.data.sessionId,configuration:e.data.configuration});});});app.on('pageerror',e=>receipt.errors.push(e.message));await app.goto(base+'/music?musicDebug=1'+(process.argv.includes('--normal-grid')?'':'&musicSemanticOnly=1'));
  if(stress)for(let i=0;i<2;i++)stressWorkers.push(new Worker('let value=.1;while(true)value=Math.sin(value)+.001;',{eval:true}));
  if(!process.argv.includes('--capture-only')){
  await app.getByRole('checkbox',{name:'Beat Grid Hybrid — Beta',exact:true}).check();await app.getByLabel('Beta local recording',{exact:true}).selectOption(sourceId);await app.getByRole('button',{name:'Play music',exact:true}).click();await app.getByRole('tab',{name:'Beat grid',exact:true}).click();
@@ -63,13 +81,15 @@ try{
  }
  await app.getByRole('button',{name:'Pause music',exact:true}).click();await app.getByRole('checkbox',{name:'Beat Grid Hybrid — Beta',exact:true}).uncheck();await app.getByRole('tab',{name:'Music',exact:true}).click();
  }
- source=await context.newPage();await source.route(base+'/hybrid-capture-fixture',route=>route.fulfill({contentType:'text/html',body:`<!doctype html><title>CC0 Hybrid capture fixture</title><audio controls src="${clip.audioUrl}"></audio>`}));await source.goto(base+'/hybrid-capture-fixture');await source.locator('audio').evaluate(a=>{a.addEventListener('ended',()=>{window.sourceEndedAt=Date.now();},{once:true});return a.play();});
- const target=(await cdp.send('Target.getTargets',{filter:[{type:'tab'}]})).targetInfos.find(t=>t.url===base+'/hybrid-capture-fixture');assert(target);await cdp.send('Extensions.triggerAction',{id:extensionId,targetId:target.targetId});
+ source=await context.newPage();const fixtureUrl=labBase+'/hybrid-capture-fixture';
+ receipt.sourceAcquisition='HTML audio fixture on the existing Lab origin, serving the exact hash-verified canonical WAV through its original audio endpoint';
+ await source.route(fixtureUrl,route=>route.fulfill({contentType:'text/html',body:`<!doctype html><title>Authorized local capture fixture</title><audio controls src="${audioUrl}"></audio>`}));await source.goto(fixtureUrl);await source.locator('audio').evaluate(a=>{a.addEventListener('ended',()=>{window.sourceEndedAt=Date.now();},{once:true});return a.play();});
+ const target=(await cdp.send('Target.getTargets',{filter:[{type:'tab'}]})).targetInfos.find(t=>t.url===fixtureUrl);assert(target);await cdp.send('Extensions.triggerAction',{id:extensionId,targetId:target.targetId});
  const privateControl=app.locator('details[aria-label="Private Beat Grid candidate"] > summary');
  await privateControl.waitFor({timeout:30000});await privateControl.click();
  const live=app.getByRole('region',{name:'Live instrument preview'});await live.waitFor();
  if(detector==='L1-gap0')await live.getByRole('combobox',{name:'Live detector',exact:true}).selectOption(detector);
- // CC0 functional consent routing; explicitly not human hearing verification.
+ // Authorized controlled-source consent routing; not human hearing verification.
  for(const name of ['I have permission to analyze this captured tab audio.','I can hear the captured tab normally.','I accept late or incorrect instrument flashes in this private test.'])await live.getByRole('checkbox',{name,exact:true}).check();
  await live.getByRole('button',{name:'Enable live preview (no audio delay)',exact:true}).click({timeout:30000});
  await live.getByRole('button',{name:'Disable live preview',exact:true}).waitFor({timeout:15000});
@@ -77,7 +97,7 @@ try{
  receipt.liveActivationText=await live.innerText();receipt.liveStartedAt=Date.now();receipt.activationDebug=await app.getByLabel('Beat sync debug',{exact:true}).textContent();await app.getByRole('tab',{name:'Beat grid',exact:true}).click();await app.bringToFront();await app.getByRole('button',{name:'Record 30 seconds',exact:true}).click();receipt.liveVisibility=await app.evaluate(()=>document.visibilityState);if(backgroundMode)await sampleWindow(liveMs);else await liveWindow(fullSession?195000:liveMs);receipt.captureMessages=await app.evaluate(()=>window.captureMessages);
  const trace=await download('Export row trace'),worker=context.serviceWorkers().find(w=>w.url().endsWith('/background.js'));assert(worker);
  const offscreen=await offscreenDiagnostics(worker);
- const backgroundTelemetry=await appDiagnostics();collect('offscreen',offscreen.telemetry);collect('background',backgroundTelemetry);collect('app',trace.telemetry);
+ const backgroundTelemetry=await appDiagnostics();await collectAudit(worker);collect('offscreen',offscreen.telemetry);collect('background',backgroundTelemetry);collect('app',trace.telemetry);
  trace.telemetry.records=[...collected.app.values()];offscreen.telemetry.records=[...collected.offscreen.values()];backgroundTelemetry.records=[...collected.background.values()];receipt.previewRevocations=backgroundTelemetry.records.filter(r=>['PREVIEW_REVOKED','CAPTURE_REPLACED','CAPTURE_STOP'].includes(r.stage));
  await writeFile(resolve(root,scenario+'-latency-live-a.json'),JSON.stringify({trace,offscreen,backgroundTelemetry},null,2));receipt.runs.push({mode:'Actual Companion live ADTOF',intentionalDelayMs:trace.captureStatus?.capability?.bufferMs,...summarize([...(offscreen?.telemetry?.records||[]),...backgroundTelemetry.records,...trace.telemetry.records]),controller:trace.controller,capability:trace.captureStatus?.capability});
  if(fullSession){receipt.eofAt=await source.evaluate(()=>window.sourceEndedAt);receipt.continuity=assessCaptureContinuity(health,[...offscreen.telemetry.records,...backgroundTelemetry.records],{startedAt:receipt.liveStartedAt,eofAt:receipt.eofAt});assert.equal(receipt.continuity.status,'PASS','Full source capture continuity must pass separately from reaching EOF');receipt.naturalEof=true;}else{assert.equal(trace.captureStatus?.capability?.mode,'experimental-live');assert.equal(trace.captureStatus?.capability?.bufferMs,0);}assert(receipt.runs.at(-1).stageCounts.EVENT_ACCEPTED>0);assert.deepEqual(receipt.errors,[]);assert(!receipt.collectionOverflow,'Bounded collection overflow');receipt.status='PARTIAL';receipt.limitations=['Real Web/Companion paths measured; Desktop has functional native evidence but no joined per-stage trace in this run.','Headless browser: physical refresh rate and foreground/background display timing not qualified.','Live CNN concurrent browser path unavailable; Python diagnostic is separate.'];
@@ -94,4 +114,7 @@ try{
  receipt.failureText=await app.locator('.floating-focus').innerText().catch(()=>null);await app.screenshot({path:resolve(root,'latency-failure.png')}).catch(()=>{});}process.exitCode=1;}
 finally{receipt.healthSamples=health;receipt.browserResources={samples:resourceSamples,
  scope:'CDP process inventory for this isolated Chrome instance; CPU counters and Windows working sets sampled around five-second intervals. Exited/unsampled processes and between-sample peaks may be missed. Sampling subprocess overhead is outside Chrome; this is not physical synchronization.'};
- await source?.locator('audio').evaluate(a=>a.pause()).catch(()=>{});await context.close();await Promise.all(stressWorkers.map(worker=>worker.terminate()));receipt.processCpuMicroseconds=process.cpuUsage(cpuStarted);receipt.elapsedMs=performance.now()-started;receipt.processResidentBytes=process.memoryUsage().rss;receipt.finishedAt=new Date().toISOString();await writeFile(resolve(root,'browser-latency-'+scenario+'.json'),JSON.stringify(receipt,null,2));console.log(JSON.stringify({status:receipt.status,scenario,runs:receipt.runs,errors:receipt.errors}));}
+  await source?.locator('audio').evaluate(a=>a.pause()).catch(()=>{});
+  try{await context.close();}finally{await Promise.all(stressWorkers.map(worker=>worker.terminate()));}
+  if(auditDiagnostics)await writeFile(resolve(root,'controlled-diagnostics.json'),JSON.stringify({features:[...audit.features.values()],frames:[...audit.frames.values()],predictions:[...audit.predictions.values()],clocks:audit.clocks,captureId:audit.captureId,replacements:audit.replacements,sourceId,detector,scope:'Private controlled local recording only. PCM probe and features are diagnostic observations; not provider content or independent acoustic references.'}));
+  receipt.processCpuMicroseconds=process.cpuUsage(cpuStarted);receipt.elapsedMs=performance.now()-started;receipt.processResidentBytes=process.memoryUsage().rss;receipt.finishedAt=new Date().toISOString();await writeFile(resolve(root,'browser-latency-'+scenario+'.json'),JSON.stringify(receipt,null,2));console.log(JSON.stringify({status:receipt.status,scenario,runs:receipt.runs,errors:receipt.errors}));}
