@@ -354,6 +354,26 @@ The [latency checkpoint](../../plans/reports/engineering-261019-1101-low-latency
 records the current structural floor, rapid-control failures and required
 architecture review. Neither tool qualifies physical synchronization.
 
+Plain `node scripts/package-music-extension.mjs --private` builds private
+Companion 0.3.25 with a capability-gated **Live detector** selector under
+**Music → Private candidate → Live preview**. L0 remains the frozen live
+default; L1-gap0 finalizes peaks earlier with the same weights/frontend/thresholds.
+Switching restarts only the drum worker, resets stale events and keeps the
+audible graph and independent Bass. Source-bound consent and policy checks still
+apply. Pause, seek, source replacement, disabling preview or configuration-failure
+cleanup restore L0. Later worker runtime failures retain the selected variant
+for the existing retry path; they do not automatically select L0.
+Public and historical XO/Hat packages exclude the L1 runtime module and option.
+
+Reload the unpacked private extension and refresh Kora plus the source tab after
+updating. Use the existing private server at `http://127.0.0.1:1420/music`
+(`node scripts/serve-hybrid-beta.mjs` if stopped). Live comparison requires no
+calibration or intentional audio delay. The private package contains its
+standalone guide; the [comparison report](../../plans/reports/engineering-261019-1717-early-percussion-decisions.md)
+and [Vietnamese listening guide](../../plans/261019-1101-low-latency-semantic/listening-guide-l1-vi.md)
+record measured benefits, worse tails and remaining acceptance limits.
+L1 is experimental and is not offline H0 or a physical synchronization pass.
+
 ### Playback-clock scheduling
 
 New producers publish before their existing output deadlines. Events carry
