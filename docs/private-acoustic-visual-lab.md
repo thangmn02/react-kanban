@@ -385,3 +385,22 @@ Focused verification commands are `node --test scripts/acoustic-visual-lab-core.
 `node scripts/verify-acoustic-lab-live.mjs`. The last three require the server;
 the live check also requires the existing private extension package. They use
 isolated temporary browser profiles and generated controls, not a user session.
+
+## Kinetic presentation and engineering qualification
+
+Normal and Semantic-only now preserve the existing accepted event identities
+independently of decorative row geometry. Held special shapes own explicit
+exclusive presentation; hidden hits are recorded as presentation-suppressed and
+are never replayed on exit. Heartbeat follows verified structural ticks and
+does not promote the degraded120BPM fallback into instrument evidence.
+Four rows remain the product default; supported Lead-state traces remain
+experimental/optional and retain their accepted identity beside percussion.
+Reduced mode uses static contributions/steady activity, with no per-hit motion.
+
+The [P3/P4 report](../plans/reports/p3-p4-implementation-and-qualification.md)
+records actual browser, Companion, YouTube, source/worker recovery and a real
+30-minute generated-control capture. See its
+[reproduction commands](../plans/261026-1706-p3-p4-qualification/qualification-commands.md).
+These engineering results do not qualify frozen P2 acoustics, physical A/V,
+all target platforms/devices, licensing or production release. The170ms route,
+detectors, EventTrack and scheduler contracts remain unchanged.

@@ -65,7 +65,7 @@ const receive = (message, sender, respond) => {
   }
   const media = document.querySelectorAll('audio,video')[message.index];
   if (!media) { respond({ ok: false }); return false; }
-  const state = { token: message.token, leaseUntil: Date.now() + 6000, generation: 0, buffering: false,
+  const state = { token: message.token, source:media.currentSrc||media.srcObject?.id,leaseUntil: Date.now() + 6000, generation: 0, buffering: false,
     events: ['play', 'playing', 'pause', 'waiting', 'seeking', 'seeked', 'ended', 'emptied', 'ratechange', 'volumechange'] };
   state.report = (event) => {
     if (watcher !== state) return;
@@ -75,7 +75,8 @@ const receive = (message, sender, respond) => {
       if (event.type === 'waiting') state.buffering = true;
       if (event.type === 'playing' || event.type === 'seeked') state.buffering = false;
     }
-    const valid = media.isConnected && document.querySelectorAll('audio,video')[message.index] === media && Boolean(media.currentSrc || media.srcObject?.id) && !media.ended;
+    const identity=media.currentSrc||media.srcObject?.id;
+    const valid = media.isConnected && document.querySelectorAll('audio,video')[message.index] === media && Boolean(identity) && identity===state.source && !media.ended;
     void chrome.runtime.sendMessage({ target: 'beat-worker', kind: 'clock', token: state.token, valid,
       clock: { currentTime: Number.isFinite(media.currentTime) ? media.currentTime : 0,
         playbackRate: media.playbackRate, sampledAt: Date.now(), paused: media.paused,

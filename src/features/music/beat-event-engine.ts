@@ -4,7 +4,7 @@ import { CHUNK_SECONDS, type MediaAsset, type TrackChunk, type TrackManifest, ty
 import { createEventTrackClient, EventTrackServiceError, InvalidEventTrack, type EventTrackClient } from './event-track-client';
 import type { BeatCapabilities } from './beat-capabilities';
 import { playbackRange, type PlaybackRange } from './event-track-ranges';
-import { clockAdvancing, clockDiscontinuity, parsePlaybackClock, parsePlaybackTiming, playbackPosition } from '../../../extensions/kanban-music/beat-timing.js';
+import { clockAdvancing, clockDiscontinuity, parsePlaybackClock, parsePlaybackTiming, playbackPosition, sourceFence, sameSourceFence, type SourceFence } from '../../../extensions/kanban-music/beat-timing.js';
 import { beatTelemetry } from '../../../extensions/kanban-music/beat-telemetry.js';
 import type { PlaybackAudioSegment } from './playback-audio-segment';
 import type { LeadAvailability } from './lead-feature';
@@ -27,7 +27,7 @@ type ScheduledEvent = Extract<BeatEvent, { kind: 'onset' | 'melody.state' | 'tem
 
 // Per playback owner: bounded chunks, requests, semantic merge and scheduling.
 // Local capture stays alive during cache waits and supplies recovery signals.
-export function createBeatEventEngine(options: BeatEventOptions, emit: (event: BeatEvent) => void, recover: () => void,
+export function createBeatEventEngine(options: BeatEventOptions, deliver: (event: BeatEvent) => void, recover: () => void,
   clientFactory = createEventTrackClient) {
   options = { ...options };
   let privateMode = options.privateCandidate === true;
@@ -37,6 +37,9 @@ export function createBeatEventEngine(options: BeatEventOptions, emit: (event: B
   const client: EventTrackClient | undefined = options.eventTrackClient || options.asset && clientFactory(options.asset, lifetime.signal, options.duration);
   let clock: MusicClock | undefined, manifest: TrackManifest | undefined;
   let stopped = false, epoch = 0, captureId = crypto.randomUUID(), sequence = 0, melody = 0;
+  let sourceOwner:SourceFence|undefined;
+  const retiredSources=new Set<string>();
+  const emit=(event:BeatEvent)=>deliver({...event,...sourceOwner});
   let localCapture: string | undefined, localLive = false, muted = false, silent = false, localReason: string | undefined;
   let localSequence = 0, localAt = 0, announcedAt = 0, stale = false;
   const retired = new Set<string>();
@@ -75,7 +78,8 @@ export function createBeatEventEngine(options: BeatEventOptions, emit: (event: B
     emit({ ...event, captureId, ...(event.kind === 'onset' ? { sequence: ++sequence } : {}),
       ...(event.kind === 'melody.state' ? { melody: { ...event.melody, note: event.melody.active ? ++melody : melody } } : {}) });
   }, recover);
-  const verifiedCache = () => !privateMode || Boolean(manifest && verifiedTrackMatches(options.verifiedSource, manifest.verification));
+  const verifiedCache = () => !['H-SHADOW','H-LIVE'].includes(mode?.hybridMode||'L0')&&!(mode?.bufferMs && mode.bufferMs>0)
+    && (!privateMode || Boolean(manifest && verifiedTrackMatches(options.verifiedSource, manifest.verification)));
   const typedLocal = () => !privateMode || Boolean(mode?.allowSemantic || mode?.allowTypedPreview);
   const coverage = (time: number) => verifiedCache() && chunks.has(Math.floor(time / CHUNK_SECONDS));
   const active = () => clock && clockAdvancing(clock) && Date.now() - clock.sampledAt <= 3500 && !muted
@@ -123,7 +127,7 @@ export function createBeatEventEngine(options: BeatEventOptions, emit: (event: B
       const oldest = pending.keys().next().value!; scheduler.cancelSemantic(oldest); pending.delete(oldest);
     }
     const key = `event:${++serial}`; pending.set(key, { row, time, rank, key });
-    scheduler.enqueue({ ...event, semanticKey: key, captureId });
+    scheduler.enqueue({ ...event, ...sourceOwner,semanticKey: key, captureId });
   };
   const loadChunk = (index: number) => {
     if (!manifest || !verifiedCache() || !client || chunks.has(index) || inFlight.has(index) || inFlight.size >= 2
@@ -272,6 +276,7 @@ export function createBeatEventEngine(options: BeatEventOptions, emit: (event: B
         && !uploadBusy && clock && active() && !coverage(playbackPosition(clock)));
     },
     captureSegment(segment: PlaybackAudioSegment) {
+      if(!sameSourceFence(sourceOwner,segment))return;
       if (stopped || !options.demand || !options.capturedInput || !demandLive || !clock || !active()
         || uploadBusy || !client?.uploadSegment || segment.end > (options.duration || 0)) return;
       const owner = epoch, identity = demandId;
@@ -285,6 +290,22 @@ export function createBeatEventEngine(options: BeatEventOptions, emit: (event: B
     },
     accept(event: BeatEvent) {
       if (stopped) return;
+      const incoming=sourceFence(event);
+      if(event.kind==='clock'||event.kind==='sync.state') {
+        if(event.kind==='clock'&&(!parsePlaybackClock(event.clock)||event.clock.sampledAt>Date.now()+8000||clock&&event.clock.sampledAt<clock.sampledAt))return;
+        if(incoming&&(retiredSources.has(incoming.synchronizationEpoch)||sourceOwner?.sourceId===incoming.sourceId&&incoming.sourceGeneration<sourceOwner.sourceGeneration
+          ||sourceOwner?.sourceRevision!==undefined&&(incoming.sourceRevision===undefined||incoming.sourceRevision<sourceOwner.sourceRevision)))return;
+        if(incoming&&sourceOwner&&!sameSourceFence(sourceOwner,event)) {
+          retiredSources.add(sourceOwner.synchronizationEpoch);
+          if(retiredSources.size>256)retiredSources.delete(retiredSources.values().next().value!);
+          sourceOwner=incoming;
+          clear();clock=undefined;localLive=false;localSequence=0;
+          emit({kind:'sync.state',mode:'clock',reason:'track-changed',captureId,...incoming});
+        }
+        if(incoming){sourceOwner=incoming;scheduler.transition(event);}
+      } else if(!sameSourceFence(sourceOwner,event)&&event.kind!=='sync.recover') {
+        telemetry.mark('EVENT_DROPPED',event.telemetry,{reason:'owner'});return;
+      }
       if (event.kind === 'clock') {
         if (!parsePlaybackClock(event.clock) || event.clock.sampledAt > Date.now() + 8000
           || clock && event.clock.sampledAt < clock.sampledAt) {
@@ -296,8 +317,10 @@ export function createBeatEventEngine(options: BeatEventOptions, emit: (event: B
       if (event.kind === 'sync.state') {
         if (event.capability?.privateCandidate) {
           const previouslyTyped = typedLocal();
+          const previouslyBuffered=Boolean(mode?.bufferMs);
+          const previousHybrid=mode?.hybridMode||'L0';
           privateMode = true; mode = event.capability;
-          if (previouslyTyped && !typedLocal()) clear();
+          if (previouslyTyped && !typedLocal() || previouslyBuffered!==Boolean(mode.bufferMs)||previousHybrid!==(mode.hybridMode||'L0')) {clear();if(clock)scheduler.clock(clock);}
         }
         if (event.captureId && retired.has(event.captureId)) { telemetry.mark('EVENT_DROPPED', event.telemetry, { reason: 'owner' }); return; }
         const wasMuted = muted, wasSilent = silent;

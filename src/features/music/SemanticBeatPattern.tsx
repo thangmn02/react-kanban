@@ -4,12 +4,19 @@ import { beatTelemetry } from '../../../extensions/kanban-music/beat-telemetry.j
 import { flashAttributes, recordCellFlash, semanticRows } from './beat-row-diagnostics';
 import type { MusicBeatState } from './useMusicBeatSync';
 import type { BrowserMusicSession } from './mediaBridge';
+import {usePresentationAttacks} from './use-presentation-attacks';
+import {ProjectedBeatFlash} from './projected-beat-flash';
 
 const telemetry = beatTelemetry.at('beat-renderer');
-export default function SemanticBeatPattern({ session, beat, orientation = 'horizontal', melodyEnabled = true, independentRows = false, melodyEvents }: { session?: BrowserMusicSession; beat: MusicBeatState; orientation?: 'horizontal' | 'vertical'; melodyEnabled?: boolean; independentRows?:boolean; melodyEvents?:readonly {id:string;duration:number}[] }) {
+export default function SemanticBeatPattern({ session, beat, orientation = 'horizontal', melodyEnabled = true, independentRows = false, melodyEvents, active=true, reduced=false }: { session?: BrowserMusicSession; beat: MusicBeatState; orientation?: 'horizontal' | 'vertical'; melodyEnabled?: boolean; independentRows?:boolean; melodyEvents?:readonly {id:string;duration:number}[]; active?:boolean; reduced?:boolean }) {
   const root = useRef<HTMLDivElement>(null);
-  const owner = session?.playing && !session.paused && beat.mode === 'capture' && beat.sessionId === session.id
-    ? `${session.id}:${beat.captureId}` : '';
+  const owner = active && session?.playing && !session.paused && !session.buffering && !session.seeking && beat.mode === 'capture' && beat.sessionId === session.id
+    && (beat.sourceGeneration===undefined||session.generation===undefined||beat.sourceGeneration===session.generation)
+    ? `${session.id}:${beat.captureId}:${beat.sourceGeneration??session.generation??''}:${beat.synchronizationEpoch||''}` : '';
+  const projected=beat.visualAttacks!==undefined;
+  const leadTrace=beat.telemetry?.['onset:melodic'];
+  const attacks=usePresentationAttacks(beat.visualAttacks,owner,'semantic-only',undefined,melodyEnabled,leadTrace,
+    (melodyEvents?.find(e=>e.id===leadTrace?.eventId)?.duration||beat.durations?.melody||.15)*1000);
   const gate = useRef({ owner: '', seen: new Set<string>(), committed: new Set<string>() });
   const timers = useRef(new Set<ReturnType<typeof setTimeout>>());
   useEffect(() => () => { timers.current.forEach(clearTimeout); }, []);
@@ -19,7 +26,7 @@ export default function SemanticBeatPattern({ session, beat, orientation = 'hori
       timers.current.forEach(clearTimeout); timers.current.clear();
       gate.current = { owner, seen: new Set(Object.values(beat.telemetry || {}).map(t => t.id)), committed: new Set<string>() };
     }
-    const traces = owner ? Object.values(beat.telemetry || {}).filter(t => t.source === 'onset'
+    const traces = owner && !projected ? Object.values(beat.telemetry || {}).filter(t => t.source === 'onset'
       && (t.eventSource === 'cache' || t.eventSource === 'local') && t.type !== 'generic'
       && Number.isFinite(t.targetPlaybackTime) && (melodyEnabled || t.type !== 'melodic')
       && !gate.current.seen.has(t.id)) : [];
@@ -43,7 +50,7 @@ export default function SemanticBeatPattern({ session, beat, orientation = 'hori
       }
     }, 0);
     timers.current.add(timer);
-  }, [owner, beat.telemetry, melodyEnabled, independentRows, melodyEvents]);
+  }, [owner, beat.telemetry, melodyEnabled, independentRows, melodyEvents,projected]);
   useEffect(() => {
     for (const element of root.current?.querySelectorAll<HTMLElement>('[data-beat-trace]') || []) {
       const trace = flashes.traces.find(t => t.id === element.dataset.beatTrace);
@@ -57,9 +64,9 @@ export default function SemanticBeatPattern({ session, beat, orientation = 'hori
     if (gate.current.committed.size > 1024) gate.current.committed = new Set(flashes.traces.map(t => t.id));
   }, [flashes, owner]);
   const rows = melodyEnabled ? semanticRows : semanticRows.filter(type => type !== 'melody');
-  return <div ref={root} className={`music-pattern semantic-only ${orientation}`} style={{ '--beat-rows': rows.length } as CSSProperties} data-semantic-only="true" data-melody-enabled={melodyEnabled} aria-hidden="true">
+  return <div ref={root} className={`music-pattern semantic-only ${orientation}`} style={{ '--beat-rows': rows.length } as CSSProperties} data-semantic-only="true" data-melody-enabled={melodyEnabled} data-motion-reduced={reduced} aria-hidden="true">
     {rows.map((type, row) => {
-      const trace = (type !== 'melody' || melodyEnabled) && flashes.owner === owner && owner ? flashes.traces.find(t => (t.type === 'melodic' ? 'melody' : t.type) === type) : undefined;
+      const trace = !projected && (type !== 'melody' || melodyEnabled) && flashes.owner === owner && owner ? flashes.traces.find(t => (t.type === 'melodic' ? 'melody' : t.type) === type) : undefined;
       // Deterministic position makes per-row routing visible without filler.
       const cell = trace ? [...trace.id].reduce((sum, c) => sum + c.charCodeAt(0), 0) % 8 : -1;
       return <div className="beat-channel" data-track={type} data-channel={type} key={type}>
@@ -68,7 +75,10 @@ export default function SemanticBeatPattern({ session, beat, orientation = 'hori
           className={`beat-square${index === cell ? ' onset' : ''}`} {...flashAttributes(index === cell ? trace : undefined, row, index)}
           style={independentRows&&type==='melody'?{'--melody-trail':`${Math.max(150,Math.min(450,(melodyEvents?.find(e=>e.id===trace?.eventId)?.duration||.15)*1000))}ms`} as CSSProperties:undefined}
           onAnimationStart={event => { if (event.target !== event.currentTarget || !trace || index !== cell) return;
-            recordCellFlash(event.currentTarget, 'animation'); telemetry.record('EVENT_RENDERED', trace, { row: row + 1, cell: index + 1, semantic: true }); }} />)}
+            recordCellFlash(event.currentTarget, 'animation'); telemetry.record('EVENT_RENDERED', trace, { row: row + 1, cell: index + 1, semantic: true }); }} >
+          {attacks.filter(a=>(a.band==='clap'?'snare':a.band)===type&&[...a.key].reduce((sum,c)=>sum+c.charCodeAt(0),0)%8===index)
+            .map(attack=><ProjectedBeatFlash key={attack.key} attack={attack} row={row} cell={index} semanticOnly reduced={reduced}/>)}
+        </span>)}
       </div>;
     })}
   </div>;

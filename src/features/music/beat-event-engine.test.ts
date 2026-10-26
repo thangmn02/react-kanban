@@ -3,6 +3,7 @@ import { createBeatEventEngine, type BeatEventOptions } from './beat-event-engin
 import { EventTrackServiceError, InvalidEventTrack, type EventTrackClient } from './event-track-client';
 import type { BeatEvent } from './mediaBridge';
 import { beatTelemetry } from '../../../extensions/kanban-music/beat-telemetry.js';
+import {decideBeatMode} from '../../../extensions/kanban-music/beat-mode.js';
 import type { TrackManifest, TrackChunk } from './event-track';
 const asset = { provider: 'youtube' as const, id: 'abcdefghijk' };
 const manifest: TrackManifest = { version: 1, asset, revision: 'r', analysisVersion: 'reference-v1', duration: 7200, chunkSeconds: 30, melodyPolicy: 'dominant-monophonic' };
@@ -19,6 +20,37 @@ const setup = (client: EventTrackClient, config = options) => {
   engine.accept({ kind: 'clock', clock: clock() });
   return { events, engine, recover };
 };
+it.each([{bufferMs:170,hybridMode:'L0' as const},{bufferMs:0,hybridMode:'H-LIVE' as const},{bufferMs:0,hybridMode:'H-SHADOW' as const}])('flushes pending cache work when private capture becomes authoritative (%j)',async mode=>{
+  const verification={status:'independently-verified' as const,sourceId:'song',sourceVersion:'v1',sourceSha256:'a'.repeat(64),annotationSha256:'b'.repeat(64),revision:'r'};
+  const client:EventTrackClient={manifest:async()=>({...manifest,verification}),chunk:async(_m,index)=>({...chunk(index),events:index===0?[{id:'cached',time:10.7,row:'hat',confidence:1}]:[]}),requestAnalysis:async()=> 'unavailable'};
+  const {engine,events}=setup(client,{...options,privateCandidate:true,verifiedSource:{id:'song',version:'v1',contentSha256:'a'.repeat(64)}});
+  const owner={sourceId:'song',sourceGeneration:1,synchronizationEpoch:'pending'};
+  engine.accept({kind:'sync.state',mode:'capture',captureId:'local',...owner,capability:{...decideBeatMode(),privateCandidate:true,bufferMs:0}});
+  engine.accept({kind:'clock',clock:{...clock(),sourceId:'song',generation:1,synchronizationEpoch:'pending'}});
+  await vi.advanceTimersByTimeAsync(100);expect(engine.stats().pending).toBeGreaterThan(0);
+  engine.accept({kind:'sync.state',mode:'capture',captureId:'local',...owner,capability:{...decideBeatMode(),privateCandidate:true,...mode,allowTypedPreview:true}});
+  expect(engine.stats().pending).toBe(0);await vi.advanceTimersByTimeAsync(800);
+  expect(semantic(events)).toHaveLength(0);
+});
+it('rejects a reversed intermediate source boundary and preserves the newest owner',()=>{
+  const client:EventTrackClient={manifest:async()=>undefined,chunk:vi.fn(),requestAnalysis:async()=> 'unavailable'};
+  const {engine,events}=setup(client);const boundary=(sourceId:string,sourceRevision:number):BeatEvent=>({kind:'sync.state',mode:'clock',sourceId,sourceGeneration:0,synchronizationEpoch:sourceId,sourceRevision});
+  engine.accept(boundary('A',1));engine.accept(boundary('C',3));const before=events.length;
+  engine.accept(boundary('B',2));expect(events).toHaveLength(before);expect(events.at(-1)?.sourceId).toBe('C');
+});
+it('cancels cached targets and rejects in-flight chunk completion across rapid source generations',async()=>{
+  let finish!:(value:TrackChunk)=>void;
+  const client:EventTrackClient={manifest:async()=>manifest,chunk:vi.fn(async(_m,index)=>index===0?new Promise<TrackChunk>(resolve=>{finish=resolve;}):({...chunk(index),events:[]})),requestAnalysis:async()=> 'unavailable'};
+  const {engine,events}=setup(client);
+  const fence={sourceId:'song',sourceGeneration:1,synchronizationEpoch:'a'};
+  engine.accept({kind:'clock',clock:{...clock(),generation:1,sourceId:'song',synchronizationEpoch:'a'}});
+  await vi.advanceTimersByTimeAsync(100);const oldFinish=finish;
+  for(let i=2;i<=4;i++)engine.accept({kind:'sync.state',mode:'clock',...fence,sourceGeneration:i,synchronizationEpoch:'epoch'+i});
+  oldFinish(chunk(0,10.3));
+  engine.accept({kind:'onset',bands:['hat'],captureId:'old',sequence:1,...fence});
+  await vi.advanceTimersByTimeAsync(500);expect(semantic(events)).toHaveLength(0);expect(engine.stats().pending).toBe(0);
+  expect(events.at(-1)).toMatchObject({kind:'sync.state',mode:'clock',sourceGeneration:4});
+});
 it('keeps independent Bass concurrent with cached Kick and Hat',async()=>{
  const client:EventTrackClient={manifest:async()=>manifest,chunk:async(_m,index)=>({...chunk(index,10.25),events:index===0?[{id:'kick',time:10.25,row:'kick',confidence:.9},{id:'hat',time:10.25,row:'hat',confidence:.9}]:[]}),requestAnalysis:async()=> 'unavailable'};
  const {engine,events}=setup(client,{...options,independentLocalRows:['bass']});

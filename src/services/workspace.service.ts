@@ -1,4 +1,5 @@
 import supabase, { requireSupabaseClient } from '../lib/supabase';
+import { DEFAULT_IDENTITY_IMAGE, resolveProfileImage } from './profile.service';
 import type { AppUser, WorkspaceMember, WorkspaceRole, WorkspaceSummary } from '../types/auth.type';
 import { mockWorkspaceMembers } from '../utils/workspaceMembers';
 
@@ -34,7 +35,7 @@ interface ProfileRow {
   avatar_url: string | null;
 }
 
-const fallbackAvatarUrl = 'https://flowbite.com/application-ui/demo/images/users/bonnie-green.png';
+const fallbackAvatarUrl = DEFAULT_IDENTITY_IMAGE;
 
 type SupabaseRpcCaller = (
   functionName: string,
@@ -89,7 +90,7 @@ export async function ensureUserProfile(user: AppUser): Promise<void> {
       full_name: user.name,
       avatar_url: user.avatarUrl,
       updated_at: new Date().toISOString(),
-    });
+    }, { onConflict: 'id', ignoreDuplicates: true });
 
   if (error) {
     throw error;
@@ -196,7 +197,8 @@ export async function fetchWorkspaceMembers(workspaceId: string | null): Promise
     throw profilesError;
   }
 
-  return mapWorkspaceMemberRows(memberRows, (profiles ?? []) as ProfileRow[]);
+  const resolved = await Promise.all(((profiles ?? []) as ProfileRow[]).map(async profile=>({...profile,avatar_url:await resolveProfileImage(profile.avatar_url)})));
+  return mapWorkspaceMemberRows(memberRows, resolved);
 }
 
 export async function addWorkspaceMemberByEmail(

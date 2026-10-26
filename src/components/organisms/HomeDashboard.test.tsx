@@ -36,16 +36,16 @@ it('discards a previous workspace retry and immediately clears old tasks', async
   let finishRetry!: (value: HomeDashboardData) => void;
   vi.mocked(fetchHomeDashboardData).mockResolvedValueOnce(data('Old task'));
   const view = render(<I18nProvider><HomeDashboard {...props} /></I18nProvider>);
-  await screen.findByText('Old task');
+  await screen.findByRole('heading', { name: 'Old task' });
   vi.mocked(fetchHomeDashboardData).mockImplementationOnce(() => new Promise((resolve) => { finishRetry = resolve; }));
   view.rerender(<I18nProvider><HomeDashboard {...props} refreshKey /></I18nProvider>);
   vi.mocked(fetchHomeDashboardData).mockResolvedValueOnce(data('New task'));
   view.rerender(<I18nProvider><HomeDashboard {...props} activeWorkspace={workspace('b')} /></I18nProvider>);
   expect(screen.queryByText('Old task')).not.toBeInTheDocument();
-  await screen.findByText('New task');
+  await screen.findByRole('heading', { name: 'New task' });
   await act(async () => finishRetry(data('Stale response')));
   expect(screen.queryByText('Stale response')).not.toBeInTheDocument();
-  expect(screen.getByText('New task')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'New task' })).toBeInTheDocument();
 });
 
 it('delegates details, focus and planning to the real workflow callbacks', async () => {
@@ -62,7 +62,7 @@ it('delegates details, focus and planning to the real workflow callbacks', async
 it('adds the ranked plan to Today from Home', async () => {
   vi.mocked(fetchHomeDashboardData).mockResolvedValueOnce(data('Planned task'));
   render(<I18nProvider><HomeDashboard {...props} /></I18nProvider>);
-  await screen.findByText('Planned task');
+  await screen.findByRole('heading', { name: 'Planned task' });
   fireEvent.click(screen.getByRole('button', { name: 'Order today’s tasks' }));
   fireEvent.click(screen.getByRole('button', { name: 'Add top 3 to Today' }));
   expect(props.onPlanFocusTasks).toHaveBeenCalledWith([expect.objectContaining({ id: 'Planned task' })]);

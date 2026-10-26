@@ -1,0 +1,13 @@
+# Existing architecture audit
+
+Baseline: `experiment/rust-audio-core-lab`, HEAD `a28d8519754b02afec8ad9f3bfea6aa575a3abfd`; exact dirty inventory and protected hashes are in `scratch/p3-p4-261026-1706/admission.json`. Work continues on `codex/p3-p4-qualification` without stashing or discarding changes. Six existing suites/162 tests passed before edits.
+
+Accepted onsets reach React in `useMusicBeatSync.receive`, after the existing Event Engine and Scheduler. It increments row counters, retains one diagnostic trace per source/type, and retains up to 64 accepted `visualAttacks` with original mapped deadlines. The Opal motion renderer already consumes that projection; Normal and Semantic-only do not. Several accepted same-row events in one React batch therefore retain data identities but expose only the last trace/counter in these two renderers. This is a presentation defect, not missing acoustic evidence.
+
+Normal stores per-row decorative geometry/expiry and private semantic overlays; keyed child spans restart same-row flashes. Wave/Ripple/Pop/Splash use the existing masks and CSS delays. Row decorations deliberately coalesce until their geometry completes. Bass owns a bounded measured hold; optional cached Lead uses its existing onset/release contract. Default presentation has four rows; the semantic data contract has five.
+
+Heart/diamond/smile moments are real-onset-triggered random decoration with a held mask and finite timer. Tempo ticks may reflash that mask. Ordinary overlays can overlap it, so explicit exclusive ownership and suppression diagnostics are missing. Tempo/decoration must remain separate from instrument evidence. No independent continuous Heartbeat exists; the existing tempo tick/lock is the available verified structural contract.
+
+Capture/epoch changes and pauses reset most existing state. Normal/Semantic-only lack the newer motion renderer's explicit active-view/source-generation guards. Opal already cancels WAAPI on owner/visibility changes, but its sequential same-row `play` calls can supersede an attack before a frame; these cases need explicit software observation classification. Reduced motion is already supported by CSS and private Opal markers.
+
+Existing diagnostics: `beat-row-diagnostics` records bounded per-cell commits/animation starts; `beat-presentation-diagnostics` records bounded decisions; Companion telemetry traces acceptance, scheduler and renderer. Existing browser scripts use dedicated Playwright profiles. Reuse these systems; DOM/CSS/RAF evidence does not measure physical photons. P2 remains PARTIAL and selected baselines/170 ms/capture/EventTrack are frozen.

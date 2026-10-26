@@ -1,7 +1,7 @@
 import { isNativeWidget } from '../native/runtime';
 import { requestNativeMusic, subscribeNativeMusic } from '../native/nativeMusic';
 import { beatTelemetry, parseBeatTraces, type BeatTrace } from '../../../extensions/kanban-music/beat-telemetry.js';
-import { parsePlaybackTiming, parsePlaybackClock, playbackDeadline, type PlaybackTiming, type PlaybackClock } from '../../../extensions/kanban-music/beat-timing.js';
+import { parsePlaybackTiming, parsePlaybackClock, playbackDeadline, sourceFence, sameSourceFence, type SourceFence, type PlaybackTiming, type PlaybackClock } from '../../../extensions/kanban-music/beat-timing.js';
 import { parseMediaAsset, type MediaAsset } from '../../../extensions/kanban-music/media-asset.js';
 import type { BeatEventPath } from './beat-event-engine';
 import type { LeadProvenance } from './lead-events';
@@ -43,7 +43,7 @@ export type BeatEvent = ({ kind: 'clock'; clock: MusicClock }
   | { kind: 'onset'; bands: BeatBand[]; captureId?: string; sequence?: number; duration?: number }
   | { kind: 'melody.state'; captureId: string; melody: MelodyState; lead?: LeadProvenance }
   | { kind: 'tempo.state'; captureId: string; tempo: { locked: boolean; bpm: number | null; confidence: number } }
-  | { kind: 'tempo.tick'; captureId: string; tick: { step: number; phase: number; beatPosition: number; subdivision: 2 } }) & { telemetry?: BeatTrace[]; eventSource?: BeatEventPath; semanticKey?: string } & Partial<PlaybackTiming>;
+  | { kind: 'tempo.tick'; captureId: string; tick: { step: number; phase: number; beatPosition: number; subdivision: 2 } }) & { telemetry?: BeatTrace[]; eventSource?: BeatEventPath; semanticKey?: string } & Partial<PlaybackTiming> & Partial<SourceFence>;
 
 const channel = 'kanban-music-v1';
 const supportedBands = ['kick', 'clap', 'hat', 'bass', 'melody', 'snare'];
@@ -51,12 +51,15 @@ const canonicalBand = (band: string): BeatBand => band === 'snare' ? 'clap' : ba
 export type MusicAction = 'sessions.get' | 'diagnostics.get' | 'media.play' | 'media.pause' | 'media.focus' | 'media.seek' | 'media.volume' | 'media.previous' | 'media.next';
 type BeatAction = 'dock.beat.sync.start' | 'dock.beat.sync.stop';
 type AudioAction = 'dock.audio.read';
+export interface LiveDiagnosticRequest {operation:'start'|'status'|'read'|'stop';recordingId:string;durationSeconds?:30|60|90}
 
 export class MusicBridgeError extends Error {
   readonly code: 'not-installed' | 'unavailable' | 'playback' | 'invalid-response';
-  constructor(code: MusicBridgeError['code']) {
+  readonly diagnosticReason?:string;
+  constructor(code: MusicBridgeError['code'],diagnosticReason?:string) {
     super(code);
     this.code = code;
+    this.diagnosticReason=diagnosticReason;
   }
 }
 
@@ -97,7 +100,7 @@ function isSyncState(value: unknown): boolean {
     && (state.capability === undefined || Boolean(parseBeatMode(state.capability)));
 }
 
-function requestBridge(action: MusicAction | BeatAction | AudioAction | 'beat.experimental.configure', sessionId?: string, subscriptionId?: string, value?: number, configuration?: SyncConfiguration): Promise<Record<string, unknown>> {
+function requestBridge(action: MusicAction | BeatAction | AudioAction | 'beat.experimental.configure' | 'beat.diagnostics', sessionId?: string, subscriptionId?: string, value?: number, configuration?: SyncConfiguration, diagnostic?:LiveDiagnosticRequest): Promise<Record<string, unknown>> {
   if ((action === 'dock.audio.read' || action === 'beat.experimental.configure') && isNativeWidget()) return Promise.reject(new MusicBridgeError('unavailable'));
   if (isNativeWidget()) return requestNativeMusic(action as MusicAction | BeatAction, sessionId, subscriptionId, value).then((response) => {
     if (response.ok !== true) throw new MusicBridgeError(response.error === 'not-installed' ? 'not-installed' : 'unavailable');
@@ -114,12 +117,14 @@ function requestBridge(action: MusicAction | BeatAction | AudioAction | 'beat.ex
       const response = event.data;
       if (!response || response.channel !== channel || response.direction !== 'extension-to-app' || response.requestId !== requestId) return;
       cleanup();
-      if (response.ok !== true) { reject(new MusicBridgeError(response.error === 'playback' ? 'playback' : 'unavailable')); return; }
+      if (response.ok !== true) { reject(new MusicBridgeError(response.error === 'playback' ? 'playback' : 'unavailable',
+        action==='beat.diagnostics'&&['detector-not-ready','diagnostics-unavailable','source-changed','recording-not-found','worker-unavailable','unavailable'].includes(response.error)?response.error:undefined)); return; }
       resolve(response);
     };
     const timeout = window.setTimeout(() => { cleanup(); reject(new MusicBridgeError('not-installed')); }, 2500);
     window.addEventListener('message', receive);
     window.postMessage({ channel, direction: 'app-to-extension', requestId, action, sessionId,
+      ...(diagnostic?{diagnostic}:{}),
       ...(configuration ? { configuration } : {}),
       ...(action === 'dock.beat.sync.start' ? { telemetryEnabled: beatTelemetry.enabled } : {}),
       ...(value !== undefined ? { value } : {}),
@@ -143,6 +148,10 @@ export async function configureExperimentalSynchronization(sessionId: string, co
   if (!validSyncConfiguration(configuration)) throw new MusicBridgeError('playback');
   await requestBridge('beat.experimental.configure', sessionId, undefined, undefined, configuration);
 }
+export async function captureLiveDiagnostics(sessionId:string,diagnostic:LiveDiagnosticRequest):Promise<Record<string,unknown>>{
+  if(isNativeWidget())throw new MusicBridgeError('unavailable');
+  return requestBridge('beat.diagnostics',sessionId,undefined,undefined,undefined,diagnostic);
+}
 
 export async function readCompanionAudio(sessionId: string, subscriptionId: string): Promise<unknown> {
   const response = await requestBridge('dock.audio.read', sessionId, subscriptionId);
@@ -161,6 +170,8 @@ export function subscribeBeatEvents(sessionId: string, subscriptionId: string, c
   let pending: ReturnType<typeof setTimeout> | undefined;
   let lastRecovery = -Infinity;
   let recovering = false;
+  let owner: SourceFence | undefined;
+  const retiredOwners=new Set<string>();
   const recover = () => {
     if (Date.now() - lastRecovery < 1000) return;
     lastRecovery = Date.now();
@@ -210,14 +221,24 @@ export function subscribeBeatEvents(sessionId: string, subscriptionId: string, c
     let delivered = false;
     const receive = (event: BeatEvent) => {
       delivered = true;
-      const value = { ...event, ...(traces ? { telemetry: traces } : {}), ...(timing || {}) };
+      const incoming=sourceFence(message);
+      const boundary=event.kind==='clock'||event.kind==='sync.state';
+      if(incoming&&boundary&&!sameSourceFence(owner,incoming)) {
+        if(owner?.sourceRevision!==undefined&&(incoming.sourceRevision===undefined||incoming.sourceRevision<owner.sourceRevision))return;
+        if(retiredOwners.has(incoming.synchronizationEpoch)||owner?.sourceId===incoming.sourceId&&incoming.sourceGeneration<owner.sourceGeneration)return;
+        if(owner)retiredOwners.add(owner.synchronizationEpoch);
+        if(retiredOwners.size>256)retiredOwners.delete(retiredOwners.values().next().value!);
+        owner=incoming;clearTimeout(pending);pending=undefined;delayed.clear();latestAt.clear();
+      } else if(incoming&&boundary&&!owner)owner=incoming;
+      if(!boundary&&!sameSourceFence(owner,message)){telemetry.mark('EVENT_DROPPED',traces,{reason:'owner'});return;}
+      const value = { ...event, ...(traces ? { telemetry: traces } : {}), ...(timing || {}),...incoming };
       const timestamp = Number.isFinite(message.emittedAt) ? message.emittedAt : Date.now();
       if (!ahead && timestamp < (latestAt.get(event.kind) ?? -Infinity)) { telemetry.mark('EVENT_DROPPED', traces, { reason: 'delivery-coalesced' }); return; }
       latestAt.set(event.kind, timestamp);
       const previous = delayed.get(event.kind);
       if (previous) telemetry.mark('EVENT_DROPPED', previous.event.telemetry, { reason: 'delivery-coalesced' });
       delayed.delete(event.kind);
-      if (late && !ahead) {
+      if (late && !ahead && !incoming) {
         delayed.set(event.kind, { event: value, expiresAt: timestamp + 2000 });
         pending ??= setTimeout(flush, 0);
       } else {

@@ -1,4 +1,6 @@
-import { useCallback, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import ViewContextBoundary from './app/ViewContextBoundary';
+import { useTaskWorkflowSync } from './hooks/use-task-workflow-sync';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { notify } from './components/organisms/toast/notify';
 
@@ -23,6 +25,7 @@ import { useCommandPaletteActions } from './hooks/useCommandPaletteActions';
 import { FocusSessionProvider } from './features/focus/FocusSessionProvider';
 import { useFocusSessionController } from './features/focus/useFocusSessionController';
 import type { TodayTaskSummary } from './services/today.service';
+import type { FocusTask } from './types/focus.type';
 import type { OnboardingSetupValues } from './types/onboarding.type';
 import { useBoardPageController } from './features/board/hooks/useBoardPageController';
 import { useBoardDialogState } from './features/board/hooks/useBoardDialogState';
@@ -71,7 +74,17 @@ function AppLayout() {
     reloadMembers,
   } = useWorkspaceMembers(activeWorkspaceId);
 
-  const taskEditor = useTaskEditorState();
+  const taskEditorState = useTaskEditorState();
+  const { closeTaskDialog: closeEditor, openEditTaskDialog: openEditor, state: editorState } = taskEditorState;
+  const closeContextTask = useCallback(() => {
+    closeEditor();
+    const query = new URLSearchParams(location.search);
+    if (query.has('task')) {
+      query.delete('task'); query.delete('taskBoard');
+      navigate(`${location.pathname}${query.size ? `?${query}` : ''}${location.hash}`, { replace: true });
+    }
+  }, [closeEditor, location, navigate]);
+  const taskEditor = { ...taskEditorState, closeTaskDialog: closeContextTask };
   const { focusViewId } = useHomeFocusView(user?.id, activeWorkspaceId);
   const boardDialogs = useBoardDialogState();
   const {
@@ -155,6 +168,23 @@ function AppLayout() {
     setActiveWorkspaceId,
     board: boardController,
   });
+  const contextTaskId = new URLSearchParams(location.search).get('task');
+  const contextBoardId = new URLSearchParams(location.search).get('taskBoard');
+  const contextTask = routing.isTaskContextReady && !boardController.isBoardLoading && !boardController.boardErrorMessage && contextBoardId === activeBoardId
+    ? boardData.task[contextTaskId || ''] : undefined;
+  const contextTaskUnavailable = Boolean(contextTaskId && routing.isTaskContextReady && !boardController.isBoardLoading && !boardController.boardErrorMessage
+    && (!contextBoardId || (contextBoardId === activeBoardId && !contextTask)));
+  useEffect(() => {
+    if (!contextTaskUnavailable) return;
+    notify.info(t('toast.focusTaskUnavailable'));
+    closeContextTask();
+  }, [contextTaskUnavailable, closeContextTask, t]);
+  const previousContextTask = useRef(contextTaskId);
+  useEffect(() => {
+    if (previousContextTask.current && !contextTaskId) closeEditor();
+    previousContextTask.current = contextTaskId;
+    if (contextTask && editorState.editingTask?.id !== contextTask.id) openEditor(contextTask);
+  }, [contextTask, contextTaskId, editorState.editingTask?.id, openEditor, closeEditor]);
   const {
     activeView,
     goToView: setActiveViewWithPath,
@@ -174,6 +204,7 @@ function AppLayout() {
     activeBoardId,
     activeBoardSummary,
   });
+  useTaskWorkflowSync(activeWorkspaceId,user?.id,focusSession);
   const {
     activeFocusTask,
     pauseTimer,
@@ -247,9 +278,11 @@ function AppLayout() {
   });
   const {
     isPictureInPictureSupported,
-    handleOpenFocusTask,
     handleOpenFloatingFocusTimer,
   } = focusIntegration;
+  const handleOpenFocusTask = useCallback(async (task: FocusTask) => {
+    handleOpenTaskFromHome(task.id, task.boardId);
+  }, [handleOpenTaskFromHome]);
 
   const planning = usePlanningController({
     focus: focusSession,
@@ -327,7 +360,7 @@ function AppLayout() {
       boardDialogs={boardDialogs}
       taskEditor={taskEditor}
       focus={focusSession}
-      focusIntegration={focusIntegration}
+      focusIntegration={{ ...focusIntegration, handleOpenFocusTask }}
       planning={planning}
       commandPalette={{
         isOpen: isCommandPaletteOpen,
@@ -418,7 +451,11 @@ function AppLayout() {
     <FocusSessionProvider value={focusSession}>
       {showNavigation && <AppNavigation activeView={activeView} onNavigate={setActiveViewWithPath} />}
       <div className={showNavigation ? 'lg:pl-20' : undefined}>
-        <Outlet context={routeContext} />
+        <ViewContextBoundary key={`${user?.id ?? 'public'}:${activeWorkspaceId ?? 'none'}`} ready={!boardController.isBoardLoading}>
+          <Suspense fallback={<div role="status" className="min-h-48 bg-canvas px-6 py-10 text-sm text-slate-500">{t('ux.loadingView')}</div>}>
+            <Outlet context={routeContext} />
+          </Suspense>
+        </ViewContextBoundary>
       </div>
       {shouldRenderOverlays && sharedDialogs}
     </FocusSessionProvider>

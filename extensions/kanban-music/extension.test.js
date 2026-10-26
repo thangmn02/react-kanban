@@ -3,6 +3,12 @@ import { allowedRequest } from './protocol.js';
 import { controlMedia, readMedia } from './media.js';
 
 afterEach(() => { document.body.replaceChildren(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+it('authorizes raw diagnostic control only on the existing local app origin with bounded tokens',()=>{
+  const m={protocol:'kanban-music-v1',sessionId:'song',action:'beat.diagnostics',diagnostic:{operation:'start',recordingId:'record'}};
+  expect(allowedRequest(m,{url:'http://127.0.0.1:1420/'})).toBe(true);
+  for(const url of ['https://kanthangboard.netlify.app/','http://127.0.0.1:5173/','https://evil.test/'])expect(allowedRequest(m,{url})).toBe(false);
+  expect(allowedRequest({...m,diagnostic:{operation:'execute',recordingId:'record'}},{url:'http://127.0.0.1:1420/'})).toBe(false);
+});
 it('controls actual seek and volume, and rejects unavailable targets and non-finite inputs', async () => {
   const audio = document.createElement('audio');
   Object.defineProperties(audio, { currentSrc: { value: 'blob:track' }, readyState: { value: 4 }, duration: { value: 120 },

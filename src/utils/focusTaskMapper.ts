@@ -18,6 +18,7 @@ export function mapTaskToFocusTask({
     dueDate: task.dueDate,
     assigneeAvatar: task.assignees[0]?.avatar,
     isDone: task.isDone,
+    updatedAt: task.updatedAt,
     repeatInterval: task.repeatInterval,
   };
 }

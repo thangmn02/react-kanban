@@ -1,16 +1,31 @@
 import { mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { join } from 'node:path';
+import { join,resolve,relative,isAbsolute } from 'node:path';
 import { deflateSync } from 'node:zlib';
+import {createHash} from 'node:crypto';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const extension = join(root, 'extensions', 'kanban-music');
 const privateCandidate = process.argv.includes('--private');
+const hybridCandidate=process.argv.includes('--hybrid-live');
+if(hybridCandidate&&!privateCandidate)throw Error('Hybrid Live requires --private');
+const diagnosticCandidate=process.argv.includes('--diagnostic-capture');
+if(diagnosticCandidate&&!privateCandidate)throw Error('Continuous capture requires --private');
+const labelMode=process.argv.find(argument=>argument.startsWith('--hat-label='))?.slice(12);
+if(labelMode&&(!privateCandidate||!['M0','M1','shadow'].includes(labelMode)))throw Error('Hat label comparison requires --private and M0/M1/shadow');
+const precisionMode=process.argv.find(argument=>argument.startsWith('--precision='))?.slice(12);
+if(precisionMode&&(!privateCandidate||!['off','shadow'].includes(precisionMode)))throw Error('Precision requires --private and off/shadow; enabled has no qualified rules');
 const xoCandidate=process.argv.find(argument=>argument.startsWith('--xo='))?.slice(5);
 if(xoCandidate&&(!privateCandidate||!['A','B'].includes(xoCandidate)))throw Error('--xo=A or --xo=B requires --private');
 const hatCandidate=process.argv.find(argument=>argument.startsWith('--hat='))?.slice(6);
+if(labelMode&&(precisionMode||xoCandidate||hatCandidate))throw Error('Hat label comparison preserves existing DSP/classifier configuration; do not combine research package flags');
+if(diagnosticCandidate&&(labelMode||precisionMode||xoCandidate||hatCandidate))throw Error('Continuous capture preserves the existing detector; do not combine candidate flags');
 if(hatCandidate&&(!privateCandidate||xoCandidate||!['A','R'].includes(hatCandidate)))throw Error('--hat=A or --hat=R requires --private and cannot combine with --xo');
-const output = hatCandidate?join(root,'scratch','hat-playback-discrepancy','candidate-'+hatCandidate):xoCandidate?join(root,'scratch','xo-percussion-recovery','candidate-'+xoCandidate)
+if(hybridCandidate&&(labelMode||precisionMode||xoCandidate||hatCandidate))throw Error('Hybrid Live preserves the original ADTOF classifier and guard settings');
+const requestedOutput=process.argv.find(arg=>arg.startsWith('--output-root='))?.slice(14);
+const outputRelative=requestedOutput?relative(resolve(root,'scratch'),resolve(root,requestedOutput)):undefined;
+if(requestedOutput&&(!privateCandidate||!outputRelative||outputRelative==='..'||outputRelative.startsWith('..\\')||outputRelative.startsWith('../')||isAbsolute(outputRelative)))throw Error('Custom packages must be private research outputs inside scratch');
+const output = requestedOutput?resolve(root,requestedOutput):hybridCandidate?join(root,'scratch','companion-hybrid-live','candidate'):diagnosticCandidate?join(root,'scratch','cross-track-hat-capture','candidate'):labelMode?join(root,'scratch','hat-label-contract','candidate-'+labelMode):precisionMode?join(root,'scratch','semantic-precision','candidate-'+precisionMode):hatCandidate?join(root,'scratch','hat-playback-discrepancy','candidate-'+hatCandidate):xoCandidate?join(root,'scratch','xo-percussion-recovery','candidate-'+xoCandidate)
   :privateCandidate ? join(root,'scratch','browser-first-candidate') : join(root, 'public', 'downloads');
 
 // Rebuild release resources; the explicit inventory excludes private/retired
@@ -91,6 +106,11 @@ for (const size of [16, 48, 128]) await writeFile(join(extension, 'icons', `${si
 const names = ['manifest.json', 'background.js', 'widget-bridge.js', 'sites.js', 'companion-action.js', 'media.js', 'media-observer.js', 'discovery-diagnostics.js', 'protocol.js', 'relay.js', 'clock.js', 'beat-sync.js', 'beat-detector.js', 'tempo-tracker.js', 'capture-engine.js', 'beat-telemetry.js', 'beat-timing.js', 'media-asset.js', 'offscreen.html', 'offscreen.js', 'setup.html', 'setup.js', 'setup.css', 'icons/16.png', 'icons/48.png', 'icons/128.png'];
 names.push('companion-update.js', 'spotify-player.js');
 names.push('beat-mode.js','beat-candidate.js');
+names.push('delayed-audio-output.js');
+names.push('semantic-precision-guards.js');
+names.push('percussion-label-contract.js');
+names.push('live-diagnostic-recorder.js');
+names.push('hybrid-percussion-runtime.js','hybrid-live-contract.js');
 const files = await Promise.all(names.map(async (name) => ({ name, bytes: await readFile(join(extension, name)) })));
 function replaceExactlyOnce(source, before, after) {
   if (source.split(before).length !== 2) throw new Error(`Expected one package sentinel: ${before}`);
@@ -99,6 +119,12 @@ function replaceExactlyOnce(source, before, after) {
 if(privateCandidate) {
   const candidate=files.find(file=>file.name==='beat-candidate.js');
   let candidateSource=replaceExactlyOnce(candidate.bytes.toString(),'privateBeatCandidate = false','privateBeatCandidate = true');
+  if(labelMode)candidateSource=replaceExactlyOnce(candidateSource,"privateHatLabelMapping = 'off'",`privateHatLabelMapping = '${labelMode}'`);
+  if(hybridCandidate){
+    candidateSource=replaceExactlyOnce(candidateSource,'hybridLiveAvailable:false','hybridLiveAvailable:true');
+    candidateSource=replaceExactlyOnce(candidateSource,'privatePercussionDiagnostics = false','privatePercussionDiagnostics = true');
+  }
+  if(precisionMode)candidateSource=replaceExactlyOnce(candidateSource,"semanticPrecisionGuards = Object.freeze({mode:'off'})",`semanticPrecisionGuards = Object.freeze({mode:'${precisionMode}'})`);
   if(!xoCandidate&&!hatCandidate)candidateSource=replaceExactlyOnce(candidateSource,'earlyDecisionAvailable:false','earlyDecisionAvailable:true');
   if(xoCandidate||hatCandidate)for(const [before,after] of [
     ['privatePercussionDiagnostics = false','privatePercussionDiagnostics = true'],
@@ -110,6 +136,9 @@ if(privateCandidate) {
   const manifest=files.find(file=>file.name==='manifest.json');
   const value=JSON.parse(manifest.bytes.toString());value.name+=' Private';value.version_name=value.version+' browser-first-v2 live preview private';
   value.version='0.3.25';value.version_name='0.3.25 private live L0 / L1-gap0';
+  if(labelMode){value.name+=` Hat Label ${labelMode} (UNQUALIFIED)`;value.version_name=value.version+` Hat Label ${labelMode} PRIVATE RESEARCH`;}
+  if(diagnosticCandidate){value.name+=' Live Diagnostics (UNQUALIFIED)';value.version_name=value.version+' continuous score capture PRIVATE RESEARCH';}
+  if(hybridCandidate){value.version='0.3.26';value.name+=' Hybrid Live (UNQUALIFIED)';value.version_name='0.3.26 L0 / H-SHADOW / H-LIVE PRIVATE';}
   if(xoCandidate){value.name+=xoCandidate==='A'?' XO Baseline A':' XO Candidate B (NO-GO)';value.version_name=value.version+` xo-${xoCandidate} UNVERIFIED DETECTOR PREVIEW`;}
   if(hatCandidate){value.name+=hatCandidate==='A'?' Hat Baseline A':' Hat Visual Recovery R';value.version_name=value.version+` hat-${hatCandidate} UNVERIFIED DETECTOR PREVIEW`;}
   manifest.bytes=Buffer.from(JSON.stringify(value,null,2)+'\n');
@@ -131,6 +160,43 @@ for (const name of ['generated/percussion/percussion.json', 'generated/percussio
   'vendor/percussion/ort.wasm.min.mjs', 'vendor/percussion/ort-wasm-simd-threaded.mjs',
   'vendor/percussion/ort-wasm-simd-threaded.wasm', 'MODEL-NOTICE.txt']) {
   files.push({ name, bytes: await readFile(join(extension, name)) });
+}
+if(hybridCandidate){
+  const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
+  const model=await readFile(join(root,'scratch/beat-grid-v2/sources/C1/webUI/drum_cnn.onnx'));
+  if(digest(model)!=='785c9b7a8640d78066598bc9da4bba54a2c67464a4b3ae125e322770e9d704db')throw Error('Frozen CNN B mismatch');
+  const adtof=files.find(file=>file.name==='generated/percussion/percussion.onnx');
+  if(digest(adtof.bytes)!=='c571062d76c322d54c2808c95339ea2dadd2f6ab99f9d83163d0f5311cd0f80a')throw Error('Frozen ADTOF mismatch');
+  const vendor=join(root,'scratch/cnn-live-recovery/vendor/wasm-audio-resampler-2.0.0/package');
+  const glue=await readFile(join(vendor,'app/soxr_wasm.js'),'utf8');
+  const sources={
+    'hybrid-pcm-worklet.js':join(extension,'hybrid-pcm-worklet.js'),
+    'hybrid-cnn-worker.js':join(extension,'hybrid-cnn-worker.js'),
+    'hybrid-frontend.mjs':join(root,'scripts/cnn-browser-frontend.mjs'),
+    'hybrid-soxr.mjs':join(root,'scripts/research-cnn-live/soxr-wasm-adapter.mjs'),
+    'hybrid-source-guard.mjs':join(root,'scripts/research-cnn-live/source-segment-guard.mjs'),
+    'generated/hybrid/coefficients.json':join(root,'scratch/cnn-live-recovery/run/coefficients.json'),
+    'generated/hybrid/soxr_wasm.wasm':join(vendor,'app/soxr_wasm.wasm'),
+    'generated/hybrid/WRAPPER-LICENSE.txt':join(vendor,'LICENSE'),
+    'generated/hybrid/CNN-SOURCE-LICENSE.txt':join(root,'scratch/beat-grid-v2/sources/C1/LICENSE'),
+    'generated/hybrid/CNN-README.source.txt':join(root,'scratch/beat-grid-v2/sources/C1/README.source.txt'),
+  };
+  for(const [name,path]of Object.entries(sources)){
+    let bytes=await readFile(path);
+    if(name==='hybrid-cnn-worker.js')bytes=Buffer.from(bytes.toString()
+      .replace('../../scripts/cnn-browser-frontend.mjs','./hybrid-frontend.mjs')
+      .replace('../../scripts/research-cnn-live/soxr-wasm-adapter.mjs','./hybrid-soxr.mjs')
+      .replace('../../scripts/research-cnn-live/source-segment-guard.mjs','./hybrid-source-guard.mjs'));
+    files.push({name,bytes});
+  }
+  files.push({name:'generated/hybrid/model.onnx',bytes:model});
+  files.push({name:'generated/hybrid/soxr-glue.mjs',bytes:Buffer.from('const exports = {};\n'+glue.replace(/\/\/# sourceMappingURL=.*$/m,'')+'\nexport default exports.default;')});
+  files.push({name:'generated/hybrid/RESEARCH-NOTICE.txt',bytes:Buffer.from('Private local experiment only. No public redistribution clearance. CNN source repository includes AGPL-3.0 (included); checkpoint permission and STAR training-data rights/redistribution scope still require verification. ADTOF MODEL-NOTICE restrictions remain. SoXR wrapper MIT license included; underlying SoXR LGPL source/relinking obligations remain unresolved for redistribution. ONNX Runtime 1.30.0 vendor header declares Microsoft MIT; full release notices/source obligations must accompany any redistribution. No research audio is bundled. Running normalization differs from frozen whole-track preprocessing; strict feature parity A_PARTIAL. PHYSICAL_AV_SYNC_NOT_VERIFIED.\n')});
+  files.push({name:'generated/hybrid/package-provenance.json',bytes:Buffer.from(JSON.stringify({
+    version:1,privateLocalEvaluationOnly:true,modelSha256:digest(model),adtofSha256:digest(adtof.bytes),
+    canonicalFrontend:'scripts/cnn-browser-frontend.mjs',normalization:'observed-only running maximum',strictParity:'A_PARTIAL',audioBundled:false,
+    assets:files.map(({name,bytes})=>({name,bytes:bytes.length,sha256:digest(bytes)})),
+  },null,2))});
 }
 const packagedNames = new Set(files.map(({ name }) => name));
 for (const { name, bytes } of files.filter(({ name }) => name.endsWith('.js'))) {
@@ -166,7 +232,7 @@ if(privateCandidate)await writeFile(join(output,'Private listening guide.html'),
 <li>Use pause, seek and source changes to investigate. A source/generation change revokes the experiment. Video, uncertain output, native capture and Spotify cannot enable this buffer.</li>
 <li>Report the approximate song time, row and observed failure. Provisional annotations remain investigation-only. Generic degraded visuals make no instrument claim.</li></ol>
 <p>No web deployment, extension-store update or installer publication is included. Model weights remain local evaluation assets.</p></body>`);
-if(privateCandidate&&!xoCandidate&&!hatCandidate)await writeFile(join(output,'Private listening guide.html'),`<!doctype html><html lang="en"><meta charset="utf-8"><title>Kora private L0 / L1 listening</title>
+if(privateCandidate&&!xoCandidate&&!hatCandidate&&!hybridCandidate)await writeFile(join(output,'Private listening guide.html'),`<!doctype html><html lang="en"><meta charset="utf-8"><title>Kora private L0 / L1 listening</title>
 <body style="max-width:850px;margin:40px auto;padding:20px;font:18px/1.6 system-ui"><h1>Private live L0 / L1 listening</h1>
 <p>Local evaluation only. L0 remains the default. L1 is earlier ADTOF peak finalization, not offline H0 or a new model. Recognition, physical synchronization, resource qualification and user acceptance are incomplete. Do not publish.</p>
 <ol><li>Use the browser with your working Companion (Brave in this session). Reload this unpacked extension, verify <b>Kora Music Companion Private ${manifest.version}</b>, then refresh the music source and Kora. Enable only one Companion and one Kora grid.</li>
@@ -176,6 +242,18 @@ if(privateCandidate&&!xoCandidate&&!hatCandidate)await writeFile(join(output,'Pr
 <li>Compare the same passage using <b>L1 · Earlier peak finalization (experimental)</b>. Confirm <b>LIVE SEMANTIC CANDIDATE — EXPERIMENTAL</b>. Switch to L0 in the same selector for rollback. The original audio is not delayed or sped up.</li>
 <li>Pause, seek or change source to revoke preview; reactivate while playing. Record approximate song time, row, missed/repeated/incorrect flashes and uncertainty. Your observations remain provisional references, never official precision/recall.</li></ol>
 <p>L1 improved software p95 by about 10–24 ms in controlled comparisons, with some worse tails. Physical speaker-to-pixel synchronization remains UNVERIFIED. No deployment, installer or store update is included.</p></body></html>`);
+if(hybridCandidate)await writeFile(join(output,'Private listening guide.html'),`<!doctype html><html lang="en"><meta charset="utf-8"><title>Kora private Hybrid Live</title>
+<body style="max-width:900px;margin:40px auto;padding:20px;font:18px/1.6 system-ui"><h1>Private Hybrid Live — UNQUALIFIED</h1>
+<p>Version ${manifest.version}. Local owner evaluation only. H-LIVE uses frozen ADTOF Kick/Snare and frozen CNN B Hi-Hat with experimental running normalization. It is not exact offline H0. Recognition and physical timing are unqualified; do not distribute this package.</p>
+<ol><li>Use one Companion and one Kora Music owner. In your browser Extensions page, load the adjacent <b>extension</b> folder (or reload this existing private copy). Verify <b>Kora Music Companion Private Hybrid Live (UNQUALIFIED)</b>, version <b>${manifest.version}</b>. Refresh Kora and the source tab after updating. No installed extension is changed by building this folder.</li>
+<li>Reuse the repository's private server on port1420; if stopped, run <code>node scripts/serve-hybrid-beta.mjs</code>. Open <a href="http://127.0.0.1:1420/focus?tab=music&musicDebug=1">Kora Music</a>.</li>
+<li>Play an authorized unprotected source tab, click its Companion toolbar action, then select that source in Kora. YouTube/provider hardware behavior still requires owner testing. Existing Spotify/protected-source and native-capture restrictions remain; those routes are not qualified here. Use playback speed1x.</li>
+<li>Open <b>Music → Private candidate → Audio Delay Compensation — Experimental</b>. Pause the source. Select <b>H-LIVE</b> in Compensated detector, choose <b>170 ms</b>, complete the existing output/permission consent only if true, then press <b>Enable 170 ms compensation</b>. Resume playback and open <b>Beat grid</b>. This uses the existing audible output route. 170 ms is an experiment, not a calibrated recommendation.</li>
+<li><b>L0</b> is the original ADTOF baseline. <b>H-SHADOW</b> computes CNN Hat and retains bounded observations while displaying L0. <b>H-LIVE</b> displays only CNN Hat, with ADTOF Kick/Snare and existing Bass/Lead. No hidden ADTOF Hat fallback is used when CNN fails.</li>
+<li>For0ms, leave compensation OFF; under <b>Live instrument preview</b> select the detector, complete all three existing consents, and enable no-delay preview while playing. Future context and processing still make decisions late. For150/170/200/250ms comparisons, disable compensation, pause and select the next preset explicitly.</li>
+<li>In Beat grid/debug, under <b>Private Live failure capture</b>, press <b>Record30 seconds</b>, wait for completion, then <b>Export row trace</b>. Record source title and approximate song interval. The export includes both model score streams and delivery stages; it contains no captured audio. Incomplete exports and resets remain evidence, not successful uninterrupted captures.</li>
+<li>Pause/resume preserves the chosen compensated detector. Seek, source replacement or clock invalidation revokes compensation; re-enable for the new source only when valid. To roll back, disable compensation/preview and select L0. Only one route remains audible; hardware output buffers cannot be retracted.</li></ol>
+<p>PHYSICAL_AV_SYNC_NOT_VERIFIED. Software timestamps do not measure speaker-to-pixel offset. Strict tensor parity remains A_PARTIAL; Hat events remain predictions, not verified Closed/Open attacks. No public routing, installer, deployment or Beat Grid visual changes are included.</p></body></html>`);
 if(hatCandidate){
  const guide=`<!doctype html><html lang="en"><meta charset="utf-8"><title>Hat playback A/R listening</title>
  <body style="max-width:900px;margin:40px auto;padding:20px;background:#18181c;color:#eee;font:18px/1.6 system-ui">

@@ -41,7 +41,8 @@ it('follows a timestamped learned percussion event through scheduled delivery, D
     data: { ...message, channel: 'kanban-music-v1', direction: 'extension-event' } }));
   const api = { runtime: { getURL: (name) => `chrome-extension://companion/${name}`, getContexts: async () => [],
     sendMessage: async (message) => {
-      if (message.kind === 'start') return { ok: await engine.start(message.streamId, message.captureId) };
+      if (message.kind === 'start') return { ok: await engine.start(message.streamId, message.captureId,{
+        sourceId:message.sourceId,sourceGeneration:message.sourceGeneration,synchronizationEpoch:message.synchronizationEpoch}) };
       if (message.kind === 'lease') return { ok: engine.renew(message.captureId) };
       if (message.kind === 'stop') engine.stopCapture(message.captureId);
       return { ok: true };
@@ -77,7 +78,7 @@ it('follows a timestamped learned percussion event through scheduled delivery, D
   expect(view.container.querySelector('[data-channel="drum"] .onset')).toBeNull();
   await act(async () => { await vi.advanceTimersByTimeAsync(100); });
   await act(async () => { await vi.advanceTimersByTimeAsync(0); });
-  const cell = view.container.querySelector('[data-channel="drum"] .onset');
+  const cell = view.container.querySelector('[data-channel="drum"] .projected-beat-flash');
   expect(cell).not.toBeNull();
   const id = cell.dataset.beatTrace;
   expect(id).toBeTruthy();
@@ -96,7 +97,7 @@ it('follows a timestamped learned percussion event through scheduled delivery, D
   await act(async () => { await vi.advanceTimersByTimeAsync(20); });
   await act(async () => { await vi.advanceTimersByTimeAsync(100); });
   await act(async () => { await vi.advanceTimersByTimeAsync(0); });
-  const resumed = view.container.querySelector('[data-channel="drum"] .onset');
+  const resumed = view.container.querySelector('[data-channel="drum"] .projected-beat-flash');
   expect(resumed).not.toBeNull();
   expect(resumed.dataset.beatTrace).not.toBe(id);
   fireEvent.animationStart(resumed, { animationName: 'square-onset' });

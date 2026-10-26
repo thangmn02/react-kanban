@@ -10,6 +10,20 @@ const event = (target: number, sequence = 1): BeatEvent => ({ kind: 'onset', cap
   targetPlaybackTime: target, playbackClock: clock(), telemetry: beatTelemetry.events('onset', ['kick'])!
     .map((trace) => ({ ...trace, targetTime: target * 1000, targetPlaybackTime: target })) });
 
+it('atomically cancels cached and live targets and rejects untimed stale arrivals after a generation handoff',async()=>{
+  const deliver=vi.fn(),scheduler=createBeatScheduler(deliver,vi.fn());
+  const a={sourceId:'song',sourceGeneration:1,synchronizationEpoch:'a'},b={...a,sourceGeneration:2,synchronizationEpoch:'b'};
+  const anchor={...clock(),sourceId:'song',generation:1,synchronizationEpoch:'a'};
+  scheduler.transition({kind:'sync.state',mode:'capture',...a});scheduler.clock(anchor);
+  for(const eventSource of ['cache','local'] as const)scheduler.enqueue({...event(10.3),...a,playbackClock:anchor,eventSource});
+  expect(scheduler.transition({kind:'sync.state',mode:'clock',...b})).toBe(true);
+  scheduler.clock({...anchor,generation:2,synchronizationEpoch:'b'});
+  scheduler.enqueue({kind:'onset',bands:['hat'],...a});
+  scheduler.enqueue({...event(10.3),...a,playbackClock:anchor});
+  await vi.advanceTimersByTimeAsync(400);expect(deliver).not.toHaveBeenCalled();
+  scheduler.enqueue({kind:'onset',bands:['kick'],...b});expect(deliver).toHaveBeenCalledOnce();scheduler.reset();
+});
+
 it('releases from the playback clock rather than arrival and preserves queued targets', async () => {
   const deliver = vi.fn(), scheduler = createBeatScheduler(deliver, vi.fn());
   scheduler.clock(clock());

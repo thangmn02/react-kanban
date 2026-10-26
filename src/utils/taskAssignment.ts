@@ -31,6 +31,7 @@ export function isTaskAssignedToUser(
     // Legacy fallback: no stable id on the assignee.
     return (
       assignee.name === currentUser.name
+      || Boolean(currentUser.legacyName && assignee.name === currentUser.legacyName)
       || (currentUser.email != null && assignee.name === currentUser.email)
     );
   });

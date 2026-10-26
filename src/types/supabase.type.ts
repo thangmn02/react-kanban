@@ -11,6 +11,9 @@ import type {
 type TaskTable = GeneratedDatabase['public']['Tables']['tasks'];
 export type Database = Omit<GeneratedDatabase, 'public'> & {
   public: Omit<GeneratedDatabase['public'], 'Tables'> & {
+    Functions: GeneratedDatabase['public']['Functions'] & {
+      transition_task_workflow: { Args: { request: Json }; Returns: Json };
+    };
     Tables: Omit<GeneratedDatabase['public']['Tables'], 'tasks'> & {
       tasks: Omit<TaskTable, 'Row' | 'Insert' | 'Update'> & { Row: TaskRow; Insert: TaskInsert; Update: TaskUpdate };
     };

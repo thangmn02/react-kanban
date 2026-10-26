@@ -2,6 +2,7 @@ import type { TodayTaskSummary } from '../../services/today.service';
 import { getPriorityBadgeClass } from '../../utils/taskMetadata';
 import DueDateBadge from '../atoms/DueDateBadge';
 import { useI18n } from '../../i18n';
+import { stripTaskHtml } from '../../utils/taskCollections';
 
 interface TodayTaskCardProps {
   task: TodayTaskSummary;
@@ -9,6 +10,8 @@ interface TodayTaskCardProps {
   onOpenTask: (task: TodayTaskSummary) => void;
   onStartFocus: (task: TodayTaskSummary) => void;
   onToggleTodayFocus: (task: TodayTaskSummary) => void;
+  onCompleteTask?: (task: TodayTaskSummary) => void;
+  isCompleting?: boolean;
 }
 
 export default function TodayTaskCard({
@@ -17,15 +20,19 @@ export default function TodayTaskCard({
   onOpenTask,
   onStartFocus,
   onToggleTodayFocus,
+  onCompleteTask,
+  isCompleting = false,
 }: TodayTaskCardProps) {
   const priorityClassName = getPriorityBadgeClass(task.priority || undefined);
   const { t } = useI18n();
+  const preview = stripTaskHtml(task.description);
 
   return (
-    <article className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-card transition hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-md">
+    <article aria-busy={isCompleting} className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-card transition-colors hover:border-slate-300">
       <button
         type="button"
         onClick={() => onOpenTask(task)}
+        aria-label={task.title}
         className="block w-full cursor-pointer text-left focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"
       >
         <div className="flex items-start justify-between gap-3">
@@ -46,9 +53,9 @@ export default function TodayTaskCard({
           )}
         </div>
 
-        {task.description && (
+        {preview && (
           <p className="mt-3 line-clamp-2 text-xs leading-5 text-slate-500">
-            {task.description}
+            {preview}
           </p>
         )}
       </button>
@@ -80,7 +87,7 @@ export default function TodayTaskCard({
         )}
       </div>
 
-      <div className="mt-4 flex items-center gap-2">
+      <div className="mt-4 flex flex-wrap items-center gap-2">
         {!task.isDone && (
           <button
             type="button"
@@ -91,6 +98,11 @@ export default function TodayTaskCard({
             {t('today.startFocus')}
           </button>
         )}
+        {!task.isDone && onCompleteTask && <button type="button" disabled={isCompleting} onClick={() => onCompleteTask(task)}
+          aria-label={`${t('common.markDone')}: ${task.title}`}
+          className="min-h-11 cursor-pointer rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-wait disabled:opacity-50">
+          {t(isCompleting ? 'ux.completing' : 'common.markDone')}
+        </button>}
         <button
           type="button"
           onClick={() => onToggleTodayFocus(task)}

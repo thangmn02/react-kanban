@@ -1,11 +1,13 @@
 // Learned activations only. Acoustic band/onset candidates are never identities.
+import {mapPercussionCandidates} from './percussion-label-contract.js';
 const classes = ['kick', 'clap', null, 'hat', 'hat'];
 
 export class PercussionClassifier {
-  constructor(thresholds = [.22, .24, .32, .22, .30], { onsetGuided = false, localProminence = false, diagnostics = false } = {}) {
+  constructor(thresholds = [.22, .24, .32, .22, .30], { onsetGuided = false, localProminence = false, diagnostics = false,labelMapping='M0' } = {}) {
     this.thresholds = thresholds;
     this.onsetGuided = onsetGuided;
     this.diagnostics = diagnostics;
+    this.labelMapping=labelMapping;
     this.localProminence = localProminence;
     this.reset();
   }
@@ -87,11 +89,7 @@ export class PercussionClassifier {
     }
     // Ten history frames, two preceding peaks and two future-score frames.
     while (this.frames.length > 16) { this.frames.shift(); this.base++; }
-    const unique = new Map();
-    for (const event of events) {
-      const key = `${event.band}:${event.audioTime}`;
-      if (!unique.has(key) || unique.get(key).confidence < event.confidence) unique.set(key, event);
-    }
-    return { outcome: unique.size ? 'percussion' : 'non-percussion/abstain', events: [...unique.values()],...(decisions?{decisions}:{}) };
+    const mapped=mapPercussionCandidates(events,this.labelMapping,this.thresholds,this.diagnostics);
+    return { outcome: mapped.events.length ? 'percussion' : 'non-percussion/abstain',...mapped,...(decisions?{decisions}:{}) };
   }
 }

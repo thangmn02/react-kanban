@@ -8,6 +8,7 @@ import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {frameCoverage,feedbackTypes} from './full-song-core.ts';
 import {createHybridRouter} from './full-song-hybrid.mjs';
+import {preparationFailureMessage} from './full-song-worker-error.mjs';
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 export {feedbackTypes};
 export async function createFullSongStore(root,{allowedOrigins=['http://127.0.0.1:5173','http://localhost:5173']}={}){
@@ -33,18 +34,22 @@ export async function createFullSongStore(root,{allowedOrigins=['http://127.0.0.
   if(reservation.cancelled){await log.close();jobs.delete(id);running=undefined;await markStopped(id,'CANCELLED','Cancelled before worker launch');await persistWorker();void startNext();return;}
   const child=spawn(resolve('scratch/beat-grid-v2/.venv/Scripts/python.exe'),['-u','scripts/prepare-full-song.py','--job',job],{cwd:process.cwd(),windowsHide:true,stdio:['ignore',log.fd,log.fd],env:{...process.env,OMP_NUM_THREADS:'4',OPENBLAS_NUM_THREADS:'4',PYTHONDONTWRITEBYTECODE:'1'}});
   reservation.child=child;let completed=false;
-  const finish=async(code,error)=>{if(completed)return;completed=true;await log.close();const active=jobs.get(id);if(active?.cancelled)await markStopped(id,'CANCELLED','Preparation cancelled; successful model caches are retained.');else if(code!==0)await markStopped(id,'BLOCKED',error||`Worker exited ${code}. Inspect preparation.log; retry retains successful caches.`);jobs.delete(id);running=undefined;await persistWorker();void startNext();};
+  const finish=async(code,error)=>{if(completed)return;completed=true;await log.close();const active=jobs.get(id);if(active?.cancelled)await markStopped(id,'CANCELLED','Preparation cancelled; successful model caches are retained.');else if(code!==0)await markStopped(id,'BLOCKED',preparationFailureMessage(await status(id),code,error));jobs.delete(id);running=undefined;await persistWorker();void startNext();};
   child.once('error',e=>void finish(-1,e.message));child.once('exit',code=>void finish(code));
   await persistWorker();
  }
  const pendingEnqueues=new Map();
- async function enqueue(id){
-  if(pendingEnqueues.has(id))return pendingEnqueues.get(id);
+ async function enqueue(id,{hybridOnly=false}={}){
+  const conflict=()=>{const error=Error('A different preparation target is already queued or running for this source. Wait for it to finish or cancel it before choosing another target.');error.status=409;throw error;};
+  const prior=pendingEnqueues.get(id);if(prior){if(prior.hybridOnly!==hybridOnly)conflict();return prior.operation;}
+  const verifyTarget=async()=>{const job=await read(resolve(folder(id),'job.json'));if((job.models||['A','B','C']).includes('C')===hybridOnly)conflict();};
   const operation=(async()=>{
-   if(queue.includes(id))return;
-   if(jobs.has(id)){if((await status(id)).state==='READY'&&!queue.includes(id)){queue.push(id);void startNext();}return;}
-   await markStopped(id,'WAITING','Queued for one preparation worker');if(!queue.includes(id)&&!jobs.has(id))queue.push(id);void startNext();
-  })();pendingEnqueues.set(id,operation);try{await operation;}finally{if(pendingEnqueues.get(id)===operation)pendingEnqueues.delete(id);}
+   const latest=await status(id);if(latest.state==='BLOCKED'&&['INPUT_DURATION_LIMIT','INPUT_CHANNEL_LIMIT'].includes(latest.errorCode)){const error=Error(latest.error);error.status=422;throw error;}
+   if(queue.includes(id)){await verifyTarget();return;}
+   if(jobs.has(id)&&(await status(id)).state!=='READY'){await verifyTarget();return;}
+   const jobPath=resolve(folder(id),'job.json'),job=await read(jobPath);await atomic(jobPath,{...job,models:hybridOnly?['A','B']:['A','B','C']});
+   await markStopped(id,'WAITING','Queued for one preparation worker');if(!queue.includes(id))queue.push(id);void startNext();
+  })();const entry={hybridOnly,operation};pendingEnqueues.set(id,entry);try{await operation;}finally{if(pendingEnqueues.get(id)===entry)pendingEnqueues.delete(id);}
  }
  async function cancel(id){
   const queued=queue.indexOf(id);if(queued>=0){queue.splice(queued,1);await markStopped(id,'CANCELLED','Cancelled before preparation');return;}
@@ -113,7 +118,7 @@ export async function createFullSongStore(root,{allowedOrigins=['http://127.0.0.
    if(range){const r=/^bytes=(\d+)-(\d*)$/.exec(range);if(!r){response.writeHead(416);response.end();return true;}start=Number(r[1]);end=r[2]?Math.min(Number(r[2]),end):end;if(start>end||start>=size){response.writeHead(416);response.end();return true;}}
    response.writeHead(range?206:200,{'Content-Type':'audio/wav','Content-Length':end-start+1,'Accept-Ranges':'bytes',...(range?{'Content-Range':`bytes ${start}-${end}/${size}`}:{})});createReadStream(file,{start,end}).pipe(response);
   }else if(action==='cancel'&&request.method==='POST'){await cancel(id);json({state:'CANCEL_REQUESTED'});}
-  else if(action==='retry'&&request.method==='POST'){await enqueue(id);json({state:'QUEUED'});}
+  else if(action==='retry'&&request.method==='POST'){const target=url.searchParams.get('target');if(target!==null&&target!=='H')throw Error('Unknown preparation target');await enqueue(id,{hybridOnly:target==='H'});json({state:'QUEUED'});}
   else if(action==='feedback'){
    const key=url.searchParams.get('review')||'listener';if(!/^[\w-]{1,80}$/.test(key))throw Error('Invalid feedback namespace');const file=resolve(dir,'feedback-'+key+'.json');let notes=[];try{notes=await read(file);}catch(error){if(error.code!=='ENOENT')throw error;}
    if(request.method==='GET')json(notes);

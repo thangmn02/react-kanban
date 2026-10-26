@@ -1,4 +1,7 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render as renderUi, screen } from '@testing-library/react';
+import type {ReactElement} from 'react';
+import {I18nProvider} from '../../i18n';
+const render=(ui:ReactElement)=>renderUi(ui,{wrapper:I18nProvider});
 import { afterEach, expect, it, vi } from 'vitest';
 import { MusicGrid } from './MusicPlayer';
 import { beatRowDiagnostics } from './beat-row-diagnostics';

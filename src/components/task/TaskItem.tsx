@@ -1,10 +1,12 @@
 import { memo, useEffect, useReducer, useState, type Dispatch, type SetStateAction } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { useReducedMotion } from 'framer-motion';
+import { sortableTransition } from '../../shared/motion';
 
 import type { BoardDeleteItem, ITaskItem } from '../../types/task.type';
 import type { TaskAssignee } from '../../types/task.type';
-import { mapWorkspaceMembersToAssignees, mockWorkspaceMembers } from '../../utils/workspaceMembers';
+import { mapWorkspaceMembersToAssignees, mockWorkspaceMembers, resolveAssigneeIdentity, sameAssigneeIdentity } from '../../utils/workspaceMembers';
 import type { WorkspaceMember } from '../../types/auth.type';
 import { TASK_PRIORITIES } from '../../constants';
 import { getDueDateStatus, getPriorityBadgeClass, getPriorityDotClass } from '../../utils/taskMetadata';
@@ -53,6 +55,7 @@ function TaskItem({
   const [showAssigneeMenu, setShowAssigneeMenu] = useState(false);
   const [, refreshCover] = useReducer((currentVersion: number) => currentVersion + 1, 0);
   const { t } = useI18n();
+  const reducedMotion = useReducedMotion();
 
   useEffect(() => {
     const handleCoverUpdate = (event: Event) => {
@@ -76,6 +79,7 @@ function TaskItem({
     attributes,
     listeners,
     setNodeRef,
+    setActivatorNodeRef,
     transform,
     transition,
     isDragging,
@@ -86,10 +90,7 @@ function TaskItem({
       type: 'task',
       listId,
     },
-    transition: {
-      duration: 200,
-      easing: 'cubic-bezier(0.25, 1, 0.5, 1)',
-    },
+    transition: reducedMotion ? null : sortableTransition,
   });
 
   const priorityBadgeClass = getPriorityBadgeClass(task.priority);
@@ -110,6 +111,7 @@ function TaskItem({
 
   return (
     <div
+      data-task-id={task.id}
       ref={isOverlay ? undefined : setNodeRef}
       style={style}
       className={`relative select-none ${
@@ -119,8 +121,9 @@ function TaskItem({
           ? 'shadow-2xl ring-1 ring-black/5'
           : ''
       }`}
-      {...(isOverlay ? {} : attributes)}
-      {...(isOverlay ? {} : listeners)}
+      onPointerDown={isOverlay ? undefined : event => {
+        if (!(event.target as HTMLElement).closest('button, a, input, select, textarea')) listeners?.onPointerDown?.(event);
+      }}
     >
       {!isDragging && (
         <div
@@ -272,6 +275,11 @@ function TaskItem({
               {/* Task card edit and delete options */}
               {!isOverlay && (
                 <>
+                <button type="button" ref={setActivatorNodeRef} {...attributes} {...listeners}
+                  onClick={event => event.stopPropagation()} aria-label={`${t('ux.moveTask')}: ${task.title}`}
+                  className="inline-flex h-9 w-8 cursor-grab items-center justify-center rounded-lg text-slate-500 focus-visible:outline-2 focus-visible:outline-blue-600 active:cursor-grabbing">
+                  <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M7 3h2v2H7zm4 0h2v2h-2zM7 9h2v2H7zm4 0h2v2h-2zM7 15h2v2H7zm4 0h2v2h-2z" /></svg>
+                </button>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -349,7 +357,7 @@ function TaskItem({
             <div className="flex items-center gap-1.5">
               {hasTeamMembers && (
               <div className="flex -space-x-1.5 overflow-hidden">
-                {(task.assignees || []).map((assignee, index) => (
+                {(task.assignees || []).map(assignee=>resolveAssigneeIdentity(assignee,workspaceMembers)).map((assignee, index) => (
                   <img
                     key={index}
                     src={assignee.avatar}
@@ -398,7 +406,7 @@ function TaskItem({
                         </div>
                         <div className="space-y-0.5 max-h-48 overflow-y-auto">
                           {assigneeOptions.map((member) => {
-                            const isAssigned = (task.assignees || []).some(a => a.name === member.name);
+                            const isAssigned = (task.assignees || []).some(a => sameAssigneeIdentity(resolveAssigneeIdentity(a,workspaceMembers),member));
                             return (
                               <button
                                 key={member.name}
@@ -406,9 +414,9 @@ function TaskItem({
                                   e.stopPropagation();
                                   let newAssignees = [...(task.assignees || [])];
                                   if (isAssigned) {
-                                    newAssignees = newAssignees.filter(a => a.name !== member.name);
+                                    newAssignees = newAssignees.filter(a => !sameAssigneeIdentity(resolveAssigneeIdentity(a,workspaceMembers),member));
                                   } else {
-                                    newAssignees.push({ name: member.name, avatar: member.avatar });
+                                    newAssignees.push(member);
                                   }
                                   await onUpdateTask(task.id, { assignees: newAssignees });
                                 }}

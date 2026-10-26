@@ -92,6 +92,7 @@ it.each(['www.youtube.com', 'music.youtube.com', 'soundcloud.com', 'open.spotify
   vi.mocked(sendMusicRequest).mockResolvedValue([{ ...session, source, playing: true }]);
   const view = renderPlayer();
   await screen.findByRole('heading', { name: session.title });
+  fireEvent.click(screen.getByRole('tab',{name:'Beat grid'}));
   await act(async () => {});
   expect(view.container.querySelectorAll('.beat-square.onset')).toHaveLength(0);
   act(() => beatReceiver.receive?.({ kind: 'sync.state', mode: 'capture', captureId: 'spotify-live' }));

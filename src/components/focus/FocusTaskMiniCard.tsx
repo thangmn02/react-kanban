@@ -33,6 +33,7 @@ function FocusTaskMiniCard({
         <button
           type="button"
           onClick={() => onActivate(task.id)}
+          disabled={task.isDone}
           className={`mt-1 h-3 w-3 shrink-0 rounded-full transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 ${
             isActive ? 'bg-sky-400' : 'bg-slate-500 hover:bg-sky-300'
           }`}

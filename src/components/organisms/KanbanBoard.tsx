@@ -4,6 +4,8 @@ import {
   type CollisionDetection,
   DndContext,
   PointerSensor,
+  KeyboardSensor,
+  type KeyboardCoordinateGetter,
   useSensor,
   useSensors,
   DragOverlay,
@@ -14,7 +16,10 @@ import {
   arrayMove,
   horizontalListSortingStrategy,
   SortableContext,
+  sortableKeyboardCoordinates,
 } from '@dnd-kit/sortable';
+import { useReducedMotion } from 'framer-motion';
+import { dropTransition } from '../../shared/motion';
 
 import TaskList from '../task/TaskList';
 import TaskItem from '../task/TaskItem';
@@ -110,15 +115,29 @@ function KanbanBoard({
   activeBoardId = null,
 }: KanbanBoardProps) {
   const { t } = useI18n();
+  const reducedMotion = useReducedMotion();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeType, setActiveType] = useState<'list' | 'task' | null>(null);
+  const keyboardCoordinates = useCallback<KeyboardCoordinateGetter>((event, args) => {
+    const { active, over, droppableRects } = args.context;
+    if (active?.data.current?.type === 'task' && ['ArrowLeft', 'ArrowRight'].includes(event.code)) {
+      event.preventDefault();
+      const currentList = over?.data.current?.listId || active.data.current.listId;
+      const nextIndex = boardData.columns.indexOf(currentList) + (event.code === 'ArrowRight' ? 1 : -1);
+      const nextList = boardData.columns[nextIndex];
+      const rect = nextList ? droppableRects.get(`task-list-${nextList}`) : null;
+      return rect ? { x: rect.left, y: rect.top } : undefined;
+    }
+    return sortableKeyboardCoordinates(event, args);
+  }, [boardData.columns]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
         distance: 10,
       },
-    })
+    }),
+    useSensor(KeyboardSensor, { coordinateGetter: keyboardCoordinates })
   );
 
   // Board background (local persistence — see utils/coverBackground.ts)
@@ -333,7 +352,7 @@ function KanbanBoard({
       onDragCancel={handleDragCancel}
       onDragEnd={handleDragEnd}
     >
-      <div className="bg-canvas p-6" style={boardBgStyle}>
+      <div className="bg-canvas p-4 sm:p-6" style={boardBgStyle}>
         {showNoResults && (
           <div className="mb-4">
             <EmptyState
@@ -347,7 +366,7 @@ function KanbanBoard({
           items={boardData.columns}
           strategy={horizontalListSortingStrategy}
         >
-          <div className="flex items-start gap-5 overflow-x-auto pb-6 pt-1">
+          <div data-scroll-key="kanban" className="flex items-start gap-5 overflow-x-auto pb-6 pt-1">
             {boardColumns.map(({ columnId, listItem, displayTasks }, columnIndex) => (
                 <MemoizedTaskList
                   key={columnId}
@@ -381,10 +400,7 @@ function KanbanBoard({
       {/* DragOverlay for Visual Ghost Representations */}
       <DragOverlay
         adjustScale={false}
-        dropAnimation={{
-          duration: 200,
-          easing: 'cubic-bezier(0.18, 0.89, 0.32, 1.28)',
-        }}
+        dropAnimation={reducedMotion ? null : dropTransition}
       >
         {activeId && activeType === 'list' && boardData.list[activeId] && (
           <div className="origin-center scale-[1.02] rotate-1 cursor-grabbing select-none opacity-95 shadow-[0_32px_90px_rgba(15,23,42,0.25)]">
@@ -397,7 +413,7 @@ function KanbanBoard({
           </div>
         )}
         {activeId && activeType === 'task' && boardData.task[activeId] && (
-          <div className="origin-center scale-[1.04] rotate-2 cursor-grabbing select-none opacity-95 shadow-[0_32px_90px_rgba(15,23,42,0.25)]">
+          <div className={`${reducedMotion ? '' : 'scale-[1.025] -rotate-1'} origin-center cursor-grabbing select-none opacity-95 shadow-[0_24px_60px_rgba(15,23,42,0.22)]`}>
             <MemoizedTaskItem
               task={boardData.task[activeId]}
               listId=""

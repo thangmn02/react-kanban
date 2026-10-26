@@ -1,8 +1,9 @@
 import { useCallback, useState, type Dispatch, type SetStateAction } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 
 import { notify } from '../../../components/organisms/toast/notify';
-import { createBoardFromTemplate, fetchBoardSnapshot } from '../../../services/board.service';
+import { createBoardFromTemplate } from '../../../services/board.service';
 import { createList } from '../../../services/list.service';
 import type { AppUser, AuthMode, WorkspaceMember } from '../../../types/auth.type';
 import type { BoardDeleteItem, ITaskItem } from '../../../types/task.type';
@@ -32,6 +33,7 @@ interface Params {
 }
 
 export function useBoardPageController(params: Params) {
+  const location = useLocation();
   const {
     authMode,
     activeView,
@@ -41,7 +43,6 @@ export function useBoardPageController(params: Params) {
     editingTask,
     activeListId,
     openCreateTaskDialog,
-    openEditTaskDialog,
     closeTaskDialog,
     closeGroupDialog,
     closeCreateBoardDialog,
@@ -139,23 +140,12 @@ export function useBoardPageController(params: Params) {
     if (workspaceId) navigate(`/workspaces/${workspaceId}/boards/${boardId}`);
   }, [board, navigate, workspaceId]);
 
-  const handleOpenTaskFromHome = useCallback(async (taskId: string, boardId: string) => {
-    board.setIsBoardLoading(true);
-    try {
-      const snapshot = await fetchBoardSnapshot(boardId, workspaceId, user?.id);
-      board.activeBoardIdRef.current = snapshot.boardId;
-      board.setActiveBoardId(snapshot.boardId);
-      board.setBoardData(snapshot.boardData);
-      board.syncBoardCache(snapshot.boardId, snapshot.boardData);
-      const task = snapshot.boardData.task[taskId];
-      if (task) openEditTaskDialog(task);
-      if (workspaceId) navigate(`/workspaces/${workspaceId}/boards/${boardId}`);
-    } catch (error) {
-      notify.error(dataErrorMessage(error, t('toast.unableOpenTask')));
-    } finally {
-      board.setIsBoardLoading(false);
-    }
-  }, [board, navigate, openEditTaskDialog, t, user?.id, workspaceId]);
+  const handleOpenTaskFromHome = useCallback((taskId: string, boardId: string) => {
+    const query = new URLSearchParams(location.search);
+    query.set('task', taskId);
+    query.set('taskBoard', boardId);
+    navigate(`${location.pathname}?${query}${location.hash}`);
+  }, [location, navigate]);
 
   const clearBoardFilters = useCallback(() => {
     setSearchQuery(''); setFilterPriority(''); setFilterAssignee(''); setFilterDueDate('');

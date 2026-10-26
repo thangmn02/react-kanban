@@ -58,6 +58,12 @@ const command = (message) => {
   receive({ target: 'beat-clock', ...message }, { id: 'companion' }, reply);
   return reply;
 };
+it('invalidates an actual source replacement even when title and media element stay unchanged',()=>{
+  command({kind:'watch',index:0,token:'source'});
+  video.currentSrc='https://media.example/other-track';video.dispatchEvent(new Event('playing'));
+  expect(send).toHaveBeenLastCalledWith(expect.objectContaining({valid:false}));
+  expect(vi.getTimerCount()).toBe(0);
+});
 it('ignores a delayed old stop after a replacement watcher is installed', async () => {
   command({ kind: 'watch', index: 0, token: 'old' });
   command({ kind: 'watch', index: 0, token: 'new' });

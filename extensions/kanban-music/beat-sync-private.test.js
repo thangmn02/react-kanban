@@ -31,9 +31,123 @@ function fixture() {
     scripting:{executeScript:vi.fn(async()=>[])}};
   sync=createBeatSync(api);
   const clock=sample=>{const token=api.tabs.sendMessage.mock.calls.find(([,message])=>message.kind==='watch')[1].token;
-    sync.clock({token,valid:true,clock:{...session,...sample,sampledAt:Date.now()}},sender);};
+    sync.clock({token,valid:true,clock:{...session,...sample,sampledAt:sample.sampledAt??Date.now()}},sender);};
   return {sync,api,session,owner,clock,setCalibration:value=>{calibration=value;}};
 }
+it.each([
+  ['buffering with paused=false',{buffering:true,paused:false,playing:true},0],
+  ['short reported stall',{buffering:true,paused:false,playing:false},0],
+  ['long reported stall',{buffering:true,paused:false,playing:false,currentTime:10},0],
+  ['genuine seek',{generation:2,seeking:true,currentTime:40},0],
+  ['source loses single-source proof',{mediaFacts:{kind:'audio-only',singleSource:false,noVideo:true,noFrames:true}},0],
+  ['unsupported playback rate',{playbackRate:1.25},0],
+  ['harmless advancing clock',{currentTime:10.001},170],
+  ['same-source pause',{playing:false,paused:true},170],
+  ['older asynchronous observation',{buffering:true,sampledAt:1},170],
+])('preserves compensation safety for %s',async(_name,sample,expected)=>{
+  const f=fixture();try{
+    await f.sync.start(f.session,f.owner,'sub');await vi.waitFor(()=>expect(f.sync.status(f.session).mode).toBe('capture'));
+    f.clock({playing:false,paused:true});const captureId=f.sync.status(f.session).captureId;
+    expect(await f.sync.configure(f.session,f.owner,{enabled:true,captureId,generation:1,compensationMs:170,
+      intentionalDelay:true,authorizedAudio:true,outputHeard:true,preview:true})).toBe(true);
+    f.clock({playing:true,paused:false});f.clock(sample);
+    expect(f.sync.status(f.session).capability.bufferMs).toBe(expected);
+    if(expected===0){
+      if(sample.seeking||sample.playbackRate!==undefined)await vi.waitFor(()=>expect(f.api.runtime.sendMessage).toHaveBeenCalledWith(expect.objectContaining({kind:'stop',captureId})));
+      else expect(f.api.runtime.sendMessage.mock.calls.filter(([m])=>m.kind==='synchronization').at(-1)[0].settings).toMatchObject({bufferMs:0,flush:true,eligible:false});
+    }
+  }finally{await f.sync.stop();}
+});
+it('binds one raw recording to the current app owner and rejects stale diagnostic replies',async()=>{
+  const f=fixture();await f.sync.start(f.session,f.owner,'sub');await vi.waitFor(()=>expect(f.sync.status(f.session).mode).toBe('capture'));
+  const original=f.api.runtime.sendMessage.getMockImplementation();
+  f.api.runtime.sendMessage.mockImplementation(async message=>{
+    if(message.kind!=='diagnostic-capture')return original(message);
+    const start=f.api.runtime.sendMessage.mock.calls.find(([m])=>m.kind==='start')[0];
+    return {ok:true,recording:{id:message.recordingId,startedAt:Date.now(),meta:{captureId:message.captureId,sourceId:start.sourceId,
+      sourceGeneration:start.sourceGeneration,synchronizationEpoch:start.synchronizationEpoch},status:'RECORDING'}};
+  });
+  expect((await f.sync.diagnostics(f.session,{...f.owner,documentId:'other'},{operation:'start',recordingId:'r'})).ok).toBe(false);
+  expect((await f.sync.diagnostics(f.session,f.owner,{operation:'start',recordingId:'r'})).ok).toBe(true);
+  const read=await f.sync.diagnostics(f.session,f.owner,{operation:'read',recordingId:'r'});
+  expect(read.source.clocks.length).toBeGreaterThan(0);expect(read.source).not.toHaveProperty('src');
+  let resolve;f.api.runtime.sendMessage.mockImplementation(message=>message.kind==='diagnostic-capture'?new Promise(done=>{resolve=done;}):original(message));
+  const pending=f.sync.diagnostics(f.session,f.owner,{operation:'read',recordingId:'r'});
+  f.clock({currentTime:40,generation:2,seeking:true});resolve(read);
+  expect(await pending).toMatchObject({ok:false,error:'source-changed'});await f.sync.stop();
+});
+it.each(['stop','replace'])('restores diagnostic instrumentation before awaiting direct %s teardown',async operation=>{
+  beatTelemetry.enable(false);const f=fixture();let release;
+  try{
+    await f.sync.start(f.session,f.owner,'sub');await vi.waitFor(()=>expect(f.sync.status(f.session).mode).toBe('capture'));
+    const original=f.api.runtime.sendMessage.getMockImplementation();
+    f.api.runtime.sendMessage.mockImplementation(message=>{
+      if(message.kind==='stop')return new Promise(resolve=>{release=()=>resolve({ok:true});});
+      if(message.kind!=='diagnostic-capture')return original(message);
+      const start=f.api.runtime.sendMessage.mock.calls.find(([m])=>m.kind==='start')[0];
+      return Promise.resolve({ok:true,recording:{id:message.recordingId,startedAt:Date.now(),status:'RECORDING',
+        meta:{captureId:message.captureId,sourceId:start.sourceId,sourceGeneration:start.sourceGeneration,synchronizationEpoch:start.synchronizationEpoch}}});
+    });
+    expect((await f.sync.diagnostics(f.session,f.owner,{operation:'start',recordingId:'recording'})).ok).toBe(true);
+    expect(beatTelemetry.enabled).toBe(true);
+    const pending=operation==='stop'?f.sync.stop():f.sync.start({...f.session,id:'replacement',src:'replacement.wav'},f.owner,'next');
+    await vi.waitFor(()=>expect(release).toBeTypeOf('function'));
+    expect(beatTelemetry.enabled).toBe(false);release();await pending;
+    f.api.runtime.sendMessage.mockImplementation(original);
+  }finally{release?.();await f.sync.stop();beatTelemetry.enable(false);beatTelemetry.clear();}
+});
+it('recreates offscreen after a failed old stop and blocks replacement when both cleanup paths fail',async()=>{
+  const f=fixture();let contexts=[{}];f.api.runtime.getContexts.mockImplementation(async()=>contexts);
+  f.api.offscreen.createDocument=vi.fn(async()=>{contexts=[{}];});
+  f.api.offscreen.closeDocument.mockImplementation(async()=>{contexts=[];});
+  await f.sync.start(f.session,f.owner,'sub');await vi.waitFor(()=>expect(f.sync.status(f.session).mode).toBe('capture'));
+  const send=f.api.runtime.sendMessage.getMockImplementation();
+  f.api.runtime.sendMessage.mockImplementation(message=>message.kind==='stop'?Promise.reject(Error('transport')):send(message));
+  const next={...f.session,id:'next',src:'next.wav'};
+  await f.sync.start(next,f.owner,'new-sub');await vi.waitFor(()=>expect(f.sync.status(next).mode).toBe('capture'));
+  expect(f.api.offscreen.closeDocument).toHaveBeenCalledOnce();
+  expect(f.api.offscreen.createDocument).toHaveBeenCalledOnce();
+  f.api.offscreen.closeDocument.mockRejectedValueOnce(Error('offscreen unavailable'));
+  const requests=f.api.tabCapture.getMediaStreamId.mock.calls.length;
+  await expect(f.sync.start({...next,id:'third',src:'third.wav'},f.owner,'third-sub')).rejects.toThrow('Previous audio ownership');
+  expect(f.api.tabCapture.getMediaStreamId).toHaveBeenCalledTimes(requests);await f.sync.stop();
+});
+it('rolls both owners to the same epoch after a failed configuration and permits a subsequent activation',async()=>{
+  const f=fixture();await f.sync.start(f.session,f.owner,'sub');await vi.waitFor(()=>expect(f.sync.status(f.session).mode).toBe('capture'));
+  const captureId=f.sync.status(f.session).captureId,send=f.api.runtime.sendMessage.getMockImplementation();let rejectOnce=true;
+  f.api.runtime.sendMessage.mockImplementation(message=>{
+    if(message.kind==='synchronization'&&!message.settings.flush&&rejectOnce){rejectOnce=false;return Promise.resolve({ok:false});}
+    return send(message);
+  });
+  const config={enabled:true,captureId,generation:1,live:true,latencyAccepted:true,outputHeard:true,authorizedAudio:true,preview:true};
+  expect(await f.sync.configure(f.session,f.owner,config)).toBe(false);
+  const rollback=f.api.runtime.sendMessage.mock.calls.filter(([m])=>m.kind==='synchronization').at(-1)[0].settings.epoch;
+  const boundary=f.api.tabs.sendMessage.mock.calls.filter(([,m])=>m.kind==='sync.state').at(-1)[1];
+  expect(rollback).toBe(boundary.synchronizationEpoch);
+  expect(await f.sync.configure(f.session,f.owner,config)).toBe(true);
+  const epoch=f.api.runtime.sendMessage.mock.calls.filter(([m])=>m.kind==='synchronization').at(-1)[0].settings.epoch;
+  const before=f.api.tabs.sendMessage.mock.calls.filter(([,m])=>m.kind==='onset').length;
+  f.sync.offscreen({kind:'onset',captureId,bands:['hat'],synchronizationEpoch:epoch},{url:'chrome-extension://private/offscreen.html'});
+  expect(f.api.tabs.sendMessage.mock.calls.filter(([,m])=>m.kind==='onset')).toHaveLength(before+1);await f.sync.stop();
+});
+it('compensates owned video with a fixed hypothesis, fences all event kinds on seek and permits immediate OFF',async()=>{
+  const f=fixture();Object.assign(f.session.mediaFacts,{kind:'video',noVideo:false,noFrames:false});
+  await f.sync.start(f.session,f.owner,'sub');await vi.waitFor(()=>expect(f.sync.status(f.session).mode).toBe('capture'));
+  f.clock({playing:false,paused:true});
+  const captureId=f.sync.status(f.session).captureId;
+  const configuration={enabled:true,captureId,generation:1,compensationMs:170,intentionalDelay:true,authorizedAudio:true,outputHeard:true,preview:true};
+  expect(await f.sync.configure(f.session,f.owner,configuration)).toBe(true);
+  f.clock({playing:true,paused:false,mediaFacts:{kind:'video',singleSource:true,noVideo:false,noFrames:false}});
+  expect(f.sync.status(f.session).capability.bufferMs).toBe(170);
+  const oldEpoch=f.api.runtime.sendMessage.mock.calls.filter(([m])=>m.kind==='synchronization').at(-1)[0].settings.epoch;
+  expect(await f.sync.configure(f.session,f.owner,{...configuration,enabled:false,compensationMs:0})).toBe(true);
+  expect(f.sync.status(f.session).capability.bufferMs).toBe(0);
+  const count=()=>f.api.tabs.sendMessage.mock.calls.filter(([,m])=>['onset','tempo.state','tempo.tick'].includes(m.kind)).length;
+  const before=count();f.clock({currentTime:40,generation:2,seeking:true,playing:false,paused:false});
+  for(const message of [{kind:'onset',bands:['hat']},{kind:'tempo.state',tempo:{locked:true,bpm:120,confidence:1}},{kind:'tempo.tick',tick:{step:1,phase:0,beatPosition:1,subdivision:2}}])
+    f.sync.offscreen({...message,captureId,synchronizationEpoch:oldEpoch},{url:'chrome-extension://private/offscreen.html'});
+  expect(count()).toBe(before);await f.sync.stop();
+});
 it('records the precise transient clock reason while still revoking live preview immediately',async()=>{
  beatTelemetry.enable();const f=fixture();try{
   await f.sync.start(f.session,f.owner,'sub');await vi.waitFor(()=>expect(f.sync.status(f.session).mode).toBe('capture'));await f.sync.start(f.session,f.owner,'sub');

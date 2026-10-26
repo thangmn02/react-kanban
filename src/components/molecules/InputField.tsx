@@ -1,4 +1,4 @@
-import type { InputHTMLAttributes } from 'react';
+import { useId, type InputHTMLAttributes } from 'react';
 
 interface InputFieldProps extends InputHTMLAttributes<HTMLInputElement> {
   label: string;
@@ -6,9 +6,11 @@ interface InputFieldProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 function InputField({ label, messageError, ...props }: InputFieldProps) {
+  const generatedId=useId();
+  const id=props.id||generatedId;
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-2">
+      <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-2">
         {label}
       </label>
       <input
@@ -16,6 +18,7 @@ function InputField({ label, messageError, ...props }: InputFieldProps) {
         placeholder="Please input ..."
         className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
         {...props}
+        id={id}
       />
       {messageError && (
         <span className="text-red-500 text-sm">{messageError}</span>

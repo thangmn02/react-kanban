@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useEffectEvent, useMemo, useState } from 'react';
 
 import {
   createWorkspaceForCurrentUser,
@@ -53,9 +53,10 @@ export function useWorkspaceSession(user: AppUser | null) {
     }
   }, [user]);
 
+  const loadForIdentity=useEffectEvent(loadWorkspaces);
   useEffect(() => {
-    void loadWorkspaces();
-  }, [loadWorkspaces]);
+    void loadForIdentity();
+  }, [user?.id]);
 
   useEffect(() => {
     const scope = buildUserScope(user);

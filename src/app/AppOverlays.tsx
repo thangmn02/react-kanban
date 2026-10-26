@@ -92,6 +92,17 @@ export default function AppOverlays(props: Props) {
         onSubmitTask={taskEditor.state.mode === 'edit' ? board.onSubmitEditTask : board.onSubmitCard}
         isFocusTask={taskEditor.state.editingTask ? focus.isFocusTask(taskEditor.state.editingTask.id) : false}
         onToggleFocusTask={taskEditor.state.editingTask ? () => focus.handleToggleFocusTask(taskEditor.state.editingTask!) : undefined}
+        onStartFocus={taskEditor.state.editingTask ? () => {
+          const task = taskEditor.state.editingTask!;
+          taskEditor.closeTaskDialog();
+          focus.handleStartFocusTask(task);
+        } : undefined}
+        onToggleCompletion={taskEditor.state.editingTask ? async () => {
+          const task = taskEditor.state.editingTask!;
+          const saved = await board.handleTaskWorkflow(task.id, !task.isDone);
+          if (saved) taskEditor.closeTaskDialog();
+          return saved;
+        } : undefined}
         workspaceMembers={props.workspaceMembers}
         workspaceId={props.workspaceId}
         boardTitle={board.activeBoardSummary?.title}

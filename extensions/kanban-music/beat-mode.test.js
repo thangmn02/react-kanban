@@ -1,5 +1,13 @@
 import {expect,it} from 'vitest';
 import {decideBeatMode,bufferRequirement,verifiedTrackMatches,parseBeatMode,validSyncConfiguration} from './beat-mode.js';
+it('observes exact compensation prerequisites without changing any policy result',()=>{
+  const f=facts(),normal=decideBeatMode(f,10000),observed=decideBeatMode({...f,diagnostics:true},10000);
+  const {prerequisites,...result}=observed;expect(result).toEqual(normal);
+  expect(prerequisites).toMatchObject({sourceEligible:true,captureEligible:true,ownerValid:true,outputRouteHealthy:true,clockHealthy:true});
+  f.clock.buffering=true;expect(decideBeatMode({...f,diagnostics:true},10000).prerequisites.clockHealthy).toBe(false);
+  f.clock.buffering=false;f.clock.sampledAt=8499;
+  expect(decideBeatMode({...f,diagnostics:true},10000)).toMatchObject({compensationEligible:false,clockHealthy:false});
+});
 const facts=()=>({privateCandidate:true,surface:'web',
   source:{id:'owned-audio',version:'1',contentSha256:'a'.repeat(64),provider:'local',kind:'audio-only',singleSource:true,noVideo:true,noFrames:true},
   capture:{id:'capture',owner:'owner',expectedOwner:'owner',active:true,audible:true,output:'tab-replacement',originalSuppressed:true},

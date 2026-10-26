@@ -1,4 +1,5 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { notify } from '../components/organisms/toast/notify';
 import { matchPath, useLocation, useNavigate } from 'react-router-dom';
 
 import type { AppUser, AuthMode, WorkspaceSummary } from '../types/auth.type';
@@ -76,6 +77,12 @@ export function useAppRoutingController({
     setIsBoardLoading,
   } = board;
   const { activeView, activeInviteToken, routeWorkspaceId, routeBoardId } = deriveAppRouteState(location.pathname);
+  const query = new URLSearchParams(location.search);
+  const previewBoardId = query.get('task') ? query.get('taskBoard') : null;
+  const requestedBoardId = previewBoardId || routeBoardId;
+  const contextKey = `${activeWorkspaceId}:${location.pathname}:${query.get('task')}:${previewBoardId}`;
+  const [loadedContext, setLoadedContext] = useState({ key: contextKey, ready: false });
+  if (loadedContext.key !== contextKey) setLoadedContext({ key: contextKey, ready: false });
   const requireFeature = useCallback((destination: string) => {
     if (authMode === 'supabase' && !user) {
       navigate(authDestination(destination));
@@ -161,15 +168,27 @@ export function useAppRoutingController({
       setIsBoardLoading(true);
       return;
     }
+    const request = new AbortController();
+    setIsBoardLoading(true);
     void (async () => {
+      try {
       const boards = await refreshBoardList();
-      if (routeBoardId && !boards.some((candidate) => candidate.id === routeBoardId)) {
+      if (request.signal.aborted) return;
+      if (requestedBoardId && !boards.some((candidate) => candidate.id === requestedBoardId)) {
         navigate('/not-found', { replace: true });
         setIsBoardLoading(false);
         return;
       }
-      await refreshBoardData({ boardId: routeBoardId || initialBoardId });
+      await refreshBoardData({ boardId: requestedBoardId || initialBoardId, signal: request.signal });
+      if (!request.signal.aborted) setLoadedContext({ key: contextKey, ready: true });
+      } catch (error) {
+        if (!request.signal.aborted) {
+          setIsBoardLoading(false);
+          notify.error(error instanceof Error ? error.message : 'Unable to load your workspace.');
+        }
+      }
     })();
+    return () => request.abort();
   }, [
     activeView,
     location.pathname,
@@ -186,11 +205,13 @@ export function useAppRoutingController({
     isWorkspaceLoading,
     navigate,
     routeBoardId,
+    requestedBoardId,
+    contextKey,
     routeWorkspaceId,
     setActiveWorkspaceId,
     user,
     workspaces,
   ]);
 
-  return { activeView, activeInviteToken, location, navigate, goToView, requireFeature };
+  return { activeView, activeInviteToken, location, navigate, goToView, requireFeature, isTaskContextReady: loadedContext.key === contextKey && loadedContext.ready };
 }

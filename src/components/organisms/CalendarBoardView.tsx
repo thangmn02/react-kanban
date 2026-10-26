@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
+import { useRetainedViewState } from '../../app/view-context';
 import { addDays, addMonths, differenceInCalendarDays, endOfMonth, endOfWeek, format, isSameDay, isSameMonth, isToday, parseISO, startOfDay, startOfMonth, startOfWeek, subMonths } from 'date-fns';
 import { enUS, vi } from 'date-fns/locale';
 
@@ -21,8 +22,8 @@ interface ScheduledTask { task: ITaskItem; color: TaskStatusColor }
 function CalendarBoardView({ boardData, searchQuery, filterPriority, filterAssignee, filterDueDate, onOpenTask }: CalendarBoardViewProps) {
   const { language, t } = useI18n();
   const locale = language === 'vi' ? vi : enUS;
-  const [activeMonth, setActiveMonth] = useState(() => startOfMonth(new Date()));
-  const [selectedDay, setSelectedDay] = useState(() => startOfDay(new Date()));
+  const [activeMonth, setActiveMonth] = useRetainedViewState('calendar-month', () => startOfMonth(new Date()));
+  const [selectedDay, setSelectedDay] = useRetainedViewState('calendar-day', () => startOfDay(new Date()));
   const finalActiveColumnId = boardData.columns.at(-2);
 
   const taskColumnById = useMemo(() => {

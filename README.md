@@ -520,6 +520,7 @@ VITE_ENABLE_DESIGN_LAB=true
 
 ## Accessibility & motion
 
+- [Task workflow and interaction rules](docs/task-workflow.md) cover contextual details, completion, keyboard dragging, retained view state and motion ownership.
 - Interactive elements expose clear focus states.
 - Decorative animation honors the OS-level "Reduce Motion" setting.
 - An offline banner and error boundaries keep the app usable under failures.

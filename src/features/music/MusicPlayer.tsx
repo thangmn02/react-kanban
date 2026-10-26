@@ -1,5 +1,8 @@
 import { useI18n } from '../../i18n';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import {useMotionReduction} from './use-motion-reduction';
+import type {MotionProfile,MotionReduction} from './semantic-motion';
+import {motionPreviewAllowed} from './semantic-motion';
 import { getMusicInstallUrl } from './mediaBridge';
 import ExperimentalBeatControl from './experimental-beat-control';
 import MusicPlaybackControls from './music-playback-controls';
@@ -14,12 +17,16 @@ import { beatTelemetry } from '../../../extensions/kanban-music/beat-telemetry.j
 import { leadPulseEnabled, leadAvailabilityText } from './lead-feature';
 import HybridBetaControl from './hybrid-beta-control';
 import {localHybridEnabled} from './use-local-hybrid-music';
+import LivePipelineTraceControl from './live-pipeline-trace-control';
 const PrivateMelodyDemo=import.meta.env.DEV ? lazy(()=>import('./diagnostics/MelodyDetectorDemo')) : null;
 
 export interface MusicVisualOptions {
   colorMode?: BeatColorMode;
   palette?: BeatPalette;
   orientation?: 'horizontal' | 'vertical';
+  motionProfile?:MotionProfile;
+  motionReduction?:MotionReduction;
+  visualActive?:boolean;
 }
 
 export function MusicNowPlaying({ music }: { music: BrowserMusicController }) {
@@ -58,7 +65,12 @@ export function MusicTrack({ music }: { music: BrowserMusicController }) {
   </>;
 }
 
-export function MusicGrid({ music, colorMode = 'random', palette = 'bloom', orientation = 'horizontal' }: { music: BrowserMusicController } & MusicVisualOptions) {
+export function MusicGrid({ music, colorMode = 'random', palette = 'bloom', orientation = 'horizontal',motionProfile='focus',motionReduction='system',visualActive=true }: { music: BrowserMusicController } & MusicVisualOptions) {
+  const {t}=useI18n();
+  const systemReduced=useMotionReduction(),reduced=motionReduction==='reduced'||systemReduced;
+  const [legacy,setLegacy]=useState(false);
+  const compareLegacy=legacy&&!reduced;
+  const motionPreview=motionPreviewAllowed(music.selected?.syncState?.capability?.privateCandidate===true);
   const showDebug = import.meta.env.DEV && new URLSearchParams(window.location.search).has('musicDebug');
   const [demo,setDemo]=useState(() => new URLSearchParams(window.location.search).get('musicDemo') === 'lead');
   const visibility = useRef<{ at: number; event: string; hidden: boolean }[]>([]);
@@ -86,8 +98,13 @@ export function MusicGrid({ music, colorMode = 'random', palette = 'bloom', orie
     :capability.allowTypedPreview?'Unverified instrument preview is on. Flashes can lag or be incorrect.'
     :capability.livePreviewEligible?'Instrument preview is off for this source. Open Music → Private candidate → Live preview to enable it. Pause, seek and source changes turn preview off.'
     :null:null;
-  const grid=<BeatPattern key={music.selected?.id} session={music.selected} beat={music.beat} colorMode={colorMode} palette={palette} orientation={orientation} semanticOnly={music.beta?.enabled?true:undefined} melodyEnabled={music.beta?.enabled&&music.beta.melody} independentRows={music.beta?.enabled} melodyEvents={music.beta?.enabled?music.beta.clip?.lead?.events:undefined} />;
+  const grid=<BeatPattern key={music.selected?.id} session={music.selected} beat={music.beat} colorMode={colorMode} palette={palette} orientation={orientation} semanticOnly={music.beta?.enabled?true:undefined} melodyEnabled={music.beta?.enabled&&music.beta.melody} independentRows={music.beta?.enabled} melodyEvents={music.beta?.enabled?music.beta.clip?.lead?.events:undefined}
+    motionProfile={motionPreview&&!compareLegacy?motionProfile:'legacy'} motionReduced={reduced} motionActive={visualActive}/>;
   return <>
+    {motionPreview&&<div className="music-motion-controls"><span>{t('dock.motion.preview')} · {compareLegacy?'Legacy':t(`dock.motion.${motionProfile}`)}</span>
+      <button type="button" className="text-button motion-legacy" disabled={reduced} aria-pressed={compareLegacy} onClick={()=>setLegacy(value=>!value)}>{t(compareLegacy?'dock.motion.restore':'dock.motion.legacy')}</button>
+    </div>}
+    {motionPreview&&reduced&&<p className="motion-reduction-note">{t('dock.motion.reducedNote')}</p>}
     {previewStatus&&<p role="status" aria-label="Instrument preview status">{previewStatus}</p>}
     {music.beta?.enabled?<div className={`hybrid-grid-frame${music.beta.renderer==='short'?' hybrid-short-attack':''}`}>{grid}</div>:grid}
     {showDebug && <details className="music-debug" open><summary>Beat debug</summary>
@@ -101,7 +118,7 @@ export function MusicGrid({ music, colorMode = 'random', palette = 'bloom', orie
             : 'new pipeline disabled · live local capture does not generate Lead events'}</p></>}
         <p aria-label="Companion capture status">Capture: {music.selected?.syncState?.mode || 'unknown'} · {music.selected?.syncState?.reason || 'no failure reported'} · Playback: {music.selected?.playing && !music.selected.paused ? 'playing' : 'paused'} · Path: {music.beat.eventPath || 'waiting'}</p>
         {music.selected?.syncState?.captureError && <p>Capture error: {music.selected.syncState.captureError.stage} · {music.selected.syncState.captureError.code}</p>}
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        {music.selected?.syncState?.capability?.privateCandidate?<LivePipelineTraceControl music={music}/>:<div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         <button type="button" className="text-button" onClick={() => { visibility.current = []; beatTelemetry.clear(); beatRowDiagnostics.start(30); }}>Record 30 seconds</button>
         <button type="button" className="text-button" onClick={() => {
           const rows = beatRowDiagnostics.snapshot(fourRowBaseline ? 'semantic-only' : undefined);
@@ -116,13 +133,14 @@ export function MusicGrid({ music, colorMode = 'random', palette = 'bloom', orie
           const link = document.createElement('a'); link.href = url; link.download = fourRowBaseline ? 'kora-four-row-trace.json' : 'kora-live-grid-trace.json'; link.click();
           setTimeout(() => URL.revokeObjectURL(url), 1000);
         }}>Export row trace</button>
-        </div>
+        </div>}
       </>
       <pre aria-label="Beat sync debug">{JSON.stringify({
       source: music.source, mode: music.beat.mode, reason: music.beat.reason, onsets: music.beat.onsets, rates: music.beat.rates,
       tempo: music.beat.tempo, tickCount: music.beat.tickCount, pattern: patternAt(music.selected?.currentTime || 0), captureId: music.beat.captureId,
       melody: music.beat.melody, lead: music.beat.lead, leadAvailability: music.beat.leadAvailability,
       eventPath: music.beat.eventPath, assetProvider: music.selected?.asset?.provider,
+      visualAttacks:music.beat.visualAttacks?.slice(-4).map(a=>({band:a.band,deadlineMs:a.deadlineMs})),
       captureStatus: music.selected?.syncState, browserAnalysisSupported: music.selected?.canAnalyze,
     }, null, 2)}</pre></details>}
   </>;

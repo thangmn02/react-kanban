@@ -13,6 +13,8 @@ export const COMMAND_PALETTE_ACTION_CONFIG = {
   GO_TODAY: { id: 'go-today', title: 'Go to Today', description: 'Open the daily focus planning page.', shortcut: 'T', keywords: ['today', 'my day', 'daily plan', 'focus plan'] },
   GO_BOARD: { id: 'go-board', title: 'Go to Board', description: 'Open the active Kora board.', shortcut: 'B', keywords: ['kanban', 'board', 'columns'] },
   GO_CALENDAR: { id: 'go-calendar', title: 'Go to Calendar', description: 'Open the calendar view for due dates.', shortcut: 'C', keywords: ['calendar', 'due dates', 'schedule'] },
+  GO_TABLE: { id: 'go-table', title: 'Go to Table', description: 'Compare and open tasks in the active board.', keywords: ['table', 'tasks', 'rows'] },
+  GO_FOCUS: { id: 'go-focus', title: 'Go to Focus', description: 'Open Tasks, Music and Beat Grid in the shared Dock.', keywords: ['focus', 'music', 'beat', 'dock'] },
   QUICK_ADD_TASK: { id: 'quick-add-task', title: 'Quick add task', description: 'Create a task in the first list of the active board.', shortcut: 'N', keywords: ['new task', 'create task', 'card'] },
   PLAN_TODAYS_FOCUS: { id: 'plan-todays-focus', title: "Plan today's focus", description: 'Open Today to choose up to 3 focus tasks.', keywords: ['today', 'my day', 'focus', 'plan'] },
   NEW_LIST: { id: 'new-list', title: 'Create list', description: 'Add a new column to the active board.', keywords: ['new list', 'column', 'group'] },

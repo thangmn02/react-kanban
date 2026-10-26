@@ -1,7 +1,10 @@
 // Exact trained frontend: 44.1kHz, Hanning FFT, log triangular filterbank.
+import {PercussionEvidence} from './semantic-precision-guards.js';
 export class PercussionFeatures {
   constructor(config) {
     this.config = config;
+    this.evidence=config.semanticPrecisionGuards?.mode&&config.semanticPrecisionGuards.mode!=='off'?new PercussionEvidence(config.sampleRate,config.fftSize):undefined;
+    this.evidenceRows=[];
     this.samples = new Float32Array(config.fftSize);
     this.real = new Float64Array(config.fftSize);
     this.imag = new Float64Array(config.fftSize);
@@ -76,14 +79,18 @@ export class PercussionFeatures {
       const began = this.config.telemetry ? Date.now() : 0;
       this.spectrum();
       if (this.config.telemetry) this.computeMs += Date.now() - began;
-      this.times.push(startTime + (i + 1 - this.config.fftSize / 2) / this.config.sampleRate);
+      const time=startTime + (i + 1 - this.config.fftSize / 2) / this.config.sampleRate;
+      this.times.push(time);
+      if(this.evidence)this.evidenceRows.push(this.evidence.measure(this.samples,this.magnitude,this.received,time));
       this.next += this.config.hopSize;
       if (++this.used === this.config.stepFrames) {
         emit({ kind: 'frames', data: this.data, times: this.times,
+          ...(this.evidence?{evidence:this.evidenceRows}:{}),
           ...(this.config.diagnostics || this.config.telemetry ? { postedAt: Date.now(), availableAudioTime: startTime + (i + 1) / this.config.sampleRate } : {}),
           ...(this.config.telemetry ? { featureComputeMs: this.computeMs } : {}) });
         this.data = new Float32Array(this.config.stepFrames * this.config.bins);
         this.times = [];
+        this.evidenceRows=[];
         this.used = 0;
         this.computeMs = 0;
       }

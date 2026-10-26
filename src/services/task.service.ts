@@ -8,6 +8,7 @@ import {
   localDeleteTask,
   localDeleteTasksByListId,
   localUpdateTaskPositions,
+  localFetchAllTasks,
 } from '../infrastructure/local/localBoardStore';
 import type { Json, TaskInsert, TaskRow, TaskUpdate } from '../types/supabase.type';
 import type { TaskRepeatInterval } from '../types/task.type';
@@ -143,7 +144,7 @@ function normalizeTaskDataPartial(taskData: TaskUpdate): TaskUpdate {
 
 export async function fetchTasks({ boardId, listId, workspaceId }: FetchTasksParams = {}): Promise<TaskRow[]> {
   if (!supabase) {
-    return [];
+    return localFetchAllTasks(workspaceId).filter(task=>(!boardId||task.board_id===boardId)&&(!listId||task.list_id===listId));
   }
 
   const client = requireSupabaseClient();

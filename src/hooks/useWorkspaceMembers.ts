@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { AuthContext } from '../contexts/AuthContext';
+import { PROFILE_CHANGED } from '../services/profile.service';
 
 import {
   fetchWorkspaceMembers,
@@ -32,12 +34,15 @@ interface UseWorkspaceMembersResult {
 }
 
 export function useWorkspaceMembers(workspaceId: string | null): UseWorkspaceMembersResult {
+  const user=useContext(AuthContext)?.user;
+  const requestId=useRef(0);
   const [members, setMembers] = useState<WorkspaceMember[]>(mockWorkspaceMembers);
   const [invites, setInvites] = useState<WorkspaceInvite[]>([]);
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
   const [memberErrorMessage, setMemberErrorMessage] = useState<string | null>(null);
 
   const reloadMembers = useCallback(async () => {
+    const request=++requestId.current;
     setIsLoadingMembers(true);
 
     try {
@@ -45,19 +50,23 @@ export function useWorkspaceMembers(workspaceId: string | null): UseWorkspaceMem
         fetchWorkspaceMembers(workspaceId),
         fetchWorkspaceInvites(workspaceId),
       ]);
-
+      if(request!==requestId.current)return;
       setMembers(nextMembers);
       setInvites(nextInvites);
       setMemberErrorMessage(null);
     } catch (error) {
+      if(request!==requestId.current)return;
       setMemberErrorMessage(error instanceof Error ? error.message : 'Unable to load workspace members.');
     } finally {
-      setIsLoadingMembers(false);
+      if(request===requestId.current)setIsLoadingMembers(false);
     }
   }, [workspaceId]);
 
   useEffect(() => {
     void reloadMembers();
+    const refresh=()=>{void reloadMembers();};
+    window.addEventListener(PROFILE_CHANGED,refresh);window.addEventListener('focus',refresh);
+    return()=>{requestId.current+=1;window.removeEventListener(PROFILE_CHANGED,refresh);window.removeEventListener('focus',refresh);};
   }, [reloadMembers]);
 
   const addMember = useCallback(async (email: string, role: WorkspaceInviteRole) => {
@@ -86,8 +95,9 @@ export function useWorkspaceMembers(workspaceId: string | null): UseWorkspaceMem
     await reloadMembers();
   }, [reloadMembers]);
 
+  const resolvedMembers=useMemo(()=>members.filter(member=>!workspaceId||member.workspaceId===workspaceId).map(member=>member.userId===user?.id ? {...member,name:user.name,avatarUrl:user.avatarUrl,previousNames:user.legacyName?[user.legacyName]:[]} : member),[members,user,workspaceId]);
   return {
-    members,
+    members: resolvedMembers,
     invites,
     isLoadingMembers,
     memberErrorMessage,

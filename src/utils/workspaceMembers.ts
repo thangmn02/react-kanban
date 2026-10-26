@@ -27,6 +27,18 @@ export function mapWorkspaceMembersToAssignees(members: WorkspaceMember[]): Task
   return members.map(mapWorkspaceMemberToAssignee);
 }
 
+export function resolveAssigneeIdentity(assignee:TaskAssignee,members:WorkspaceMember[]):TaskAssignee {
+  const matches=members.filter(member=>assignee.userId ? member.userId===assignee.userId : assignee.workspaceMemberId ? member.id===assignee.workspaceMemberId
+    : member.name===assignee.name || member.previousNames?.includes(assignee.name));
+  return matches.length===1 ? {...assignee,name:matches[0].name,avatar:matches[0].avatarUrl} : assignee;
+}
+
 export function getWorkspaceMemberDisplayName(member: Pick<WorkspaceMember, 'name' | 'email'>) {
   return member.name || member.email || 'Workspace member';
+}
+
+export function sameAssigneeIdentity(a:TaskAssignee,b:TaskAssignee):boolean {
+  if(a.userId&&b.userId)return a.userId===b.userId;
+  if(a.workspaceMemberId&&b.workspaceMemberId)return a.workspaceMemberId===b.workspaceMemberId;
+  return a.name===b.name;
 }

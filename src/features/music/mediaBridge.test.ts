@@ -4,6 +4,27 @@ import { beatTelemetry } from '../../../extensions/kanban-music/beat-telemetry.j
 
 afterEach(() => { beatTelemetry.enable(false); beatTelemetry.clear(); vi.restoreAllMocks(); vi.useRealTimers(); vi.unstubAllEnvs(); });
 const session = { id: '1', title: 'Song', artist: 'Artist', source: 'youtube.com', paused: true };
+it('never adopts an unseen older boundary when rapid source transitions arrive in reverse order',()=>{
+  const received=vi.fn(),stop=subscribeBeatEvents('song','subscription',received);
+  const send=(revision:number,sourceId:string)=>window.dispatchEvent(new MessageEvent('message',{source:window,origin:location.origin,data:{
+    channel:'kanban-music-v1',direction:'extension-event',event:'beat',sessionId:'song',subscriptionId:'subscription',emittedAt:Date.now(),
+    kind:'sync.state',mode:'capture',sourceId,sourceGeneration:0,synchronizationEpoch:sourceId,sourceRevision:revision}}));
+  send(1,'A');send(3,'C');send(2,'B');expect(received.mock.calls.map(([e])=>e.sourceId)).toEqual(['A','C']);stop();
+});
+it('drops coalesced, untimed and old-generation semantic messages after a new source boundary',async()=>{
+  vi.useFakeTimers();const received=vi.fn(),stop=subscribeBeatEvents('song','subscription',received);
+  const a={sourceId:'song',sourceGeneration:1,synchronizationEpoch:'a'},b={...a,sourceGeneration:2,synchronizationEpoch:'b'};
+  const send=(message:object)=>window.dispatchEvent(new MessageEvent('message',{source:window,origin:location.origin,data:{
+    channel:'kanban-music-v1',direction:'extension-event',event:'beat',sessionId:'song',subscriptionId:'subscription',emittedAt:Date.now(),...message}}));
+  send({kind:'sync.state',mode:'capture',captureId:'capture',...a});
+  send({kind:'onset',bands:['hat'],captureId:'capture',sequence:1,emittedAt:Date.now()-800,...a});
+  send({kind:'sync.state',mode:'clock',...b});const before=received.mock.calls.length;
+  send({kind:'onset',bands:['hat'],captureId:'capture',sequence:2,...a});
+  send({kind:'tempo.state',captureId:'capture',tempo:{locked:true,bpm:120,confidence:1},...a});
+  send({kind:'sync.state',mode:'capture',captureId:'capture',...a});
+  send({kind:'onset',bands:['hat'],captureId:'capture',sequence:3});
+  await vi.advanceTimersByTimeAsync(1);expect(received).toHaveBeenCalledTimes(before);stop();
+});
 it('sends debug opt-in only with the capture start request', async () => {
   beatTelemetry.enable();
   const post = vi.spyOn(window, 'postMessage').mockImplementation(message => reply(message, { ok: true }));

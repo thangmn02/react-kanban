@@ -82,7 +82,6 @@ function getLocalDashboardData(currentUser: AppUser | null): HomeDashboardData {
   const myTasks = tasks
     .filter((task) => !task.is_done && boardTitleById.has(task.board_id) && isTaskAssignedToUser(normalizeTaskAssignees(task.assignees), currentUser))
     .map<HomeTaskSummary>((task) => {
-      const assignees = normalizeTaskAssignees(task.assignees);
       return {
         id: task.id,
         boardId: task.board_id,
@@ -90,7 +89,7 @@ function getLocalDashboardData(currentUser: AppUser | null): HomeDashboardData {
         title: task.title,
         priority: task.priority as HomeTaskSummary['priority'],
         dueDate: task.due_date,
-        assigneeAvatar: assignees[0]?.avatar,
+        assigneeAvatar: currentUser?.avatarUrl,
       };
     })
     .sort(sortTasksByDueDate);
@@ -105,7 +104,7 @@ function getLocalDashboardData(currentUser: AppUser | null): HomeDashboardData {
   const recentBoards = boards.map<RecentBoardSummary>((board) => {
     const boardTasks = tasksByBoardId.get(board.id) || [];
     const memberAvatars = Array.from(new Set(boardTasks.flatMap((task) => (
-      normalizeTaskAssignees(task.assignees).map((assignee) => assignee.avatar)
+      normalizeTaskAssignees(task.assignees).map((assignee) => isTaskAssignedToUser([assignee],currentUser??null)?currentUser!.avatarUrl:assignee.avatar)
     ))));
 
     return {
@@ -225,7 +224,6 @@ export async function fetchHomeDashboardData({
   const myTasks = tasks
     .filter((task) => !task.is_done && boardTitleById.has(task.board_id) && isTaskAssignedToUser(normalizeTaskAssignees(task.assignees), currentUser ?? null))
     .map<HomeTaskSummary>((task) => {
-      const assignees = normalizeTaskAssignees(task.assignees);
       return {
         id: task.id,
         boardId: task.board_id,
@@ -233,7 +231,7 @@ export async function fetchHomeDashboardData({
         title: task.title,
         priority: task.priority,
         dueDate: task.due_date,
-        assigneeAvatar: assignees[0]?.avatar,
+        assigneeAvatar: currentUser?.avatarUrl,
       };
     })
     .sort(sortTasksByDueDate);
@@ -248,7 +246,7 @@ export async function fetchHomeDashboardData({
   const recentBoards = boards.slice(0, 6).map<RecentBoardSummary>((board) => {
     const boardTasks = tasksByBoardId.get(board.id) || [];
     const memberAvatars = Array.from(new Set(boardTasks.flatMap((task) => (
-      normalizeTaskAssignees(task.assignees).map((assignee) => assignee.avatar)
+      normalizeTaskAssignees(task.assignees).map((assignee) => isTaskAssignedToUser([assignee],currentUser??null)?currentUser!.avatarUrl:assignee.avatar)
     ))));
 
     return {

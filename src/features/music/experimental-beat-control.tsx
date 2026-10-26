@@ -1,6 +1,7 @@
 import { useId, useState } from 'react';
 import { configureExperimentalSynchronization, type BrowserMusicSession } from './mediaBridge';
 import ExperimentalLivePreviewControl from './experimental-live-preview-control';
+import AudioDelayCompensationControl from './audio-delay-compensation-control';
 
 export default function ExperimentalBeatControl({session,refresh,initiallyOpen=false}:{session:BrowserMusicSession;refresh:()=>void;initiallyOpen?:boolean}) {
   const [consent,setConsent]=useState({intentionalDelay:false,outputHeard:false,authorizedAudio:false,preview:false});
@@ -45,6 +46,7 @@ export default function ExperimentalBeatControl({session,refresh,initiallyOpen=f
   return <details open={initiallyOpen} className="muted" aria-label="Private Beat Grid candidate">
     <summary>Private candidate · {capability.mode} · {capability.bufferMs ? `Audio intentionally delayed ${capability.bufferMs} ms` : 'Audio delay off'}</summary>
     <ExperimentalLivePreviewControl session={session} refresh={refresh}/>
+    <AudioDelayCompensationControl session={session} refresh={refresh}/>
     <h2>Calibrated delay · audio-only sources</h2>
     <p role="status">{capability.reason} · {capability.detectorId} / {capability.detectorVersion}. Capture {capability.captureHealthy?'healthy':'unproven'}, clock {capability.clockHealthy?'healthy':'unreliable'}. Processing p95/p99 {capability.measuredP95Ms?.toFixed(1)??'unknown'} / {capability.measuredP99Ms?.toFixed(1)??'unknown'} ms ({capability.latencySamples} samples). Physical synchronization unverified.</p>
     {!policyBlocker&&<p>Buffer: {capability.bufferReason}. Withheld/reset instrument predictions: {capability.droppedSemanticEvents}. Only use authorized audio: clicking Companion starts local analysis and calibration. Confirm the captured output is audible, then pause. Delay is available only while paused on that same source. Typed preview uses an unverified detector.</p>}

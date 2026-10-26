@@ -1,15 +1,17 @@
 export const LEAD_AUDIO_VERSION = 'server-lead-pulse-range-v1';
 export const LEAD_AUDIO_FRAMES = 8820;
 
-export async function createLeadAudioTap({ context, source, Node = globalThis.AudioWorkletNode }) {
+export async function createLeadAudioTap({ context, source, ownership, Node = globalThis.AudioWorkletNode }) {
   if (context.sampleRate !== 44100 || !context.audioWorklet || !Node) return null;
   await context.audioWorklet.addModule(new URL('./lead-audio-worklet.js', import.meta.url));
-  const node = new Node(context, 'kora-lead-audio');
-  let packet;
+  const node = new Node(context, 'kora-lead-audio',{processorOptions:{ownership}});
+  let packet,live=true;
   node.port.onmessage = ({ data }) => {
+    if(!live)return;
     packet?.samples.fill(0);
     packet = undefined;
-    if (data.samples instanceof ArrayBuffer && data.samples.byteLength === LEAD_AUDIO_FRAMES * 2
+    if ((!ownership||['captureId','sourceId','sourceGeneration','synchronizationEpoch'].every(key=>data.ownership?.[key]===ownership[key]))
+      && data.samples instanceof ArrayBuffer && data.samples.byteLength === LEAD_AUDIO_FRAMES * 2
       && Number.isSafeInteger(data.sequence) && data.sequence > 0 && Number.isFinite(data.endTime) && data.endTime >= 0) {
       packet = { sequence: data.sequence, endTime: data.endTime, samples: new Uint8Array(data.samples) };
     }
@@ -24,9 +26,10 @@ export async function createLeadAudioTap({ context, source, Node = globalThis.Au
       for (const byte of value.samples) binary += String.fromCharCode(byte);
       const pcm = btoa(binary);
       value.samples.fill(0);
-      return { sequence: value.sequence, endTime: value.endTime, pcm };
+      return { sequence: value.sequence, endTime: value.endTime, pcm,...ownership };
     },
     stop() {
+      if(!live)return;live=false;
       packet?.samples.fill(0); packet = undefined;
       node.port.onmessage = null; node.port.close(); node.disconnect();
       try { source.disconnect(node); } catch { /* The original graph may already be closed. */ }

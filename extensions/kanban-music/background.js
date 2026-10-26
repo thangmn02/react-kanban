@@ -73,6 +73,7 @@ async function handle(message, sender) {
   }
   const session = sessions.find((item) => item.id === message.sessionId);
   if (!session) return { ok: false, error: 'unavailable' };
+  if(message.action==='beat.diagnostics')return beats.diagnostics(session,owner,message.diagnostic);
   if (message.action === 'beat.experimental.configure') {
     return { ok: await beats.configure(session, owner, message.configuration) };
   }

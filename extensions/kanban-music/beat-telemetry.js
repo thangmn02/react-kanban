@@ -8,6 +8,8 @@ const sources = new Set(['onset', 'tempo', 'random', 'lifecycle']);
 stages.add('PREVIEW_REVOKED');
 stages.add('CAPTURE_REPLACED');
 stages.add('DETECTOR_TIMING');
+stages.add('OUTPUT_ROUTE_CHANGED');
+stages.add('COMPENSATION_REVOKED');
 const types = new Set(['kick', 'snare', 'hat', 'bass', 'melodic', 'generic']);
 const origins = new Set(['event-track-cache', 'local-detector', 'capture-engine', 'native-audio-engine', 'visual-decoration']);
 const components = new Set(['capture-engine', 'offscreen', 'beat-sync', 'widget-bridge',
@@ -31,6 +33,7 @@ reasons.add('buffering');
 reasons.add('tempo-selected');
 reasons.add('semantic-duplicate'); reasons.add('priority');
 reasons.add('worker-stalled');
+reasons.add('output-device-changed');
 const finite = (n) => typeof n === 'number' && Number.isFinite(n);
 const opaque = (s) => typeof s === 'string' && /^[a-zA-Z0-9:_-]{1,160}$/.test(s);
 const canonical = (band) => ({ clap: 'snare', melody: 'melodic' })[band] || band;
@@ -51,6 +54,17 @@ export function parseBeatTraces(value) {
         ...(finite(t.targetPlaybackTime) && t.targetPlaybackTime >= 0 ? { targetPlaybackTime: t.targetPlaybackTime } : {}),
         ...(['cache', 'local', 'degraded'].includes(t.eventSource) ? { eventSource: t.eventSource } : {}),
         ...(opaque(t.eventId) ? { eventId: t.eventId } : {}),
+        ...(opaque(t.sourceId)?{sourceId:t.sourceId}:{}),
+        ...(opaque(t.synchronizationEpoch)?{synchronizationEpoch:t.synchronizationEpoch}:{}),
+        ...(Number.isSafeInteger(t.sourceGeneration)&&t.sourceGeneration>=0?{sourceGeneration:t.sourceGeneration}:{}),
+        ...(finite(t.sourceAudioTime)&&t.sourceAudioTime>=0?{sourceAudioTime:t.sourceAudioTime}:{}),
+        ...(finite(t.detectorReadyAt)&&t.detectorReadyAt>=0?{detectorReadyAt:t.detectorReadyAt}:{}),
+        ...(finite(t.configuredAudioDelayMs)&&t.configuredAudioDelayMs>=0&&t.configuredAudioDelayMs<=500?{configuredAudioDelayMs:t.configuredAudioDelayMs}:{}),
+        ...(Number.isInteger(t.originalClassIndex)&&t.originalClassIndex>=0&&t.originalClassIndex<5?{originalClassIndex:t.originalClassIndex}:{}),
+        ...(['M0','M1'].includes(t.percussionLabelMapping)?{percussionLabelMapping:t.percussionLabelMapping}:{}),
+        ...(['CNN-B','ADTOF-A'].includes(t.detectorModel)?{detectorModel:t.detectorModel}:{}),
+        ...Object.fromEntries(['frontendReadyTime','cnnInferenceStart','cnnInferenceEnd','detectorDecisionReady','workerPostTime','companionReceiveTime']
+          .filter(key=>finite(t[key])&&t[key]>=0).map(key=>[key,t[key]])),
         ...(origins.has(t.origin) ? { origin: t.origin } : {}),
         ...(opaque(t.captureId) ? { captureId: t.captureId } : {}) });
     }
@@ -62,10 +76,12 @@ export function createBeatTelemetry({ now = Date.now, limit = 2048 } = {}) {
   const capacity = Math.max(1, Math.min(2048, Math.floor(limit) || 2048));
   let enabled = false, prefix, sequence = 0, write = 0, size = 0, evicted = 0;
   const records = new Array(capacity), counts = {};
+  const listeners=new Set();
   const api = {
     enable(value = true) { enabled = value === true; },
     get enabled() { return enabled; },
     clear() { records.fill(undefined); write = size = evicted = 0; for (const key of Object.keys(counts)) delete counts[key]; },
+    subscribe(listener){listeners.add(listener);return ()=>listeners.delete(listener);},
     snapshot() { return { enabled, evicted, counts: { ...counts }, records: Array.from({ length: size }, (_, i) => ({ ...records[(write - size + i + capacity) % capacity] })) }; },
     record(stage, trace, details = {}) {
       if (!enabled || !stages.has(stage)) return;
@@ -75,10 +91,11 @@ export function createBeatTelemetry({ now = Date.now, limit = 2048 } = {}) {
         const entry = { stage, at: time, ...safe };
         if (safe?.targetClock === 'epoch-ms') entry.offsetMs = time - safe.targetTime;
         if (components.has(details.component)) entry.component = details.component;
-        for (const key of ['queueDepth', 'sequence', 'frames', 'audioTime', 'delayMs', 'durationMs', 'targetPlaybackTime', 'playbackTime', 'offsetMs']) {
+        for (const key of ['queueDepth', 'sequence', 'frames', 'audioTime', 'delayMs', 'durationMs', 'targetPlaybackTime', 'playbackTime', 'offsetMs','sourceGeneration','configuredAudioDelayMs']) {
           if (finite(details[key])) entry[key] = details[key];
         }
         if (opaque(details.captureId)) entry.captureId = details.captureId;
+        if (opaque(details.synchronizationEpoch)) entry.synchronizationEpoch=details.synchronizationEpoch;
         if (opaque(details.parentId)) entry.parentId = details.parentId;
         if (Number.isInteger(details.row) && details.row >= 1 && details.row <= 5) entry.row = details.row;
         if (Number.isInteger(details.cell) && details.cell >= 1 && details.cell <= 8) entry.cell = details.cell;
@@ -92,10 +109,10 @@ export function createBeatTelemetry({ now = Date.now, limit = 2048 } = {}) {
             if (finite(details[key]) && details[key] >= 0) entry[key] = details[key];
           }
         }
-        if(stage==='PREVIEW_REVOKED') {
+        if(stage==='PREVIEW_REVOKED'||stage==='COMPENSATION_REVOKED') {
           if(['clock','renewal'].includes(details.trigger))entry.trigger=details.trigger;
           if(['source-or-output-unproven','capture-unproven','clock-unreliable','not-playing','detector-rights-unavailable'].includes(details.previewReason))entry.previewReason=details.previewReason;
-          for(const key of ['playing','paused','seeking','buffering','captureHealthy','clockHealthy','outputOwned','singleSource'])if(typeof details[key]==='boolean')entry[key]=details[key];
+          for(const key of ['playing','paused','seeking','buffering','captureHealthy','clockHealthy','outputOwned','singleSource','compensationEligible'])if(typeof details[key]==='boolean')entry[key]=details[key];
           if(Number.isSafeInteger(details.generation)&&details.generation>=0)entry.generation=details.generation;
           if(finite(details.clockAgeMs))entry.clockAgeMs=details.clockAgeMs;
         }
@@ -115,6 +132,7 @@ export function createBeatTelemetry({ now = Date.now, limit = 2048 } = {}) {
         records[write] = entry; write = (write + 1) % capacity;
         if (size < capacity) size++; else evicted++;
         counts[stage] = (counts[stage] || 0) + 1;
+        for(const listener of listeners){try{listener({...entry});}catch{/* Observers cannot interrupt playback. */}}
       } catch { /* Diagnostics must never interrupt audio or rendering. */ }
     },
     events(source, bands, details = {}) {

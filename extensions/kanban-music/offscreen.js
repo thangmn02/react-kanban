@@ -15,15 +15,22 @@ const engine = createCaptureEngine({
   onStop: (captureId, reason) => send({ kind: 'stopped', captureId, reason,
     ...(engine.lastFailure ? { captureError: engine.lastFailure } : {}) }),
 });
+navigator.mediaDevices?.addEventListener?.('devicechange',()=>{
+  if(engine.delaySeconds>0)void engine.stop('output-device-changed');
+});
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (sender.id !== chrome.runtime.id || sender.tab || message?.target !== 'beat-offscreen') return false;
+  if(privateBeatCandidate&&message.kind==='precision-diagnostics'){respond(engine.precisionDiagnostics||{});return false;}
+  if(privateBeatCandidate&&message.kind==='label-diagnostics'){respond(engine.labelDiagnostics||{});return false;}
   if(privateBeatCandidate&&privatePercussionDiagnostics&&message.kind==='percussion-diagnostics') {respond(engine.percussionDiagnostics||{});return false;}
   if(privateBeatCandidate&&privatePercussionDiagnostics&&message.kind==='percussion-clock') {respond(engine.percussionClock||{});return false;}
   if(privateBeatCandidate&&message.kind==='diagnostics') {respond({health:engine.health,telemetry:beatTelemetry.snapshot()});return false;}
+  if(privateBeatCandidate&&message.kind==='diagnostic-capture'){respond(engine.diagnosticCapture(message.captureId,message.operation,message.recordingId,message.durationSeconds));return false;}
   if (message.kind === 'start' && typeof message.streamId === 'string') {
     beatTelemetry.enable(message.telemetryEnabled === true);
     const timeout = setTimeout(() => engine.stopCapture(message.captureId), 4000);
-    void engine.start(message.streamId, message.captureId, {candidate:message.candidate===true,sourceProvider:message.sourceProvider}).then((ok) => { clearTimeout(timeout); respond({ ok, delaySeconds: engine.delaySeconds,
+    void engine.start(message.streamId, message.captureId, {candidate:message.candidate===true,sourceProvider:message.sourceProvider,
+      sourceId:message.sourceId,sourceGeneration:message.sourceGeneration,synchronizationEpoch:message.synchronizationEpoch}).then((ok) => { clearTimeout(timeout); respond({ ok, delaySeconds: engine.delaySeconds,
       ...(!ok && engine.lastFailure ? { captureError: engine.lastFailure } : {}) }); });
     return true;
   }

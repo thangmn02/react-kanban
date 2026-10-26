@@ -3,10 +3,93 @@ import { afterEach, expect, it, vi } from 'vitest';
 import BeatPattern from './BeatPattern';
 import { effectNames, isShapeCell, momentDuration, shapeNames } from './beatVisuals';
 import { beatTelemetry } from '../../../extensions/kanban-music/beat-telemetry.js';
+import type { BrowserMusicSession } from './mediaBridge';
 
 afterEach(() => { cleanup(); beatTelemetry.enable(false); beatTelemetry.clear(); vi.restoreAllMocks(); vi.useRealTimers(); });
 const session = { id: 'song', title: 'Song', artist: '', source: '', paused: false, playing: true, currentTime: 0, sampledAt: 1000, playbackRate: 1 };
 const clock = { sessionId: 'song', mode: 'clock' as const, onsets: {} };
+it.each([210,219])('keeps a retriggered Hat flash alive when the prior decorative hold expires (%i ms spacing)',async spacing=>{
+  vi.useFakeTimers();beatTelemetry.enable();
+  const live={...clock,mode:'capture' as const,captureId:'hat-expiry',rates:{hat:1}};
+  const privateSession={...session,syncState:{mode:'capture',capability:{privateCandidate:true}}} as BrowserMusicSession;
+  const view=render(<BeatPattern session={privateSession} beat={live}/>);
+  await act(async()=>{await vi.advanceTimersByTimeAsync(0);});
+  const first=beatTelemetry.events('onset',['hat'])![0],second=beatTelemetry.events('onset',['hat'])![0];
+  view.rerender(<BeatPattern session={privateSession} beat={{...live,onsets:{hat:1},telemetry:{'onset:hat':first}}}/>);
+  await act(async()=>{await vi.advanceTimersByTimeAsync(0);});
+  await act(async()=>{await vi.advanceTimersByTimeAsync(spacing);});
+  view.rerender(<BeatPattern session={privateSession} beat={{...live,onsets:{hat:2},telemetry:{'onset:hat':second}}}/>);
+  await act(async()=>{await vi.advanceTimersByTimeAsync(0);});
+  const selector='[data-channel="hat"] .semantic-beat-flash';
+  const secondFlash=view.container.querySelector(selector);
+  expect(view.container.querySelector(selector)).toHaveAttribute('data-beat-trace',second.id);
+  await act(async()=>{await vi.advanceTimersByTimeAsync(30);});
+  expect(view.container.querySelector(selector)).toHaveAttribute('data-beat-trace',second.id);
+  expect(view.container.querySelector(selector)).toBe(secondFlash);
+  await act(async()=>{await vi.advanceTimersByTimeAsync(119);});
+  expect(view.container.querySelector(selector)).toHaveAttribute('data-beat-trace',second.id);
+  await act(async()=>{await vi.advanceTimersByTimeAsync(1);});
+  expect(view.container.querySelector(selector)).toBeNull();
+});
+it('keeps the private attack independent of row decoration, then suppresses it for an exclusive shape and source replacement',async()=>{
+  vi.useFakeTimers();beatTelemetry.enable();vi.spyOn(Math,'random').mockReturnValue(0);
+  const live={...clock,mode:'capture' as const,captureId:'private-attack',synchronizationEpoch:'a',rates:{hat:1}};
+  const playing={...session,syncState:{mode:'capture',capability:{privateCandidate:true}}} as BrowserMusicSession;
+  const view=render(<BeatPattern session={playing} beat={live}/>);
+  await act(async()=>{await vi.advanceTimersByTimeAsync(0);});
+  const trace=beatTelemetry.events('onset',['hat'])![0];
+  const hit={...live,onsets:{hat:1},telemetry:{'onset:hat':trace}};
+  view.rerender(<BeatPattern session={playing} beat={hit}/>);
+  await act(async()=>{await vi.advanceTimersByTimeAsync(0);});
+  const flash=view.container.querySelector('[data-channel="hat"] .semantic-beat-flash');
+  await act(async()=>{await vi.advanceTimersByTimeAsync(100);});
+  view.rerender(<BeatPattern session={{...playing,currentTime:36}} beat={{...hit,onsets:{hat:1,kick:1}}}/>);
+  await act(async()=>{await vi.advanceTimersByTimeAsync(0);});
+  expect(flash).not.toBeNull();
+  expect(view.container.querySelector('[data-channel="hat"] .semantic-beat-flash')).toBeNull();
+  view.rerender(<BeatPattern session={playing} beat={{...hit,synchronizationEpoch:'replacement'}}/>);
+  expect(view.container.querySelectorAll('.semantic-beat-flash')).toHaveLength(0);
+  await act(async()=>{await vi.advanceTimersByTimeAsync(200);});
+  expect(view.container.querySelectorAll('.semantic-beat-flash')).toHaveLength(0);
+});
+it('retains the non-private decorative lifetime without enabling the private repair',async()=>{
+  vi.useFakeTimers();const live={...clock,mode:'capture' as const,captureId:'normal',rates:{hat:1}};
+  const view=render(<BeatPattern session={session} beat={live}/>);
+  await act(async()=>{await vi.advanceTimersByTimeAsync(0);});
+  view.rerender(<BeatPattern session={session} beat={{...live,onsets:{hat:1}}}/>);
+  await act(async()=>{await vi.advanceTimersByTimeAsync(150);});
+  expect(view.container.querySelector('[data-channel="hat"] .onset')).not.toBeNull();
+  await act(async()=>{await vi.advanceTimersByTimeAsync(70);});
+  expect(view.container.querySelector('[data-channel="hat"] .onset')).toBeNull();
+});
+it('preserves a private attack across tempo-lock presentation changes',async()=>{
+  vi.useFakeTimers();beatTelemetry.enable();
+  const live={...clock,mode:'capture' as const,captureId:'private-tempo',rates:{hat:1}};
+  const playing={...session,syncState:{mode:'capture',capability:{privateCandidate:true}}} as BrowserMusicSession;
+  const view=render(<BeatPattern session={playing} beat={live}/>);
+  await act(async()=>{await vi.advanceTimersByTimeAsync(0);});
+  const trace=beatTelemetry.events('onset',['hat'])![0],hit={...live,onsets:{hat:1},telemetry:{'onset:hat':trace}};
+  view.rerender(<BeatPattern session={playing} beat={hit}/>);
+  await act(async()=>{await vi.advanceTimersByTimeAsync(100);});
+  const flash=view.container.querySelector('[data-channel="hat"] .semantic-beat-flash');
+  view.rerender(<BeatPattern session={playing} beat={{...hit,tempo:{locked:true,bpm:120,confidence:1}}}/>);
+  await act(async()=>{await vi.advanceTimersByTimeAsync(49);});
+  expect(view.container.querySelector('[data-channel="hat"] .semantic-beat-flash')).toBe(flash);
+  await act(async()=>{await vi.advanceTimersByTimeAsync(1);});
+  expect(view.container.querySelector('[data-channel="hat"] .semantic-beat-flash')).toBeNull();
+});
+it.each([false,true])('clears active semantic flashes when the synchronization owner changes without replacing capture (%s)',async semanticOnly=>{
+  vi.useFakeTimers();beatTelemetry.enable();
+  const base={...clock,mode:'capture' as const,captureId:'capture',synchronizationEpoch:'a',rates:{hat:1}};
+  const view=render(<BeatPattern session={session} beat={base} semanticOnly={semanticOnly}/>);
+  await act(async()=>{await vi.advanceTimersByTimeAsync(0);});
+  const trace={...beatTelemetry.events('onset',['hat'])![0],targetPlaybackTime:0,eventSource:'local' as const};
+  view.rerender(<BeatPattern session={session} beat={{...base,onsets:{hat:1},telemetry:{'onset:hat':trace}}} semanticOnly={semanticOnly}/>);
+  await act(async()=>{await vi.advanceTimersByTimeAsync(0);});
+  expect(view.container.querySelectorAll('.onset,.semantic-beat-flash').length).toBeGreaterThan(0);
+  view.rerender(<BeatPattern session={session} beat={{...base,synchronizationEpoch:'b'}} semanticOnly={semanticOnly}/>);
+  expect(view.container.querySelectorAll('.onset,.semantic-beat-flash')).toHaveLength(0);
+});
 
 it.each([false, true])('keeps normal presentation at four rows even with retained Lead data (semantic-only %s)', async semanticOnly => {
   vi.useFakeTimers();
@@ -87,7 +170,7 @@ it.each([0, 8, 16, 24])('gives an actual hit an immediate cell in every pattern 
   expect(view.container.querySelectorAll('[data-channel="bass"] .onset')).toHaveLength(0);
 });
 
-it('preserves the held decorative mask while committing a distinct immediate semantic flash', async () => {
+it('preserves the exclusive decorative mask while recording the hidden semantic identity', async () => {
   vi.useFakeTimers(); beatTelemetry.enable(); vi.spyOn(Math, 'random').mockReturnValue(0);
   const live = { ...clock, mode: 'capture' as const, captureId: 'shape-trace', rates: { kick: 1 } };
   const view = render(<BeatPattern session={session} beat={live} />);
@@ -101,15 +184,13 @@ it('preserves the held decorative mask while committing a distinct immediate sem
   await act(async () => { await vi.advanceTimersByTimeAsync(0); });
   expect([...view.container.querySelectorAll('.moment-lit')]).toEqual(mask);
   const flash = view.container.querySelector('[data-channel="hat"] .semantic-beat-flash');
-  expect(flash).toHaveAttribute('data-beat-trace', trace.id);
-  expect(flash).toHaveAttribute('data-semantic', 'true');
-  expect(flash).toHaveAttribute('data-presentation', 'semantic-hit');
+  expect(flash).toBeNull();
   for (const decoration of view.container.querySelectorAll('.moment-lit,.shape-beat-flash')) {
     expect(decoration).toHaveAttribute('data-semantic', 'false');
     expect(decoration).toHaveAttribute('data-presentation', 'decorative-shape');
     expect(decoration).not.toHaveClass('onset');
   }
-  expect(beatTelemetry.snapshot().records.some(r => r.id === trace.id && r.stage === 'EVENT_COMMITTED')).toBe(true);
+  expect(beatTelemetry.snapshot().records.some(r => r.id === trace.id && r.stage === 'EVENT_COMMITTED')).toBe(false);
 });
 
 it('animates degraded timing as decorative traces without inventing instrument counters', async () => {

@@ -75,7 +75,7 @@ export function useFocusTasks(boardData: BoardData, scope: StorageScope) {
     focusTasks.map((focusTask) => {
       const liveTask = boardData.task[focusTask.id];
 
-      if (!liveTask) {
+      if (!liveTask || (focusTask.updatedAt && (!liveTask.updatedAt || Date.parse(focusTask.updatedAt)>Date.parse(liveTask.updatedAt)))) {
         return focusTask;
       }
 
@@ -91,6 +91,7 @@ export function useFocusTasks(boardData: BoardData, scope: StorageScope) {
         dueDate: liveTask.dueDate,
         assigneeAvatar: liveTask.assignees[0]?.avatar,
         isDone: liveTask.isDone,
+        updatedAt: liveTask.updatedAt,
         repeatInterval: liveTask.repeatInterval,
         listId: liveListId || focusTask.listId,
         listTitle: liveList?.title || focusTask.listTitle,

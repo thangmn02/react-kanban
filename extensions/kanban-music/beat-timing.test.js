@@ -1,7 +1,18 @@
 import { expect, it, vi, afterEach } from 'vitest';
 import { outputTiming, audibleClock, playbackTiming, playbackPosition, parsePlaybackClock, parsePlaybackTiming } from './beat-timing.js';
+import {playbackDeadline} from './beat-timing.js';
 afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); });
 const clock = { currentTime: 12, playbackRate: 2, playing: true, paused: false, sampledAt: 10000 };
+it.each([1,2])('accounts for 170 ms exactly once through output and scheduler clocks at rate %s',rate=>{
+  vi.useFakeTimers();vi.setSystemTime(10000);vi.spyOn(performance,'now').mockReturnValue(50);
+  const context={currentTime:2,baseLatency:.01,outputLatency:.02,getOutputTimestamp:()=>({contextTime:1.97,performanceTime:50})};
+  const media={...clock,playbackRate:rate},sourceAudioTime=2;
+  const baseline=playbackTiming(media,outputTiming(context,sourceAudioTime+.03),0);
+  const compensated=playbackTiming(media,outputTiming(context,sourceAudioTime+.03+.17),.17);
+  expect(compensated.targetPlaybackTime).toBeCloseTo(baseline.targetPlaybackTime,10);
+  expect(playbackDeadline(compensated)-playbackDeadline(baseline)).toBeCloseTo(170,8);
+  expect(sourceAudioTime).toBe(2);
+});
 it('normalizes an audio output deadline into real song seconds without arrival-time substitution', () => {
   vi.useFakeTimers(); vi.setSystemTime(10000);
   const context = { currentTime: 2, baseLatency: .01, outputLatency: .02 };

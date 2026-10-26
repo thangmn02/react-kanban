@@ -100,7 +100,7 @@ function buildNextListMapWithMovedTask(
 }
 
 export function applyRealtimeTaskMutation(boardData: BoardData, taskRow: TaskRow): RealtimeTaskMutationResult {
-  if (taskRow.deleted_at) {
+  if (taskRow.deleted_at || taskRow.archived_at) {
     return {
       nextBoardData: removeTaskFromBoardData(boardData, taskRow.id),
       shouldRefreshBoardSnapshot: false,
@@ -115,6 +115,9 @@ export function applyRealtimeTaskMutation(boardData: BoardData, taskRow: TaskRow
       shouldRefreshBoardSnapshot: true,
     };
   }
+  // Stored positions may be spaced ranks, not array indices. Fetch the ordered
+  // snapshot instead of guessing where an out-of-range rank belongs.
+  if (taskRow.position > destinationList.tasks.length) return { nextBoardData: boardData, shouldRefreshBoardSnapshot: true };
 
   const nextTaskItem = mapTaskRowToTaskItem(taskRow);
   const currentTaskItem = boardData.task[taskRow.id];

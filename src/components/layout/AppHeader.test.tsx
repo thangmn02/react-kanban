@@ -1,3 +1,4 @@
+import { MemoryRouter } from 'react-router-dom';
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { I18nProvider } from '../../i18n';
@@ -16,13 +17,13 @@ const props = {
 };
 it.each([['en', 'Download Kora for Windows'], ['vi', 'Tải Kora cho Windows']])('offers a labeled installer download in %s', (language, label) => {
   localStorage.setItem('app.language', language);
-  render(<I18nProvider><AppHeader {...props} /></I18nProvider>);
+  render(<MemoryRouter><I18nProvider><AppHeader {...props} /></I18nProvider></MemoryRouter>);
   const download = screen.getByRole('link', { name: label });
   expect(download).toHaveAttribute('href', '/downloads/Kora-setup.exe');
   expect(download).toHaveAttribute('download', 'Kora-setup.exe');
 });
 it('does not offer a download inside the installed app', () => {
   native.enabled = true;
-  render(<I18nProvider><AppHeader {...props} /></I18nProvider>);
+  render(<MemoryRouter><I18nProvider><AppHeader {...props} /></I18nProvider></MemoryRouter>);
   expect(screen.queryByRole('link', { name: /Download Kora/ })).toBeNull();
 });

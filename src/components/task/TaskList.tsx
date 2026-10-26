@@ -6,6 +6,8 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { useReducedMotion } from 'framer-motion';
+import { sortableTransition } from '../../shared/motion';
 
 import type { BoardDeleteItem, IListItem, ITaskItem } from '../../types/task.type';
 import type { WorkspaceMember } from '../../types/auth.type';
@@ -46,6 +48,7 @@ function TaskList({
   isFinalActiveColumn = false,
 }: TaskListProps) {
   const { t } = useI18n();
+  const reducedMotion = useReducedMotion();
   const taskIds = tasks.map(task => task.id);
   const isCompletedColumn = /^(done|completed|hoàn thành|đã xong)$/i.test(listItem.title.trim());
   const status = columnStatusColor(tasks, isFinalActiveColumn);
@@ -63,10 +66,7 @@ function TaskList({
       type: 'list',
       listId: listItem.id,
     },
-    transition: {
-      duration: 250,
-      easing: 'cubic-bezier(0.25, 1, 0.5, 1)',
-    },
+    transition: reducedMotion ? null : sortableTransition,
   });
 
   const { setNodeRef: setTaskAreaNodeRef } = useDroppable({
@@ -85,6 +85,7 @@ function TaskList({
 
   return (
     <div
+      data-list-id={listItem.id}
       ref={isOverlay ? undefined : setNodeRef}
       style={style}
       className={`group/list flex max-h-[85vh] w-80 flex-shrink-0 flex-col rounded-2xl border border-slate-200/80 bg-white p-4 shadow-card ring-1 ring-slate-900/[0.02] transition-[box-shadow,border,background,opacity] duration-200 ${

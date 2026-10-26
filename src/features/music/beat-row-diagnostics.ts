@@ -12,7 +12,7 @@ export interface CellFlash {
   eventId: string; traceId: string; type: string; source: string;
   targetPlaybackTime: number | null; actualRenderTime: number; row: number | null; cell: number | null;
   presentation: 'semantic-hit' | 'decorative-cell' | 'decorative-shape' | 'decorative-global';
-  semantic: boolean; origin: string; stage: 'commit' | 'animation'; mode: 'normal' | 'semantic-only';
+  semantic: boolean; origin: string; stage: 'commit' | 'animation' | 'frame'; mode: 'normal' | 'semantic-only';
   captureId?: string;
   parentId?: string;
 }
@@ -69,10 +69,15 @@ export const beatRowDiagnostics = {
     startTime = Date.now(); endTime = startTime + (duration + (playbackRange ? 10 : 0)) * 1000;
   },
   stop() { endTime = Math.min(endTime, Date.now()); },
+  alignWindow(start:number,end:number){
+    if(!Number.isFinite(start)||!Number.isFinite(end)||end<=start||end-start>100000)throw Error('Invalid diagnostic window');
+    startTime=start;endTime=end;
+  },
   snapshot(mode?: CellFlash['mode']) {
     const rows = Object.fromEntries(semanticRows.map(row => [row, [] as CellFlash[]])) as Record<EventRow, CellFlash[]>;
     const seen = new Set<string>();
     for (const flash of flashes) {
+      if(flash.actualRenderTime<startTime||flash.actualRenderTime>=endTime)continue;
       if (mode && flash.mode !== mode) continue;
       if (!flash.semantic || flash.stage !== 'commit' || !semanticRows.includes(flash.type as EventRow)) continue;
       // Multiple cells/animations of one attack are not additional detections.

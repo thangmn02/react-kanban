@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
+import { useRetainedViewState } from '../../app/view-context';
 import { format, parseISO } from 'date-fns';
 
 import type { BoardData, ITaskItem } from '../../types/task.type';
@@ -12,8 +13,11 @@ import {
 } from '../../utils/boardTableRows';
 import EmptyState from '../atoms/EmptyState';
 import { useI18n } from '../../i18n';
+import type { WorkspaceMember } from '../../types/auth.type';
+import { resolveAssigneeIdentity } from '../../utils/workspaceMembers';
 
 interface TableViewProps {
+  workspaceMembers?:WorkspaceMember[];
   boardData: BoardData;
   searchQuery: string;
   filterPriority: string;
@@ -31,6 +35,7 @@ function formatUpdatedAt(value: string): string {
 }
 
 function TableView({
+  workspaceMembers=[],
   boardData,
   searchQuery,
   filterPriority,
@@ -39,8 +44,8 @@ function TableView({
   onOpenTask,
 }: TableViewProps) {
   const { t } = useI18n();
-  const [sortKey, setSortKey] = useState<TableSortKey>('dueDate');
-  const [sortDirection, setSortDirection] = useState<TableSortDirection>('asc');
+  const [sortKey, setSortKey] = useRetainedViewState<TableSortKey>('table-sort', () => 'dueDate');
+  const [sortDirection, setSortDirection] = useRetainedViewState<TableSortDirection>('table-direction', () => 'asc');
 
   const rows = useMemo(() => {
     const allRows = buildBoardTableRows(boardData);
@@ -102,7 +107,7 @@ function TableView({
 
   return (
     <div className="bg-canvas p-6">
-      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-card">
+      <div data-scroll-key="table" className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-card">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-left">
             <tr>
@@ -116,6 +121,7 @@ function TableView({
           </thead>
           <tbody className="divide-y divide-slate-100">
             {rows.map((row) => {
+              const displayedAssignee=row.task.assignees[0]?resolveAssigneeIdentity(row.task.assignees[0],workspaceMembers):null;
               const dueMeta = getDueDateStatus(row.dueDate, row.isDone);
               const priorityClass = getPriorityBadgeClass(row.priority) || '';
               return (
@@ -125,9 +131,9 @@ function TableView({
                   className="cursor-pointer transition hover:bg-slate-50"
                 >
                   <td className="px-4 py-3">
-                    <span className={`font-medium ${row.isDone ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
+                    <button type="button" onClick={event => { event.stopPropagation(); onOpenTask(row.task); }} className={`cursor-pointer rounded text-left font-medium focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600 ${row.isDone ? 'text-slate-500 line-through' : 'text-slate-800'}`}>
                       {row.title}
-                    </span>
+                    </button>
                   </td>
                   <td className="px-4 py-3 text-slate-600">{row.status}</td>
                   <td className="px-4 py-3">
@@ -135,12 +141,12 @@ function TableView({
                       <div className="flex items-center gap-2">
                         {row.assigneeAvatar && (
                           <img
-                            src={row.assigneeAvatar}
-                            alt={row.assigneeName}
+                            src={displayedAssignee?.avatar||row.assigneeAvatar}
+                            alt={displayedAssignee?.name||row.assigneeName}
                             className="h-6 w-6 rounded-full object-cover"
                           />
                         )}
-                        <span className="text-slate-700">{row.assigneeName}</span>
+                        <span className="text-slate-700">{displayedAssignee?.name||row.assigneeName}</span>
                       </div>
                     ) : (
                       <span className="text-slate-400">—</span>

@@ -9,6 +9,7 @@ import type { FocusSessionValue } from '../features/focus/useFocusSessionControl
 import type { AppUser, WorkspaceInvite, WorkspaceMember, WorkspaceSummary } from '../types/auth.type';
 import type { OnboardingSetupValues } from '../types/onboarding.type';
 import type { TodayTaskSummary } from '../services/today.service';
+import type { ITaskItem } from '../types/task.type';
 import { readReturnTo } from './auth-routing';
 
 interface Params {
@@ -52,6 +53,13 @@ export function useAppLayoutRouteContextValue(params: Params): AppLayoutRouteCon
   const returnTo = readReturnTo(routing.location.search, routing.location.state);
   const taskAction = (action: () => void) => () => {
     if (routing.requireFeature('/tasks')) action();
+  };
+  const openBoardTask = (task: ITaskItem) => {
+    params.taskEditor.openEditTaskDialog(task);
+    const query = new URLSearchParams(routing.location.search);
+    query.set('task', task.id);
+    if (board.activeBoardId) query.set('taskBoard', board.activeBoardId);
+    routing.navigate(`${routing.location.pathname}?${query}${routing.location.hash}`);
   };
 
   return {
@@ -110,6 +118,7 @@ export function useAppLayoutRouteContextValue(params: Params): AppLayoutRouteCon
       onOpenBoard: board.handleOpenBoardFromHome,
       onToggleFocusTask: focus.handleToggleFocusTaskFromHome,
       onStartFocusTask: focus.handleStartFocusTaskFromHome,
+      onCompleteTask: (task) => params.onMarkFocusDone({ ...task, priority: task.priority ?? undefined, dueDate: task.dueDate ?? undefined }),
       onPlanFocusTasks: focus.handlePlanFocusTasksFromHome,
       isFocusTask: focus.isFocusTask,
       currentUser: params.user,
@@ -131,6 +140,8 @@ export function useAppLayoutRouteContextValue(params: Params): AppLayoutRouteCon
       onOpenTask: params.handleOpenTaskFromToday,
       onStartFocus: focus.handleStartFocusTaskFromToday,
       onToggleTodayFocus: focus.handleToggleFocusTaskFromToday,
+      onCompleteTask: (task) => params.onMarkFocusDone({ ...task, priority: task.priority ?? undefined, dueDate: task.dueDate ?? undefined }),
+      taskRevision: board.boardData.task,
       onQuickCreateTask: board.handleQuickAddTask,
     },
     board: {
@@ -180,7 +191,7 @@ export function useAppLayoutRouteContextValue(params: Params): AppLayoutRouteCon
         filters: { searchQuery: board.searchQuery, priority: board.filterPriority, assignee: board.filterAssignee, dueDate: board.filterDueDate },
         ui: { openMenuId: board.openMenuId, toggleMenu: board.toggleMenu },
         handlers: {
-          onEditTask: params.taskEditor.openEditTaskDialog,
+          onEditTask: openBoardTask,
           onDeleteItem: board.setDeleteItem,
           onOpenAddTask: params.taskEditor.openCreateTaskDialog,
           onOpenAddGroup: params.boardDialogs.openGroupDialog,
@@ -192,8 +203,8 @@ export function useAppLayoutRouteContextValue(params: Params): AppLayoutRouteCon
         workspaceMembers: params.workspaceMembers,
         activeBoardId: board.activeBoardId,
       },
-      calendar: { boardData: board.boardData, searchQuery: board.searchQuery, filterPriority: board.filterPriority, filterAssignee: board.filterAssignee, filterDueDate: board.filterDueDate, onOpenTask: params.taskEditor.openEditTaskDialog },
-      table: { boardData: board.boardData, searchQuery: board.searchQuery, filterPriority: board.filterPriority, filterAssignee: board.filterAssignee, filterDueDate: board.filterDueDate, onOpenTask: params.taskEditor.openEditTaskDialog },
+      calendar: { boardData: board.boardData, searchQuery: board.searchQuery, filterPriority: board.filterPriority, filterAssignee: board.filterAssignee, filterDueDate: board.filterDueDate, onOpenTask: openBoardTask },
+      table: { workspaceMembers: params.workspaceMembers, boardData: board.boardData, searchQuery: board.searchQuery, filterPriority: board.filterPriority, filterAssignee: board.filterAssignee, filterDueDate: board.filterDueDate, onOpenTask: openBoardTask },
       empty: { workspaceName: params.activeWorkspace?.name, onCreateBoard: params.boardDialogs.openCreateBoardDialog },
     },
   };

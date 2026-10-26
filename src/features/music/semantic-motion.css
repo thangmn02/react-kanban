@@ -1,0 +1,51 @@
+/* Opal Bloom: fixed material, moving reflective bands and a clipped white rim. */
+.music-pattern.semantic-motion { --motion-surface:#e2e6e8; --motion-border:#d0d7dc; --opal-rim:.78; --opal-depth:.12; --opal-bloom:.42; isolation:isolate; }
+.ultraviolet .semantic-motion, [data-theme='dark'] .semantic-motion, .dark .semantic-motion { --motion-surface:#27313b; --motion-border:#3b4a55; }
+.music-pattern.semantic-motion .beat-channel { color:var(--instrument-color); }
+.music-pattern.semantic-motion .channel-icon { opacity:1; font-size:16px; text-align:center; line-height:1; }
+.music-pattern.semantic-motion .beat-square {
+  background:var(--motion-surface); border:1px solid var(--motion-border);
+  overflow:clip; contain:paint; isolation:isolate; animation:none; transition:none; transform:none; box-shadow:none;
+}
+.instrument-motion-layer { position:absolute; inset:0; box-sizing:border-box; border-radius:inherit; pointer-events:none; opacity:0; transform-origin:center; }
+.semantic-motion .motion-body {
+  background:radial-gradient(ellipse at 36% 18%,rgba(255,255,255,var(--opal-bloom)),transparent 68%),
+    linear-gradient(155deg,rgba(255,255,255,.28),transparent 42%,rgba(23,25,52,var(--opal-depth))),
+    conic-gradient(from 207deg at 46% 48%,var(--opal-3),var(--opal-2),var(--opal-4),var(--opal-1),var(--opal-3));
+}
+.semantic-motion .motion-edge {
+  inset:-25%; border-radius:0;
+  background:linear-gradient(117deg,transparent 0 20%,rgba(255,255,255,.78) 21% 26%,transparent 27% 47%,rgba(255,255,255,.47) 48% 50%,transparent 51% 80%,rgba(255,255,255,.4) 81% 84%,transparent 85%);
+  mix-blend-mode:screen;
+}
+.semantic-motion .motion-rim {
+  border:1px solid rgba(255,255,255,var(--opal-rim)); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--instrument-color) 42%,white);
+  background:radial-gradient(ellipse at 36% 38%,rgba(255,255,255,var(--opal-bloom)),transparent 66%);
+}
+.semantic-motion [data-motion-band='kick'] { --opal-bloom:.72; }
+.semantic-motion [data-motion-band='clap'] { --opal-bloom:.48; }
+.semantic-motion [data-motion-band='hat'] { --opal-bloom:.27; }
+.semantic-motion [data-motion-band='bass'] { --opal-bloom:.34; }
+.semantic-motion [data-motion-band='melody'] { --opal-bloom:.38; }
+.semantic-motion[data-opal-variant='high-contrast'] { --motion-surface:#d5dce1; --motion-border:#bac6cf; --opal-rim:1; --opal-depth:.32; }
+.ultraviolet .semantic-motion[data-opal-variant='high-contrast'],[data-theme='dark'] .semantic-motion[data-opal-variant='high-contrast'],.dark .semantic-motion[data-opal-variant='high-contrast'] { --motion-surface:#202a34; --motion-border:#495a68; }
+.semantic-motion[data-opal-variant='high-contrast'] .motion-body {
+  background:radial-gradient(ellipse at 32% 18%,rgba(255,255,255,.54),transparent 48%),
+    linear-gradient(160deg,transparent 28%,rgba(16,20,48,var(--opal-depth))),
+    conic-gradient(from 207deg at 46% 48%,var(--opal-3) 0deg,var(--opal-2) 65deg,var(--opal-4) 152deg,var(--opal-1) 245deg,var(--opal-3) 360deg);
+}
+.semantic-motion[data-opal-variant='high-contrast'] .motion-rim { border-width:2px; box-shadow:inset 0 0 0 1px var(--instrument-color); }
+.semantic-motion[data-opal-variant='high-contrast'] [data-motion-band='kick'] { --opal-bloom:.92; }
+.semantic-motion [data-reduced-marker]::after { content:''; position:absolute; inset:auto 25% 4px; height:2px; background:var(--instrument-color); border-radius:2px; }
+.semantic-motion[data-motion-reduced='true'] .instrument-motion-layer { display:none; }
+.music-motion-controls { display:flex; align-items:center; flex-wrap:wrap; gap:8px 14px; margin:0 0 12px; font-size:11px; }
+.music-motion-controls label { display:flex; align-items:center; gap:6px; }
+.music-motion-controls select { max-width:150px; border:1px solid var(--border,#d6d9e0); border-radius:6px; background:var(--surface,#fff); color:inherit; padding:4px 6px; }
+.music-motion-controls .motion-legacy { font-size:11px; padding:4px 6px; }
+.motion-reduction-note { margin:4px 0 10px; font-size:11px; color:inherit; opacity:.75; }
+@media(prefers-reduced-motion:reduce) { .semantic-motion .instrument-motion-layer { display:none; } }
+@media(forced-colors:active) {
+  .semantic-motion .instrument-motion-layer { display:none; }
+  .music-pattern.semantic-motion .beat-square { background:Canvas; border-color:GrayText; }
+  .semantic-motion [data-reduced-marker]::after { background:CanvasText; }
+}

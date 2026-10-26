@@ -88,6 +88,7 @@ export function useFocusTaskHandlers({
   }, [buildFocusTaskInput, t, toggleFocusTask]);
 
   const handleStartFocusTask = useCallback((task: ITaskItem) => {
+    if (task.isDone) return;
     const focusTaskInput = buildFocusTaskInput(task);
 
     if (!focusTaskInput) {
@@ -236,6 +237,7 @@ export function useFocusTaskHandlers({
   }, [buildFocusTaskInputFromTodayTask, t, toggleFocusTask]);
 
   const handleStartFocusTaskFromToday = useCallback((taskSummary: TodayTaskSummary) => {
+    if (taskSummary.isDone || boardData.task[taskSummary.id]?.isDone) return;
     if (!isFocusTask(taskSummary.id)) {
       const didPinTask = pinFocusTask(buildFocusTaskInputFromTodayTask(taskSummary));
 
@@ -248,6 +250,7 @@ export function useFocusTaskHandlers({
     setIsFocusDockCollapsed(false);
     startFocusTimer(taskSummary.id);
   }, [
+    boardData.task,
     buildFocusTaskInputFromTodayTask,
     isFocusTask,
     pinFocusTask,

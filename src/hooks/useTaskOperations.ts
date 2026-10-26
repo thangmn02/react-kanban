@@ -1,3 +1,6 @@
+import { useEffect, useRef } from 'react';
+import { transitionTaskWorkflow } from '../services/task-workflow.service';
+import { resolveTaskWorkflow, workflowCompletionState } from '../features/task/model/task-workflow';
 import type { Dispatch, SetStateAction } from 'react';
 import { notify } from '../components/organisms/toast/notify';
 
@@ -19,8 +22,6 @@ import {
   deleteTasksByListId,
   restoreTask,
   updateTask,
-  createNextRecurringTaskOccurrence,
-  updateTaskPositions,
   RecurrenceSchemaError,
   AttachmentSchemaError,
 } from '../services/task.service';
@@ -33,7 +34,6 @@ import {
 import { showUndoToast } from '../components/organisms/toast/showUndoToast';
 import {
   buildChangedListPositionPayload,
-  buildChangedTaskPositionPayload,
 } from '../features/task/model/taskPositions';
 
 interface BoardChangeActivity {
@@ -63,6 +63,7 @@ export interface UseTaskOperationsResult {
   onSubmitQuickPlan: (formData: QuickPlanFormData) => Promise<void>;
   onSubmitEditTask: (formData: TaskDialogFormData) => Promise<void>;
   handleDeleteConfirm: () => Promise<void>;
+  handleTaskWorkflow: (taskId: string, done: boolean) => Promise<boolean>;
   handleUpdateTask: (taskId: string, fields: Partial<ITaskItem>) => Promise<void>;
   handleBoardPositionChange: (
     nextBoardData: BoardData,
@@ -76,7 +77,6 @@ export function useTaskOperations({
   setBoardData,
   activeBoardId,
   activeWorkspaceId,
-  syncBoardCache,
   setIsSavingBoard,
   userId,
   deleteItem,
@@ -88,11 +88,37 @@ export function useTaskOperations({
   onTaskCompleted,
 }: UseTaskOperationsParams): UseTaskOperationsResult {
   const { t } = useI18n();
+  const pendingWorkflow = useRef(new Set<string>());
+  const scope = `${userId}:${activeWorkspaceId}`;
+  const latestScope = useRef(scope);
+  useEffect(() => { latestScope.current = scope; }, [scope]);
+  const handleTaskWorkflow = async (taskId: string, done: boolean) => {
+    if (!activeBoardId || pendingWorkflow.current.has(taskId)) return false;
+    pendingWorkflow.current.add(taskId);
+    const requestScope = scope;
+    try {
+      const result = await transitionTaskWorkflow({ taskId, boardId: activeBoardId, workspaceId: activeWorkspaceId, kind: done ? 'complete' : 'reopen' });
+      if (latestScope.current !== requestScope) return false;
+      await refreshBoardData();
+      if(latestScope.current!==requestScope)return false;
+      if (result.completedTransition) onTaskCompleted?.();
+      return true;
+    } catch (error) {
+      if (latestScope.current === requestScope) {
+        await refreshBoardData();
+        if(latestScope.current!==requestScope)return false;
+        notify.error(error instanceof Error ? error.message : 'Task transition failed.');
+      }
+      return false;
+    } finally { pendingWorkflow.current.delete(taskId); }
+  };
+
   const taskErrorMessage = (error: unknown, fallback: string) => error instanceof RecurrenceSchemaError
     ? t('toast.recurrenceNeedsDatabaseUpdate') : error instanceof AttachmentSchemaError
       ? t('toast.attachmentsNeedDatabaseUpdate') : dataErrorMessage(error, fallback);
 
   const onSubmitQuickPlan = async (formData: QuickPlanFormData) => {
+    const requestScope = scope;
     if (!activeBoardId || !formData.targetListId) return;
 
     const targetList = boardData.list[formData.targetListId];
@@ -131,6 +157,7 @@ export function useTaskOperations({
 
     try {
       for (const [index, plannedTask] of plannedTasks.entries()) {
+        if(latestScope.current!==requestScope)return;
         try {
           const createdTask = await createTask({
             ...buildTaskInsertPayload({
@@ -161,6 +188,7 @@ export function useTaskOperations({
             console.error('Failed to create Quick Plan activity:', activityError);
           }
         } catch (error) {
+      if(latestScope.current!==requestScope)return;
           failureCount += 1;
           if (!firstErrorMessage) {
             firstErrorMessage = taskErrorMessage(error, t('toast.unableCreateTasks'));
@@ -168,7 +196,9 @@ export function useTaskOperations({
         }
       }
 
+      if(latestScope.current!==requestScope)return;
       await refreshBoardData();
+      if(latestScope.current!==requestScope)return;
 
       if (failureCount > 0) {
         notify.warning(
@@ -187,14 +217,16 @@ export function useTaskOperations({
         plural: successCount === 1 ? '' : 's',
       }));
     } catch (error) {
+      if(latestScope.current!==requestScope)return;
       const message = taskErrorMessage(error, t('toast.unableFinishQuickPlan'));
       notify.error(message);
     } finally {
-      setIsSavingBoard(false);
+      if(latestScope.current===requestScope)setIsSavingBoard(false);
     }
   };
 
   const onSubmitCard = async (formData: TaskDialogFormData) => {
+    const requestScope = scope;
     if (!activeListId || !activeBoardId || !boardData.list[activeListId]) {
       notify.error(t('toast.chooseValidTargetList'));
       return;
@@ -235,20 +267,24 @@ export function useTaskOperations({
         actorId: userId,
       });
 
+      if(latestScope.current!==requestScope)return;
       await refreshBoardData();
+      if(latestScope.current!==requestScope)return;
       closeTaskDialog();
       notify.success(t('toast.cardAdded'));
     } catch (error) {
+      if(latestScope.current!==requestScope)return;
       const message = taskErrorMessage(error, t('toast.unableAddTask'));
       console.error('[tasks] Create failed:', message,
         error && typeof error === 'object' && 'code' in error ? String(error.code) : '');
       notify.error(message);
     } finally {
-      setIsSavingBoard(false);
+      if(latestScope.current===requestScope)setIsSavingBoard(false);
     }
   };
 
   const onSubmitEditTask = async (formData: TaskDialogFormData) => {
+    const requestScope = scope;
     if (!editingTask || !activeBoardId) return;
 
     setIsSavingBoard(true);
@@ -318,30 +354,38 @@ export function useTaskOperations({
         actorId: userId,
       });
 
+      if(latestScope.current!==requestScope)return;
       await refreshBoardData();
+      if(latestScope.current!==requestScope)return;
       closeTaskDialog();
       notify.success(t('toast.taskUpdated'));
     } catch (error) {
+      if(latestScope.current!==requestScope)return;
       const message = taskErrorMessage(error, t('toast.unableUpdateTask'));
 
       notify.error(message);
     } finally {
-      setIsSavingBoard(false);
+      if(latestScope.current===requestScope)setIsSavingBoard(false);
     }
   };
 
   const handleRestoreTask = async (taskId: string) => {
+    const requestScope = scope;
     try {
       await restoreTask(taskId);
+      if(latestScope.current!==requestScope)return;
       await refreshBoardData();
+      if(latestScope.current!==requestScope)return;
       notify.success(t('toast.taskRestored'));
     } catch (error) {
+      if(latestScope.current!==requestScope)return;
       const message = taskErrorMessage(error, t('toast.unableRestoreTask'));
       notify.error(message);
     }
   };
 
   const handleDeleteConfirm = async () => {
+    const requestScope = scope;
     if (!deleteItem) return;
 
     const previousBoardData = boardData;
@@ -430,7 +474,9 @@ export function useTaskOperations({
         await deleteTask(itemToDelete.cardId);
       }
 
+      if(latestScope.current!==requestScope)return;
       await refreshBoardData();
+      if(latestScope.current!==requestScope)return;
 
       if (itemToDelete.type === 'list') {
         notify.success(t('toast.listDeleted'));
@@ -441,14 +487,14 @@ export function useTaskOperations({
         });
       }
     } catch (error) {
-      // Rollback optimistic update on error
-      setBoardData(previousBoardData);
-      syncBoardCache(activeBoardId, previousBoardData);
+      if(latestScope.current!==requestScope)return;
+      await refreshBoardData();
+      if(latestScope.current!==requestScope)return;
 
       const message = taskErrorMessage(error, t('toast.unableDeleteItem', { type: itemToDelete.type }));
       notify.error(message);
     } finally {
-      setIsSavingBoard(false);
+      if(latestScope.current===requestScope)setIsSavingBoard(false);
     }
   };
 
@@ -458,9 +504,16 @@ export function useTaskOperations({
     activity?: BoardChangeActivity,
   ) => {
     const previousBoardData = boardData;
+    const requestScope = scope;
 
-    setBoardData(nextBoardData);
-    syncBoardCache(activeBoardId, nextBoardData);
+    const policy=resolveTaskWorkflow(nextBoardData.columns.map((id,position)=>({id,title:nextBoardData.list[id].title,position})));
+    const movingId=changeType==='task'?activity?.taskId:null;
+    const destination=movingId?nextBoardData.columns.find(id=>nextBoardData.list[id].tasks.includes(movingId)):undefined;
+    const optimistic=movingId&&nextBoardData.task[movingId]?{...nextBoardData,task:{...nextBoardData.task,[movingId]:{...nextBoardData.task[movingId],
+      isDone:workflowCompletionState('move',policy.doneListId,destination,Boolean(nextBoardData.task[movingId].isDone))}}}:nextBoardData;
+    setBoardData(optimistic);
+    // Status and position share one optimistic projection; failures reconcile.
+    setIsSavingBoard(true);
 
     try {
       if (changeType === 'list') {
@@ -470,37 +523,35 @@ export function useTaskOperations({
           await updateListPositions(listPositions);
         }
       } else {
-        const taskPositions = buildChangedTaskPositionPayload(previousBoardData, nextBoardData);
-
-        if (taskPositions.length > 0) {
-          await updateTaskPositions(taskPositions);
-
-          if (activity) {
-            try {
-              await createActivity(activity.taskId, 'move', {
-                description: activity.description,
-              }, undefined, undefined, {
-                workspaceId: activeWorkspaceId,
-                boardId: activeBoardId,
-                actorId: userId,
-              });
-            } catch (activityError) {
-              console.error('Failed to create move activity:', activityError);
-            }
-          }
-        }
+        const taskId = activity?.taskId;
+        if (!taskId || !activeBoardId) throw new Error('Task move has no task identity.');
+        const source = previousBoardData.columns.find(id => previousBoardData.list[id].tasks.includes(taskId));
+        const destination = nextBoardData.columns.find(id => nextBoardData.list[id].tasks.includes(taskId));
+        if (!source || !destination) throw new Error('Task move has no valid destination.');
+        const result = await transitionTaskWorkflow({ taskId, boardId: activeBoardId, workspaceId: activeWorkspaceId, kind: 'move',
+          destinationListId: destination, destinationIndex: nextBoardData.list[destination].tasks.indexOf(taskId), expectedListId: source,
+          expectedUpdatedAt: previousBoardData.task[taskId]?.updatedAt });
+        if (latestScope.current !== requestScope) return;
+        if (result.completedTransition) onTaskCompleted?.();
+        await refreshBoardData();
       }
     } catch (error) {
-      setBoardData(previousBoardData);
-      syncBoardCache(activeBoardId, previousBoardData);
+      if (latestScope.current !== requestScope) return;
+      await refreshBoardData();
+      if(latestScope.current!==requestScope)return;
 
       const message = taskErrorMessage(error, t('toast.unableSaveDragDrop'));
       notify.error(message);
+    } finally {
+      if(latestScope.current===requestScope)setIsSavingBoard(false);
     }
   };
 
   const handleUpdateTask = async (taskId: string, fields: Partial<ITaskItem>) => {
+    if (fields.isDone !== undefined) { await handleTaskWorkflow(taskId, fields.isDone); return; }
     const previousBoardData = boardData;
+    const requestScope = scope;
+    setIsSavingBoard(true);
 
     // Instant local UI feedback (optimistic update)
     setBoardData(prev => {
@@ -521,7 +572,7 @@ export function useTaskOperations({
     try {
       const payload = buildTaskFieldUpdatePayload(fields);
 
-      const updatedTask = await updateTask(taskId, payload);
+      await updateTask(taskId, payload);
 
       const originalTask = previousBoardData.task[taskId];
       if (originalTask) {
@@ -553,31 +604,15 @@ export function useTaskOperations({
             });
           }
         }
-        if ('isDone' in fields && fields.isDone !== originalTask.isDone) {
-          await createActivity(taskId, 'status_change', {
-            description: fields.isDone ? 'Marked task as completed' : 'Marked task as incompleted',
-            field: 'isDone',
-            oldValue: originalTask.isDone,
-            newValue: fields.isDone
-          }, undefined, undefined, {
-            workspaceId: activeWorkspaceId,
-            boardId: activeBoardId,
-            actorId: userId,
-          });
 
-          if (fields.isDone) {
-            const nextOccurrence = !originalTask.isDone ? await createNextRecurringTaskOccurrence(updatedTask) : null;
-            if (nextOccurrence) await refreshBoardData();
-            onTaskCompleted?.();
-          }
-        }
       }
     } catch (error) {
-      setBoardData(previousBoardData);
-      syncBoardCache(activeBoardId, previousBoardData);
+      if (latestScope.current !== requestScope) return;
+      await refreshBoardData();
+      if(latestScope.current!==requestScope)return;
       const message = taskErrorMessage(error, t('toast.unableUpdateTask'));
       notify.error(message);
-    }
+    } finally { if(latestScope.current === requestScope)setIsSavingBoard(false); }
   };
 
   return {
@@ -587,5 +622,6 @@ export function useTaskOperations({
     handleDeleteConfirm,
     handleUpdateTask,
     handleBoardPositionChange,
+    handleTaskWorkflow,
   };
 }

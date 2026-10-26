@@ -1,7 +1,9 @@
 import { beatTelemetry } from './beat-telemetry.js';
+import {precisionConfiguration} from './semantic-precision-guards.js';
+import {validateHatLabelMode} from './percussion-label-contract.js';
 const telemetry = beatTelemetry.at('percussion-classifier');
 
-export async function createPercussionRuntime({ context, source, onEvent, signal, onDiagnostic, classifier, onFailure = () => {}, onProgress = () => {} }) {
+export async function createPercussionRuntime({ context, source, onEvent, signal, ownership, onDiagnostic, onCaptureDiagnostic, semanticPrecisionGuards={mode:'off'},hatLabelMapping='off', classifier, onFailure = () => {}, onProgress = () => {} }) {
   if (signal?.aborted || !context.audioWorklet || typeof AudioWorkletNode === 'undefined') return null;
   let live = true, worker, node, watchdog, timeout, pendingSince;
   let submittedTime = -Infinity;
@@ -15,6 +17,7 @@ export async function createPercussionRuntime({ context, source, onEvent, signal
     loadingAbort.abort(); resolveReady(false); resolveCancelled(null);
     worker?.terminate();
     if (node) node.port.onmessage = null;
+    node?.port.close?.();
     node?.disconnect();
     signal?.removeEventListener('abort', stop);
     if (node) { try { source.disconnect(node); } catch { /* Graph may already be closed. */ } }
@@ -34,17 +37,26 @@ export async function createPercussionRuntime({ context, source, onEvent, signal
     const response = await fetch(new URL('./generated/percussion/percussion.json', import.meta.url), { signal: loadingAbort.signal });
     if (!live || !response.ok) return null;
     const config = await response.json();
+    config.semanticPrecisionGuards=precisionConfiguration(semanticPrecisionGuards);
+    config.hatLabelMapping=validateHatLabelMode(hatLabelMapping);
     if (['onset-guided','local-prominence','early-finalization'].includes(classifier)) config.classifier = classifier;
     if (!live || context.sampleRate !== config.sampleRate || config.version !== 1 || config.bins !== 84) return null;
     // Raw activations are private, explicitly requested diagnostics only.
-    config.diagnostics = typeof onDiagnostic === 'function';
+    config.diagnostics = typeof onDiagnostic === 'function'||config.semanticPrecisionGuards.mode!=='off'||config.hatLabelMapping!=='off';
     // Timing-only instrumentation never requests raw scores or feature arrays.
     config.telemetry = beatTelemetry.enabled;
+    if(ownership)config.ownership={...ownership};
+    const owns = data => !ownership || ['captureId','sourceId','sourceGeneration','synchronizationEpoch']
+      .every(key=>data.ownership?.[key]===ownership[key]);
     worker = new Worker(new URL('./percussion-worker.js', import.meta.url), { type: 'module' });
     const ready = new Promise(resolve => { resolveReady = resolve; });
     worker.onerror = () => fail();
     worker.onmessage = ({ data }) => {
-      if (!live) return;
+      if (!live || !owns(data)) return;
+      if(data.diagnosticRecordingId&&onCaptureDiagnostic){
+        try{onCaptureDiagnostic({...data,mainThreadReceivedAt:Date.now(),receivedAudioTime:context.currentTime});}
+        catch{/* Recording cannot interrupt event delivery. */}
+      }
       if (data.kind === 'ready') resolveReady(true);
       if (data.kind === 'failed') fail();
       if (data.kind === 'backlog') telemetry.record('EVENT_DROPPED', undefined, { reason: 'worker-backlog' });
@@ -54,11 +66,14 @@ export async function createPercussionRuntime({ context, source, onEvent, signal
         onProgress();
         telemetry.record('WORKER_BATCH', undefined, { ...data.timing, queueDepth: data.queueDepth, durationMs: data.durationMs,
           receivedAt: config.telemetry ? Date.now() : undefined });
-        if (config.diagnostics) {
+        if (config.diagnostics&&onDiagnostic) {
           try { onDiagnostic({ ...data, mainThreadReceivedAt: Date.now(), receivedAudioTime: context.currentTime }); }
           catch { /* Diagnostic observers cannot prevent semantic delivery. */ }
         }
-        for (const event of data.events || []) onEvent(event);
+        for (const event of data.events || []) {
+          if(!live)return;
+          onEvent(ownership?{...event,...ownership}:event);
+        }
       }
     };
     worker.postMessage({ kind: 'init', config, model: new URL('./generated/percussion/percussion.onnx', import.meta.url).href });
@@ -67,10 +82,10 @@ export async function createPercussionRuntime({ context, source, onEvent, signal
     if (!live) return null;
     node = new AudioWorkletNode(context, 'kora-percussion-features', { processorOptions: config });
     node.port.onmessage = ({ data }) => {
-      if (!live || !data.times?.length || !data.data?.buffer) return;
+      if (!live || !owns(data) || !data.times?.length || !data.data?.buffer) return;
       submittedTime = data.times.at(-1);
       pendingSince ??= performance.now();
-      if(config.diagnostics){
+      if(config.diagnostics&&onDiagnostic){
         try{onDiagnostic({kind:'features',times:data.times,data:Array.from(data.data),
           postedAt:data.postedAt,availableAudioTime:data.availableAudioTime,
           receivedAt:Date.now(),receivedAudioTime:context.currentTime});}
@@ -84,7 +99,11 @@ export async function createPercussionRuntime({ context, source, onEvent, signal
     watchdog = setInterval(() => {
       if (context.state === 'running' && pendingSince !== undefined && performance.now() - pendingSince > 2000) fail('worker-stalled');
     }, 250);
-    return { stop };
+    return { stop,recordDiagnostics(recordingId,enabled){
+      if(!live||typeof onCaptureDiagnostic!=='function')return false;
+      node?.port.postMessage?.({kind:'diagnostic-capture',enabled:enabled===true,ownership});
+      worker.postMessage({kind:'diagnostic-capture',recordingId,enabled:enabled===true,ownership});return true;
+    } };
   };
   try {
     const runtime = await Promise.race([initialize(), cancelled]);

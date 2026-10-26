@@ -13,6 +13,27 @@ const trace = (type: string, time: number, eventSource: 'local' | 'cache' = 'cac
   origin: eventSource === 'cache' ? 'event-track-cache' as const : 'capture-engine' as const,
 });
 afterEach(() => { cleanup(); beatRowDiagnostics.semanticOnly(false); beatTelemetry.clear(); beatTelemetry.enable(false); vi.useRealTimers(); });
+it('keeps an independent retrigger alive beyond the previous decorative expiry',async()=>{
+ vi.useFakeTimers();beatRowDiagnostics.start();
+ const view=render(<BeatPattern independentRows session={session} beat={live}/>);
+ await act(async()=>{await vi.advanceTimersByTimeAsync(0);});
+ const first=trace('kick',1),second=trace('kick',1.21);
+ view.rerender(<BeatPattern independentRows session={session} beat={{...live,onsets:{kick:1},telemetry:{'onset:kick':first}}}/>);
+ await act(async()=>{await vi.advanceTimersByTimeAsync(0);});
+ await act(async()=>{await vi.advanceTimersByTimeAsync(210);});
+ const state={...live,onsets:{kick:2},telemetry:{'onset:kick':second}};
+ view.rerender(<BeatPattern independentRows session={session} beat={state}/>);
+ await act(async()=>{await vi.advanceTimersByTimeAsync(0);});
+ await act(async()=>{await vi.advanceTimersByTimeAsync(30);});
+ expect(view.container.querySelector(`.semantic-beat-flash[data-event-id="${second.id}"]`)).not.toBeNull();
+ const snare=trace('snare',1.24);
+ view.rerender(<BeatPattern independentRows session={session} beat={{...state,onsets:{kick:2,clap:1},telemetry:{...state.telemetry,'onset:snare':snare}}}/>);
+ await act(async()=>{await vi.advanceTimersByTimeAsync(0);});
+ expect(view.container.querySelector(`.semantic-beat-flash[data-event-id="${second.id}"]`)).not.toBeNull();
+ await act(async()=>{await vi.advanceTimersByTimeAsync(121);});
+ expect(view.container.querySelector(`.semantic-beat-flash[data-event-id="${second.id}"]`)).toBeNull();
+ expect(state.onsets).toEqual({kick:2});expect(second.targetPlaybackTime).toBe(1.21);
+});
 it('gives one saved Lead attack a bounded duration trail without repeated commits',async()=>{
  vi.useFakeTimers();beatTelemetry.enable();const melodyEvents=[{id:'note',duration:2}];const view=render(<SemanticBeatPattern session={session} beat={live} melodyEnabled independentRows melodyEvents={melodyEvents}/>);
  const note={...trace('melodic',1),eventId:'note'};view.rerender(<SemanticBeatPattern session={session} beat={{...live,telemetry:{note}}} melodyEnabled independentRows melodyEvents={melodyEvents}/>);

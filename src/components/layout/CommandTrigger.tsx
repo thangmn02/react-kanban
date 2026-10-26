@@ -18,6 +18,7 @@ export default function CommandTrigger({
 }: CommandTriggerProps) {
   return (
     <button
+      id="workspace-command-trigger"
       type="button"
       onClick={onOpen}
       className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-500 shadow-sm transition hover:bg-white hover:text-slate-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 sm:w-full sm:max-w-sm sm:justify-between sm:px-3"

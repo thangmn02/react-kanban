@@ -33,12 +33,23 @@ export function getTaskLabelClass(color: TaskLabelColor) {
   return TASK_LABEL_CLASS_MAP[normalizeTaskLabelColor(color)] || TASK_LABEL_CLASS_MAP.sky;
 }
 
-export function stripTaskHtml(html: string) {
+export function stripTaskHtml(html: string | null | undefined) {
+  if (!html) return '';
+  // Parsing is inert; remove non-content nodes and insert boundaries before
+  // extracting text so adjacent paragraphs/list items cannot run together.
+  const spaced = html.replace(/<\/?(?:p|div|li|ul|ol|h[1-6]|blockquote|pre|table|tr|td|th|br|hr)\b[^>]*>/gi, ' ');
   if (typeof window === 'undefined') {
-    return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    return spaced.replace(/<(script|style|template|iframe)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '').replace(/<[^>]*>/g, ' ')
+      .replace(/&(?:amp|lt|gt|quot|apos|nbsp);|&#(?:x[\da-f]+|\d+);/gi, entity => {
+        const named: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&apos;': "'", '&nbsp;': ' ' };
+        if (named[entity.toLowerCase()]) return named[entity.toLowerCase()];
+        const value = entity.slice(2, -1); const code = value[0]?.toLowerCase() === 'x' ? parseInt(value.slice(1), 16) : parseInt(value, 10);
+        return Number.isFinite(code) && code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : '';
+      }).replace(/\s+/g, ' ').trim();
   }
 
-  const descriptionDocument = new DOMParser().parseFromString(html, 'text/html');
+  const descriptionDocument = new DOMParser().parseFromString(spaced, 'text/html');
+  descriptionDocument.querySelectorAll('script,style,template,iframe,object,noscript').forEach(node => node.remove());
   return descriptionDocument.body.textContent?.replace(/\s+/g, ' ').trim() || '';
 }
 

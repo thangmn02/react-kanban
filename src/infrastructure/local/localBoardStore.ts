@@ -46,10 +46,11 @@ import type {
   TaskUpdate,
 } from '../../types/supabase.type';
 import {
-  readScopedJSON,
-  writeScopedJSON,
+  buildStorageKey,
   type StorageScope,
 } from '../../shared/storage/storageAdapter';
+import { planTaskWorkflow, type WorkflowRequest, type WorkflowResult } from '../../features/task/model/task-workflow';
+import { addDays, addMonths, format, parseISO } from 'date-fns';
 
 export interface LocalBoardState {
   boards: BoardRow[];
@@ -185,19 +186,72 @@ function seedState(): LocalBoardState {
 let cachedState: LocalBoardState | null = null;
 
 function getState(): LocalBoardState {
-  if (cachedState) return cachedState;
-  const stored = readScopedJSON<LocalBoardState | null>(MOCK_SCOPE, BOARD_STORE_FEATURE, null);
-  if (stored && Array.isArray(stored.boards) && stored.boards.length > 0) {
+  const raw = localStorage.getItem(buildStorageKey(MOCK_SCOPE, BOARD_STORE_FEATURE));
+  let stored: LocalBoardState | null;
+  try { stored = raw === null ? null : JSON.parse(raw); } catch { throw new Error('Local data could not be read. Restore the local backup before continuing.'); }
+  if (stored && Array.isArray(stored.boards) && Array.isArray(stored.lists) && Array.isArray(stored.tasks)) {
     cachedState = { ...stored, activities: Array.isArray(stored.activities) ? stored.activities : [], briefingPins: Array.isArray(stored.briefingPins) ? stored.briefingPins : [] };
-  } else {
+  } else if (stored === null) {
     cachedState = seedState();
-    writeScopedJSON(MOCK_SCOPE, BOARD_STORE_FEATURE, cachedState);
-  }
+    saveState();
+  } else throw new Error('Local data has an unsupported format. Existing data was preserved.');
   return cachedState;
 }
 
+/** One recoverable storage commit owns state, membership, activity and recurrence. */
+export function localTransitionTaskWorkflow(request: WorkflowRequest): WorkflowResult {
+  const current = getState();
+  if(!current.boards.some(board=>board.id===request.boardId&&board.workspace_id===request.workspaceId&&!board.archived_at))throw new Error('Board is unavailable in this workspace.');
+  const task = current.tasks.find(t => t.id === request.taskId);
+  if (!task) throw new Error('Task was not found.');
+  const lists = current.lists.filter(l=>l.board_id===request.boardId && l.workspace_id===request.workspaceId && !l.archived_at);
+  const duplicate = current.activities.some(a=>a.id===request.operationId && a.task_id===task.id);
+  const now = nowIso();
+  const plan = planTaskWorkflow(task, lists, current.tasks, current.activities, duplicate?{...request,expectedListId:undefined,expectedUpdatedAt:undefined}:request, now);
+  if (duplicate || !plan.changed) return {task,changed:false,completedTransition:false,mapping:plan.policy.mode,occurrence:null};
+  const next = structuredClone(current);
+  const updated = next.tasks.find(t=>t.id===task.id)!;
+  Object.assign(updated,{is_done:plan.isDone,completed_at:plan.completedAt,list_id:plan.listId,updated_at:now});
+  for(const listId of new Set([task.list_id,plan.listId])) {
+    const ordered = next.tasks.filter(t=>t.list_id===listId && t.id!==task.id && !t.deleted_at&&!t.archived_at)
+      .sort((a,b)=>a.position-b.position||a.created_at.localeCompare(b.created_at)||a.id.localeCompare(b.id));
+    if(listId===plan.listId) ordered.splice(plan.targetIndex,0,updated);
+    ordered.forEach((row,index)=>{ row.position=index*LIST_POSITION_STEP; });
+  }
+  const completedTransition = !task.is_done && updated.is_done;
+  const previousRecurrence = current.activities.some(a=>a.task_id===task.id && Boolean((a.details as Record<string,unknown>).recurrenceId));
+  let occurrence: TaskRow|null = null;
+  if(completedTransition && !previousRecurrence && task.due_date && ['daily','weekly','monthly'].includes(task.repeat_interval||'')) {
+    const date=parseISO(task.due_date);
+    const due=format(task.repeat_interval==='monthly'?addMonths(date,1):addDays(date,task.repeat_interval==='weekly'?7:1),'yyyy-MM-dd');
+    const activeList=plan.policy.activeListId||task.list_id;
+    occurrence={...task,id:createLocalId('task'),list_id:activeList,position:Math.max(-LIST_POSITION_STEP,...next.tasks.filter(t=>t.list_id===activeList&&!t.deleted_at&&!t.archived_at).map(t=>t.position))+LIST_POSITION_STEP,
+      due_date:due,is_done:false,completed_at:null,created_at:now,updated_at:now};
+    next.tasks.push(occurrence);
+  }
+  next.activities.push({id:request.operationId,task_id:task.id,task_title:task.title,board_id:task.board_id,workspace_id:task.workspace_id,
+    actor_id:null,actor:{name:'You',avatar:''},action:task.is_done!==updated.is_done?'status_change':'move',created_at:now,
+    details:{description:request.kind==='move'?'Moved task through workflow':updated.is_done?'Marked task as completed':'Reopened task',workflowTransition:true,
+      fromListId:task.list_id,fromIndex:plan.sourceIndex,fromPosition:task.position,toListId:updated.list_id,toPosition:updated.position,
+      fromCompleted:task.is_done,toCompleted:updated.is_done,...(occurrence?{recurrenceId:occurrence.id}:{})}});
+  // Do not use the general adapter's best-effort writes for a domain commit.
+  localStorage.setItem(buildStorageKey(MOCK_SCOPE,'workflow_backup'),JSON.stringify(current));
+  localStorage.setItem(buildStorageKey(MOCK_SCOPE,BOARD_STORE_FEATURE),JSON.stringify(next));
+  cachedState=next;
+  return {task:updated,changed:true,completedTransition,mapping:plan.policy.mode,occurrence};
+}
+
 function saveState(): void {
-  if (cachedState) writeScopedJSON(MOCK_SCOPE, BOARD_STORE_FEATURE, cachedState);
+  if (!cachedState) return;
+  const key = buildStorageKey(MOCK_SCOPE,BOARD_STORE_FEATURE);
+  const previous = localStorage.getItem(key);
+  try {
+    if (previous !== null) localStorage.setItem(buildStorageKey(MOCK_SCOPE,'board_store_backup'),previous);
+    localStorage.setItem(key,JSON.stringify(cachedState));
+  } catch {
+    cachedState = previous ? JSON.parse(previous) : null;
+    throw new Error('Local changes could not be saved. Existing data was preserved. Free storage space and try again.');
+  }
 }
 
 export function resetLocalBoardStore(): void {

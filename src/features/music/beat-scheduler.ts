@@ -1,6 +1,6 @@
 import type { BeatEvent, MusicClock } from './mediaBridge';
 import { beatTelemetry } from '../../../extensions/kanban-music/beat-telemetry.js';
-import { parsePlaybackTiming, parsePlaybackClock, playbackPosition, clockAdvancing, clockDiscontinuity } from '../../../extensions/kanban-music/beat-timing.js';
+import { parsePlaybackTiming, parsePlaybackClock, playbackPosition, clockAdvancing, clockDiscontinuity, sourceFence, sameSourceFence, type SourceFence } from '../../../extensions/kanban-music/beat-timing.js';
 
 const telemetry = beatTelemetry.at('beat-scheduler');
 const position = playbackPosition;
@@ -19,6 +19,8 @@ export function createBeatScheduler(deliver: (event: BeatEvent) => void, recover
   let order = 0;
   let lastRecovery = -Infinity;
   let resetAt = -Infinity;
+  let owner: SourceFence | undefined;
+  const retiredOwners=new Set<string>();
   const queue: ScheduledBeat[] = [];
 
   const requestRecovery = () => {
@@ -68,6 +70,7 @@ export function createBeatScheduler(deliver: (event: BeatEvent) => void, recover
     const target = queue[0]?.target;
     while (queue[0] && queue[0].target === target && queue[0].target <= position(clock) + .00005) {
       const { event, target } = queue.shift()!;
+      if(!sameSourceFence(owner,event)){drop(event,'owner');continue;}
       const offsetMs = (position(clock) - target) / clock.playbackRate * 1000;
       if (offsetMs > 5) observe('EVENT_LATE', event, { reason: 'schedule-late', offsetMs, targetPlaybackTime: target });
       if (offsetMs > 600) {
@@ -93,6 +96,20 @@ export function createBeatScheduler(deliver: (event: BeatEvent) => void, recover
 
   return {
     reset,
+    transition(value: BeatEvent) {
+      const next=sourceFence(value);
+      if(!next)return false;
+      if(retiredOwners.has(next.synchronizationEpoch)||owner?.sourceRevision!==undefined
+        &&(next.sourceRevision===undefined||next.sourceRevision<owner.sourceRevision))return undefined;
+      const changed=Boolean(owner&&!sameSourceFence(owner,next));
+      if(changed){
+        retiredOwners.add(owner!.synchronizationEpoch);
+        if(retiredOwners.size>256)retiredOwners.delete(retiredOwners.values().next().value!);
+        reset('track-changed',true);
+      }
+      owner=next;
+      return changed;
+    },
     cancelSemantic(key: string) {
       for (let i = queue.length - 1; i >= 0; i--) if (queue[i].event.semanticKey === key) drop(queue.splice(i, 1)[0].event, 'priority');
       arm();
@@ -114,6 +131,10 @@ export function createBeatScheduler(deliver: (event: BeatEvent) => void, recover
       if (clock && next.sampledAt < clock.sampledAt) return false;
 
       const discontinuity = clockDiscontinuity(clock, next);
+      const nextOwner=sourceFence({clock:next});
+      if(nextOwner&&(retiredOwners.has(nextOwner.synchronizationEpoch)||owner?.sourceRevision!==undefined
+        &&(nextOwner.sourceRevision===undefined||nextOwner.sourceRevision<owner.sourceRevision)))return false;
+      if(nextOwner)owner=nextOwner;
       if (discontinuity || !clockAdvancing(next)) {
         reset(discontinuity ? 'track-changed' : next.buffering ? 'buffering' : 'not-playing');
       }
@@ -122,8 +143,10 @@ export function createBeatScheduler(deliver: (event: BeatEvent) => void, recover
       return discontinuity;
     },
     enqueue(event: BeatEvent) {
+      if(!sameSourceFence(owner,event)){drop(event,'owner');return;}
       const timing = parsePlaybackTiming(event);
       if (!timing) {
+        if(owner&&!clock){drop(event,'clock');return;}
         if (event.targetPlaybackTime !== undefined || event.playbackClock !== undefined) {
           drop(event, 'invalid');
           return;
@@ -135,6 +158,7 @@ export function createBeatScheduler(deliver: (event: BeatEvent) => void, recover
         deliver(event);
         return;
       }
+      if(owner&&!sameSourceFence(owner,{playbackClock:timing.playbackClock})){drop(event,'owner');return;}
       if (timing.playbackClock.sampledAt < resetAt) {
         drop(event, 'schedule-reset');
         return;

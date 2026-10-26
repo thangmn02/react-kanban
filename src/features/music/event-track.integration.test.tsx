@@ -22,10 +22,40 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllEnvs(); vi.useRea
 const update = () => {};
 const asset = { provider: 'youtube' as const, id: 'abcdefghijk' };
 const options = { asset, duration: 60, demand: true, capabilities: { tier: 'clock-only' as const, captureClock: 'unavailable' as const } };
-function Harness() {
+function Harness({semanticOnly=false}:{semanticOnly?:boolean}={}) {
   const beat = useMusicBeatSync('song', update, options);
-  return <BeatPattern melodyEnabled session={{ id: 'song', title: 'Annotated track', artist: '', source: '', playing: true, paused: false, currentTime: 10 }} beat={beat} />;
+  return <BeatPattern melodyEnabled semanticOnly={semanticOnly} session={{ id: 'song', title: 'Annotated track', artist: '', source: '', playing: true, paused: false, currentTime: 10 }} beat={beat} />;
 }
+it.each([false,true])('preserves a supported cached Lead state onset alongside projected percussion (semantic %s)',async semanticOnly=>{
+  vi.useFakeTimers();vi.setSystemTime(10000);beatTelemetry.enable();
+  vi.spyOn(globalThis,'fetch').mockImplementation(async url=>{
+    const chunk=new URL(String(url),'https://kora.example').searchParams.get('chunk');
+    return Response.json(chunk===null?{version:1,asset,revision:'combined',analysisVersion:'server-colab-v1',duration:60,chunkSeconds:30,melodyPolicy:'dominant-monophonic'}
+      :{version:1,revision:'combined',index:Number(chunk),events:chunk==='0'?[{id:'kick',row:'kick',time:10.25,confidence:.9},{id:'lead',row:'melody',time:10.25,confidence:.8,duration:.3}]:[]});
+  });
+  const view=render(<Harness semanticOnly={semanticOnly}/>);
+  act(()=>bridge.receive?.({kind:'clock',clock:{currentTime:10,sampledAt:Date.now(),playbackRate:1,playing:true,paused:false}}));
+  await act(async()=>{await vi.advanceTimersByTimeAsync(250);});
+  await act(async()=>{await vi.advanceTimersByTimeAsync(0);});
+  expect(view.container.querySelector('[data-event-id="kick"][data-semantic="true"]')).not.toBeNull();
+  expect(view.container.querySelector('[data-event-id="lead"][data-semantic="true"]')).not.toBeNull();
+  expect(beatTelemetry.snapshot().records.filter(r=>r.eventId==='lead'&&r.stage==='EVENT_COMMITTED')).toHaveLength(1);
+});
+it.each([false,true])('does not replay a cached Lead when percussion first enables the projection in a later task (semantic %s)',async semanticOnly=>{
+  vi.useFakeTimers();vi.setSystemTime(10000);beatTelemetry.enable();
+  vi.spyOn(globalThis,'fetch').mockImplementation(async url=>{
+    const chunk=new URL(String(url),'https://kora.example').searchParams.get('chunk');
+    return Response.json(chunk===null?{version:1,asset,revision:'split',analysisVersion:'server-colab-v1',duration:60,chunkSeconds:30,melodyPolicy:'dominant-monophonic'}
+      :{version:1,revision:'split',index:Number(chunk),events:chunk==='0'?[{id:'lead',row:'melody',time:10.25,confidence:.8,duration:.3},{id:'kick',row:'kick',time:10.3,confidence:.9}]:[]});
+  });
+  render(<Harness semanticOnly={semanticOnly}/>);
+  act(()=>bridge.receive?.({kind:'clock',clock:{currentTime:10,sampledAt:Date.now(),playbackRate:1,playing:true,paused:false}}));
+  await act(async()=>{await vi.advanceTimersByTimeAsync(250);});
+  await act(async()=>{await vi.advanceTimersByTimeAsync(0);});
+  expect(beatTelemetry.snapshot().records.filter(r=>r.eventId==='lead'&&r.stage==='EVENT_COMMITTED')).toHaveLength(1);
+  await act(async()=>{await vi.advanceTimersByTimeAsync(50);});
+  expect(beatTelemetry.snapshot().records.filter(r=>r.eventId==='lead'&&r.stage==='EVENT_COMMITTED')).toHaveLength(1);
+});
 it('traces validated HTTP cache events through scheduling, controller, DOM and animation without local capture', async () => {
   vi.useFakeTimers(); vi.setSystemTime(10000); beatTelemetry.enable();
   const manifest = { version: 1, asset, revision: 'r', analysisVersion: 'annotated', duration: 60, chunkSeconds: 30, melodyPolicy: 'dominant-monophonic' };
@@ -40,7 +70,7 @@ it('traces validated HTTP cache events through scheduling, controller, DOM and a
   expect(view.container.querySelector('.beat-square.onset')).toBeNull();
   await act(async () => { await vi.advanceTimersByTimeAsync(50); });
   await act(async () => { await vi.advanceTimersByTimeAsync(0); });
-  const cell = view.container.querySelector('.beat-square.onset')!; expect(cell).not.toBeNull();
+  const cell = view.container.querySelector('.projected-beat-flash[data-semantic="true"]')!; expect(cell).not.toBeNull();
   fireEvent.animationStart(cell, { animationName: 'square-onset' });
   const records = beatTelemetry.snapshot().records.filter(r => r.id === cell.getAttribute('data-beat-trace'));
   expect(records.map(r => r.stage)).toEqual(expect.arrayContaining(['EVENT_DETECTED', 'EVENT_SCHEDULED', 'EVENT_ACCEPTED',

@@ -6,6 +6,17 @@ const clock = (currentTime: number, sampledAt = 10000): PlaybackClock => ({ curr
 const pcm = new Float32Array(8820).fill(.1);
 
 describe('bounded private playback segments', () => {
+  it('keeps old PCM out after a new source clock is activated and tags newly completed segments',()=>{
+    const segments:Parameters<Parameters<typeof createPlaybackAudioBuffer>[0]>[0][]=[];
+    const buffer=createPlaybackAudioBuffer(segment=>segments.push(segment));
+    const a={...clock(.1),sourceId:'song',generation:1,synchronizationEpoch:'a',sourceRevision:1};
+    const b={...a,generation:2,synchronizationEpoch:'b',sourceRevision:2};
+    buffer.clock(a);buffer.push(pcm,a,10000);expect(buffer.stats().bufferedSeconds).toBeGreaterThan(0);
+    buffer.clock(b);buffer.push(pcm,a,10000);expect(buffer.stats().bufferedSeconds).toBe(0);
+    buffer.clock(a);expect(buffer.stats().bufferedSeconds).toBe(0);
+    for(let index=0;index<300;index++)buffer.push(pcm,{...b,currentTime:(index+1)/10},10000);
+    expect(segments[0]).toMatchObject({sourceId:'song',sourceGeneration:2,synchronizationEpoch:'b',sourceRevision:2});
+  });
   it('publishes aligned real PCM cores with historical context and bounded memory', () => {
     const segments: Parameters<Parameters<typeof createPlaybackAudioBuffer>[0]>[0][] = [];
     const buffer = createPlaybackAudioBuffer(segment => segments.push(segment));

@@ -43,3 +43,5 @@ Changing tabs or document visibility updates analysis demand without replacing
 the music capture subscription. Source changes and shutdown still release that
 subscription. Native captured audio is admitted only while analysis needs it;
 hidden-state input and the preceding PCM context are discarded before resuming.
+
+Task entry points and surrounding Dock motion follow the [task interaction rules](task-workflow.md). The editor starts Focus only from saved task data. UI transitions retain the existing intention step and session controller; they do not introduce another playback owner. Dock base styles are scoped to the Dock, so visiting Focus cannot restyle task pages.

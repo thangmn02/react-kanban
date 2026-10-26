@@ -3,6 +3,9 @@ export interface OutputTiming {
 }
 
 export interface PlaybackClock {
+  sourceId?: string;
+  synchronizationEpoch?: string;
+  sourceRevision?: number;
   playing: boolean;
   paused: boolean;
   currentTime: number;
@@ -12,6 +15,9 @@ export interface PlaybackClock {
   buffering?: boolean;
   generation?: number;
 }
+export interface SourceFence {sourceId:string;sourceGeneration:number;synchronizationEpoch:string;sourceRevision?:number}
+export function sourceFence(value:unknown):SourceFence|undefined;
+export function sameSourceFence(expected:SourceFence|undefined,value:unknown):boolean;
 
 export interface PlaybackTiming {
   targetPlaybackTime: number;

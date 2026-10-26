@@ -88,3 +88,11 @@ describe('useFocusTasks', () => {
     expect(result.current.activeFocusTaskId).toBe('first');
   });
 });
+
+it('retains a newer workflow completion while the board snapshot is older',()=>{
+ localStorage.clear();
+ const {result}=renderHook(()=>useFocusTasks({...boardData,task:{[task.id]:{...task,updatedAt:'2026-10-26T12:00:00Z'}}},scopeA));
+ act(()=>{result.current.pinFocusTask({task,boardId:'board-1',boardTitle:'Board'});});
+ act(()=>result.current.updateFocusedTask(task.id,{isDone:true,updatedAt:'2026-10-26T12:01:00Z'}));
+ expect(result.current.focusTasks[0].isDone).toBe(true);
+});

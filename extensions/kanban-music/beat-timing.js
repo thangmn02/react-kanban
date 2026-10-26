@@ -29,6 +29,9 @@ export function audibleClock(clock, delaySeconds = 0) {
     ...(typeof clock.seeking === 'boolean' ? { seeking: clock.seeking } : {}),
     ...(typeof clock.buffering === 'boolean' ? { buffering: clock.buffering } : {}),
     ...(Number.isSafeInteger(clock.generation) && clock.generation >= 0 ? { generation: clock.generation } : {}),
+    ...(typeof clock.sourceId==='string'?{sourceId:clock.sourceId}:{}),
+    ...(typeof clock.synchronizationEpoch==='string'?{synchronizationEpoch:clock.synchronizationEpoch}:{}),
+    ...(Number.isSafeInteger(clock.sourceRevision)?{sourceRevision:clock.sourceRevision}:{}),
     currentTime: Math.max(0, currentTime),
     sampledAt: clock.sampledAt + Math.max(0, -currentTime / clock.playbackRate) * 1000,
   };
@@ -61,10 +64,30 @@ export function playbackPosition(clock, now = Date.now()) {
 
 export function clockDiscontinuity(previous, next) {
   if (!previous) return false;
+  if(previous.sourceId!==next.sourceId||previous.synchronizationEpoch!==next.synchronizationEpoch)return true;
   if (next.seeking && !previous.seeking || next.generation !== undefined
     && previous.generation !== undefined && next.generation !== previous.generation) return true;
   return clockAdvancing(previous) && clockAdvancing(next)
     && Math.abs(next.currentTime - playbackPosition(previous, next.sampledAt)) > .75;
+}
+
+// Legacy producers retain capture ownership checks. Once a fenced producer is
+// selected, missing or old metadata cannot fall back to the legacy arrival path.
+export function sourceFence(value) {
+  const clock=value?.clock||value?.playbackClock;
+  const sourceId=value?.sourceId??clock?.sourceId;
+  const sourceGeneration=value?.sourceGeneration??clock?.generation;
+  const synchronizationEpoch=value?.synchronizationEpoch??clock?.synchronizationEpoch;
+  const sourceRevision=value?.sourceRevision??clock?.sourceRevision;
+  if(typeof sourceId!=='string'||!sourceId.length||sourceId.length>2048
+    ||!Number.isSafeInteger(sourceGeneration)||sourceGeneration<0
+    ||typeof synchronizationEpoch!=='string'||!synchronizationEpoch.length||synchronizationEpoch.length>160)return;
+  return {sourceId,sourceGeneration,synchronizationEpoch,...(Number.isSafeInteger(sourceRevision)&&sourceRevision>=0?{sourceRevision}:{})};
+}
+export function sameSourceFence(expected,value) {
+  if(!expected)return true;
+  const actual=sourceFence(value);
+  return Boolean(actual&&['sourceId','sourceGeneration','synchronizationEpoch'].every(key=>actual[key]===expected[key]));
 }
 
 export function playbackTiming(clock, timing, delaySeconds = 0) {

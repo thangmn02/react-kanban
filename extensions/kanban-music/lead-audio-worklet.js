@@ -1,7 +1,8 @@
 // A bounded tap on the existing captured source. Its output is always silent.
 class LeadAudioProcessor extends AudioWorkletProcessor {
-  constructor() {
+  constructor(options) {
     super();
+    this.ownership=options?.processorOptions?.ownership;
     this.samples = new Int16Array(8820);
     this.count = 0; this.sequence = 0; this.pending = false;
     this.port.onmessage = () => { this.pending = false; };
@@ -18,7 +19,7 @@ class LeadAudioProcessor extends AudioWorkletProcessor {
         if (!this.pending) {
           const samples = this.samples.slice();
           this.pending = true;
-          this.port.postMessage({ sequence: this.sequence, endTime: (currentFrame + index + 1) / sampleRate,
+          this.port.postMessage({ sequence: this.sequence, ownership:this.ownership,endTime: (currentFrame + index + 1) / sampleRate,
             samples: samples.buffer }, [samples.buffer]);
         }
         this.samples.fill(0); this.count = 0;

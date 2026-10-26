@@ -2,6 +2,8 @@ import type { TodayTaskSummary } from '../../services/today.service';
 import SectionCard from '../atoms/SectionCard';
 import EmptyState from '../atoms/EmptyState';
 import TodayTaskCard from './TodayTaskCard';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { uiSpring } from '../../shared/motion';
 
 interface TodayTaskSectionProps {
   title: string;
@@ -13,6 +15,8 @@ interface TodayTaskSectionProps {
   onStartFocus: (task: TodayTaskSummary) => void;
   onToggleTodayFocus: (task: TodayTaskSummary) => void;
   compactShell?: boolean;
+  onCompleteTask?: (task: TodayTaskSummary) => void;
+  completingIds?: ReadonlySet<string>;
 }
 
 export default function TodayTaskSection({
@@ -25,7 +29,10 @@ export default function TodayTaskSection({
   onStartFocus,
   onToggleTodayFocus,
   compactShell = false,
+  onCompleteTask,
+  completingIds,
 }: TodayTaskSectionProps) {
+  const reduced = useReducedMotion();
   const content = (
     <>
       <div className="mb-4 flex items-start justify-between gap-4">
@@ -42,7 +49,8 @@ export default function TodayTaskSection({
         <EmptyState title={emptyMessage} compact />
       ) : (
         <div className="grid gap-3">
-          {tasks.map((task) => (
+          <AnimatePresence initial={false}>{tasks.map((task) => (
+            <motion.div key={task.id} layout={reduced ? false : 'position'} exit={reduced ? { opacity: 0 } : { opacity: 0, x: 8 }} transition={reduced ? { duration: 0 } : uiSpring}>
             <TodayTaskCard
               key={task.id}
               task={task}
@@ -50,20 +58,23 @@ export default function TodayTaskSection({
               onOpenTask={onOpenTask}
               onStartFocus={onStartFocus}
               onToggleTodayFocus={onToggleTodayFocus}
+              onCompleteTask={onCompleteTask}
+              isCompleting={completingIds?.has(task.id)}
             />
-          ))}
+            </motion.div>
+          ))}</AnimatePresence>
         </div>
       )}
     </>
   );
 
   if (compactShell) {
-    return <div>{content}</div>;
+    return <div data-task-section tabIndex={-1}>{content}</div>;
   }
 
   return (
-    <SectionCard className="p-5">
+    <div data-task-section tabIndex={-1}><SectionCard className="p-5">
       {content}
-    </SectionCard>
+    </SectionCard></div>
   );
 }

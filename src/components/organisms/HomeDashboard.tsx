@@ -16,6 +16,8 @@ import BriefingPinForm from '../home/BriefingPinForm';
 import type { BriefingPin } from '../../types/briefing.type';
 import PlanMyDayDialog from '../../features/today/components/PlanMyDayDialog';
 import { useHomeFocusView } from '../../hooks/useHomeFocusView';
+import { useSummaryCompletion } from '../../hooks/use-summary-completion';
+import { TASK_WORKFLOW_CHANGED } from '../../services/task-workflow.service';
 
 interface HomeDashboardProps {
   focusControls?: HomeFocusControls;
@@ -37,6 +39,7 @@ interface HomeDashboardProps {
   hasTeamMembers?: boolean;
   refreshKey?: boolean;
   taskRevision?: BoardData['task'];
+  onCompleteTask?: (task: HomeTaskSummary) => Promise<boolean>;
 }
 
 const quietButton = 'inline-flex cursor-pointer items-center justify-center rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600';
@@ -95,13 +98,22 @@ export default function HomeDashboard(props: HomeDashboardProps) {
 
 function HomeBriefing({ currentUser, activeWorkspace, onOpenTask, onOpenBoard,
   onToggleFocusTask, onStartFocusTask, isFocusTask, onCreateBoard, onCreateTask,
-  onPlanFocusTasks, onOpenQuickPlan, onOpenToday, focusTaskCount = 0, focusSessionsToday = 0, refreshKey, taskRevision, focusControls, onRequireSignIn,
+  onPlanFocusTasks, onOpenQuickPlan, onOpenToday, focusTaskCount = 0, focusSessionsToday = 0, refreshKey, taskRevision, focusControls, onRequireSignIn, onCompleteTask,
 }: HomeDashboardProps) {
   const { t, language } = useI18n();
+  const completion = useSummaryCompletion(onCompleteTask);
   const workspaceId = activeWorkspace?.id;
   const [data, setData] = useState<HomeDashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    const refresh = (event: Event) => {
+      if (event.type === TASK_WORKFLOW_CHANGED && (event as CustomEvent).detail?.workspaceId !== workspaceId) return;
+      setAttempt(value=>value+1);
+    };
+    window.addEventListener(TASK_WORKFLOW_CHANGED,refresh); window.addEventListener('focus',refresh);
+    return ()=>{window.removeEventListener(TASK_WORKFLOW_CHANGED,refresh);window.removeEventListener('focus',refresh);};
+  },[workspaceId]);
   const { focusViewId, setFocusViewId } = useHomeFocusView(currentUser?.id, workspaceId);
   const [isPinFormOpen, setIsPinFormOpen] = useState(false);
   const [isPlanMyDayOpen, setIsPlanMyDayOpen] = useState(false);
@@ -119,10 +131,10 @@ function HomeBriefing({ currentUser, activeWorkspace, onOpenTask, onOpenBoard,
     return () => { active = false; };
   }, [currentUser, workspaceId, attempt, refreshKey, taskRevision]);
 
-  const tasks = data?.myTasks ?? [];
+  const tasks = (data?.myTasks ?? []).filter(task => !completion.completed.has(task.id));
   const attentionTasks = tasks.slice(0, 3);
   const plannedTasks = focusControls
-    ? focusControls.session.focusTasks.filter((task) => !task.isDone).slice(0, 3).map((task) => {
+    ? focusControls.session.focusTasks.filter((task) => !task.isDone && !completion.completed.has(task.id)).slice(0, 3).map((task) => {
       const liveTask = tasks.find((candidate) => candidate.id === task.id);
       return { ...task, ...liveTask, priority: liveTask ? liveTask.priority : task.priority ?? null, dueDate: liveTask ? liveTask.dueDate : task.dueDate ?? null };
     })
@@ -169,15 +181,33 @@ function HomeBriefing({ currentUser, activeWorkspace, onOpenTask, onOpenBoard,
             <p className="text-[13px] text-slate-500">{date}<span className="mx-2" aria-hidden="true">·</span>{activeWorkspace?.name || 'Kora'}</p>
             <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">{currentUser ? t(greeting, { name: firstName }) : 'Kora'}</h1>
             {showBriefing && <p className="mt-2 text-[13px] leading-6 text-slate-500">{t('briefing.dailyFacts', { sessions: focusSessionsToday, plural: focusSessionsToday === 1 ? '' : 's', overdue, today: dueToday })}</p>}
-            {showBriefing && canEditPins && <button type="button" onClick={() => { if (onRequireSignIn?.() !== false) setIsPinFormOpen(true); }} className={`${primaryButton} mt-4 px-5 py-2.5`}>{t('briefing.pin.pinAction')}</button>}
           </header>
 
           {loading && <div className="mt-10 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /></div>}
           {error && <div className="mt-8"><ErrorState title={t('today.errorTitle')} description={t('today.errorDescription')} details={error} onRetry={() => { setError(null); setAttempt((value) => value + 1); }} /></div>}
 
           {showBriefing && <>
-            {(arePinsLoading || pins.length > 0 || pinsError) && <section aria-labelledby="briefing-pins" className="mt-10 border-t border-slate-200 pt-8">
+            {(plannedTasks[0] || tasks[0]) && (() => {
+              const task = plannedTasks[0] || tasks[0];
+              return <section aria-label={t('ux.nextAction')} className="mt-6 rounded-xl border border-slate-200 bg-white p-5">
+                <p className={sectionLabel}>{t(plannedTasks.length ? 'ux.yourPlan' : 'ux.fromTasks')}</p>
+                <h2 className="mt-2 break-words text-xl font-semibold tracking-tight text-slate-950">{task.title}</h2>
+                <p className="mt-1 text-xs text-slate-500">{task.boardTitle}</p>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {task.priority && <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{task.priority}</span>}
+                  <DueDateBadge dueDate={task.dueDate ?? undefined} />
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {onStartFocusTask && <button type="button" onClick={() => startTask(task)} aria-label={`${t('home.startFocus')}: ${task.title}`} className={`${primaryButton} min-h-11 px-5`}>{t('home.startFocus')}</button>}
+                  <button type="button" className={`${quietButton} min-h-11`} onClick={() => onOpenTask(task.id, task.boardId)}>{t('briefing.details')}</button>
+                  {onCompleteTask && <button type="button" className={`${quietButton} min-h-11 disabled:opacity-50`} disabled={completion.pending.has(task.id)} aria-label={`${t('common.markDone')}: ${task.title}`} onClick={() => { void completion.run(task); }}>{t(completion.pending.has(task.id) ? 'ux.completing' : 'common.markDone')}</button>}
+                </div>
+              </section>;
+            })()}
+            <p role="status" aria-live="polite" className="mt-3 text-sm text-slate-700">{completion.message}</p>
+            {(canEditPins || arePinsLoading || pins.length > 0 || pinsError) && <section aria-labelledby="briefing-pins" className="mt-8 border-t border-slate-200 pt-6">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h2 id="briefing-pins" className={sectionLabel}>{t('briefing.pin.sectionTitle')}</h2><span className="text-xs text-slate-400">{t('briefing.pin.teamVisible')}</span></div>
+              {canEditPins && <button type="button" onClick={() => { if (onRequireSignIn?.() !== false) setIsPinFormOpen(true); }} className={`${quietButton} mb-3 -ml-3`}>{t('briefing.pin.pinAction')}</button>}
               {arePinsLoading && <Skeleton className="h-44 w-full" />}
               {pinsError && <p className="text-sm text-rose-600">{t('briefing.pin.loadError')}</p>}
               <div className="space-y-3">{pins.map((pin) => <PinnedThreadCard key={pin.id} pin={pin} language={language} canDelete={canEditPins || pin.createdBy === currentUser?.id} onOpenLinkedTask={() => { void openLinkedPinTask(pin); }} onDelete={(pinId) => { void removePin(pinId).catch((reason) => notify.error(reason instanceof Error ? reason.message : t('briefing.pin.deleteError'))); }} t={t} />)}</div>
@@ -221,7 +251,7 @@ function HomeBriefing({ currentUser, activeWorkspace, onOpenTask, onOpenBoard,
         {showBriefing && <aside className="min-w-0 space-y-10 border-t border-slate-200 pt-8 lg:border-0 lg:pt-0">
           <section aria-labelledby="briefing-focus">
             <h2 id="briefing-focus" className={sectionLabel}>{t('today.plan')}</h2>
-            <p className="mt-2 text-[13px] text-slate-600">{t('home.focusSelectedCount', { count: focusControls ? plannedTasks.length : focusTaskCount || plannedTasks.length, max: 3 })}</p>
+            <p className="mt-2 text-[13px] text-slate-600">{t('home.focusSelectedCount', { count: focusControls ? focusControls.session.focusTasks.length : focusTaskCount || plannedTasks.length, max: 3 })}</p>
             <ol className="mt-3 space-y-3">
               {plannedTasks.map((task, index) => <li key={task.id} className="rounded-xl border border-slate-200 bg-white p-4">
                 <span className="text-xs font-bold text-blue-600">{index + 1}</span>

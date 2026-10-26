@@ -2,6 +2,25 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { beatTelemetry, createBeatTelemetry, parseBeatTraces } from './beat-telemetry.js';
 
 afterEach(() => { beatTelemetry.enable(false); beatTelemetry.clear(); vi.restoreAllMocks(); });
+it('keeps compensation revocation evidence opt-in, numeric and free of PCM or source URLs',()=>{
+  const log=createBeatTelemetry();const details={component:'beat-sync',captureId:'capture',configuredAudioDelayMs:170,
+    trigger:'clock',clockAgeMs:12,playing:true,paused:false,buffering:true,captureHealthy:true,clockHealthy:false,
+    outputOwned:true,singleSource:true,compensationEligible:false,pcm:[1,2],url:'private-source'};
+  log.record('COMPENSATION_REVOKED',undefined,details);expect(log.snapshot().records).toHaveLength(0);
+  log.enable();log.record('COMPENSATION_REVOKED',undefined,details);
+  expect(log.snapshot().records[0]).toMatchObject({stage:'COMPENSATION_REVOKED',configuredAudioDelayMs:170,
+    trigger:'clock',clockAgeMs:12,buffering:true,clockHealthy:false,compensationEligible:false});
+  expect(log.snapshot().records[0]).not.toHaveProperty('pcm');expect(log.snapshot().records[0]).not.toHaveProperty('url');
+});
+it('preserves bounded original percussion head and mapping without guessing absent provenance',()=>{
+  const log=createBeatTelemetry();log.enable();const trace=log.events('onset',['hat'])[0];
+  expect(parseBeatTraces([trace])[0]).not.toHaveProperty('originalClassIndex');
+  const original={...trace,originalClassIndex:4,percussionLabelMapping:'M0'};
+  expect(parseBeatTraces([original])).toEqual([original]);log.record('EVENT_RECEIVED',original);
+  expect(log.snapshot().records[0]).toMatchObject({originalClassIndex:4,percussionLabelMapping:'M0'});
+  for(const index of [-1,5,3.5,NaN,'4'])expect(parseBeatTraces([{...trace,originalClassIndex:index,percussionLabelMapping:'shadow'}])[0]).not.toHaveProperty('originalClassIndex');
+  expect(parseBeatTraces([{...trace,percussionLabelMapping:'shadow'}])[0]).not.toHaveProperty('percussionLabelMapping');
+});
 it('keeps detector timing numeric, opt-in and separate from raw model diagnostics', () => {
   const log = createBeatTelemetry();
   log.record('DETECTOR_TIMING', undefined, { inferenceStartedAt: 10 });

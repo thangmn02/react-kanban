@@ -1,7 +1,50 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { createPercussionRuntime } from './percussion-runtime.js';
 import { beatTelemetry } from './beat-telemetry.js';
+it('starts raw capture on demand without restarting the model or enabling feature dumps',async()=>{
+  const f=fixture(),onCaptureDiagnostic=vi.fn(),onEvent=vi.fn(),ownership={captureId:'c',sourceId:'s',sourceGeneration:1,synchronizationEpoch:'e'};
+  const loading=createPercussionRuntime({...f,onEvent,onCaptureDiagnostic,ownership});
+  await Promise.resolve();await Promise.resolve();const worker=f.instances[0];
+  expect(worker.postMessage.mock.calls[0][0].config.diagnostics).toBe(false);
+  worker.onmessage({data:{kind:'ready',ownership}});const runtime=await loading;
+  expect(runtime.recordDiagnostics('r',true)).toBe(true);
+  expect(worker.postMessage).toHaveBeenLastCalledWith({kind:'diagnostic-capture',recordingId:'r',enabled:true,ownership});
+  worker.onmessage({data:{kind:'diagnostic-start',diagnosticRecordingId:'r',ownership}});expect(onCaptureDiagnostic).toHaveBeenCalledOnce();
+  worker.onmessage({data:{kind:'result',diagnosticRecordingId:'r',ownership:{...ownership,sourceGeneration:0},events:[{band:'hat'}]}});
+  expect(onCaptureDiagnostic).toHaveBeenCalledOnce();expect(onEvent).not.toHaveBeenCalled();
+  runtime.stop();expect(runtime.recordDiagnostics('r',false)).toBe(false);
+});
+
+it('fences PCM jobs and late inference results by exact source generation and aborts the old Worker',async()=>{
+  const f=fixture(),onEvent=vi.fn(),onProgress=vi.fn(),controller=new AbortController();
+  const ownership={captureId:'c',sourceId:'song-A',sourceGeneration:4,synchronizationEpoch:'epoch-4'};
+  const loading=createPercussionRuntime({...f,onEvent,onProgress,ownership,signal:controller.signal});
+  await Promise.resolve();await Promise.resolve();const worker=f.instances[0];
+  worker.onmessage({data:{kind:'ready',ownership}});await loading;
+  const input={times:[1],data:new Float32Array(84)};
+  f.nodes[0].port.onmessage({data:{...input,ownership:{...ownership,sourceGeneration:3}}});
+  expect(worker.postMessage).toHaveBeenCalledTimes(1);
+  f.nodes[0].port.onmessage({data:{...input,ownership}});expect(worker.postMessage).toHaveBeenCalledTimes(2);
+  const event={band:'hat',audioTime:1,confidence:.9,classMargin:.4};
+  worker.onmessage({data:{kind:'result',events:[event],ownership:{...ownership,synchronizationEpoch:'old'}}});
+  expect(onEvent).not.toHaveBeenCalled();expect(onProgress).not.toHaveBeenCalled();
+  worker.onmessage({data:{kind:'result',events:[event],ownership}});expect(onEvent).toHaveBeenCalledWith({...event,...ownership});
+  controller.abort();worker.onmessage({data:{kind:'result',events:[event],ownership}});
+  expect(onEvent).toHaveBeenCalledOnce();expect(worker.terminate).toHaveBeenCalledOnce();
+});
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); beatTelemetry.enable(false); beatTelemetry.clear(); });
+it('keeps shadow predictions unchanged and exposes separate guard decisions through diagnostics',async()=>{
+  const f=fixture(),onEvent=vi.fn(),onDiagnostic=vi.fn();
+  const loading=createPercussionRuntime({...f,onEvent,onDiagnostic,semanticPrecisionGuards:{mode:'shadow'}});
+  await Promise.resolve();await Promise.resolve();const worker=f.instances[0];
+  expect(worker.postMessage.mock.calls[0][0].config).toMatchObject({semanticPrecisionGuards:{mode:'shadow'},diagnostics:true});
+  worker.onmessage({data:{kind:'ready'}});const runtime=await loading;
+  const event={band:'hat',audioTime:1,confidence:.8,scores:[.2,.8,0,.8,.5]};
+  const guardDecisions=[{audioTime:1,guard:{accept:true,wouldAccept:false},rawScores:event.scores}];
+  worker.onmessage({data:{kind:'result',events:[event],guardDecisions}});
+  expect(onEvent).toHaveBeenCalledWith(event);expect(onDiagnostic).toHaveBeenCalledWith(expect.objectContaining({guardDecisions}));
+  runtime.stop();
+});
 function fixture() {
   const instances = [], nodes = [];
   class Worker {

@@ -15,6 +15,15 @@ vi.mock('./mediaBridge', () => ({
 beforeEach(() => { vi.useFakeTimers(); bridge.send.mockResolvedValue(undefined); });
 afterEach(() => { cleanup(); beatTelemetry.enable(false); beatTelemetry.clear(); vi.useRealTimers(); vi.clearAllMocks(); vi.restoreAllMocks(); });
 const emit = (event: BeatEvent) => act(() => { bridge.receive?.(event); });
+it('retains the accepted epoch on same-capture metadata refresh but clears it on replacement',()=>{
+  const {result}=renderHook(()=>useMusicBeatSync('source',vi.fn()));
+  emit({kind:'sync.state',mode:'capture',captureId:'capture',sourceId:'source',sourceGeneration:0,synchronizationEpoch:'epoch'});
+  expect(result.current.synchronizationEpoch).toBe('epoch');
+  emit({kind:'sync.state',mode:'capture',captureId:'capture'});
+  expect(result.current.synchronizationEpoch).toBe('epoch');
+  emit({kind:'sync.state',mode:'capture',captureId:'replacement'});
+  expect(result.current.synchronizationEpoch).toBeUndefined();expect(result.current.sourceGeneration).toBeUndefined();
+});
 it('unsubscribes an injected local transport before immediate pagehide release',async()=>{
  const listeners=new Set<(event:BeatEvent)=>void>();let active=false;
  const transport={subscribe:(receive:(event:BeatEvent)=>void)=>{listeners.add(receive);return()=>{listeners.delete(receive);};},start:vi.fn(async()=>{active=true;}),stop:vi.fn(async()=>{if(!listeners.size)active=false;})};
@@ -37,6 +46,43 @@ it.each([false,true])('preserves 20/30/50/100 ms local attacks through controlle
   await act(async()=>{await vi.advanceTimersByTimeAsync(1300);});
   expect(result.current.onsets.hat).toBe(times.length);
   expect(beatTelemetry.snapshot().records.filter(r=>r.reason==='debounce')).toHaveLength(0);
+});
+it('retains scheduled deadlines with diagnostics off without accepting rejected duplicates',async()=>{
+  vi.setSystemTime(1000);beatTelemetry.enable(false);
+  const onClock=vi.fn();const {result}=renderHook(()=>useMusicBeatSync('visual-song',onClock));
+  const clock={currentTime:10,sampledAt:1000,playbackRate:1,playing:true,paused:false};
+  emit({kind:'clock',clock});emit({kind:'sync.state',mode:'capture',captureId:'visual'});
+  for(const [i,time]of [10.1,10.11,10.13].entries())emit({kind:'onset',captureId:'visual',sequence:i+1,bands:['hat'],targetPlaybackTime:time,playbackClock:clock});
+  await act(async()=>{await vi.advanceTimersByTimeAsync(150);});
+  expect(result.current.onsets.hat).toBe(2);expect(result.current.visualAttacks).toHaveLength(2);
+  expect(result.current.visualAttacks?.[0].deadlineMs).toBeCloseTo(1100,7);expect(result.current.visualAttacks?.[1].deadlineMs).toBeCloseTo(1130,7);
+  expect(result.current.visualAttacks?.every(a=>a.trace===undefined)).toBe(true);expect(beatTelemetry.snapshot().records).toHaveLength(0);
+});
+it.each([[false,false],[false,true],[true,false],[true,true]])('uses the scheduler remapped deadline after a newer playback sample (engine %s, diagnostics %s)',async(withEngine,diagnostics)=>{
+  vi.setSystemTime(1000);beatTelemetry.enable(diagnostics);
+  const options=withEngine?{demand:false,capabilities:{tier:'tab-capture' as const,captureClock:'output-clock-capable' as const}}:undefined;
+  const onClock=vi.fn();const {result}=renderHook(()=>useMusicBeatSync('remapped-song',onClock,options));
+  const producerClock={currentTime:10,sampledAt:1000,playbackRate:1,playing:true,paused:false};
+  emit({kind:'clock',clock:producerClock});emit({kind:'sync.state',mode:'capture',captureId:'remapped'});
+  emit({kind:'onset',captureId:'remapped',sequence:1,bands:['hat'],targetPlaybackTime:10.2,playbackClock:producerClock,
+    telemetry:beatTelemetry.events('onset',['hat'])});
+  await act(async()=>{await vi.advanceTimersByTimeAsync(50);});
+  emit({kind:'clock',clock:{...producerClock,currentTime:9.65,sampledAt:1050}});
+  await act(async()=>{await vi.advanceTimersByTimeAsync(600);});
+  expect(result.current.onsets.hat).toBe(1);
+  expect(result.current.visualAttacks).toHaveLength(1);
+  expect(result.current.visualAttacks?.[0].deadlineMs).toBeCloseTo(1600,7);
+});
+it('does not reuse an unfenced clock across capture replacement with diagnostics off',async()=>{
+  vi.setSystemTime(1000);beatTelemetry.enable(false);const onClock=vi.fn();
+  const {result}=renderHook(()=>useMusicBeatSync('replacement-song',onClock));
+  emit({kind:'sync.state',mode:'capture',captureId:'A'});
+  emit({kind:'clock',clock:{currentTime:10,sampledAt:1100,playbackRate:1,playing:true,paused:false}});
+  emit({kind:'sync.state',mode:'capture',captureId:'B'});
+  emit({kind:'onset',captureId:'B',sequence:1,bands:['hat'],targetPlaybackTime:.1,
+    playbackClock:{currentTime:0,sampledAt:1000,playbackRate:1,playing:true,paused:false}});
+  await act(async()=>{await vi.advanceTimersByTimeAsync(150);});
+  expect(result.current.onsets.hat).toBe(1);expect(result.current.visualAttacks?.[0].deadlineMs).toBeCloseTo(1100,7);
 });
 it.each([false,true])('still rejects a sub-20 ms local duplicate (event engine %s)',async withEngine=>{
   beatTelemetry.enable();
@@ -217,6 +263,19 @@ it('observes state coalescing without losing the existing batched onset counts',
   ]));
   emit({ kind: 'sync.state', mode: 'capture', captureId: 'replacement' });
   expect(result.current.telemetry).toBeUndefined();
+});
+
+it('does not label retained accepted attack identities as dropped when the latest-row trace is replaced',()=>{
+  vi.setSystemTime(1000);beatTelemetry.enable();
+  const onClock=vi.fn();const {result}=renderHook(()=>useMusicBeatSync('song',onClock));
+  const clock={currentTime:1,sampledAt:Date.now(),playbackRate:1,playing:true,paused:false};
+  emit({kind:'clock',clock});emit({kind:'sync.state',mode:'capture',captureId:'capture'});
+  const first=beatTelemetry.events('onset',['hat'])!,second=beatTelemetry.events('onset',['hat'])!;
+  emit({kind:'onset',captureId:'capture',sequence:1,bands:['hat'],targetPlaybackTime:1.02,playbackClock:clock,telemetry:first});
+  emit({kind:'onset',captureId:'capture',sequence:2,bands:['hat'],targetPlaybackTime:1.05,playbackClock:clock,telemetry:second});
+  act(()=>{vi.advanceTimersByTime(100);});
+  expect(result.current.visualAttacks?.map(a=>a.key)).toEqual([first[0].id,second[0].id]);
+  expect(beatTelemetry.snapshot().records.filter(r=>r.stage==='EVENT_DROPPED'&&r.reason==='renderer-coalesced')).toHaveLength(0);
 });
 
 it('leases Melody only from the current live capture and clears stalled notes, pause and capture replacement', async () => {

@@ -8,6 +8,8 @@ import { createPlaybackAudioBuffer } from './playback-audio-segment';
 import { subscribeNativeAudio } from '../native/nativeMusic';
 import { isNativeWidget } from '../native/runtime';
 import { startCompanionLeadAudio } from './companion-lead-audio';
+import {parsePlaybackTiming,parsePlaybackClock,playbackDeadline} from '../../../extensions/kanban-music/beat-timing.js';
+import type {VisualAttack} from './semantic-motion';
 import type { LeadProvenance } from './lead-events';
 import type { LeadAvailability } from './lead-feature';
 const telemetry = beatTelemetry.at('beat-controller');
@@ -22,11 +24,16 @@ export interface MusicBeatState {
   tickCount?: number;
   reason?: string;
   captureId?: string;
+  synchronizationEpoch?: string;
+  /** Generation accepted by the event owner, independent of optional display metadata. */
+  sourceGeneration?:number;
   melody?: MelodyState;
   lead?: LeadProvenance;
   leadAvailability?: LeadAvailability;
   eventPath?: BeatEventPath;
   telemetry?: Record<string, BeatTrace>;
+  /** Read-only presentation of already accepted scheduler output, independent of diagnostics. */
+  visualAttacks?:readonly VisualAttack[];
 }
 
 export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessionId: string, clock: MusicClock) => void, eventOptions?: BeatEventOptions, demand = eventOptions?.demand): MusicBeatState {
@@ -61,6 +68,7 @@ export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessio
     let captureId: string | undefined;
     let liveMode: 'clock' | 'capture' = 'clock';
     let melodySequence = -1;
+    let presentationClock:MusicClock|undefined;
     let melodyLease: ReturnType<typeof setTimeout> | undefined;
     const recent: Record<BeatBand, number[]> = { kick: [], clap: [], hat: [], bass: [], melody: [] };
     const lastAccepted: Record<BeatBand, number> = { kick: -Infinity, clap: -Infinity, hat: -Infinity, bass: -Infinity, melody: -Infinity };
@@ -76,6 +84,7 @@ export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessio
     };
     const retired = new Set<string>();
     const retireCapture = () => {
+      presentationClock=undefined;
       if (captureId) retired.add(captureId);
       if (retired.size > 16) retired.delete(retired.values().next().value!);
     };
@@ -89,7 +98,8 @@ export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessio
         event.telemetry.filter((t) => !bands || bands.some((b) => (b === 'clap' ? 'snare' : b === 'melody' ? 'melodic' : b) === t.type))
           .forEach((t) => {
             const key = `${t.source}:${t.type}`, previous = traces[key];
-            if (previous && previous.id !== t.id && !committed.current.has(previous.id)) {
+            if (previous && previous.id !== t.id && !committed.current.has(previous.id)
+              && !current.visualAttacks?.some(attack=>attack.key===previous.id)) {
               telemetry.record('EVENT_DROPPED', previous, { reason: 'renderer-coalesced' });
             }
             traces[key] = { ...t, eventSource: event.eventSource || t.eventSource || 'local',
@@ -102,6 +112,8 @@ export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessio
       if (event.kind === 'sync.recover') { void renew(); return; }
       if (event.kind === 'clock') {
         const discontinuity = scheduler.clock(event.clock);
+        const parsedClock=parsePlaybackClock(event.clock);
+        if(parsedClock&&(!presentationClock||parsedClock.sampledAt>=presentationClock.sampledAt))presentationClock=parsedClock;
         onClock(selectedSessionId, event.clock);
         if (!clockAdvancing(event.clock) || discontinuity) {
           retireCapture();
@@ -174,17 +186,37 @@ export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessio
         accepted(acceptedBands);
       } else {
         if (captureId !== event.captureId || liveMode !== event.mode) {
+          presentationClock=undefined;
           sequence = 0; melodySequence = -1; clearRates(); clearTimeout(melodyLease);
         }
         captureId = event.captureId;
         liveMode = event.mode;
       }
+      // Retain the scheduler deadline for the visual consumer, even with tracing off.
+      // This projection happens after acceptance and does not reschedule or emit events.
+      const visualTiming=event.kind==='onset'?parsePlaybackTiming(event):undefined;
+      const visualClock=visualTiming&&presentationClock&&presentationClock.sampledAt>=visualTiming.playbackClock.sampledAt
+        &&presentationClock.sourceId===visualTiming.playbackClock.sourceId
+        &&presentationClock.generation===visualTiming.playbackClock.generation
+        &&presentationClock.synchronizationEpoch===visualTiming.playbackClock.synchronizationEpoch
+        ?presentationClock:visualTiming?.playbackClock;
+      const visualAttacks:VisualAttack[]=visualTiming?acceptedBands.map(band=>{
+        const trace=event.telemetry?.find(t=>t.type===(band==='clap'?'snare':band==='melody'?'melodic':band));
+        return {key:trace?.id||`${captureId}:${event.kind==='onset'?event.sequence:''}:${band}`,band,
+          // Scheduler traces contain its current anchor; without diagnostics,
+          // mirror that mapping using the latest same-owner playback sample.
+          deadlineMs:trace?.targetClock==='epoch-ms'&&Number.isFinite(trace.targetTime)?trace.targetTime
+            :playbackDeadline({...visualTiming,playbackClock:visualClock!}),
+          durationMs:event.kind==='onset'&&Number.isFinite(event.duration)?Math.min(2,Math.max(0,event.duration!))/(event.playbackClock?.playbackRate||1)*1000:undefined,trace};
+      }):[];
       // Clock messages alone cannot keep a dead capture looking live.
       lastLiveState = Date.now();
       setState((previous) => {
         const current: MusicBeatState = previous.sessionId === selectedSessionId ? previous : { sessionId: selectedSessionId, mode: 'clock', onsets: {} };
         if (event.kind === 'sync.state') return {
           ...current, mode: event.mode, reason: event.reason, captureId: event.captureId,
+          synchronizationEpoch:event.synchronizationEpoch??(current.captureId===event.captureId&&current.mode===event.mode?current.synchronizationEpoch:undefined),
+          sourceGeneration:event.sourceGeneration??(current.captureId===event.captureId?current.sourceGeneration:undefined),
           eventPath: event.eventPath,
           onsets: current.mode === event.mode && current.captureId === event.captureId ? current.onsets : {},
           durations: current.mode === event.mode && current.captureId === event.captureId ? current.durations : {},
@@ -193,6 +225,7 @@ export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessio
           tickCount: current.mode === event.mode && current.captureId === event.captureId ? current.tickCount : 0,
           melody: current.mode === event.mode && current.captureId === event.captureId ? current.melody : undefined,
           lead: current.mode === event.mode && current.captureId === event.captureId ? current.lead : undefined,
+          visualAttacks:current.mode===event.mode&&current.captureId===event.captureId?current.visualAttacks:undefined,
           ...(current.telemetry ? { telemetry: current.mode === event.mode && current.captureId === event.captureId ? current.telemetry : undefined } : {}),
         };
         if (current.mode !== 'capture') return current;
@@ -204,7 +237,9 @@ export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessio
         });
         // Rejected row traces must not replace the last accepted row's origin.
         const acceptedTraces = diagnostic(current, acceptedBands);
-        return { ...current, onsets, durations, rates: rates(Date.now()), ...acceptedTraces };
+        return { ...current, onsets, durations, rates: rates(Date.now()), ...acceptedTraces,
+          sourceGeneration:event.sourceGeneration??visualTiming?.playbackClock.generation??current.sourceGeneration,
+          visualAttacks:[...(current.visualAttacks||[]),...visualAttacks].filter(a=>a.deadlineMs>Date.now()-10000).slice(-64) };
       });
     }
     const engine = eventOptions && createBeatEventEngine({ ...eventOptions, demand: requestedDemand.current, onLeadAvailability: status => {
@@ -230,6 +265,15 @@ export function useMusicBeatSync(sessionId: string | undefined, onClock: (sessio
       if (event.kind === 'clock') audioBuffer?.clock(event.clock);
       if (event.kind === 'sync.state' && event.mode === 'clock') audioBuffer?.reset();
       if (engine) { engine.accept(event); return; }
+      if(event.kind==='clock'||event.kind==='sync.state') {
+        const transition=scheduler.transition(event);
+        if(transition===undefined)return;
+        if(transition){
+          presentationClock=undefined;
+          audioBuffer?.reset();clearRates();clearTimeout(melodyLease);sequence=0;melodySequence=-1;
+          setState({sessionId:selectedSessionId,mode:'clock',reason:'track-changed',onsets:{}});
+        }
+      }
       if (event.kind === 'clock') { receive(event); return; }
       if (event.kind === 'sync.state') {
         if (event.mode === 'capture' && event.captureId && retired.has(event.captureId)) {

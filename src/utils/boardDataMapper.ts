@@ -119,7 +119,7 @@ function applyTaskDefaults({
   };
 }
 
-function normalizeTaskPriority(priority: string | null): BoardTaskItem['priority'] | undefined {
+export function normalizeTaskPriority(priority: string | null): BoardTaskItem['priority'] | undefined {
   if (priority !== null && (TASK_PRIORITIES as readonly string[]).includes(priority)) {
     return priority as BoardTaskItem['priority'];
   }

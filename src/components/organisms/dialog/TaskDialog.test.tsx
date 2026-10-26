@@ -11,6 +11,29 @@ vi.mock('../../../services/taskBreakdown.service', () => ({ generateTaskBreakdow
 beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); });
 afterEach(cleanup);
 
+it('keeps a dirty task open rather than losing edits through Start Focus', async () => {
+  const start = vi.fn();
+  const task: ITaskItem = { id: 'task', title: 'Saved title', description: '', assignees: [], labels: [], attachments: [], checklistItems: [] };
+  render(<I18nProvider><TaskDialog isOpen taskData={task} onClose={vi.fn()} onSubmitTask={vi.fn()} onStartFocus={start} /></I18nProvider>);
+  const focus = screen.getByRole('button', { name: 'Start focus session' });
+  await waitFor(() => expect(focus).toBeEnabled());
+  fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), { target: { value: 'Unsaved title' } });
+  expect(focus).toBeDisabled();
+  fireEvent.click(focus);
+  expect(start).not.toHaveBeenCalled();
+  expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('Unsaved title');
+});
+
+it.each(['Attachment name', 'https://...'])('preserves an uncommitted %s draft when starting Focus', async placeholder => {
+  const task: ITaskItem = { id: 'task', title: 'Saved title', description: '', assignees: [], labels: [], attachments: [], checklistItems: [] };
+  render(<I18nProvider><TaskDialog isOpen taskData={task} onClose={vi.fn()} onSubmitTask={vi.fn()} onStartFocus={vi.fn()} /></I18nProvider>);
+  const focus = screen.getByRole('button', { name: 'Start focus session' });
+  await waitFor(() => expect(focus).toBeEnabled());
+  fireEvent.change(screen.getByPlaceholderText(placeholder), { target: { value: 'https://example.com/draft' } });
+  expect(focus).toBeDisabled();
+  expect(screen.getByText('Save changes before starting Focus')).toBeVisible();
+});
+
 it.each(['en', 'vi'])('keeps the %s task form concise while preserving labels and actions', (language) => {
   localStorage.setItem('app.language', language);
   render(<I18nProvider><TaskDialog isOpen onClose={vi.fn()} onSubmitTask={vi.fn()} workspaceId="workspace" /></I18nProvider>);

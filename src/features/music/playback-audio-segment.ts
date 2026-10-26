@@ -1,6 +1,6 @@
-import { clockAdvancing, clockDiscontinuity, playbackPosition, type PlaybackClock } from '../../../extensions/kanban-music/beat-timing.js';
+import { clockAdvancing, clockDiscontinuity, playbackPosition, sourceFence, sameSourceFence, type SourceFence, type PlaybackClock } from '../../../extensions/kanban-music/beat-timing.js';
 
-export interface PlaybackAudioSegment {
+export interface PlaybackAudioSegment extends Partial<SourceFence> {
   start: number; end: number; inputStart: number; sampleRate: 16000; audio: Uint8Array;
 }
 export const SEGMENT_SECONDS = 30;
@@ -17,14 +17,20 @@ export function createPlaybackAudioBuffer(deliver: (segment: PlaybackAudioSegmen
   const samples = new Int16Array((seconds + context) * rate);
   let previous: PlaybackClock | undefined, count = 0, inputStart = 0, coreStart: number | undefined;
   let remainder = 0, sum = 0, sourceFrames = 0;
-  const reset = () => { count = 0; coreStart = undefined; remainder = sum = sourceFrames = 0; };
+  let owner:SourceFence|undefined;
+  const reset = () => { samples.fill(0);count = 0; coreStart = undefined; remainder = sum = sourceFrames = 0; };
   return {
     reset,
     clock(clock: PlaybackClock) {
+      const next=sourceFence({clock});
+      if(owner?.sourceRevision!==undefined&&(next?.sourceRevision===undefined||next.sourceRevision<owner.sourceRevision))return;
+      if(next)owner=next;
       if (!clockAdvancing(clock) || clock.playbackRate !== 1 || clockDiscontinuity(previous, clock)) reset();
       previous = clock;
     },
     push(stereo: Float32Array, clock: PlaybackClock, sampledAt = Date.now()) {
+      if(!sameSourceFence(owner,{clock}))return;
+      owner??=sourceFence({clock});
       if (!clockAdvancing(clock) || clock.playbackRate !== 1 || sampledAt - clock.sampledAt > 1500
         || stereo.length % 2 || !stereo.length || stereo.length > 88200
         || stereo.some(sample => !Number.isFinite(sample) || Math.abs(sample) > 1)) { reset(); previous = clock; return; }
@@ -58,7 +64,7 @@ export function createPlaybackAudioBuffer(deliver: (segment: PlaybackAudioSegmen
           view.setUint32(24, rate, true); view.setUint32(28, rate * 2, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true);
           text(36, 'data'); view.setUint32(40, pcm.length * 2, true);
           pcm.forEach((sample, index) => view.setInt16(44 + index * 2, sample, true));
-          deliver({ start: coreStart, end: coreStart + seconds, inputStart: wantedStart, sampleRate: rate, audio });
+          deliver({ start: coreStart, end: coreStart + seconds, inputStart: wantedStart, sampleRate: rate, audio,...owner });
           const keep = Math.min(context * rate, count);
           samples.copyWithin(0, count - keep, count); count = keep;
           inputStart = finish - keep / rate; coreStart += seconds;

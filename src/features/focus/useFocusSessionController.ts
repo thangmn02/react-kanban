@@ -187,21 +187,20 @@ export function useFocusSessionController({
 
   const resolveRunnableTaskId = useCallback((taskId?: string) => {
     if (taskId) {
-      return taskId;
+      return focusTasksApi.focusTasks.find(task=>task.id===taskId)?.isDone ? null : taskId;
     }
 
     const requestedTaskId = pomodoro.timerState.activeTaskId || focusTasksApi.activeFocusTaskId;
-    if (requestedTaskId && focusTasksApi.focusTasks.some((task) => task.id === requestedTaskId)) {
+    if (requestedTaskId && focusTasksApi.focusTasks.some((task) => task.id === requestedTaskId && !task.isDone)) {
       return requestedTaskId;
     }
 
-    return focusTasksApi.focusTasks.find((task) => !task.isDone)?.id
-      || focusTasksApi.focusTasks[0]?.id
-      || null;
+    return focusTasksApi.focusTasks.find((task) => !task.isDone)?.id || null;
   }, [focusTasksApi.activeFocusTaskId, focusTasksApi.focusTasks, pomodoro.timerState.activeTaskId]);
 
   const startFocusSessionNow = useCallback((taskId?: string, intention = '') => {
     const nextTaskId = resolveRunnableTaskId(taskId);
+    if (!nextTaskId && (taskId || focusTasksApi.focusTasks.some(task=>task.isDone))) return false;
     if (!nextTaskId) {
       // A Pomodoro can run without a task. Keep the same timer, persistence,
       // completion and logging path rather than fabricating a focus task.
@@ -219,6 +218,7 @@ export function useFocusSessionController({
 
   const handleStartFocusTimer = useCallback((taskId?: string, nextStep = '') => {
     const nextTaskId = resolveRunnableTaskId(taskId);
+    if (taskId && !nextTaskId) return;
     if (!nextTaskId) {
       startFocusSessionNow();
       return;

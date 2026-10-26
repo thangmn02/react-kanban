@@ -6,6 +6,9 @@ export interface AppUser {
   name: string;
   avatarUrl: string;
   isMock: boolean;
+  legacyName?: string;
+  profileUpdatedAt?: string|null;
+  profileCleanupPending?: boolean;
 }
 
 export interface AuthActionResult {
@@ -25,6 +28,7 @@ export type WorkspaceInviteRole = Exclude<WorkspaceRole, 'owner'>;
 export type WorkspaceInviteStatus = 'member_added' | 'invite_created' | 'invite_existing';
 
 export interface WorkspaceMember {
+  previousNames?: string[];
   id: string;
   userId: string;
   workspaceId: string;

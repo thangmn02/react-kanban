@@ -3,13 +3,11 @@ import { useLocation, type NavigateFunction } from 'react-router-dom';
 
 import { notify } from '../../components/organisms/toast/notify';
 import { useDocumentPictureInPicture } from '../../hooks/useDocumentPictureInPicture';
-import { createActivity } from '../../services/activity.service';
+import { transitionTaskWorkflow } from '../../services/task-workflow.service';
 import { fetchBoardSnapshot } from '../../services/board.service';
-import { createNextRecurringTaskOccurrence, updateTask } from '../../services/task.service';
 import type { AppUser } from '../../types/auth.type';
 import type { FocusTask } from '../../types/focus.type';
 import type { ITaskItem } from '../../types/task.type';
-import { buildTaskFieldUpdatePayload } from '../../utils/boardDataMapper';
 import type { useI18n } from '../../i18n';
 import type { FocusSessionValue } from './useFocusSessionController';
 import type { useBoardPageController } from '../board/hooks/useBoardPageController';
@@ -64,9 +62,11 @@ export function useAppFocusIntegration({
   };
 
   const handleOpenFocusTask = useCallback(async (focusTask: FocusTask) => {
+    const requestScopeKey=focusContextRef.current.scopeKey;
     board.setIsBoardLoading(true);
     try {
       const snapshot = await fetchBoardSnapshot(focusTask.boardId, workspaceId, user?.id);
+      if(focusContextRef.current.scopeKey!==requestScopeKey)return;
       board.activeBoardIdRef.current = snapshot.boardId;
       board.setActiveBoardId(snapshot.boardId);
       board.setBoardData(snapshot.boardData);
@@ -79,34 +79,21 @@ export function useAppFocusIntegration({
         notify.info(t('toast.focusTaskUnavailable'));
       }
     } catch (error) {
-      notify.error(error instanceof Error ? error.message : t('toast.unableOpenFocusTask'));
+      if(focusContextRef.current.scopeKey===requestScopeKey)notify.error(error instanceof Error ? error.message : t('toast.unableOpenFocusTask'));
     } finally {
-      board.setIsBoardLoading(false);
+      if(focusContextRef.current.scopeKey===requestScopeKey)board.setIsBoardLoading(false);
     }
   }, [board, focus, navigate, openEditTaskDialog, t, user?.id, workspaceId]);
 
   const handleMarkFocusTaskDone = useCallback(async (focusTask: FocusTask) => {
     const requestScopeKey = focusContextRef.current.scopeKey;
     try {
-      const updatedTask = await updateTask(focusTask.id, buildTaskFieldUpdatePayload({ isDone: true }));
-      const nextOccurrence = !focusTask.isDone ? await createNextRecurringTaskOccurrence(updatedTask) : null;
+      const result = await transitionTaskWorkflow({taskId: focusTask.id, boardId: focusTask.boardId, workspaceId, kind: 'complete'});
       if (focusContextRef.current.scopeKey !== requestScopeKey) return false;
-      focus.updateFocusedTask(focusTask.id, { isDone: true });
-      if (board.boardData.task[focusTask.id]) {
-        board.setBoardData((current) => ({
-          ...current,
-          task: { ...current.task, [focusTask.id]: { ...current.task[focusTask.id], isDone: true } },
-        }));
-      }
-      if (nextOccurrence) await board.refreshBoardData();
-      void createActivity(focusTask.id, 'status_change', {
-        description: 'Marked task as completed from Focus Dock',
-        field: 'isDone',
-        oldValue: focusTask.isDone,
-        newValue: true,
-      }, undefined, undefined, { workspaceId, boardId: focusTask.boardId, actorId: user?.id })
-        .catch((error) => console.warn('Unable to log focus task completion activity:', error));
-      if (!focusTask.isDone) onTaskCompleted();
+      focus.updateFocusedTask(focusTask.id, { isDone: result.task.is_done, updatedAt: result.task.updated_at });
+      await board.refreshBoardData();
+      if(focusContextRef.current.scopeKey!==requestScopeKey)return false;
+      if (result.completedTransition) onTaskCompleted();
       const currentTimer = focusContextRef.current;
       if (currentTimer.activeTaskId === focusTask.id && currentTimer.mode === 'focus' && currentTimer.isRunning) {
         focus.pauseTimer();
@@ -114,10 +101,10 @@ export function useAppFocusIntegration({
       notify.success(t('toast.focusTaskMarkedDone'));
       return true;
     } catch (error) {
-      notify.error(error instanceof Error ? error.message : t('toast.unableMarkFocusTaskDone'));
+      if(focusContextRef.current.scopeKey===requestScopeKey)notify.error(error instanceof Error ? error.message : t('toast.unableMarkFocusTaskDone'));
       return false;
     }
-  }, [board, focus, onTaskCompleted, t, user?.id, workspaceId]);
+  }, [board, focus, onTaskCompleted, t, workspaceId]);
 
   const handleMarkDoneFromCompletion = useCallback(async () => {
     const task = focus.focusCompletion?.task;

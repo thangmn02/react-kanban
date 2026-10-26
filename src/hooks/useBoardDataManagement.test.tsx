@@ -18,6 +18,31 @@ const reminderKey = 'kanban_due_date_reminder_date';
 beforeEach(() => { vi.resetAllMocks(); localStorage.clear(); });
 afterEach(cleanup);
 
+it('ignores an older snapshot that resolves after the current board request', async () => {
+  let finishOld!: (value: { boardId: string; boardData: typeof data }) => void;
+  vi.mocked(fetchBoardSnapshot).mockImplementationOnce(() => new Promise(resolve => { finishOld = resolve; }));
+  vi.mocked(fetchBoardSnapshot).mockResolvedValueOnce({ boardId: 'new-board', boardData: emptyBoard });
+  const { result } = renderHook(() => useBoardDataManagement(signedIn));
+  let old!: Promise<void>;
+  act(() => { old = result.current.refreshBoardData({ boardId: 'old-board' }); });
+  await act(async () => { await result.current.refreshBoardData({ boardId: 'new-board' }); });
+  await act(async () => { finishOld({ boardId: 'old-board', boardData: data }); await old; });
+  expect(result.current.activeBoardId).toBe('new-board');
+  expect(result.current.boardData).toEqual(emptyBoard);
+});
+
+it('ignores an aborted contextual snapshot', async () => {
+  let finish!: (value: { boardId: string; boardData: typeof data }) => void;
+  vi.mocked(fetchBoardSnapshot).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  const { result } = renderHook(() => useBoardDataManagement(signedIn));
+  const controller = new AbortController();
+  let request!: Promise<void>;
+  act(() => { request = result.current.refreshBoardData({ boardId: 'aborted', signal: controller.signal }); });
+  controller.abort();
+  await act(async () => { finish({ boardId: 'aborted', boardData: data }); await request; });
+  expect(result.current.activeBoardId).not.toBe('aborted');
+});
+
 it.each([false, true])('keeps the login and signup screen empty without a demo reminder when cached=%s', (cached) => {
   if (cached) vi.mocked(readBoardCache).mockReturnValue({ boardId: 'demo-board', boardData: data });
   const { result } = renderHook(() => useBoardDataManagement({ authMode: 'supabase', userId: undefined, activeWorkspaceId: null }));
@@ -75,4 +100,18 @@ it('still loads demo tasks and sends real due-date reminders in local mode', asy
   expect(result.current.boardData).toEqual(data);
   await act(async () => { await result.current.refreshBoardData(); });
   expect(notify.info).toHaveBeenCalledOnce();
+});
+
+it('rejects old mutation refresh callbacks without cancelling the new workspace load',async()=>{
+ let finish!:(value:{boardId:string;boardData:typeof data})=>void;
+ vi.mocked(fetchBoardSnapshot).mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve;}));
+ const hook=renderHook(params=>useBoardDataManagement(params),{initialProps:signedIn});
+ const oldRefresh=hook.result.current.refreshBoardData;
+ hook.rerender({...signedIn,activeWorkspaceId:'workspace-b'});
+ let pending!:Promise<void>;
+ act(()=>{pending=hook.result.current.refreshBoardData({boardId:'board-b'});});
+ await act(async()=>{await oldRefresh({boardId:'board-a'});});
+ expect(fetchBoardSnapshot).toHaveBeenCalledOnce();
+ await act(async()=>{finish({boardId:'board-b',boardData:data});await pending;});
+ expect(hook.result.current.activeBoardId).toBe('board-b');
 });

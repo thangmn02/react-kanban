@@ -1,11 +1,13 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'framer-motion';
+import { uiFade, uiSpring } from '../../shared/motion';
 import type { FocusTask, PomodoroTimerState, PomodoroTimerSettings, PomodoroMode } from '../../types/focus.type';
 import { formatPomodoroTime } from '../../utils/pomodoroTime';
 import { useI18n } from '../../i18n';
 import { MusicFeedback, MusicGrid, MusicSetup, MusicTrack, MusicNowPlaying } from '../../features/music/MusicPlayer';
 import { useBrowserMusic } from '../../features/music/useBrowserMusic';
 import { useDockPreferences, beatColorModes, beatPalettes } from './useDockPreferences';
+import {motionPreviewAllowed} from '../../features/music/semantic-motion';
 
 export interface FloatingFocusProps {
   initialTab?: 'focus' | 'beat' | 'music';
@@ -40,7 +42,6 @@ export interface FloatingFocusProps {
 }
 
 const ringCircumference = 2 * Math.PI * 54;
-const glide = { duration: 0.35, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] };
 type Card = 'focus' | 'beat' | 'music';
 
 function DockIcon({ kind }: { kind: 'settings' | 'widget' | 'return' | 'close' }) {
@@ -95,7 +96,7 @@ export default function FloatingFocus(props: FloatingFocusProps) {
   const hasMusic = music.sessions.length > 0;
   const cycle = Math.min((timerState.completedCycleFocus || 0) + 1, cycleTotal);
   const progress = Math.max(0, Math.min(1, remainingSeconds / Math.max(1, timerState.plannedSeconds || remainingSeconds || 1500)));
-  const layoutTransition = reducedMotion ? { duration: 0 } : glide;
+  const layoutTransition = reducedMotion ? { duration: 0 } : uiSpring;
   const activeTab = selectedTab;
   const cards: Card[] = ['focus', 'music', 'beat'];
   const hidden = (card: Card) => card !== 'focus' && card !== activeTab;
@@ -135,6 +136,14 @@ export default function FloatingFocus(props: FloatingFocusProps) {
               {beatColorModes.map((value) => <option key={value} value={value}>{t(`dock.colors.${value}`)}</option>)}</select></label>
             <label>{t('dock.palette')}<select value={preferences.palette} onChange={(event) => preferences.setPalette(event.target.value as typeof preferences.palette)}>
               {beatPalettes.map((value) => <option key={value} value={value}>{t(`dock.palette.${value}`)}</option>)}</select></label>
+            {motionPreviewAllowed(music.selected?.syncState?.capability?.privateCandidate===true)&&<>
+              <label>{t('dock.visualStyle')}<select value={preferences.motionProfile} onChange={event=>preferences.setMotionProfile(event.target.value as typeof preferences.motionProfile)}>
+                <option value="focus">{t('dock.motion.focus')}</option><option value="dynamic">{t('dock.motion.dynamic')}</option>
+              </select></label>
+              <label>{t('dock.motionReduction')}<select value={preferences.motionReduction} onChange={event=>preferences.setMotionReduction(event.target.value as typeof preferences.motionReduction)}>
+                <option value="system">{t('dock.motion.system')}</option><option value="reduced">{t('dock.motion.reduced')}</option>
+              </select></label>
+            </>}
             {props.onMusicSetup && <button type="button" disabled={props.musicSetupPending} onClick={props.onMusicSetup}>
               {t(props.musicSetupPending ? 'music.companionUpdating' : 'music.installCompanion')}</button>}
             {props.musicSetupMessage && <p role="status" className="muted" style={{ overflowWrap: 'anywhere' }}>{props.musicSetupMessage}</p>}
@@ -164,7 +173,7 @@ export default function FloatingFocus(props: FloatingFocusProps) {
             <select className="dock-task-select task-select" aria-label={t('focus.timer.chooseTask')} value={taskId} disabled={!tasks.length || !onActiveTaskChange}
               onChange={(event) => onActiveTaskChange?.(event.target.value)}>
               {!tasks.length && <option value="">{t('home.focusEmptyTitle')}</option>}
-              {tasks.map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}</select>
+              {tasks.map((task) => <option key={task.id} value={task.id} disabled={task.isDone}>{task.title}</option>)}</select>
             <span className="cycle">{cycle}/{cycleTotal}</span>
           </motion.div>
           <motion.div layout layoutId="timer-ring" className="dock-ring" transition={{ layout: layoutTransition }}>
@@ -175,9 +184,12 @@ export default function FloatingFocus(props: FloatingFocusProps) {
               onClick={() => setSettingsOpen((current) => !current)}>{formatPomodoroTime(remainingSeconds)}</button>
               : <span className="time">{formatPomodoroTime(remainingSeconds)}</span>}
           </motion.div>
-          <div className="dock-cycle">{modeLabel}</div>
+          <motion.div key={timerState.mode} className="dock-cycle" role="status" aria-live="polite"
+            initial={reducedMotion ? false : { opacity: 0, y: 3 }} animate={{ opacity: 1, y: 0 }}
+            transition={reducedMotion ? { duration: 0 } : uiFade}>{modeLabel}</motion.div>
           <div className="dock-focus-actions">
             <button type="button" className="solid dock-start" onClick={timerState.isRunning ? onPause : onStart}
+              disabled={!timerState.isRunning && timerState.mode === 'focus' && Boolean(activeTask?.isDone)}
               aria-label={timerState.isRunning ? t('focus.timer.pause') : t('focus.timer.start')}>
               <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">{timerState.isRunning ? <path d="M7 5h4v14H7zm6 0h4v14h-4z" /> : <path d="m8 5 11 7-11 7z" />}</svg>
               <span>{timerState.isRunning ? t('focus.timer.pause') : t('focus.timer.start')}</span></button>
@@ -199,7 +211,7 @@ export default function FloatingFocus(props: FloatingFocusProps) {
               disabled={task.isDone || !onMarkDoneAndNext} onClick={() => onMarkDoneAndNext?.(task.id)}>
               {task.isDone && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg>}
             </button>
-            <button type="button" className="dock-work-task" disabled={!onActiveTaskChange} aria-pressed={task.id === taskId}
+            <button type="button" className="dock-work-task" disabled={!onActiveTaskChange || task.isDone} aria-pressed={task.id === taskId}
               onClick={() => onActiveTaskChange?.(task.id)}><span>{task.title}</span><small>{[task.boardTitle, task.listTitle].filter(Boolean).join(' · ')}</small></button>
             {task.id === taskId && !task.isDone && <span className="dock-work-current">{t('dock.currentTask')}</span>}
           </li>)}</ul> : <p className="dock-empty muted">{t('home.focusEmptyTitle')}</p>}
@@ -210,7 +222,8 @@ export default function FloatingFocus(props: FloatingFocusProps) {
           role="tabpanel" aria-labelledby={`${groupId}-beat-tab`} tabIndex={0}
           animate={{ opacity: hidden('beat') ? 0 : 1 }} transition={{ ...layoutTransition, layout: layoutTransition }}>
           {!hasMusic && <p className="dock-empty muted">{t('music.nothingPlaying')}</p>}
-          <MusicGrid music={music} colorMode={preferences.colorMode} palette={preferences.palette} />
+          <MusicGrid music={music} colorMode={preferences.colorMode} palette={preferences.palette} motionProfile={preferences.motionProfile} motionReduction={preferences.motionReduction}
+            visualActive={selectedTab==='beat'&&visible&&!props.isMinimized}/>
         </motion.section>
         <motion.section id={`${groupId}-music`} layout layoutId="music-row" className={`dock-panel dock-track-pane${preferences.palette === 'ultraviolet' ? ' ultraviolet' : ''}`}
           data-card="music" aria-label={t('focus.island.music')} aria-hidden={hidden('music')} inert={hidden('music')}

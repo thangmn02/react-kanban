@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useDialogFocus } from '../../../hooks/use-dialog-focus';
+import { uiSpring } from '../../../shared/motion';
 import type { Dispatch, SetStateAction } from 'react';
 import { useForm, useWatch, type Resolver } from 'react-hook-form';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
@@ -29,7 +31,7 @@ import {
 } from '../../../utils/taskCollections';
 import { createLocalId } from '../../../utils/idGenerator';
 import { formatFocusSessionDuration } from '../../../utils/timeFormatting';
-import { mapWorkspaceMembersToAssignees, mockWorkspaceMembers } from '../../../utils/workspaceMembers';
+import { mapWorkspaceMembersToAssignees, mockWorkspaceMembers, resolveAssigneeIdentity, sameAssigneeIdentity } from '../../../utils/workspaceMembers';
 import { Skeleton } from '../../atoms/skeleton';
 import TaskCoverPicker from '../../task/TaskCoverPicker';
 import { useI18n } from '../../../i18n';
@@ -45,6 +47,8 @@ interface TaskDialogProps {
   taskData?: ITaskItem | null;
   isFocusTask?: boolean;
   onToggleFocusTask?: () => void;
+  onStartFocus?: () => void;
+  onToggleCompletion?: () => Promise<boolean>;
   workspaceMembers?: WorkspaceMember[];
   workspaceId?: string | null;
   boardTitle?: string;
@@ -108,11 +112,17 @@ function TaskDialog({
   taskData,
   isFocusTask = false,
   onToggleFocusTask,
+  onStartFocus,
+  onToggleCompletion,
   workspaceMembers = mockWorkspaceMembers,
   workspaceId = null,
   boardTitle = '',
   columnTitle = '',
 }: TaskDialogProps) {
+  const dialogRef = useRef<HTMLElement | null>(null);
+  const [isCompleting, setIsCompleting] = useState(false);
+  const completionPending = useRef(false);
+  useDialogFocus(isOpen, dialogRef, onClose);
   const isEditMode = Boolean(taskData);
   const shouldReduceMotion = useReducedMotion();
   const { t, language } = useI18n();
@@ -140,7 +150,7 @@ function TaskDialog({
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isDirty },
     reset,
     setValue,
     control,
@@ -271,7 +281,7 @@ function TaskDialog({
     setValue('assignees', nextValues.assignees);
 
     if (editor) {
-      editor.commands.setContent(nextValues.description);
+      editor.commands.setContent(nextValues.description, { emitUpdate: false });
     }
   }, [editor, isOpen, reset, setValue, taskData]);
 
@@ -350,6 +360,9 @@ function TaskDialog({
     });
   };
 
+  const hasUnsavedChanges = isDirty || Boolean(formDrafts.checklist.trim() || formDrafts.label.name.trim() || formDrafts.attachment.name.trim() || formDrafts.attachment.url.trim())
+    || JSON.stringify(labels) !== JSON.stringify(taskData?.labels || []) || JSON.stringify(attachments) !== JSON.stringify(taskData?.attachments || []) || JSON.stringify(checklistItems) !== JSON.stringify(taskData?.checklistItems || []);
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -364,6 +377,7 @@ function TaskDialog({
           />
 
           <motion.aside
+            ref={dialogRef} tabIndex={-1}
             role="dialog"
             aria-modal="true"
             aria-labelledby="task-dialog-title"
@@ -371,16 +385,25 @@ function TaskDialog({
             initial={shouldReduceMotion ? false : { x: '100%', opacity: 0.72, scale: 0.98 }}
             animate={{ x: 0, opacity: 1, scale: 1 }}
             exit={shouldReduceMotion ? { opacity: 0 } : { x: '100%', opacity: 0, scale: 0.98 }}
-            transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 220, damping: 26, mass: 0.9 }}
+            transition={shouldReduceMotion ? { duration: 0 } : uiSpring}
           >
-        <div className="flex items-start justify-between border-b border-gray-200 bg-white px-6 py-5">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-gray-200 bg-white px-4 py-4 sm:px-6">
           <div>
             <h3 id="task-dialog-title" className="text-2xl font-bold tracking-tight text-gray-900">
               {t(isEditMode ? 'task.edit' : 'task.create')}
             </h3>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex max-w-full flex-wrap items-center gap-2">
+            {isEditMode && onToggleCompletion && <button type="button" disabled={hasUnsavedChanges || isCompleting}
+              onClick={async () => {
+                if (completionPending.current) return;
+                completionPending.current = true; setIsCompleting(true);
+                try { await onToggleCompletion(); } finally { completionPending.current = false; setIsCompleting(false); }
+              }} className="min-h-11 cursor-pointer rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-600">
+              {t(isCompleting ? 'ux.completing' : taskData?.isDone ? 'common.markNotDone' : 'common.markDone')}
+            </button>}
+            {isEditMode && !taskData?.isDone && onStartFocus && <button type="button" disabled={hasUnsavedChanges} aria-describedby={hasUnsavedChanges ? "task-focus-save-hint" : undefined} onClick={onStartFocus} title={t('ux.savedTaskFocus')} className="min-h-11 cursor-pointer rounded-xl bg-slate-950 px-3 py-2 text-xs font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50">{t('task.startFocus')}</button>}
             {isEditMode && onToggleFocusTask && (
               <button
                 type="button"
@@ -408,6 +431,11 @@ function TaskDialog({
             </button>
           </div>
         </div>
+        {isEditMode && <div className="border-b border-slate-100 px-4 py-3 sm:px-6" aria-label={t('ux.context')}>
+          <p className="break-words text-xs text-slate-500">{[boardTitle, columnTitle].filter(Boolean).join(' · ')}</p>
+          {onStartFocus && hasUnsavedChanges && <p id="task-focus-save-hint" className="mt-2 text-xs text-slate-600">{t('ux.savedTaskFocus')}</p>}
+          {Boolean(taskData?.attachments?.length) && <div className="mt-2 flex flex-wrap gap-2">{taskData?.attachments.filter(item => /^https?:\/\//i.test(item.url)).map(item => <a key={item.id} href={item.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-9 max-w-full items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-blue-700 focus-visible:outline-2 focus-visible:outline-blue-600"><span className="truncate">{item.name || item.url}</span><span aria-hidden="true">↗</span></a>)}</div>}
+        </div>}
 
         <form onSubmit={handleSubmit(handleFormSubmit)} className="flex min-h-0 flex-1 flex-col">
           <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
@@ -591,7 +619,7 @@ function TaskDialog({
                     <div className="flex flex-wrap items-center gap-3">
                       {currentAssignees.length > 0 ? (
                         <div className="flex -space-x-2 overflow-hidden">
-                          {currentAssignees.map((assignee) => (
+                          {currentAssignees.map(assignee=>resolveAssigneeIdentity(assignee,workspaceMembers)).map((assignee) => (
                             <img
                               key={assignee.name}
                               src={assignee.avatar}
@@ -626,7 +654,7 @@ function TaskDialog({
                               </div>
                               <div className="max-h-56 space-y-1 overflow-y-auto">
                                 {assigneeOptions.map((member) => {
-                                  const isSelected = currentAssignees.some((assignee) => assignee.name === member.name);
+                                  const isSelected = currentAssignees.some((assignee) => sameAssigneeIdentity(resolveAssigneeIdentity(assignee,workspaceMembers),member));
 
                                   return (
                                     <button
@@ -634,8 +662,8 @@ function TaskDialog({
                                       key={member.name}
                                       onClick={() => {
                                         const nextAssignees = isSelected
-                                          ? currentAssignees.filter((assignee) => assignee.name !== member.name)
-                                          : [...currentAssignees, { name: member.name, avatar: member.avatar }];
+                                          ? currentAssignees.filter((assignee) => !sameAssigneeIdentity(resolveAssigneeIdentity(assignee,workspaceMembers),member))
+                                          : [...currentAssignees, member];
 
                                         setValue('assignees', nextAssignees, { shouldDirty: true, shouldValidate: true });
                                       }}

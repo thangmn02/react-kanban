@@ -1,8 +1,10 @@
 const offscreenPath = 'offscreen.html';
 import { beatTelemetry, parseBeatTraces } from './beat-telemetry.js';
-import { audibleClock, playbackTiming, playbackTraces, parsePlaybackClock, clockDiscontinuity } from './beat-timing.js';
+import { audibleClock, playbackTiming, playbackTraces, parsePlaybackClock, clockDiscontinuity, sameSourceFence } from './beat-timing.js';
 import { privateBeatCandidate, candidateDetector } from './beat-candidate.js';
 import { decideBeatMode, validSyncConfiguration } from './beat-mode.js';
+import {validDiagnosticRequest} from './protocol.js';
+import {parseMediaAsset} from './media-asset.js';
 const telemetry = beatTelemetry.at('beat-sync');
 const validBands = new Set(['kick', 'bass', 'clap', 'hat']);
 const sameOwner = (a, b) => a.native === b.native && a.tabId === b.tabId && a.documentId === b.documentId;
@@ -29,8 +31,21 @@ export function createBeatSync(api, nativePublish) {
   let state;
   let creating;
   let queue = Promise.resolve();
+  let sourceRevision=0;
+  let diagnosticSession,diagnosticTimer;
+  const stopDiagnosticInstrumentation=current=>{
+    if(!diagnosticSession?.instrumentationActive)return;
+    clearTimeout(diagnosticTimer);diagnosticSession.instrumentationActive=false;
+    current.diagnostics=diagnosticSession.priorCurrentDiagnostics;beatTelemetry.enable(diagnosticSession.priorTelemetry);
+    void offscreenMessage({kind:'diagnostic-capture',operation:'status',recordingId:diagnosticSession.recordingId,captureId:diagnosticSession.captureId}).catch(()=>{});
+  };
   const serialize = (fn) => { queue = queue.catch(() => {}).then(fn); return queue; };
   const offscreenMessage = (message) => api.runtime.sendMessage({ target: 'beat-offscreen', ...message });
+  const fence=current=>{
+    if(current.revisionEpoch!==current.synchronizationEpoch){current.revisionEpoch=current.synchronizationEpoch;sourceRevision=Math.max(sourceRevision+1,Date.now()*1000);current.sourceRevision=sourceRevision;}
+    return {sourceId:current.session.id,sourceGeneration:current.clock?.generation||0,synchronizationEpoch:current.synchronizationEpoch,sourceRevision:current.sourceRevision};
+  };
+  const fencedClock=current=>({...current.clock,generation:current.clock?.generation||0,...fence(current)});
   const modeFacts = current => ({privateCandidate:privateBeatCandidate,surface:current.owner.native?'desktop':'web',
     source:{...(current.clock?.mediaFacts||current.session.mediaFacts||{kind:'unknown'}),
       id:current.session.id,version:current.session.src,
@@ -40,12 +55,15 @@ export function createBeatSync(api, nativePublish) {
       active:current.captureReady===true,audible:current.audioDetected===true,
       output:current.owner.native?'native-monitor':'tab-replacement',originalSuppressed:current.captureReady===true&&current.originalSuppressed===true&&!current.owner.native},
     clock:{...current.clock,generation:current.clock?.generation||0},
-    detector:current.experiment?.enabled&&current.experiment?.detectorVariant==='L1-gap0'
-      ?{...candidateDetector,id:'adtof-early-finalization',version:'L1-gap0'}:candidateDetector,
+    detector:current.experiment?.enabled&&['H-SHADOW','H-LIVE'].includes(current.experiment.detectorVariant)
+      ?{...candidateDetector,id:'hybrid-adtof-cnn-running',version:current.experiment.detectorVariant}
+      :current.experiment?.enabled&&current.experiment?.detectorVariant==='L1-gap0'
+        ?{...candidateDetector,id:'adtof-early-finalization',version:'L1-gap0'}:candidateDetector,
     timing:current.experiment?.enabled&&!current.experiment.live?current.experiment.calibration:current.calibration||{},health:current.health||{},experiment:current.experiment||{}});
   const capability = current => privateBeatCandidate?decideBeatMode(modeFacts(current)):undefined;
   const pauseRetainsCapture = current => privateBeatCandidate&&current.captureReady&&current.audioDetected
-    &&!current.owner.native&&current.clock?.mediaFacts?.kind==='audio-only'&&current.clock.mediaFacts.noVideo===true;
+    &&!current.owner.native&&(current.clock?.mediaFacts?.kind==='audio-only'&&current.clock.mediaFacts.noVideo===true
+      ||capability(current).compensationEligible);
 
   function clockReason(current) {
     if (current.mode === 'capture') return undefined;
@@ -87,7 +105,7 @@ export function createBeatSync(api, nativePublish) {
   function publish(current, event) {
     if (state !== current) { telemetry.mark('EVENT_DROPPED', event.telemetry, { reason: 'owner' }); return; }
     telemetry.mark('EVENT_SENT', event.telemetry);
-    event = { ...event, emittedAt: Date.now() };
+    event = { ...event, ...fence(current), emittedAt: Date.now() };
     if (current.owner.native) {
       nativePublish?.(current.owner.native, { sessionId: current.session.id, subscriptionId: current.subscriptionId, ...event });
       return;
@@ -108,6 +126,7 @@ export function createBeatSync(api, nativePublish) {
   }
 
   function cancelCapture(current) {
+    stopDiagnosticInstrumentation(current);
     const captureId = current.captureId;
     if (!captureId && current.mode === 'clock') return;
     telemetry.record('CAPTURE_STOP', undefined, { captureId, reason: current.fallbackReason || 'stopped' });
@@ -116,11 +135,13 @@ export function createBeatSync(api, nativePublish) {
     current.audioDetected = false;
     current.delaySeconds = 0;
     current.experiment = undefined;
+    current.synchronizationEpoch=crypto.randomUUID();
     current.calibration = undefined;
     current.originalSuppressed = false;
     current.mode = 'clock';
     publishState(current);
-    if (captureId) void offscreenMessage({ kind: 'stop', captureId }).catch(() => {});
+    if (captureId) current.stopTask=Promise.all([current.stopTask,
+      timeout(offscreenMessage({ kind: 'stop', captureId }),1500)]).then(([prior,response])=>prior!==false&&response?.ok===true,()=>false);
   }
 
   async function capture(current, force = false) {
@@ -136,6 +157,7 @@ export function createBeatSync(api, nativePublish) {
       || (!force && Date.now() < current.retryAt)) return;
     const captureId = crypto.randomUUID();
     current.captureId = captureId;
+    current.synchronizationEpoch=crypto.randomUUID();
     telemetry.record('CAPTURE_START', undefined, { captureId });
     current.captureReady = false;
     current.audioDetected = false;
@@ -145,6 +167,12 @@ export function createBeatSync(api, nativePublish) {
     current.captureTask = (async () => {
       let stage = 'offscreen-create';
       try {
+        if(await current.stopTask===false) {
+          const closed=await timeout(api.offscreen.closeDocument(),1000).then(()=>true,()=>false);
+          if(!closed)throw new Error('Previous capture cleanup unavailable');
+          current.stopTask=Promise.resolve(true);
+        }
+        if(state!==current||current.captureId!==captureId)return;
         await ensureOffscreen();
         if (state !== current || current.captureId !== captureId) return;
         stage = 'capture-permission';
@@ -152,6 +180,7 @@ export function createBeatSync(api, nativePublish) {
         if (state !== current || current.captureId !== captureId) return;
         stage = 'capture-stream';
         const response = await timeout(offscreenMessage({ kind: 'start', captureId, streamId, telemetryEnabled: telemetryEnabled(current),
+          ...fence(current),
           ...(privateBeatCandidate?{candidate:true,sourceProvider:modeFacts(current).source.provider}: {}) }), 4500);
         if (state !== current || current.captureId !== captureId) {
           void offscreenMessage({ kind: 'stop', captureId }).catch(() => {}); return;
@@ -189,21 +218,27 @@ export function createBeatSync(api, nativePublish) {
 
   async function stopCurrent(keepOffscreen = false,reason='stopped') {
     const previous = state;
+    if(previous)stopDiagnosticInstrumentation(previous);
     state = undefined;
+    let released=true;
     if (previous) {
       telemetry.record('CAPTURE_STOP',undefined,{captureId:previous.captureId,reason});
       void api.tabs.sendMessage(previous.session.tabId, { target: 'beat-clock', kind: 'stop', token: previous.token },
         { documentId: previous.session.documentId }).catch(() => {});
-      if (previous.captureId) await timeout(offscreenMessage({ kind: 'stop', captureId: previous.captureId }), 1000).catch(() => {});
+      if (previous.captureId) released=(await timeout(offscreenMessage({ kind: 'stop', captureId: previous.captureId }), 1000).catch(() => undefined))?.ok===true;
+      if(await previous.stopTask===false)released=false;
     }
     // A handoff releases the entire old stream/graph, but can reuse the empty document.
-    if (keepOffscreen) return;
+    if (keepOffscreen&&released) return true;
     // Also clean up an orphan left by a restarted service worker.
     if (creating) await timeout(creating, 4500).catch(() => {});
-    await timeout(api.offscreen.closeDocument(), 1000).catch(() => {});
+    const closed=await timeout(api.offscreen.closeDocument(), 1000).then(()=>true,()=>false);
+    return released||closed;
   }
 
   function stopIfCurrent(current,reason='stopped') {
+    // Revoke admission immediately, before serialized cleanup can await another task.
+    if(state===current)cancelCapture(current);
     return serialize(async () => { if (state === current) await stopCurrent(false,reason); });
   }
 
@@ -237,6 +272,7 @@ export function createBeatSync(api, nativePublish) {
         : session.muted || session.tabMuted ? 'muted' : 'not-selected' };
     },
     start(session, owner, subscriptionId, diagnostics = false) {
+      if(state&&(state.session.id!==session.id||state.session.src!==session.src||!sameOwner(state.owner,owner)))cancelCapture(state);
       return serialize(async () => {
         if (state && sameOwner(state.owner, owner) && state.owner.nativeAudio === owner.nativeAudio
           && state.subscriptionId === subscriptionId && state.session.id === session.id && state.session.src === session.src) {
@@ -271,8 +307,8 @@ export function createBeatSync(api, nativePublish) {
           return;
         }
         if(state)telemetry.record('CAPTURE_REPLACED',undefined,{captureId:state.captureId,sameOwner:sameOwner(state.owner,owner),sameNativeAudio:state.owner.nativeAudio===owner.nativeAudio,sameSubscription:state.subscriptionId===subscriptionId,sameSession:state.session.id===session.id,sameSource:state.session.src===session.src});
-        await stopCurrent(true,'replaced');
-        const current = { owner, session, subscriptionId, diagnostics: diagnostics === true, token: crypto.randomUUID(), mode: 'clock', retryAt: 0,
+        if(!await stopCurrent(true,'replaced'))throw new Error('Previous audio ownership could not be released');
+        const current = { owner, session, subscriptionId, synchronizationEpoch:crypto.randomUUID(),diagnostics: diagnostics === true, token: crypto.randomUUID(), mode: 'clock', retryAt: 0,
           tabMuted: session.tabMuted, clock: session };
         state = current;
         publishState(current);
@@ -291,34 +327,76 @@ export function createBeatSync(api, nativePublish) {
           ||!validSyncConfiguration(configuration)||configuration.captureId!==current.captureId
           ||configuration.generation!==(current.clock?.generation||0)
           ||configuration.detectorVariant==='L1-gap0'&&candidateDetector.earlyDecisionAvailable!==true
-          ||configuration.live&&current.delaySeconds>0||current.clock?.playing&&!configuration.live
+          ||['H-SHADOW','H-LIVE'].includes(configuration.detectorVariant)&&candidateDetector.hybridLiveAvailable!==true
+          ||['H-SHADOW','H-LIVE'].includes(configuration.detectorVariant)&&current.clock?.playbackRate!==1
+          ||configuration.live&&current.delaySeconds>0||configuration.enabled&&current.clock?.playing&&!configuration.live
           ||current.clock?.seeking||current.clock?.buffering) return false;
         const available=capability(current);
-        if(configuration.enabled&&(configuration.live?!available.livePreviewEligible||!current.clock?.playing:!available.bufferEligible))return false;
-        const experiment={...configuration,bufferMs:configuration.enabled&&!configuration.live?available.requiredBufferMs:0,
+        if(configuration.enabled&&(configuration.live?!available.livePreviewEligible||!current.clock?.playing
+          :configuration.compensationMs!==undefined?!available.compensationEligible:!available.bufferEligible))return false;
+        const experiment={...configuration,bufferMs:configuration.enabled&&!configuration.live?configuration.compensationMs??available.requiredBufferMs:0,
           calibration:{...current.calibration}};
         const next=decideBeatMode({...modeFacts(current),experiment});
         const expectedMode=configuration.live?'experimental-live':'experimental-buffered';
         if(configuration.enabled&&next.mode!==expectedMode)return false;
         const epoch=crypto.randomUUID();current.synchronizationEpoch=epoch;
-        const result=await offscreenMessage({kind:'synchronization',captureId:current.captureId,
+        publishState(current);
+        const result=await timeout(offscreenMessage({kind:'synchronization',captureId:current.captureId,
           settings:{bufferMs:next.bufferMs,allowTypedPreview:next.allowTypedPreview,eligible:next.mode===expectedMode,
-            paused:!current.clock?.playing,live:configuration.live===true,epoch,
-            detectorVariant:configuration.enabled?configuration.detectorVariant||'L0':'L0'}}).catch(()=>undefined);
+            paused:!current.clock?.playing,live:configuration.live===true,flush:!configuration.enabled,epoch,
+            detectorVariant:configuration.enabled?configuration.detectorVariant||'L0':'L0'}}),1500).catch(()=>undefined);
         if(state!==current||result?.ok!==true||current.captureId!==configuration.captureId||current.synchronizationEpoch!==epoch
-          ||current.clock?.playing&&!configuration.live
+          ||configuration.enabled&&current.clock?.playing&&!configuration.live
           ||configuration.enabled&&configuration.live&&!current.clock?.playing
           ||configuration.generation!==(current.clock?.generation||0)
           ||configuration.enabled&&decideBeatMode({...modeFacts(current),experiment}).mode!==expectedMode) {
-          if(state===current){current.experiment=undefined;current.delaySeconds=0;publishState(current);}
-          void offscreenMessage({kind:'synchronization',captureId:configuration.captureId,
+          if(state!==current||current.captureId!==configuration.captureId||current.synchronizationEpoch!==epoch)return false;
+          const rollbackEpoch=crypto.randomUUID();current.synchronizationEpoch=rollbackEpoch;
+          current.experiment=undefined;current.delaySeconds=0;publishState(current);
+          const rollback=await timeout(offscreenMessage({kind:'synchronization',captureId:configuration.captureId,
             settings:{bufferMs:0,eligible:false,allowTypedPreview:false,flush:true,live:configuration.live===true,
-              epoch:crypto.randomUUID()}}).catch(()=>{});
+              epoch:rollbackEpoch}}),1500).catch(()=>undefined);
+          if(state===current&&current.synchronizationEpoch===rollbackEpoch&&rollback?.ok!==true)cancelCapture(current);
           return false;
         }
         current.experiment=experiment;current.delaySeconds=next.bufferMs/1000;
+        publish(current,{kind:'clock',clock:audibleClock(fencedClock(current),current.delaySeconds)});
         publishState(current);return true;
       });
+    },
+    async diagnostics(session,owner,request){
+      const current=state;
+      if(!privateBeatCandidate||!validDiagnosticRequest(request)||owner.native||!current
+        ||!sameOwner(current.owner,owner)||current.session.id!==session.id||current.session.src!==session.src
+        ||!current.captureId||current.mode!=='capture')return {ok:false,error:'unavailable'};
+      const initialFence=fence(current),captureId=current.captureId;
+      if(request.operation!=='start'&&(!diagnosticSession||diagnosticSession.recordingId!==request.recordingId
+        ||diagnosticSession.captureId!==captureId||!sameSourceFence(diagnosticSession,initialFence)))return {ok:false,error:'source-changed'};
+      const result=await timeout(offscreenMessage({kind:'diagnostic-capture',operation:request.operation,recordingId:request.recordingId,captureId,
+        ...(request.durationSeconds!==undefined?{durationSeconds:request.durationSeconds}:{})}),2500).catch(()=>undefined);
+      if(state!==current||current.captureId!==captureId||!sameSourceFence(initialFence,fence(current))){
+        if(request.operation==='start')void offscreenMessage({kind:'diagnostic-capture',operation:'stop',recordingId:request.recordingId,captureId}).catch(()=>{});
+        return {ok:false,error:'source-changed'};
+      }
+      if(result?.ok!==true||result.recording?.id!==request.recordingId
+        ||result.recording?.meta?.captureId!==captureId||!Number.isFinite(result.recording.startedAt)
+        ||!sameSourceFence(initialFence,result.recording.meta))return {ok:false,error:result?.error||'diagnostics-unavailable'};
+      if(request.operation==='start'){
+        stopDiagnosticInstrumentation(current);
+        const asset=parseMediaAsset(current.session.asset);
+        diagnosticSession={recordingId:request.recordingId,captureId,...initialFence,asset,
+          videoId:asset?.provider==='youtube'?asset.id:null,startedAt:Date.now(),clockOverflow:0,
+          clocks:[],decisions:[],decisionOverflow:0,instrumentationActive:true,priorCurrentDiagnostics:current.diagnostics===true,priorTelemetry:beatTelemetry.enabled,
+          configuration:{capability:capability(current),playbackRate:current.clock?.playbackRate,
+            concurrentHybridOwner:'NOT_OBSERVED_BY_COMPANION',physicalVerified:false}};
+        current.diagnostics=true;beatTelemetry.enable();
+        const endsAt=Number.isFinite(result.recording.endsAt)?result.recording.endsAt:result.recording.startedAt+(request.durationSeconds??30)*1000;
+        diagnosticTimer=setTimeout(()=>stopDiagnosticInstrumentation(current),Math.max(0,endsAt+1000-Date.now()));
+      }
+      if(diagnosticSession.clocks.length<2000)diagnosticSession.clocks.push({at:Date.now(),clock:parsePlaybackClock(fencedClock(current)),delaySeconds:current.delaySeconds});else diagnosticSession.clockOverflow++;
+      if(request.operation==='stop'||result.recording.status!=='RECORDING')stopDiagnosticInstrumentation(current);
+      const packet={...result,source:{...diagnosticSession,...(request.operation==='read'?{}:{clocks:undefined,decisions:undefined})}};
+      return packet;
     },
     async readAudio(session, owner, subscriptionId) {
       const current = state;
@@ -329,13 +407,14 @@ export function createBeatSync(api, nativePublish) {
           || !current.clock?.playing || current.clock.paused || current.clock.seeking || current.clock.buffering
           || current.clock.muted || current.tabMuted || current.clock.playbackRate !== 1
         || Date.now() - current.clock.sampledAt > 1500) return;
-      const captureId = current.captureId;
+      const captureId = current.captureId, readFence=fence(current);
       const result = await timeout(offscreenMessage({ kind: 'audio.read', captureId }), 800).catch(() => undefined);
-        if (state !== current || current.captureId !== captureId || !current.clock?.playing
+        if (state !== current || current.captureId !== captureId || !sameSourceFence(readFence,fence(current)) || !current.clock?.playing
           || current.clock.paused || current.clock.seeking || current.clock.buffering || current.clock.muted
           || current.tabMuted || current.clock.playbackRate !== 1 || Date.now() - current.clock.sampledAt > 1500) return;
       const packet = result?.packet;
-      const timing = playbackTiming(current.clock, packet);
+      if(packet.sourceId!==undefined&&!sameSourceFence(fence(current),packet))return;
+      const timing = playbackTiming(fencedClock(current), packet);
       if (!timing || !Number.isSafeInteger(packet.sequence) || packet.sequence <= 0 || packet.sampleRate !== 44100
         || typeof packet.pcm !== 'string' || packet.pcm.length !== 23520
         || Date.now() - packet.targetOutputTime > 500 || packet.targetOutputTime > Date.now() + 100) return;
@@ -350,24 +429,60 @@ export function createBeatSync(api, nativePublish) {
       if (!parsePlaybackClock(clock) || current.clock && clock.sampledAt < current.clock.sampledAt) return;
       const resumed = (!current.clock?.playing || current.clock?.muted) && clock.playing && !clock.muted;
       const previous = current.clock;
+      const diagnostic=diagnosticSession?.instrumentationActive&&diagnosticSession.captureId===current.captureId?diagnosticSession:undefined;
+      const before={delay:current.delaySeconds||0,epoch:current.synchronizationEpoch,mode:current.experiment?.detectorVariant||'L0'};
       const discontinuity = clockDiscontinuity(previous, clock)
         || previous?.playing && clock.playing && previous.playbackRate !== clock.playbackRate;
       current.clock = clock;
+      if(diagnosticSession?.instrumentationActive&&diagnosticSession.captureId===current.captureId&&sameSourceFence(diagnosticSession,fence(current))){
+        if(diagnosticSession.clocks.length<2000)diagnosticSession.clocks.push({at:Date.now(),clock:parsePlaybackClock(fencedClock(current)),delaySeconds:current.delaySeconds});else diagnosticSession.clockOverflow++;
+      }
       telemetry.record('EVENT_RECEIVED', undefined, { captureId: current.captureId });
       if (resumed) current.retryAt = 0;
       if (discontinuity) { current.retryAt = 0; cancelCapture(current); }
       if(privateBeatCandidate&&current.experiment?.live&&(!clock.playing||!capability(current).livePreviewEligible))revokeLivePreview(current,'clock');
-      if(privateBeatCandidate&&current.delaySeconds&&((!clock.playing&&previous?.playing)||!capability(current).bufferEligible)) {
+      const bufferAllowed=privateBeatCandidate&&(current.experiment?.compensationMs!==undefined?capability(current).compensationEligible:capability(current).bufferEligible);
+      const decisionFacts=diagnostic?decideBeatMode({...modeFacts(current),diagnostics:true}):undefined;
+      let decisionReason=discontinuity?'clock-discontinuity':bufferAllowed?'eligible':'prerequisite-invalid';
+      if(privateBeatCandidate&&current.delaySeconds&&((!clock.playing&&previous?.playing)||!bufferAllowed)) {
+        const facts=capability(current);
+        telemetry.record('COMPENSATION_REVOKED',undefined,{captureId:current.captureId,synchronizationEpoch:current.synchronizationEpoch,
+          sourceGeneration:clock.generation||0,configuredAudioDelayMs:current.delaySeconds*1000,
+          trigger:'clock',clockAgeMs:Date.now()-clock.sampledAt,playing:clock.playing,paused:clock.paused,seeking:clock.seeking,buffering:clock.buffering,
+          captureHealthy:facts.captureHealthy,clockHealthy:facts.clockHealthy,outputOwned:facts.outputOwned,singleSource:facts.singleSource,
+          compensationEligible:facts.compensationEligible});
         // Empty the old DelayNode on pause/unsafe source changes. A fresh node
         // retains the fixed delay only for the same paused, eligible source.
-        const retain=!clock.playing&&capability(current).bufferEligible&&pauseRetainsCapture(current);
+        const retain=!clock.playing&&bufferAllowed&&pauseRetainsCapture(current);
+        decisionReason=retain?'paused-route-flush-retain':!clock.playing?'playback-stopped':facts.clockHealthy?'source-capture-output-ineligible':'clock-unreliable';
         const epoch=crypto.randomUUID();current.synchronizationEpoch=epoch;
-        void offscreenMessage({kind:'synchronization',captureId:current.captureId,
+        void timeout(offscreenMessage({kind:'synchronization',captureId:current.captureId,
           settings:{bufferMs:retain?current.delaySeconds*1000:0,allowTypedPreview:retain&&current.experiment?.preview===true,
-            eligible:retain,paused:!clock.playing,flush:true,epoch}}).catch(()=>{});
+            eligible:retain,paused:!clock.playing,flush:true,epoch,detectorVariant:retain?current.experiment?.detectorVariant:'L0'}}),1500).then(result=>{
+              if(state===current&&current.synchronizationEpoch===epoch&&result?.ok!==true)cancelCapture(current);
+            },()=>{if(state===current&&current.synchronizationEpoch===epoch)cancelCapture(current);});
         if(!retain){current.delaySeconds=0;current.experiment=undefined;}
       }
-      publish(current, { kind: 'clock', clock: audibleClock(clock, clock.playing ? current.delaySeconds || 0 : 0) || clock });
+      if(privateBeatCandidate&&resumed&&current.delaySeconds>0&&bufferAllowed) {
+        decisionReason='resume-clean-route';
+        const epoch=crypto.randomUUID();current.synchronizationEpoch=epoch;
+        void timeout(offscreenMessage({kind:'synchronization',captureId:current.captureId,
+          settings:{bufferMs:current.delaySeconds*1000,allowTypedPreview:current.experiment?.preview===true,
+            eligible:true,paused:false,resume:true,flush:true,epoch,detectorVariant:current.experiment?.detectorVariant}}),1500).then(result=>{
+              if(state===current&&current.synchronizationEpoch===epoch&&result?.ok!==true)cancelCapture(current);
+            },()=>{if(state===current&&current.synchronizationEpoch===epoch)cancelCapture(current);});
+      }
+      if(diagnostic){
+        const row={decisionTime:Date.now(),performanceNow:performance.now(),timeOrigin:performance.timeOrigin,
+          clockDomain:'epoch-ms and background performance-ms',captureId:current.captureId,sourceId:current.session.id,
+          sourceGeneration:clock.generation,previousEpoch:before.epoch,resultingEpoch:current.synchronizationEpoch,
+          previousCompensation:before.delay*1000,requestedCompensation:current.experiment?.compensationMs??0,
+          effectiveCompensation:(current.delaySeconds||0)*1000,decisionReason,resultingMode:current.experiment?.detectorVariant||'L0',
+          ...decisionFacts.prerequisites,mediaProgressHealthy:null,mediaProgressStatus:'Correlate independently sampled media clock; no policy progress estimator',
+          previousClock:parsePlaybackClock(previous),clock:parsePlaybackClock(clock),discontinuity:Boolean(discontinuity)};
+        if(diagnostic.decisions.length<2048)diagnostic.decisions.push(row);else diagnostic.decisionOverflow++;
+      }
+      publish(current, { kind: 'clock', clock: audibleClock(fencedClock(current), clock.playing ? current.delaySeconds || 0 : 0) || clock });
       if ((!clock.playing&&!pauseRetainsCapture(current)) || clock.muted || current.tabMuted) cancelCapture(current);
       else void capture(current);
     },
@@ -375,10 +490,15 @@ export function createBeatSync(api, nativePublish) {
       const current = state;
       const trace = parseBeatTraces(message.telemetry);
       if (sender.url !== api.runtime.getURL(offscreenPath) || sender.tab || !current || message.captureId !== current.captureId) { telemetry.mark('EVENT_DROPPED', trace, { reason: 'owner' }); return; }
+      if(['onset','tempo.state','tempo.tick'].includes(message.kind)
+        && (message.sourceId!==undefined&&!sameSourceFence(fence(current),message)
+          ||privateBeatCandidate&&message.synchronizationEpoch!==current.synchronizationEpoch)) {
+        telemetry.mark('EVENT_DROPPED',trace,{reason:'owner'});return;
+      }
       telemetry.mark('EVENT_RECEIVED', trace);
       // Carry only the allowlisted diagnostic envelope. Beat validation below
       // remains independent of telemetry validity or whether tracing is enabled.
-      const timing = playbackTiming(current.clock, message, current.delaySeconds || 0);
+      const timing = playbackTiming(fencedClock(current), message, current.delaySeconds || 0);
       const mapped = playbackTraces(trace, timing, message.targetOutputTime);
       const diagnostic = { ...(mapped ? { telemetry: mapped } : {}), ...(timing || {}) };
       let delivered = false;

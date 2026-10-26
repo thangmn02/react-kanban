@@ -11,6 +11,25 @@ function harness(origin = 'https://kanthangboard.netlify.app') {
   return { sendMessage, postMessage, page, receive: (data, options = {}) => receive?.({ source: page, origin, data, ...options }) };
 }
 const request = { channel: 'kanban-music-v1', direction: 'app-to-extension', requestId: 'request-1', action: 'sessions.get' };
+it.each([30,60,90])('forwards the explicit bounded %i second private recording duration',durationSeconds=>{
+  const h=harness('http://127.0.0.1:1420');h.receive({...request,action:'beat.diagnostics',sessionId:'song',diagnostic:{operation:'start',recordingId:'record',durationSeconds,unrelated:true}});
+  expect(h.sendMessage.mock.calls[0][0].diagnostic).toEqual({operation:'start',recordingId:'record',durationSeconds});
+});
+it.each([0,31,120,Infinity,'60'])('rejects invalid private recording duration %s',durationSeconds=>{
+  const h=harness('http://127.0.0.1:1420');h.receive({...request,action:'beat.diagnostics',sessionId:'song',diagnostic:{operation:'start',recordingId:'record',durationSeconds}});
+  expect(h.sendMessage).not.toHaveBeenCalled();
+});
+it('relays bounded raw-capture controls only from the private local app route',()=>{
+  const message={...request,action:'beat.diagnostics',sessionId:'song',diagnostic:{operation:'start',recordingId:'record',samples:[1]}};
+  const local=harness('http://127.0.0.1:1420');local.receive(message);
+  expect(local.sendMessage).toHaveBeenCalledWith(expect.objectContaining({diagnostic:{operation:'start',recordingId:'record'}}),expect.any(Function));
+  for(const origin of ['https://kanthangboard.netlify.app','http://127.0.0.1:5173']){const h=harness(origin);h.receive(message);expect(h.sendMessage).not.toHaveBeenCalled();}
+  local.sendMessage.mockClear();local.receive({...message,diagnostic:{operation:'read',recordingId:'../unsafe'}});expect(local.sendMessage).not.toHaveBeenCalled();
+});
+it.each([0,100,120,150,170,200,250])('preserves the exact compensation preset %s through the settings relay',compensationMs=>{
+  const h=harness();h.receive({...request,action:'beat.experimental.configure',sessionId:'song',configuration:{compensationMs}});
+  expect(h.sendMessage.mock.calls[0][0].configuration.compensationMs).toBe(compensationMs);
+});
 it('supports only the explicit local app origins on the native development port',()=>{
  for(const origin of ['http://127.0.0.1:1420','http://localhost:1420']){const h=harness(origin);h.receive(request);expect(h.sendMessage).toHaveBeenCalledOnce();}
  const h=harness('http://127.0.0.1:1421');h.receive(request);expect(h.sendMessage).not.toHaveBeenCalled();
@@ -35,9 +54,9 @@ it('preserves seek and volume values while rejecting invalid control input', () 
   for (const value of [undefined, '1', NaN, Infinity, -1, 2]) h.receive({ ...request, action: 'media.volume', sessionId: 'song', value });
   expect(h.sendMessage).not.toHaveBeenCalled();
 });
-it('relays only the two bounded detector choices without accepting qualification claims',()=>{
+it('relays bounded detector choices without accepting qualification claims',()=>{
   const h=harness();
-  for(const detectorVariant of ['L0','L1-gap0']){
+  for(const detectorVariant of ['L0','L1-gap0','H-SHADOW','H-LIVE']){
     h.receive({...request,action:'beat.experimental.configure',sessionId:'song',configuration:{detectorVariant,accuracyQualified:true}});
     expect(h.sendMessage.mock.calls.at(-1)[0].configuration.detectorVariant).toBe(detectorVariant);
     expect(h.sendMessage.mock.calls.at(-1)[0].configuration).not.toHaveProperty('accuracyQualified');

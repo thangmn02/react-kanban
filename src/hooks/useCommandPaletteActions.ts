@@ -6,7 +6,7 @@ import type { FocusTask } from '../types/focus.type';
 import type { BoardViewMode } from './useViewRouting';
 
 export interface UseCommandPaletteActionsParams {
-  setActiveViewWithPath: (view: BoardViewMode) => void;
+  setActiveViewWithPath: (view: BoardViewMode | 'table' | 'focus') => void;
   handleQuickAddTask: () => void;
   openGroupDialog: () => void;
   openCreateBoardDialog: () => void;
@@ -61,6 +61,8 @@ export function useCommandPaletteActions({
     withRun(COMMAND_PALETTE_ACTION_CONFIG.GO_TODAY, () => setActiveViewWithPath('today')),
     withRun(COMMAND_PALETTE_ACTION_CONFIG.GO_BOARD, () => setActiveViewWithPath('board')),
     withRun(COMMAND_PALETTE_ACTION_CONFIG.GO_CALENDAR, () => setActiveViewWithPath('calendar')),
+    withRun(COMMAND_PALETTE_ACTION_CONFIG.GO_TABLE, () => setActiveViewWithPath('table')),
+    withRun(COMMAND_PALETTE_ACTION_CONFIG.GO_FOCUS, () => setActiveViewWithPath('focus')),
     withRun(COMMAND_PALETTE_ACTION_CONFIG.QUICK_ADD_TASK, handleQuickAddTask),
     withRun(COMMAND_PALETTE_ACTION_CONFIG.PLAN_TODAYS_FOCUS, () => setActiveViewWithPath('today')),
     withRun(COMMAND_PALETTE_ACTION_CONFIG.NEW_LIST, () => {

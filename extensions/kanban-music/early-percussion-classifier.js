@@ -1,6 +1,7 @@
 import { PercussionClassifier } from './percussion-classifier.js';
+import {mapPercussionCandidates} from './percussion-label-contract.js';
 
-// Private L1-gap0 decision variant. The frozen classifier stays byte-identical.
+// Private L1-gap0 finalizes the same peak groups earlier.
 export class EarlyPercussionClassifier extends PercussionClassifier {
   constructor(thresholds, options = {}) {
     super(thresholds, { ...options, onsetGuided: true, localProminence: false });
@@ -21,11 +22,13 @@ export class EarlyPercussionClassifier extends PercussionClassifier {
           activation: group.best.confidence, novelty: group.best.value });
       }
     }
-    const unique = new Map();
-    for (const event of events.sort((a, b) => a.classIndex - b.classIndex)) {
-      const key = `${event.band}:${event.audioTime}`;
-      if (!unique.has(key) || unique.get(key).confidence < event.confidence) unique.set(key, event);
+    const mapped=mapPercussionCandidates(events.sort((a,b)=>a.classIndex-b.classIndex),this.labelMapping,this.thresholds,this.diagnostics);
+    if(this.diagnostics){
+      const final=new Map(mapped.labelCandidates.map(record=>[record.eventId,record]));
+      mapped.labelCandidates=[...(result.labelCandidates||[]).map(record=>{
+        const next=final.get(record.eventId);final.delete(record.eventId);return next?{...record,...next}:record;
+      }),...final.values()];
     }
-    return { ...result, outcome: unique.size ? 'percussion' : 'non-percussion/abstain', events: [...unique.values()] };
+    return {...result,...mapped,outcome:mapped.events.length?'percussion':'non-percussion/abstain'};
   }
 }

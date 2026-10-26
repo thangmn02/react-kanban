@@ -34,6 +34,8 @@ export default defineConfig(({ mode }) => ({
         // Emitted AudioWorklets retain their relative feature-module import.
         if (options.dir) await copyFile(resolve('extensions/kanban-music/percussion-features.js'),
           resolve(options.dir, 'assets/percussion-features.js'));
+        if (options.dir) await copyFile(resolve('extensions/kanban-music/semantic-precision-guards.js'),
+          resolve(options.dir, 'assets/semantic-precision-guards.js'));
         // Web builds ship the download; native builds must not embed old installers.
         if (process.env.TAURI_ENV_PLATFORM && options.dir) {
           await rm(resolve(options.dir, 'downloads/Kora-setup.exe'), { force: true });

@@ -108,9 +108,9 @@ function getLocalTodayData(currentUser: AppUser): TodayPageData {
   const listById = new Map(lists.map((list) => [list.id, list]));
 
   const assignedTasks = tasks
+    .filter(task=>!task.is_done)
     .filter((task) => isTaskAssignedToUser(normalizeTaskAssignees(task.assignees), currentUser))
     .map<TodayTaskSummary>((task) => {
-      const assignees = normalizeTaskAssignees(task.assignees);
       const list = listById.get(task.list_id);
 
       return {
@@ -123,7 +123,7 @@ function getLocalTodayData(currentUser: AppUser): TodayPageData {
         description: task.description || '',
         priority: task.priority as TodayTaskSummary['priority'],
         dueDate: task.due_date,
-        assigneeAvatar: assignees[0]?.avatar,
+        assigneeAvatar: currentUser.avatarUrl,
         isDone: Boolean(task.is_done),
         updatedAt: task.updated_at || task.created_at,
       };
@@ -192,9 +192,9 @@ export async function fetchTodayPageData({
   const listById = new Map(((listsResult.data ?? []) as TodayListRow[]).map((list) => [list.id, list]));
 
   const assignedTasks = ((tasksResult.data ?? []) as TodayTaskRow[])
+    .filter(task=>!task.is_done)
     .filter((task) => isTaskAssignedToUser(normalizeTaskAssignees(task.assignees), currentUser))
     .map<TodayTaskSummary>((task) => {
-      const assignees = normalizeTaskAssignees(task.assignees);
       const list = listById.get(task.list_id);
 
       return {
@@ -207,7 +207,7 @@ export async function fetchTodayPageData({
         description: task.description || '',
         priority: task.priority,
         dueDate: task.due_date,
-        assigneeAvatar: assignees[0]?.avatar,
+        assigneeAvatar: currentUser.avatarUrl,
         isDone: Boolean(task.is_done),
         updatedAt: task.updated_at || task.created_at,
       };

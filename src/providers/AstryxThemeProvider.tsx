@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Theme } from '@astryxdesign/core/theme';
-import { neutralTheme } from '@astryxdesign/theme-neutral';
+import { neutralTheme } from '@astryxdesign/theme-neutral/built';
 
 interface AstryxThemeProviderProps {
   children: ReactNode;
@@ -21,11 +21,8 @@ interface AstryxThemeProviderProps {
  * is on <html>, the scoped CSS also reaches portals (toast fallback viewports,
  * floating timers, etc.).
  *
- * SCAFFOLD — not wired into the app yet (wiring it before install would break
- * the build). After installing @astryxdesign/core + @astryxdesign/theme-neutral:
- *   1. delete `src/types/astryx-shim.d.ts` (real types take over), and
- *   2. import this provider in `src/main.tsx` and wrap <App />.
- * See `docs/astryx-integration.md` for the exact steps.
+ * Use the prebuilt theme: index.css already imports its CSS in the base layer.
+ * Runtime injection would override Tailwind heading and control utilities.
  */
 export default function AstryxThemeProvider({
   children,
