@@ -12,6 +12,7 @@ import type { useI18n } from '../../i18n';
 import type { FocusSessionValue } from './useFocusSessionController';
 import type { useBoardPageController } from '../board/hooks/useBoardPageController';
 import { isNativeWidget } from '../native/runtime';
+import { NOTES_PREVIEW_ENABLED } from '../../constants/features';
 
 interface Params {
   focus: FocusSessionValue;
@@ -150,6 +151,7 @@ export function useAppFocusIntegration({
   }, [focus, handleMarkFocusTaskDone]);
 
   const pictureInPicture = useDocumentPictureInPicture({
+    onOpenNotes: NOTES_PREVIEW_ENABLED ? () => { navigate('/notes?filter=pinned'); window.focus(); } : undefined,
     activeTab: dockTab, onTabChange: handleDockTabChange,
     isMinimized: isFocusPage && focus.isFocusDockCollapsed,
     onDismiss: () => navigate('/home'),

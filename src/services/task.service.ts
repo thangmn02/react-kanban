@@ -88,6 +88,7 @@ const STABLE_TASK_FIELD_NORMALIZERS = {
  */
 function normalizeTaskData(taskData: TaskInsert): TaskInsert {
   return {
+    ...(taskData.id ? { id: taskData.id } : {}),
     board_id: taskData.board_id,
     list_id: taskData.list_id,
     workspace_id: taskData.workspace_id ?? undefined,

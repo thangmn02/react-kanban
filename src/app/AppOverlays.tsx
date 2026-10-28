@@ -1,4 +1,5 @@
 import { lazy, Suspense } from 'react';
+import {openQuickNotes} from '../features/notes/quick-notes-events';
 
 import AddGroupDialog from '../components/organisms/dialog/AddGroupDialog';
 import BoardActivityDialog from '../components/organisms/dialog/BoardActivityDialog';
@@ -24,7 +25,7 @@ import type { usePlanningController } from '../features/today/hooks/usePlanningC
 import type { useCommandPaletteActions } from '../hooks/useCommandPaletteActions';
 import { useI18n } from '../i18n';
 import { getPomodoroModeSeconds } from '../utils/pomodoroTime';
-import { ARCANA_ENABLED } from '../constants/features';
+import { ARCANA_ENABLED, NOTES_PREVIEW_ENABLED } from '../constants/features';
 import { isNativeWidget } from '../features/native/runtime';
 
 const ArcanaRewardToast = lazy(() => import('../features/arcana/ArcanaRewardToast'));
@@ -86,8 +87,11 @@ export default function AppOverlays(props: Props) {
         onClose={focus.closeFocusCompletion}
       />
       <TaskDialog
+        currentUser={props.user}
+        openCommentId={new URLSearchParams(window.location.search).get('comment')??undefined}
         isOpen={taskEditor.isOpen}
         onClose={taskEditor.closeTaskDialog}
+        onOpenNotes={NOTES_PREVIEW_ENABLED && props.user && taskEditor.state.editingTask ? () => openQuickNotes({taskId:taskEditor.state.editingTask!.id,boardId:board.activeBoardId??undefined}) : undefined}
         taskData={taskEditor.state.mode === 'edit' ? taskEditor.state.editingTask : null}
         onSubmitTask={taskEditor.state.mode === 'edit' ? board.onSubmitEditTask : board.onSubmitCard}
         isFocusTask={taskEditor.state.editingTask ? focus.isFocusTask(taskEditor.state.editingTask.id) : false}

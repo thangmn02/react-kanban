@@ -5,6 +5,15 @@
 [functions."beat-event-cache"]
   included_files = ["public/beat-tracks/**"]
 
+[functions."note-images"]
+  external_node_modules = ["sharp"]
+
+[[redirects]]
+  from = "/api/note-images"
+  to = "/.netlify/functions/note-images"
+  status = 200
+  force = true
+
 [[redirects]]
   from = "/api/beat-events"
   to = "/.netlify/functions/beat-event-cache"

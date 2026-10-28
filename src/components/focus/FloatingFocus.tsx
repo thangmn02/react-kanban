@@ -28,6 +28,7 @@ export interface FloatingFocusProps {
   onActiveTaskChange?: (taskId: string) => void;
   onMarkDoneAndNext?: (taskId: string) => void;
   onPopOut?: () => void;
+  onOpenNotes?: () => void;
   onReturnToTab?: () => void;
   onDismiss?: () => void;
   isWidget?: boolean;
@@ -113,6 +114,7 @@ export default function FloatingFocus(props: FloatingFocusProps) {
           title={props.returnLabel || t(props.isWidget ? 'dock.return' : 'dock.widget')} disabled={props.isWidget ? !props.onReturnToTab : !props.canPopOut || !props.onPopOut}
           onClick={props.isWidget ? props.onReturnToTab : props.onPopOut}><DockIcon kind={props.isWidget ? 'return' : 'widget'} /></button>
         {props.nativeControls}
+        {props.onOpenNotes && <button type="button" className="dock-icon-button" aria-label="Open pinned notes" title={t('shell.notes')} onClick={props.onOpenNotes}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true"><rect x="5" y="3" width="15" height="18" rx="2" /><path d="M9 3v18M12 8h5M12 12h5M12 16h3" /></svg></button>}
         {!props.isWidget && props.onDismiss && <button type="button" className="dock-icon-button" aria-label={t('dock.dismiss')} onClick={props.onDismiss}><DockIcon kind="close" /></button>}
         <AnimatePresence>
           {settingsOpen && <motion.div id={settingsId} className="dock-settings glass" role="dialog" aria-label={t('dock.settings')}

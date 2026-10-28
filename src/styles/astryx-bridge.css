@@ -13,18 +13,11 @@
  *    where <fallback> matches the app's current "Quiet Velocity" light values.
  *    The app therefore builds AND looks correct EVEN BEFORE @astryxdesign/* is
  *    installed. Once theme-neutral's theme.css is loaded (see
- *    docs/astryx-integration.md) the real Astryx tokens take over automatically
+ *    docs/design-system.md) the real Astryx tokens take over automatically
  *    — surfaces, text, borders, radius and motion upgrade with no further code
  *    changes.
- *  - No global resets: this file ONLY defines variables plus a light
- *    color-scheme guard for the neutral theme scope. It does NOT import Astryx
- *    reset.css / astryx.css, so existing Tailwind utilities and app styles are
- *    completely untouched.
- *
- * Load order (post-install, in src/index.css):
- *   @import "tailwindcss";
- *   @import "@astryxdesign/theme-neutral/theme.css";  // Astryx tokens
- *   @import "./styles/astryx-bridge.css";             // this file
+ *  - This bridge defines aliases only. index.css owns the explicit global
+ *    reset/theme/component layer order; see docs/design-system.md.
  */
 
 /*

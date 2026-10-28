@@ -16,11 +16,15 @@ export default function AvatarEditor({src,value,onChange,onBusy}:{src:string;val
     return()=>{active=false;if(url)URL.revokeObjectURL(url);};
   },[file]);
   const rect=value?avatarCropGeometry(value):null;
+  const drag=useRef<{id:number;x:number;y:number;crop:AvatarCrop}|null>(null);
   return <fieldset className="space-y-3"><legend className="text-sm font-semibold text-slate-800">{t('settings.avatar')}</legend>
-    <div className="relative mx-auto h-60 w-60 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100" aria-label={t('settings.imagePreview')}>
+    <div className="relative mx-auto h-60 w-60 touch-none overflow-hidden rounded-2xl border border-slate-200 bg-slate-100" aria-label={t('settings.imagePreview')}
+      onPointerDown={event=>{if(!value)return;drag.current={id:event.pointerId,x:event.clientX,y:event.clientY,crop:value};event.currentTarget.setPointerCapture(event.pointerId);}}
+      onPointerMove={event=>{const start=drag.current;if(!start||start.id!==event.pointerId)return;const geometry=avatarCropGeometry(start.crop);onChange({...start.crop,x:Math.max(-1,Math.min(1,start.crop.x+(geometry.width>240?2*(event.clientX-start.x)/(geometry.width-240):0))),y:Math.max(-1,Math.min(1,start.crop.y+(geometry.height>240?2*(event.clientY-start.y)/(geometry.height-240):0)))});}}
+      onPointerUp={()=>{drag.current=null;}} onPointerCancel={()=>{drag.current=null;}} onLostPointerCapture={()=>{drag.current=null;}}>
       <motion.div key={value?.image.src||src} className="absolute inset-0" initial={reduced?false:{opacity:0}} animate={{opacity:1}} transition={reduced?{duration:0}:uiFade}>
       {value&&rect ? <img src={value.image.src} alt={t('settings.imagePreview')} draggable={false} className="absolute max-w-none" style={rect}/>
-        : <img src={value===null?DEFAULT_IDENTITY_IMAGE:src||DEFAULT_IDENTITY_IMAGE} alt={t('settings.imagePreview')} className="h-full w-full object-cover"/>}
+        : <img src={value===null?DEFAULT_IDENTITY_IMAGE:src||DEFAULT_IDENTITY_IMAGE} alt={t('settings.imagePreview')} className="h-full w-full object-cover" onError={event=>{event.currentTarget.src=DEFAULT_IDENTITY_IMAGE;event.currentTarget.onerror=null;}}/>}
       </motion.div>
       <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset ring-slate-900/10"/>
     </div>

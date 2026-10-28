@@ -17,6 +17,7 @@ import TodayTaskSection from './TodayTaskSection';
 import TodayTaskCard from './TodayTaskCard';
 import { Skeleton, SkeletonTaskCard } from '../atoms/skeleton';
 import { useI18n } from '../../i18n';
+import { NOTES_PREVIEW_ENABLED } from '../../constants/features';
 
 interface TodayPageProps {
   currentUser: AppUser;
@@ -28,6 +29,7 @@ interface TodayPageProps {
   onStartFocus: (task: TodayTaskSummary) => void;
   onToggleTodayFocus: (task: TodayTaskSummary) => void;
   onQuickCreateTask: () => void;
+  onCreateNote?: () => void;
   onCompleteTask?: (task: TodayTaskSummary) => Promise<boolean>;
   taskRevision?: BoardData['task'];
 }
@@ -51,6 +53,7 @@ export default function TodayPage({
   onStartFocus,
   onToggleTodayFocus,
   onQuickCreateTask,
+  onCreateNote,
   onCompleteTask,
   taskRevision,
 }: TodayPageProps) {
@@ -176,13 +179,13 @@ export default function TodayPage({
           title={t('today.title')}
           className="mb-4"
           actions={(
-            <button
+            <div className="flex flex-wrap gap-2">{NOTES_PREVIEW_ENABLED && onCreateNote && <button type="button" onClick={onCreateNote} className="min-h-11 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">New note</button>}<button
               type="button"
               onClick={onQuickCreateTask}
               className="cursor-pointer rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-blue-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-100"
             >
               {t('today.quickAddTask')}
-            </button>
+            </button></div>
           )}
         />
 
@@ -341,7 +344,7 @@ export default function TodayPage({
               )}
             </div>
 
-            {(hasUrgentTasks || hasSecondaryTasks) && <div className="space-y-4">
+            {(hasUrgentTasks || hasSecondaryTasks) && <div id="today-due-tasks" className="space-y-4">
               {(todayData.overdueTasks.length > 0 || todayData.dueTodayTasks.length > 0) && (
                 <SectionCard className="p-4">
                   <div className="mb-4">

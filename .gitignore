@@ -47,6 +47,7 @@ test-results/
 # =========================================================
 .env
 .env.local
+.env.staging.local
 .env.*.local
 .env.development.local
 .env.test.local
@@ -121,7 +122,8 @@ Thumbs.db
 # =========================================================
 # Private/local documentation
 # =========================================================
-/docs/
+/docs/*
+!/docs/design-system.md
 
 # =========================================================
 # Third-party source repositories

@@ -28,7 +28,7 @@ interface Params {
   isRetryingWorkspace: boolean;
   onRetryWorkspace: () => void;
   reloadWorkspaces: () => Promise<unknown>;
-  setActiveWorkspaceId: (workspaceId: string | null) => void;
+  setActiveWorkspaceId: (workspaceId: string | null,reload?:boolean) => void | Promise<void>;
   addMember: AppLayoutRouteContext['members']['onAddMember'];
   changeMemberRole: AppLayoutRouteContext['members']['onRoleChange'];
   removeMember: AppLayoutRouteContext['members']['onRemoveMember'];
@@ -84,8 +84,7 @@ export function useAppLayoutRouteContextValue(params: Params): AppLayoutRouteCon
       token: routing.activeInviteToken,
       currentUser: params.user!,
       onAccepted: async (workspaceId) => {
-        await params.reloadWorkspaces();
-        params.setActiveWorkspaceId(workspaceId);
+        await params.setActiveWorkspaceId(workspaceId,true);
         routing.navigate('/home');
       },
       onGoHome: () => routing.navigate('/home'),
@@ -132,6 +131,7 @@ export function useAppLayoutRouteContextValue(params: Params): AppLayoutRouteCon
       hasTeamMembers: params.workspaceMembers.length > 1,
     },
     today: {
+      onCreateNote: () => routing.navigate('/notes?new=1'),
       currentUser: params.user!,
       activeWorkspace: params.activeWorkspace,
       focusTasks: focus.focusTasks,

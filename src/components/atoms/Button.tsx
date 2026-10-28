@@ -1,4 +1,5 @@
 import React from 'react'
+import {Button as AstryxButton} from '@astryxdesign/core/Button'
 
 interface ButtonProps {
   text: string,
@@ -41,15 +42,17 @@ function Button({
   }
 
   return (
-    <button
+    <AstryxButton
+      data-kora-button="astryx"
+      label={text}
+      icon={icon}
+      variant={variant==='text'?'ghost':variant==='outline'?'secondary':variant}
+      size={size}
       className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className ?? ''}`}
       onClick={onClick}
       type={type}
-      disabled={disabled}
-    >
-      {icon}
-      {text}
-    </button>
+      isDisabled={disabled}
+    />
   )
 }
 

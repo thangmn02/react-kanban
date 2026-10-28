@@ -71,7 +71,7 @@ export function removeScopedKey(scope: StorageScope, feature: string): void {
 }
 
 /**
- * Removes cached user data, retaining only opaque image-retirement retry work.
+ * Removes cached user data, retaining device Notes documents and opaque image-retirement retry work.
  * Call this on sign-out / session expiry to prevent cross-account data leakage.
  */
 export function clearUserData(userId: string): void {
@@ -87,7 +87,9 @@ export function clearUserData(userId: string): void {
     // Retired private object names contain no image, signed URL or credential.
     // Retain only this deletion worklist so logout cannot orphan a failed
     // retirement. Storage RLS still requires its owner to retry deletion.
-    if (key && key.startsWith(prefix) && key!==`${prefix}global:profile:v1:image-cleanup`) {
+    // Device documents are durable originals, not disposable server caches.
+    const deviceDocument = key?.endsWith(':notes-preview:v1') || key?.endsWith(':notes-preview:v1:backup');
+    if (key && key.startsWith(prefix) && !deviceDocument && key!==`${prefix}global:profile:v1:image-cleanup`) {
       keysToRemove.push(key);
     }
   }

@@ -21,7 +21,8 @@ import type {
   TaskChecklistItem,
   TaskLabel,
 } from '../../../types/task.type';
-import type { WorkspaceMember } from '../../../types/auth.type';
+import type { AppUser, WorkspaceMember } from '../../../types/auth.type';
+import TaskComments from '../../../features/notes/task-comments';
 import { TASK_PRIORITIES } from '../../../constants';
 import { useTaskActivityData } from '../../../hooks/useTaskActivityData';
 import {
@@ -41,6 +42,8 @@ import { generateTaskBreakdown } from '../../../services/taskBreakdown.service';
 
 
 interface TaskDialogProps {
+  currentUser?:AppUser|null;
+  openCommentId?:string;
   isOpen: boolean;
   onClose: () => void;
   onSubmitTask: (data: TaskDialogFormData) => void;
@@ -48,6 +51,7 @@ interface TaskDialogProps {
   isFocusTask?: boolean;
   onToggleFocusTask?: () => void;
   onStartFocus?: () => void;
+  onOpenNotes?: () => void;
   onToggleCompletion?: () => Promise<boolean>;
   workspaceMembers?: WorkspaceMember[];
   workspaceId?: string | null;
@@ -113,6 +117,9 @@ function TaskDialog({
   isFocusTask = false,
   onToggleFocusTask,
   onStartFocus,
+  onOpenNotes,
+  currentUser,
+  openCommentId,
   onToggleCompletion,
   workspaceMembers = mockWorkspaceMembers,
   workspaceId = null,
@@ -395,6 +402,7 @@ function TaskDialog({
           </div>
 
           <div className="flex max-w-full flex-wrap items-center gap-2">
+            {isEditMode && onOpenNotes && <button type="button" onClick={onOpenNotes} className="min-h-11 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700">Task notes</button>}
             {isEditMode && onToggleCompletion && <button type="button" disabled={hasUnsavedChanges || isCompleting}
               onClick={async () => {
                 if (completionPending.current) return;
@@ -994,6 +1002,7 @@ function TaskDialog({
             </div>
           </div>
 
+          {taskData&&currentUser&&workspaceId&&<div className="px-6 pb-5"><TaskComments key={`${currentUser.id}:${workspaceId}:${taskData.id}`} user={currentUser} workspaceId={workspaceId} taskId={taskData.id} members={workspaceMembers} canEdit={currentUser.isMock||workspaceMembers.some(member=>member.userId===currentUser.id&&member.role!=='viewer')} openCommentId={openCommentId}/></div>}
           <div className="border-t border-gray-200 bg-white px-6 py-4">
             <div className="flex flex-wrap items-center justify-end gap-4">
               <div className="flex items-center gap-3">

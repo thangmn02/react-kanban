@@ -1,13 +1,14 @@
 import { lazy, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
-import App from './App.tsx'
-import { AuthProvider } from './providers/AuthProvider.tsx'
-import AstryxThemeProvider from './providers/AstryxThemeProvider'
 import ErrorBoundary from './components/error/ErrorBoundary.tsx'
-import OfflineBanner from './components/error/OfflineBanner.tsx'
 import { isDesignLabEnabled, shouldMountDesignLab } from './design-lab/isDesignLabRoute.ts'
-import { I18nProvider } from './i18n'
+import { isTauri } from '@tauri-apps/api/core'
+import { getCurrentWindow } from '@tauri-apps/api/window'
+
+const MainApp = lazy(() => import('./app/main-app'));
+const NativeNoteWindow = lazy(() => import('./features/notes/native-note-window'));
+const isNoteWindow = isTauri() && getCurrentWindow().label.startsWith('note-');
 
 // Preview-only design lab: rendered in isolation BEFORE the production app so it
 // never touches auth, Supabase, or App's hook order. Gated to dev builds (or an
@@ -30,20 +31,13 @@ const isLab = typeof window !== 'undefined' && shouldMountDesignLab(window.locat
 createRoot(document.getElementById('root')!).render(
   // <StrictMode>
     <ErrorBoundary>
-      {isLab && DesignLab ? (
+      {isNoteWindow ? <Suspense fallback={null}><NativeNoteWindow /></Suspense> : isLab && DesignLab ? (
         <Suspense fallback={null}>
           <DesignLab />
         </Suspense>
       ) : (
         <>
-          <I18nProvider>
-            <AstryxThemeProvider>
-              <AuthProvider>
-                <App />
-              </AuthProvider>
-            </AstryxThemeProvider>
-            <OfflineBanner />
-          </I18nProvider>
+          <Suspense fallback={null}><MainApp /></Suspense>
         </>
       )}
     </ErrorBoundary>

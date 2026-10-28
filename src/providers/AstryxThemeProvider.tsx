@@ -21,8 +21,8 @@ interface AstryxThemeProviderProps {
  * is on <html>, the scoped CSS also reaches portals (toast fallback viewports,
  * floating timers, etc.).
  *
- * Use the prebuilt theme: index.css already imports its CSS in the base layer.
- * Runtime injection would override Tailwind heading and control utilities.
+ * Use the prebuilt theme with the explicit reset/theme/component layer order
+ * in index.css. Tailwind utilities retain the final override layer.
  */
 export default function AstryxThemeProvider({
   children,

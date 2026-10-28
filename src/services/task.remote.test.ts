@@ -31,6 +31,11 @@ it('bulk inserts non-recurring tasks without that column', async () => {
   expect(await createTasks([task, { ...task, title: 'Read' }])).toHaveLength(2);
   expect(sentBody().every((item: object) => !('repeat_interval' in item))).toBe(true);
 });
+it('retains a supplied task identity so a retried note conversion cannot create a second task', async () => {
+  fetcher.mockResolvedValueOnce(Response.json({ ...row, id: 'note-conversion-id' }));
+  await createTask({ ...task, id: 'note-conversion-id' });
+  expect(sentBody()).toHaveProperty('id', 'note-conversion-id');
+});
 it.each(['42703', 'PGRST204'])('retries a null recurrence update only after exact missing-column error %s', async (code) => {
   fetcher.mockResolvedValueOnce(Response.json({ ...missing, code }, { status: 400 })).mockResolvedValueOnce(Response.json(row));
   await updateTask('task', { title: 'New title', repeat_interval: null, due_date: '2026-10-06' });

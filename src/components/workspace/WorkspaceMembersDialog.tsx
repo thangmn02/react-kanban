@@ -47,6 +47,7 @@ export default function WorkspaceMembersDialog({
   onRetry,
 }: WorkspaceMembersDialogProps) {
   const [email, setEmail] = useState('');
+  const [search, setSearch] = useState('');
   const [role, setRole] = useState<WorkspaceInviteRole>('member');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
@@ -63,15 +64,14 @@ export default function WorkspaceMembersDialog({
     return `${window.location.origin}/invite/${token}`;
   };
 
-  const handleCopyInviteLink = (inviteLink: string) => {
+  const handleCopyInviteLink = async (inviteLink: string) => {
     if (!navigator.clipboard) {
       setSubmitErrorMessage('Clipboard is not available in this browser.');
       return;
     }
 
-    void navigator.clipboard.writeText(inviteLink);
-    setSubmitErrorMessage(null);
-    setSubmitSuccessMessage('Invite link copied.');
+    try { await navigator.clipboard.writeText(inviteLink); setSubmitErrorMessage(null); setSubmitSuccessMessage('Invite link copied.'); }
+    catch { setSubmitErrorMessage('The invite link could not be copied. Check clipboard permission and retry.'); }
   };
 
   const getInviteResultMessage = (result: WorkspaceInviteActionResult) => {
@@ -189,6 +189,7 @@ export default function WorkspaceMembersDialog({
                       <option value="viewer">Viewer</option>
                     </select>
                   </div>
+                  <p className="mt-2 text-xs leading-5 text-slate-600">Admins manage members. Members edit workspace tasks. Viewers read. Notes have separate sharing permissions.</p>
                   <button
                     type="submit"
                     disabled={isSubmitting}
@@ -229,6 +230,7 @@ export default function WorkspaceMembersDialog({
               )}
 
               <section className="space-y-3">
+                <input aria-label="Search workspace members" type="search" placeholder="Find by name or email" value={search} onChange={event => setSearch(event.target.value)} className="min-h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" />
                 <div>
                   <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                     Current members
@@ -255,7 +257,7 @@ export default function WorkspaceMembersDialog({
                     No members found in this workspace.
                   </p>
                 ) : (
-                  members.map((member) => (
+                  members.filter(member => `${member.name} ${member.email ?? ''}`.toLowerCase().includes(search.toLowerCase())).map((member) => (
                     <WorkspaceMemberRow
                       key={member.id}
                       member={member}
@@ -271,7 +273,7 @@ export default function WorkspaceMembersDialog({
               <section className="mt-6 space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                    Pending invites
+                    Invitations
                   </h3>
                   <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500">
                     {invites.length}

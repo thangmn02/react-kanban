@@ -13,6 +13,7 @@ const InviteRoute = lazy(() => import('./pages/invite/InviteRoute'));
 const HomeRoute = lazy(() => import('./pages/home/HomeRoute'));
 const FeatureRoute = lazy(() => import('./pages/focus/FeatureRoute'));
 const TodayRoute = lazy(() => import('./pages/today/TodayRoute'));
+const NotesRoute = lazy(() => import('./pages/notes/notes-route'));
 const BoardRoute = lazy(() => import('./pages/board/BoardRoute'));
 const CalendarRoute = lazy(() => import('./pages/board/CalendarRoute'));
 const TableRoute = lazy(() => import('./pages/board/TableRoute'));
@@ -41,6 +42,7 @@ export default function App() {
               <Route path="beat-grid" element={<FeatureRoute tab="beat" />} />
               <Route path="focus" element={<FeatureRoute tab="focus" />} />
               <Route path="today" element={<TodayRoute />} />
+              <Route path="notes" element={<NotesRoute />} />
               <Route path="arcana" element={ARCANA_ENABLED ? <ArcanaRoute /> : <Navigate to="/home" replace />} />
               <Route path="workspaces/:workspaceId/members" element={<WorkspaceMembersRoute />} />
               <Route path="workspaces/:workspaceId/boards/:boardId" element={<BoardRoute />} />

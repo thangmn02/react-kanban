@@ -1,0 +1,9 @@
+[[permission]]
+identifier = "notes-main"
+description = "Main repository/auth owner; retains existing audio/dock commands."
+commands.allow = ["native_music_request", "native_music_setup", "native_audio_start", "native_audio_renew", "native_audio_stop", "native_dock_shape", "native_notes_control"]
+
+[[permission]]
+identifier = "notes-frame"
+description = "Registered note-only window; all requests are bound to its Rust context."
+commands.allow = ["native_note_request"]

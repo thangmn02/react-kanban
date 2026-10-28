@@ -5,6 +5,10 @@ Opening `/focus` shows the existing dock in the application page, including an
 empty task list. Internal tabs share the same Focus session and music controller.
 The selected tab is recorded in the route query so refreshing preserves it.
 Minimize/restore retains the dock DOM; Shutdown opens the existing ritual dialog.
+Leaving the Focus page parks its existing portal host, hidden under the document
+body, and minimizes presentation demand. Returning reattaches the same host and
+music view; a normal route switch does not unmount their subscriptions. Explicit
+Dismiss and application shutdown still own teardown.
 The compact Home island remains task-gated and is not opened by unrelated actions.
 
 Old `/music` and `/beat-grid` links redirect to `/focus?tab=music` and

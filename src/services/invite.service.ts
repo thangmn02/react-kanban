@@ -70,7 +70,6 @@ export async function fetchWorkspaceInvites(workspaceId: string | null): Promise
     .from('workspace_invites')
     .select(inviteSelectColumns)
     .eq('workspace_id', workspaceId)
-    .is('accepted_at', null)
     .order('created_at', { ascending: false });
 
   if (error) {

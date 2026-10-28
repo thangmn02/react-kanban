@@ -1,15 +1,17 @@
+@layer reset, theme, base, astryx-base, astryx-theme, components, utilities;
 @import "tailwindcss";
+@import "@astryxdesign/core/reset.css";
+@import "@astryxdesign/core/astryx.css";
 
 /*
  * Astryx theme CSS. Loaded BEFORE astryx-bridge.css so the
  * --app-* variables resolve to the real Astryx neutral-theme tokens. The theme
- * also includes typography defaults: keep them in the base layer so explicit
- * Tailwind utilities retain control of heading sizes and text colors.
+ * owns its reset/theme layers. Explicit Tailwind utilities come last.
  * The Theme provider (src/providers/AstryxThemeProvider)
  * keeps data-astryx-theme="neutral" on <html> in sync so these scoped tokens
  * reach the whole app (incl. portals).
  */
-@import "@astryxdesign/theme-neutral/theme.css" layer(base);
+@import "@astryxdesign/theme-neutral/theme.css";
 
 /* App-level Astryx → app token bridge (graceful fallbacks; active now). */
 @import "./styles/astryx-bridge.css";
@@ -18,7 +20,7 @@
  * Design foundation tokens (Phase 0).
  * Tailwind v4 theme extension. These are ADDITIVE semantic aliases on top of the
  * default scale — they do not override Tailwind's built-in radius/shadow values,
- * so existing utilities keep working unchanged. See docs/design-guidelines.md.
+ * so existing utilities keep working unchanged. See docs/design-system.md.
  */
 @theme {
   /* Radius scale — prefer these over arbitrary values like [1.35rem]/[32px]. */

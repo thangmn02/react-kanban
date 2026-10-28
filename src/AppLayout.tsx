@@ -1,3 +1,4 @@
+import {runNotesTransition} from './features/notes/native-notes-lifecycle';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import ViewContextBoundary from './app/ViewContextBoundary';
 import { useTaskWorkflowSync } from './hooks/use-task-workflow-sync';
@@ -5,10 +6,11 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { notify } from './components/organisms/toast/notify';
 
 import { ERROR_MESSAGES } from './constants';
-import { ARCANA_ENABLED } from './constants/features';
+import { ARCANA_ENABLED, NOTES_PREVIEW_ENABLED } from './constants/features';
 import { useI18n } from './i18n';
 import AppHeader from './components/layout/AppHeader';
 import AppNavigation from './components/layout/AppNavigation';
+import ContextSidebar from './components/layout/context-sidebar';
 import { useAuth } from './hooks/useAuth';
 import { useGlobalKeyboardShortcuts } from './hooks/useGlobalKeyboardShortcuts';
 import { useWorkspaceSession } from './hooks/useWorkspaceSession';
@@ -39,6 +41,12 @@ import { useHomeFocusView } from './hooks/useHomeFocusView';
 import { isNativeWidget } from './features/native/runtime';
 import NativeSurface from './features/native/NativeSurface';
 import { authDestination, readReturnTo } from './app/auth-routing';
+import NativeNotesOwner from './features/notes/native-notes-owner';
+import QuickNotesLayer from './features/notes/quick-notes-layer';
+import {openQuickNotes} from './features/notes/quick-notes-events';
+import {nativeNotesControl} from './features/notes/native-note-bridge';
+import {prepareConnectedNotesToClose} from './features/notes/notes-repository';
+import {prepareDeviceNotesToClose} from './features/notes/device-notes-session';
 
 function AppLayout() {
   const native = isNativeWidget();
@@ -47,21 +55,33 @@ function AppLayout() {
     authMode,
     user,
     isAuthLoading,
-    signOut,
+    signOut:finishSignOut,
   } = useAuth();
+  const actorId=user?.id;
+  const prepareNotesToLeave=useCallback(async()=>{try{
+    if(native)await nativeNotesControl('await_settled');
+    if(actorId)await Promise.all([prepareConnectedNotesToClose(actorId),prepareDeviceNotesToClose(actorId)]);
+  }catch(reason){if(native)await nativeNotesControl('cancel_close').catch(()=>{});throw reason;}},[actorId,native]);
+  const signOut=useCallback(async()=>{try{await runNotesTransition(async()=>{try{await prepareNotesToLeave();await finishSignOut();}catch(reason){if(native)await nativeNotesControl('cancel_close').catch(()=>{});throw reason;}});}catch(reason){notify.error(`${String(reason)} Your account stays open so you can retry or export the retained draft.`);}},[prepareNotesToLeave,finishSignOut,native]);
   const { t } = useI18n();
   const navigate = useNavigate();
   const location = useLocation();
+  useEffect(()=>{if(!native)return;const blocked=(event:Event)=>{setNativeDock(false);navigate('/notes');notify.error(`Kora stayed open: ${String((event as CustomEvent).detail)}`);};window.addEventListener('kora:notes-quit-blocked',blocked);return()=>window.removeEventListener('kora:notes-quit-blocked',blocked);},[native,navigate]);
   const {
     workspaces,
     activeWorkspace,
     activeWorkspaceId,
     isWorkspaceLoading,
     workspaceErrorMessage,
-    setActiveWorkspaceId,
+    setActiveWorkspaceId:commitWorkspaceChange,
     reloadWorkspaces,
     createWorkspace,
   } = useWorkspaceSession(user);
+  const activeWorkspaceRef=useRef(activeWorkspaceId);useEffect(()=>{activeWorkspaceRef.current=activeWorkspaceId;},[activeWorkspaceId]);
+  const setActiveWorkspaceId=useCallback(async(workspaceId:string|null,reload=false)=>{
+    if(!reload&&workspaceId===activeWorkspaceRef.current)return;
+    await runNotesTransition(async()=>{try{const previous=activeWorkspaceRef.current;await prepareNotesToLeave();if(reload){const rows=await reloadWorkspaces();if(!rows||workspaceId&&!rows.some(row=>row.id===workspaceId))throw Error('The requested workspace could not be loaded. Retry after reviewing your access.');}commitWorkspaceChange(workspaceId);activeWorkspaceRef.current=workspaceId;if(native&&previous===workspaceId)await nativeNotesControl('cancel_close');}catch(reason){if(native)await nativeNotesControl('cancel_close').catch(()=>{});throw reason;}});
+  },[prepareNotesToLeave,commitWorkspaceChange,reloadWorkspaces,native]);
   const {
     members: workspaceMembers,
     invites: workspaceInvites,
@@ -192,10 +212,10 @@ function AppLayout() {
 
   const handleRetryWorkspace = useCallback(() => {
     setIsRetryingWorkspace(true);
-    void reloadWorkspaces().finally(() => {
+    void runNotesTransition(async()=>{try{await prepareNotesToLeave();await reloadWorkspaces();}finally{if(native)await nativeNotesControl('cancel_close').catch(()=>{});}}).catch(reason=>notify.error(String(reason))).finally(() => {
       setIsRetryingWorkspace(false);
     });
-  }, [reloadWorkspaces]);
+  }, [reloadWorkspaces,prepareNotesToLeave,native]);
 
   const focusSession = useFocusSessionController({
     user,
@@ -222,6 +242,9 @@ function AppLayout() {
       throw new Error(ERROR_MESSAGES.INVALID_TEMPLATE);
     }
 
+    await runNotesTransition(async()=>{
+    await prepareNotesToLeave();
+    try{
     const createdWorkspace = await createWorkspace(setupValues.workspaceName);
     const createdBoard = await createBoardFromTemplate({
       title: setupValues.boardTitle,
@@ -239,7 +262,7 @@ function AppLayout() {
     );
     const boardRows = await fetchBoards(createdWorkspace.id);
 
-    setActiveWorkspaceId(createdWorkspace.id);
+    activeWorkspaceRef.current=createdWorkspace.id;
     activeBoardIdRef.current = boardSnapshot.boardId;
     setActiveBoardId(boardSnapshot.boardId);
     setBoardData(boardSnapshot.boardData);
@@ -248,6 +271,8 @@ function AppLayout() {
     const requested = new URLSearchParams(location.search).has('returnTo');
     navigate(requested ? readReturnTo(location.search) : `/workspaces/${createdWorkspace.id}/boards/${boardSnapshot.boardId}`);
     notify.success(t('toast.workspaceCreated'));
+    }catch(reason){if(native)await nativeNotesControl('cancel_close').catch(()=>{});throw reason;}
+    });
   };
 
   const handleOpenArcanaBooth = useCallback((consumeRewardDraw = false) => {
@@ -340,9 +365,9 @@ function AppLayout() {
       onOpenCommandPalette={() => { if (routing.requireFeature('/tasks')) setIsCommandPaletteOpen(true); }}
       onCreateBoard={() => { if (routing.requireFeature('/tasks')) openCreateBoardDialog(); }}
       onWorkspaceChange={(workspaceId) => {
-        setActiveWorkspaceId(workspaceId);
-        setIsBoardLoading(true);
-        navigate('/home');
+        void(async()=>{try{
+          await setActiveWorkspaceId(workspaceId);setIsBoardLoading(true);navigate('/home');
+        }catch(reason){notify.error(`${String(reason)} Your workspace stays open so you can retry or export retained edits.`);}})();
       }}
       onSignOut={() => void signOut()}
       onOpenArcanaBooth={() => handleOpenArcanaBooth()}
@@ -396,6 +421,7 @@ function AppLayout() {
       openShutdown: () => planning.setIsShutdownRitualOpen(true),
     },
     featureDock: {
+      onOpenNotes: NOTES_PREVIEW_ENABLED ? () => openQuickNotes({taskId:focusSession.activeFocusTask?.id}) : undefined,
       activeTab: focusIntegration.dockTab, onTabChange: focusIntegration.handleDockTabChange,
       isMinimized: focusSession.isFocusDockCollapsed,
       activeTask: focusSession.selectedTimerTask || focusSession.activeFocusTask,
@@ -450,23 +476,31 @@ function AppLayout() {
   const content = (
     <FocusSessionProvider value={focusSession}>
       {showNavigation && <AppNavigation activeView={activeView} onNavigate={setActiveViewWithPath} />}
-      <div className={showNavigation ? 'lg:pl-20' : undefined}>
+      <div className={showNavigation ? 'min-h-screen bg-white lg:ml-14 lg:flex' : undefined}>
+        {showNavigation && <ContextSidebar key={`${user?.id}:${activeWorkspaceId}`} activeView={activeView} workspaceId={activeWorkspaceId} workspaceName={activeWorkspace?.name} boards={boardController.boardSummaries} activeBoardId={activeBoardId} boardData={boardData} onBoard={boardController.handleOpenBoardFromHome} onHighPriority={filterHighPriority} onDueToday={filterDueToday} onClearFilters={clearBoardFilters} />}
+        <div className="min-w-0 flex-1 bg-white">
         <ViewContextBoundary key={`${user?.id ?? 'public'}:${activeWorkspaceId ?? 'none'}`} ready={!boardController.isBoardLoading}>
           <Suspense fallback={<div role="status" className="min-h-48 bg-canvas px-6 py-10 text-sm text-slate-500">{t('ux.loadingView')}</div>}>
             <Outlet context={routeContext} />
           </Suspense>
         </ViewContextBoundary>
+        </div>
       </div>
       {shouldRenderOverlays && sharedDialogs}
     </FocusSessionProvider>
   );
-  if (!native) return content;
+  const notesLayer=NOTES_PREVIEW_ENABLED&&user&&<QuickNotesLayer key={`${user.id}:${activeWorkspaceId}`} user={user} workspace={activeWorkspace} onManager={()=>{setNativeDock(false);navigate('/notes');}} onOpenOriginal={source=>{void(async()=>{if(source.workspaceId&&source.workspaceId!==activeWorkspaceId)await setActiveWorkspaceId(source.workspaceId);setNativeDock(false);const query=new URLSearchParams();if(source.taskId){query.set('task',source.taskId);if(source.boardId)query.set('taskBoard',source.boardId);}if(source.commentId)query.set('comment',source.commentId);if(source.noteId){query.set('note',source.noteId);if(!source.workspaceId)query.set('scope','personal');}navigate(`/notes?${query}`);})().catch(reason=>notify.error(String(reason)));}}/>;
+  if (!native) return <>{content}{notesLayer}</>;
   const showDock = nativeDock && shouldRenderOverlays;
   // The existing AppLayout controller owns both native views. Switching to
   // Tasks never creates a second Pomodoro timer or a second session log.
-  return <FocusSessionProvider value={focusSession}><NativeSurface dock={showDock}
+  return <FocusSessionProvider value={focusSession}>
+    {notesLayer}
+    {NOTES_PREVIEW_ENABLED && <NativeNotesOwner user={user} workspace={activeWorkspace} onManager={() => {setNativeDock(false);navigate('/notes');}} onOpenTask={(taskId,boardId)=>{setNativeDock(false);navigate(`/notes?task=${taskId}&taskBoard=${boardId}`);}} />}
+    <NativeSurface dock={showDock}
     onToggle={shouldRenderOverlays ? () => setNativeDock((current) => !current) : undefined}
     focusProps={{
+      onOpenNotes: NOTES_PREVIEW_ENABLED ? () => openQuickNotes({taskId:focusSession.activeFocusTask?.id}) : undefined,
       activeTab: focusIntegration.dockTab, onTabChange: focusIntegration.handleDockTabChange,
       activeTask: focusSession.selectedTimerTask || focusSession.activeFocusTask,
       focusTasks: focusSession.focusTasks, timerState: focusSession.timerState,

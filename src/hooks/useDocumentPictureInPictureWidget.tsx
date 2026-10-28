@@ -37,6 +37,7 @@ export function useDocumentPictureInPicture(props: FloatingFocusProps) {
   const mountedRef = useRef(true);
   const [pipWindow, setPipWindow] = useState<Window | null>(null);
   const [activated, setActivated] = useState(false);
+  const [parked, setParked] = useState(false);
   const [widgetError, setWidgetError] = useState('');
   // Keep the portal target stable. Moving its host between documents preserves
   // React state, music subscriptions, and the FLIP elements rather than remounting.
@@ -67,6 +68,7 @@ export function useDocumentPictureInPicture(props: FloatingFocusProps) {
     if (!host) return;
     (pageRef.current || document.body).appendChild(host);
     host.hidden = false;
+    setParked(false);
     host.style.cssText = pageRef.current ? 'width:100%;height:auto;'
       : 'position:fixed;right:16px;bottom:16px;width:min(520px,calc(100vw - 32px));height:min(580px,calc(100dvh - 32px));z-index:1000;border-radius:22px;';
     pipWindowRef.current = null;
@@ -77,11 +79,18 @@ export function useDocumentPictureInPicture(props: FloatingFocusProps) {
     pageRef.current = node;
     if (node) {
       ensureHost();
+      setParked(false);
       setActivated(true);
       if (!pipWindowRef.current) returnToTab();
     } else if (!pipWindowRef.current) {
       if (poppedOutRef.current) returnToTab();
-      else { hostRef.current?.remove(); setActivated(false); }
+      else {
+        // Keep the same portal and audio subscriptions across route changes.
+        // Minimize the existing presentation while its host is parked off-page.
+        const host = hostRef.current;
+        if (host) { host.hidden = true; document.body.appendChild(host); }
+        setParked(true);
+      }
     }
   }, [ensureHost, returnToTab]);
 
@@ -145,7 +154,7 @@ export function useDocumentPictureInPicture(props: FloatingFocusProps) {
     attachFocusDock,
     floatingFocusPortal: activated && target ? createPortal(<FloatingFocus
       {...props} isWidget={Boolean(pipWindow)} canPopOut={isSupported} widgetError={widgetError}
-      isMinimized={!pipWindow && props.isMinimized}
+      isMinimized={!pipWindow && (props.isMinimized || parked)}
       onPopOut={() => { void openPictureInPicture().catch(() => { if (mountedRef.current) setWidgetError(t('dock.widgetFailed')); }); }}
       onReturnToTab={closePictureInPicture} onDismiss={dismiss}
     />, target) : null,

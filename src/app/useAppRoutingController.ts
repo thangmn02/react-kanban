@@ -7,7 +7,7 @@ import type { BoardViewMode } from '../hooks/useViewRouting';
 import { authDestination, readReturnTo } from './auth-routing';
 import type { useBoardPageController } from '../features/board/hooks/useBoardPageController';
 
-type AppView = BoardViewMode | 'table' | 'arcana' | 'members' | 'contact' | 'music' | 'beat-grid' | 'focus';
+type AppView = BoardViewMode | 'table' | 'arcana' | 'members' | 'contact' | 'music' | 'beat-grid' | 'focus' | 'notes';
 
 export function deriveAppRouteState(pathname: string) {
   const boardMatch = matchPath('/workspaces/:workspaceId/boards/:boardId/*', pathname);
@@ -15,6 +15,8 @@ export function deriveAppRouteState(pathname: string) {
   const inviteMatch = matchPath('/invite/:token', pathname);
   const activeView: AppView = matchPath('/contact', pathname)
     ? 'contact'
+    : pathname.startsWith('/notes')
+    ? 'notes'
     : pathname.startsWith('/auth')
     ? 'auth'
     : pathname.startsWith('/onboarding')
@@ -53,7 +55,7 @@ interface Params {
   isWorkspaceLoading: boolean;
   activeWorkspaceId: string | null;
   workspaces: WorkspaceSummary[];
-  setActiveWorkspaceId: (workspaceId: string | null) => void;
+  setActiveWorkspaceId: (workspaceId: string | null) => void | Promise<void>;
   board: ReturnType<typeof useBoardPageController>;
 }
 
@@ -105,6 +107,7 @@ export function useAppRoutingController({
     if (nextView === 'onboarding') return navigate('/onboarding');
     if (nextView === 'home') return navigate('/home');
     if (nextView === 'today') return navigate('/today');
+    if (nextView === 'notes') return navigate('/notes');
     if (nextView === 'contact') return navigate('/contact');
     if (nextView === 'music' || nextView === 'beat-grid' || nextView === 'focus') return navigate(`/${nextView}`);
     if (nextView === 'arcana') return navigate('/arcana');
@@ -164,8 +167,8 @@ export function useAppRoutingController({
         navigate('/not-found', { replace: true });
         return;
       }
-      setActiveWorkspaceId(routeWorkspaceId);
       setIsBoardLoading(true);
+      void Promise.resolve().then(()=>setActiveWorkspaceId(routeWorkspaceId)).catch(error=>{setIsBoardLoading(false);notify.error(error instanceof Error?error.message:'Save retained Notes edits before changing workspace.');navigate('/notes',{replace:true});});
       return;
     }
     const request = new AbortController();

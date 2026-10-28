@@ -5,6 +5,8 @@ import WorkspaceSwitcher from './WorkspaceSwitcher';
 import { useI18n } from '../../i18n';
 import AppNavigation, { type NavigationView } from './AppNavigation';
 import { isNativeWidget } from '../../features/native/runtime';
+import {NOTES_PREVIEW_ENABLED} from '../../constants/features';
+import {openQuickNotes,openSavedContext} from '../../features/notes/quick-notes-events';
 
 interface AppHeaderProps {
   authMode: AuthMode;
@@ -101,6 +103,7 @@ export default function AppHeader({
         </div>
 
         <div className="flex items-center gap-2">
+          {user&&NOTES_PREVIEW_ENABLED&&<><button type="button" className="min-h-10 rounded-lg px-2 text-sm text-slate-600 hover:bg-slate-100" onClick={()=>openQuickNotes({create:true})} title="Quick Notes (Ctrl+Alt+N)">Quick note</button><button type="button" className="min-h-10 rounded-lg px-2 text-sm text-slate-600 hover:bg-slate-100" onClick={openSavedContext}>Saved</button></>}
           {!isNativeWidget() && <a
             href="/downloads/Kora-setup.exe"
             download="Kora-setup.exe"

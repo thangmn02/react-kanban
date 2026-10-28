@@ -31,6 +31,8 @@ updates. See [Windows setup and updates](src-tauri/README.md).
 
 ## Table of contents
 
+Maintainers: [Kora design-system guide](docs/design-system.md) covers the pinned Astryx tooling, theme and shared controls.
+
 - [Feature matrix — Local vs Supabase](#feature-matrix--local-vs-supabase)
 - [Quick start — local mode](#quick-start--local-mode)
 - [Full Supabase setup (from a clean clone)](#full-supabase-setup-from-a-clean-clone)
@@ -56,6 +58,10 @@ updates. See [Windows setup and updates](src-tauri/README.md).
 | Today daily planning + focus task suggestions | ✅ | ✅ |
 | Home overview dashboard | ✅ | ✅ |
 | Focus dock + Pomodoro timer | ✅ | ✅ |
+| Centered identity profile, Settings and layered task shell | ✅ | ✅ |
+| Quick Notes, history, selected import/export and task links | ✅ (IndexedDB) | ✅ (qualified Notes schema required) |
+| Task comments and Saved Context references | ✅ (device scope) | ✅ (current resource permissions) |
+| Private note images and sharing | Device images | ✅ (private-image backend required) |
 | Command palette (keyboard navigation) | ✅ | ✅ |
 | Arcana tarot mini-game | ✅ | ✅ |
 | Bilingual UI (English / Vietnamese) | ✅ | ✅ |
@@ -70,6 +76,16 @@ updates. See [Windows setup and updates](src-tauri/README.md).
 
 Local mode is the easiest way to try the product end-to-end; Supabase mode is the
 collaborative, multi-user configuration.
+
+Notes capture is available through the header, task drawer and Focus as well as
+the manager. Windows adds native external notes with topmost, Ghost, bubble and
+durable recovery. Connected Notes is enabled with `VITE_ENABLE_NOTES_PREVIEW=true`
+only after qualifying the target schema. Native image uploads also require the
+approved HTTPS `VITE_NOTE_IMAGES_URL`; server credentials stay in the image
+backend. See [task workflows](docs/task-workflow.md) and
+[release readiness](plans/reports/kora-final-production-readiness.md) for the
+current qualification limits. A prepared release candidate is not a deployed
+production update.
 
 In Supabase mode, web and desktop must select the same workspace to show the
 same boards, cards and completed focus-session history. The workspace selector

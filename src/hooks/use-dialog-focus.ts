@@ -3,7 +3,7 @@ import { useEffect, useRef, type RefObject } from 'react';
 const focusable = 'button:not(:disabled), a[href], input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex="0"], [contenteditable="true"]';
 
 /** Contain keyboard focus in the topmost modal and return it to its opener. */
-export function useDialogFocus(isOpen: boolean, root: RefObject<HTMLElement | null>, onClose: () => void, restoreSelector?: string) {
+export function useDialogFocus(isOpen: boolean, root: RefObject<HTMLElement | null>, onClose: () => void, restoreSelector?: string, containFocus = true) {
   const close = useRef(onClose);
   useEffect(() => { close.current = onClose; }, [onClose]);
   useEffect(() => {
@@ -14,10 +14,10 @@ export function useDialogFocus(isOpen: boolean, root: RefObject<HTMLElement | nu
     const keydown = (event: KeyboardEvent) => {
       const element = root.current;
       if (!element) return;
-      const dialogs = [...document.querySelectorAll<HTMLElement>('[role="dialog"][aria-modal="true"]')];
+      const dialogs = [...document.querySelectorAll<HTMLElement>('[role="dialog"]')];
       if (dialogs.at(-1) !== element) return;
       if (event.key === 'Escape') { event.preventDefault(); close.current(); }
-      if (event.key !== 'Tab') return;
+      if (event.key !== 'Tab' || !containFocus) return;
       const items = [...element.querySelectorAll<HTMLElement>(focusable)].filter(item => item.getClientRects().length > 0);
       const first = items[0], last = items.at(-1);
       if (!first || !last) { event.preventDefault(); element.focus(); return; }
@@ -48,5 +48,5 @@ export function useDialogFocus(isOpen: boolean, root: RefObject<HTMLElement | nu
         }
       });
     };
-  }, [isOpen, root, restoreSelector]);
+  }, [isOpen, root, restoreSelector, containFocus]);
 }

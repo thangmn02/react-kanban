@@ -18,6 +18,33 @@ it.each<AuthMode>(['mock', 'supabase'])('hides Arcana and reward badges in the %
   expect(onOpenArcanaBooth).not.toHaveBeenCalled();
   if (authMode === 'supabase') {
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
-    expect(onSignOut).toHaveBeenCalledOnce();
+    expect(onSignOut).not.toHaveBeenCalled();
+    await waitFor(() => expect(onSignOut).toHaveBeenCalledOnce());
   }
+});
+
+it('retains the exact long email while constraining its displayed lines', async () => {
+  const email = 'qualification-account-with-a-very-long-generated-identifier@example.invalid';
+  render(<MemoryRouter><I18nProvider><UserMenu user={{ id: 'user', name: 'Alex', email, avatarUrl: '', isMock: true }} authMode="mock" activeWorkspace={null} onSignOut={vi.fn()} onOpenArcanaBooth={vi.fn()} /></I18nProvider></MemoryRouter>);
+  fireEvent.click(screen.getByRole('button', { name: 'Open user menu' }));
+  const address = await screen.findByText(email);
+  expect(address).toHaveAttribute('title', email);
+  expect(address).toHaveClass('line-clamp-2', 'break-all');
+  expect(screen.getByRole('dialog')).toHaveAttribute('aria-modal', 'true');
+});
+
+it('dismisses an open identity when workspace or account changes', async () => {
+  const user = { id: 'first', name: 'First account', email: null, avatarUrl: '', isMock: true };
+  const workspace = { id: 'first-workspace', name: 'First workspace', role: 'owner' as const, ownerId: user.id };
+  const props = { user, authMode: 'mock' as const, activeWorkspace: workspace, onSignOut: vi.fn(), onOpenArcanaBooth: vi.fn() };
+  const wrap = (next: typeof props) => <MemoryRouter><I18nProvider><UserMenu {...next} /></I18nProvider></MemoryRouter>;
+  const view = render(wrap(props));
+  fireEvent.click(screen.getByRole('button', { name: 'Open user menu' }));
+  expect(await screen.findByRole('dialog')).toHaveTextContent('First workspace');
+  view.rerender(wrap({ ...props, activeWorkspace: { ...workspace, id: 'second-workspace', name: 'Second workspace' } }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  fireEvent.click(screen.getByRole('button', { name: 'Open user menu' }));
+  await screen.findByRole('dialog');
+  view.rerender(wrap({ ...props, user: { ...user, id: 'second', name: 'Second account' } }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 });

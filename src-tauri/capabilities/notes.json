@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "notes",
+  "description": "Local registered Notes windows; no filesystem, shell, updater or audio commands.",
+  "windows": ["note-*"],
+  "permissions": ["notes-frame", "core:event:allow-listen", "core:event:allow-unlisten"]
+}

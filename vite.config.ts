@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv } from 'vite'
 import { aiDevelopmentPlugin } from './server/viteAiPlugin'
 import { beatCacheDevelopmentPlugin } from './server/vite-beat-cache-plugin'
+import { noteImagesDevelopmentPlugin } from './server/vite-note-images-plugin'
 import {localHybridDevelopmentPlugin} from './server/vite-local-hybrid-plugin'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
@@ -14,6 +15,7 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     localHybridDevelopmentPlugin(process.env.VITE_PRIVATE_LOCAL_HYBRID==='true'),
     react(),
+    noteImagesDevelopmentPlugin({ ...loadEnv(mode, process.cwd(), ''), ...process.env } as Record<string, string>),
     tailwindcss(),
     {
       name: 'public-document-routes',

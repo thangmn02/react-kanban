@@ -30,7 +30,7 @@ export function useWorkspaceSession(user: AppUser | null) {
       setWorkspaces([]);
       setActiveWorkspaceId(null);
       setIsWorkspaceLoading(false);
-      return;
+      return [];
     }
 
     setIsWorkspaceLoading(true);
@@ -46,8 +46,10 @@ export function useWorkspaceSession(user: AppUser | null) {
       setWorkspaces(nextWorkspaces);
       setActiveWorkspaceId(nextActiveWorkspace?.id || null);
       setWorkspaceErrorMessage(null);
+      return nextWorkspaces;
     } catch (error) {
       setWorkspaceErrorMessage(error instanceof Error ? error.message : 'Unable to load workspaces.');
+      return null;
     } finally {
       setIsWorkspaceLoading(false);
     }
