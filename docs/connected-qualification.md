@@ -6,7 +6,11 @@ Production release preparation keeps operator credentials outside the OneDrive c
 
 The private-image function reads `SUPABASE_SERVICE_ROLE_KEY` from Netlify's production **Functions** environment at runtime, alongside the public Supabase URL/client key. The local operator variable `KORA_PRODUCTION_SERVICE_ROLE_KEY` is not automatically imported or published. Never give it a `VITE_` prefix or include it in Tauri assets. Configuring the function environment or deploying it requires separate release authorization. A key restricted to this backend must not be reused for unrelated backup/admin routines.
 
+Build Netlify function artifacts on Linux for the Linux runtime. A Windows `functions:build` run can package a Windows Sharp native binding, which cannot run in Lambda. The release evidence includes a credential-free, digest-pinned Linux build, actual Sharp decoder tests and inspection of the Linux x64 ELF module. Use the approved Linux build/CI artifact during a future authorized promotion, not a Windows test ZIP. No service key is needed for packaging or unit decoding tests.
+
 `scripts/qualify-authorized-staging.mjs --production-read-only-backup` has an independently pinned production target and performs hosted reads plus isolated local recovery only. It refuses to download private production Storage objects with the backend key. `--database-only` can verify database recovery independently, but explicitly reports incomplete Storage recovery when objects exist; it is not a complete release backup. Keep production database archives encrypted outside the checkout. Storage byte recovery needs separate authorized backup access. Inspect the owning release plan before running any production preparation.
+
+Production database capture shares one exported read-only repeatable snapshot across inspection and `pg_dump`; the owning connection closes after recovery verification. Canonical session formatting is explicit when comparing row fingerprints. This avoids treating live Auth refreshes or differing float/regclass text formatting as data loss. SQL migrations and the dependency lock use the repository's LF checkout policy so qualification hashes remain byte-stable. Never reconcile history or repair rows as part of a backup check.
 
 ## Local Supabase
 

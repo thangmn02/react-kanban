@@ -72,6 +72,8 @@ test-results/
 *.crt
 *.p12
 *.pfx
+*.dpapi
+*.dump
 credentials.json
 service-account*.json
 

@@ -8,10 +8,16 @@ const paths=git(['diff','--cached','--name-only','--diff-filter=ACMR','-z']).toS
 if(!paths.length)throw Error('Stage the exact release files before running this check.');
 const privatePath=path=>/(^|\/)(?:\.env(?:\.|$)|scratch\/|\.netlify\/|\.signing\/)|\.(?:key|pem|p12|pfx|dpapi|dump)$|(?:^|\/)(?:credentials|service-account[^/]*)\.json$/i.test(path)&&!/(?:^|\/)\.env(?:\.[a-z-]+)?\.(?:example|sample|template)$/i.test(path);
 const credentials=[];
+function privateConfiguration(name,value){
+  if(value.length<8)return false;
+  let role;try{if(value.split('.').length===3)role=JSON.parse(Buffer.from(value.split('.')[1],'base64url')).role;}catch{/* Unknown key formats stay conservative. */}
+  if(role&&role!=='anon'||value.startsWith('sb_secret_')||/SECRET|PASSWORD|TOKEN|DB_URL|SERVICE_ROLE|PRIVATE/.test(name))return true;
+  if(/SITE_KEY$/.test(name)||role==='anon'||value.startsWith('sb_publishable_'))return false;
+  return /KEY/.test(name);
+}
 for(const path of ['.env','.env.local','.env.staging.local','.env.production.local','supabase/functions/.env.local',...(process.env.LOCALAPPDATA?[join(process.env.LOCALAPPDATA,'Kora/secrets/production.env')]:[])]){
   try{for(const[name,value]of Object.entries(parseEnv(await readFile(path,'utf8')))){
-    if(value.length<8||name.startsWith('VITE_')||/ANON|PROJECT_REF|SITE_KEY$/.test(name))continue;
-    if(/KEY|SECRET|PASSWORD|TOKEN|DB_URL/.test(name)){credentials.push(value);if(/DB_URL/.test(name))credentials.push(decodeURIComponent(new URL(value).password));}
+    if(privateConfiguration(name,value)){credentials.push(value);if(/DB_URL/.test(name))credentials.push(decodeURIComponent(new URL(value).password));}
   }}catch(error){if(error.code!=='ENOENT')throw Error('A private configuration source could not be safely scanned; values withheld.');}
 }
 if(process.env.LOCALAPPDATA){try{credentials.push(await readFile(join(process.env.LOCALAPPDATA,'Kora/signing/kora.key'),'utf8'));}catch(error){if(error.code!=='ENOENT')throw Error('Signing key scan source could not be read; value withheld.');}}
