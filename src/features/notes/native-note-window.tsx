@@ -1,6 +1,6 @@
 import {NoteMediaProvider} from './note-media-provider';
 import { useEffect, useRef, useState } from 'react';
-import { listen } from '@tauri-apps/api/event';
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import MiniEditor from './mini-editor';
 import NoteAppearance from './note-appearance';
 import { processDeviceImage, type NoteMedia, type UploadedNoteImage } from './note-media';
@@ -15,29 +15,30 @@ export default function NativeNoteWindow() {
   const [snapshot,setSnapshot]=useState<NativeNoteSnapshot|null>(null),[flags,setFlags]=useState<NativeNoteFlags>({alwaysOnTop:true,opacity:0.96,collapsed:false,ghost:false,peek:false}),[error,setError]=useState(''),[hasFailed,setHasFailed]=useState(false);
   const requests=useRef(new Map<string,{resolve:(value:unknown)=>void;reject:(reason:Error)=>void;timer:ReturnType<typeof setTimeout>}>()),early=useRef(new Map<string,Reply>()),active=useRef(false),latest=useRef<NativeNoteSnapshot|null>(null),writing=useRef(0),mediaListeners=useRef(new Set<()=>void>());
   const send=useRef<<T,>(action:string,payload?:unknown)=>Promise<T>>(()=>Promise.reject(Error('The note is preparing.')));
+  const context=useRef<NativeNoteContext|null>(null);
   const acknowledged=useRef<NativeNoteSnapshot|null>(null),failed=useRef(false),writerId=useRef(''),editVersion=useRef(0),closing=useRef(false),closeCancellation=useRef(0);
   const [preparingClose,setPreparingClose]=useState(false);
   useEffect(()=>{
-    const pendingRequests=requests.current,earlyReplies=early.current,listeners=mediaListeners.current;active.current=true;document.documentElement.classList.add('native-note-document');const cleanups:(()=>void)[]=[];
-    const apply=(value:NativeNoteSnapshot)=>{latest.current=value;if(!writing.current&&!failed.current){setSnapshot(value);if(/^(Saved locally|All changes saved)/.test(value.status))acknowledged.current=value;}};
+    const noteWindow=getCurrentWebviewWindow(),pendingRequests=requests.current,earlyReplies=early.current,listeners=mediaListeners.current;active.current=true;document.documentElement.classList.add('native-note-document');const cleanups:(()=>void)[]=[];
+    const apply=(value:NativeNoteSnapshot)=>{if(context.current?.noteId&&value.note.id!==context.current.noteId)return false;latest.current=value;if(!writing.current&&!failed.current){setSnapshot(value);if(/^(Saved locally|All changes saved)/.test(value.status))acknowledged.current=value;}return true;};
     const reply=(event:Reply)=>{const pending=requests.current.get(event.nonce);if(!pending){early.current.set(event.nonce,event);return;}clearTimeout(pending.timer);requests.current.delete(event.nonce);if(event.error)pending.reject(Error(event.error));else pending.resolve(event.result);};
     send.current=async<T,>(action:string,payload:unknown={}):Promise<T>=>{
       const result=await nativeNoteRequest<{nonce:string}>(action,payload);
       return new Promise<T>((resolve,reject)=>{if(!active.current){reject(Error('The note window closed.'));return;}const timer=setTimeout(()=>{requests.current.delete(result.nonce);reject(Error('The main Notes repository did not respond. Your draft stays in this window; retry or export it.'));},55000);requests.current.set(result.nonce,{resolve:resolve as(value:unknown)=>void,reject,timer});const arrived=early.current.get(result.nonce);if(arrived){early.current.delete(result.nonce);reply(arrived);}});
     };
     void(async()=>{
-      const replyStop=await listen<Reply>('kora-note-reply',event=>reply(event.payload));if(!active.current){replyStop();return;}cleanups.push(replyStop);
-      const snapshotStop=await listen<NativeNoteSnapshot>('kora-note-snapshot',event=>{const previous=latest.current;apply(event.payload);if(previous?.note.revision!==event.payload.note.revision||previous?.readOnly!==event.payload.readOnly)mediaListeners.current.forEach(invalidate=>invalidate());});if(!active.current){snapshotStop();return;}cleanups.push(snapshotStop);
-      const flagStop=await listen<NativeNoteFlags>('kora-note-flags',event=>setFlags(event.payload));if(!active.current){flagStop();return;}cleanups.push(flagStop);
+      const replyStop=await noteWindow.listen<Reply>('kora-note-reply',event=>reply(event.payload));if(!active.current){replyStop();return;}cleanups.push(replyStop);
+      const snapshotStop=await noteWindow.listen<NativeNoteSnapshot>('kora-note-snapshot',event=>{const previous=latest.current;if(!apply(event.payload))return;if(previous?.note.revision!==event.payload.note.revision||previous?.readOnly!==event.payload.readOnly)mediaListeners.current.forEach(invalidate=>invalidate());});if(!active.current){snapshotStop();return;}cleanups.push(snapshotStop);
+      const flagStop=await noteWindow.listen<NativeNoteFlags>('kora-note-flags',event=>setFlags(event.payload));if(!active.current){flagStop();return;}cleanups.push(flagStop);
       const prepareClose=(nonce:string)=>{void(async()=>{
         closing.current=true;setPreparingClose(true);
         for(let attempt=0;attempt<45&&(writing.current||!acknowledged.current)&&!failed.current;attempt++)await new Promise(resolve=>setTimeout(resolve,100));
         if(active.current&&!writing.current&&!failed.current&&acknowledged.current)await nativeNoteRequest('close_ready',{nonce,writerId:writerId.current});
       })().catch(()=>{});};
-      const closeStop=await listen<{nonce:string}>('kora-note-prepare-close',event=>prepareClose(event.payload.nonce));if(!active.current){closeStop();return;}cleanups.push(closeStop);
-      const cancelStop=await listen('kora-note-close-cancel',()=>{closeCancellation.current++;closing.current=false;setPreparingClose(false);});if(!active.current){cancelStop();return;}cleanups.push(cancelStop);
+      const closeStop=await noteWindow.listen<{nonce:string}>('kora-note-prepare-close',event=>prepareClose(event.payload.nonce));if(!active.current){closeStop();return;}cleanups.push(closeStop);
+      const cancelStop=await noteWindow.listen('kora-note-close-cancel',()=>{closeCancellation.current++;closing.current=false;setPreparingClose(false);});if(!active.current){cancelStop();return;}cleanups.push(cancelStop);
       const contextCancellation=closeCancellation.current;
-      const initial=await nativeNoteRequest<NativeNoteFlags&{context:NativeNoteContext;writerId:string;closeNonce?:string}>('context');if(!active.current)return;writerId.current=initial.writerId;setFlags(initial);if(initial.closeNonce&&contextCancellation===closeCancellation.current)prepareClose(initial.closeNonce);
+      const initial=await nativeNoteRequest<NativeNoteFlags&{context:NativeNoteContext;writerId:string;closeNonce?:string}>('context');if(!active.current)return;context.current=initial.context;writerId.current=initial.writerId;setFlags(initial);if(initial.closeNonce&&contextCancellation===closeCancellation.current)prepareClose(initial.closeNonce);
       const first=await send.current<NativeNoteSnapshot>('read');acknowledged.current=first;apply(first);
       requestAnimationFrame(()=>document.querySelector<HTMLElement>('[contenteditable="true"]')?.focus());
     })().catch(reason=>{if(active.current)setError(String(reason));});

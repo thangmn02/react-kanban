@@ -84,7 +84,7 @@ async fn update_flags(app:&AppHandle,state:&NativeNotes,label:&str,payload:Value
     if restore{window.show().map_err(|e|e.to_string())?;}
     context_for(state,label).and_then(|current|if current.user_id==context.user_id{Ok(())}else{Err("Note identity changed".into())})?;
     let flags={let inner=lock(state)?;flags_payload(inner.entries.get(label).ok_or("Note window closed")?)};
-    window.emit("kora-note-flags",&flags).map_err(|e|e.to_string())?;persist_placement(app,state,label,None)?;Ok(flags)
+    window.emit_to(window.label(),"kora-note-flags",&flags).map_err(|e|e.to_string())?;persist_placement(app,state,label,None)?;Ok(flags)
 }
 async fn hide_window(app:&AppHandle,state:&NativeNotes,label:&str)->Result<(),String>{
     let operation={let inner=lock(state)?;inner.entries.get(label).ok_or("Note window is unavailable")?.operation.clone()};let _operation=operation.lock().await;context_for(state,label)?;
@@ -109,7 +109,7 @@ pub fn setup(app:&AppHandle)->Result<(),Box<dyn std::error::Error>>{
     let menu=Menu::with_items(app,&[&capture_item,&restore_item,&manager_item,&quit_item])?;
     let mut tray=TrayIconBuilder::with_id("kora-notes").tooltip("Kora · Quick Notes").menu(&menu).show_menu_on_left_click(true).on_menu_event(|app,event|match event.id.as_ref(){
         "notes-capture"=>capture(app),"notes-restore"=>{let app=app.clone();tauri::async_runtime::spawn(async move{let _=restore_all(&app).await;});},
-        "notes-manager"=>{if let Some(main)=app.get_webview_window("main"){let _=main.unminimize();let _=main.show();let _=main.set_focus();let _=main.emit("kora-notes-command",json!({"action":"manager"}));}},
+        "notes-manager"=>{if let Some(main)=app.get_webview_window("main"){let _=main.unminimize();let _=main.show();let _=main.set_focus();let _=main.emit_to("main","kora-notes-command",json!({"action":"manager"}));}},
         "notes-quit"=>request_quit(app),_=>{}
     });
     if let Some(icon)=app.default_window_icon(){tray=tray.icon(icon.clone());}tray.build(app)?;
@@ -126,12 +126,12 @@ fn request_quit(app:&AppHandle){
     tauri::async_runtime::spawn(async move{
         tokio::time::sleep(Duration::from_secs(7)).await;let state=handle.state::<NativeNotes>();
         if !lock(&state).map(|inner|inner.quit_generation==generation).unwrap_or(false){return;}
-        if let Some(main)=handle.get_webview_window("main"){let _=main.show();let _=main.unminimize();let _=main.emit("kora-notes-command",json!({"action":"quit_blocked"}));}
+        if let Some(main)=handle.get_webview_window("main"){let _=main.show();let _=main.unminimize();let _=main.emit_to("main","kora-notes-command",json!({"action":"quit_blocked"}));}
     });
 }
 fn open_window(app:&AppHandle,state:&NativeNotes,context:Context,focus:bool,preserve_hidden:bool)->Result<String,String>{
     let label={let inner=lock(state)?;check_scope(&inner.identity,&context)?;inner.entries.iter().find(|(_,entry)|entry.context.user_id==context.user_id&&entry.context.note_id==context.note_id&&entry.context.workspace_id==context.workspace_id&&entry.context.local==context.local).map(|(label,_)|label.clone())};
-    if let Some(label)=label {if let Some(window)=app.get_webview_window(&label){if !preserve_hidden{{let mut inner=lock(state)?;let entry=inner.entries.get_mut(&label).ok_or("Note window closed")?;entry.placement.hidden=false;entry.ghost=false;entry.peek=false;}window.set_ignore_cursor_events(false).map_err(|e|e.to_string())?;window.show().map_err(|e|e.to_string())?;let flags={let inner=lock(state)?;flags_payload(inner.entries.get(&label).ok_or("Note window closed")?)};window.emit("kora-note-flags",flags).map_err(|e|e.to_string())?;persist_placement(app,state,&label,None)?;}if focus{window.set_focus().map_err(|e|e.to_string())?;}return Ok(label);}}
+    if let Some(label)=label {if let Some(window)=app.get_webview_window(&label){if !preserve_hidden{{let mut inner=lock(state)?;let entry=inner.entries.get_mut(&label).ok_or("Note window closed")?;entry.placement.hidden=false;entry.ghost=false;entry.peek=false;}window.set_ignore_cursor_events(false).map_err(|e|e.to_string())?;window.show().map_err(|e|e.to_string())?;let flags={let inner=lock(state)?;flags_payload(inner.entries.get(&label).ok_or("Note window closed")?)};window.emit_to(window.label(),"kora-note-flags",flags).map_err(|e|e.to_string())?;persist_placement(app,state,&label,None)?;}if focus{window.set_focus().map_err(|e|e.to_string())?;}return Ok(label);}}
     let path=placement_path(app,&context)?;
     let data_directory=root(app)?.join("webviews").join(&context.user_id);
     let mut placement=std::fs::read(path).ok().and_then(|bytes|serde_json::from_slice::<Placement>(&bytes).ok()).unwrap_or_default();placement.opened=true;placement.local=context.local;if !preserve_hidden{placement.hidden=false;}placement.opacity=placement.opacity.clamp(0.3,1.0);

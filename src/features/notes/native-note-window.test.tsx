@@ -5,7 +5,8 @@ import {newNote} from './notes-store';
 import type {NativeNoteSnapshot} from './native-note-bridge';
 
 const mocks=vi.hoisted(()=>({request:vi.fn(),events:new Map<string,(event:{payload:unknown})=>void>()}));
-vi.mock('@tauri-apps/api/event',()=>({listen:async(name:string,handler:(event:{payload:unknown})=>void)=>{mocks.events.set(name,handler);return()=>mocks.events.delete(name);}}));
+vi.mock('@tauri-apps/api/event',()=>({listen:()=>{throw Error('Frame events must target their owning window.');}}));
+vi.mock('@tauri-apps/api/webviewWindow',()=>({getCurrentWebviewWindow:()=>({label:'note-owned',listen:async(name:string,handler:(event:{payload:unknown})=>void)=>{mocks.events.set(name,handler);return()=>mocks.events.delete(name);}})}));
 vi.mock('./native-note-bridge',()=>({nativeNoteRequest:mocks.request}));
 vi.mock('./mini-editor',()=>({default:({html,readOnly,onChange}:{html:string;readOnly:boolean;onChange:(value:string)=>void})=><textarea aria-label="Note content" value={html} readOnly={readOnly} onChange={event=>onChange(event.target.value)}/>}));
 vi.mock('./note-appearance',()=>({default:()=>null}));
@@ -13,7 +14,7 @@ let snapshot:NativeNoteSnapshot;
 beforeEach(()=>{
   mocks.events.clear();mocks.request.mockReset();snapshot={note:newNote(),readOnly:false,status:'Saved locally on this device.',error:'',conflict:false};
   mocks.request.mockImplementation(async(action:string)=>{
-    if(action==='context')return{writerId:'frame-writer',context:{},alwaysOnTop:true,opacity:0.96,collapsed:false,ghost:false,peek:false};
+    if(action==='context')return{writerId:'frame-writer',context:{noteId:snapshot.note.id},alwaysOnTop:true,opacity:0.96,collapsed:false,ghost:false,peek:false};
     if(action==='read'){queueMicrotask(()=>mocks.events.get('kora-note-reply')?.({payload:{nonce:'read',result:snapshot,error:null}}));return{nonce:'read'};}
     return null;
   });
@@ -56,4 +57,8 @@ it('does not revive a canceled close from a delayed initial context response',as
   render(<NativeNoteWindow/>);await waitFor(()=>expect(mocks.request).toHaveBeenCalledWith('context'));
   await act(async()=>{mocks.events.get('kora-note-close-cancel')!({payload:null});release();});
   expect(await screen.findByLabelText('Note title')).not.toHaveAttribute('readonly');expect(mocks.request.mock.calls.some(([action])=>action==='close_ready')).toBe(false);
+});
+
+it('keeps the established original when a snapshot names another note',async()=>{
+ await ready();const original=snapshot.note.id;await act(async()=>mocks.events.get('kora-note-snapshot')!({payload:{...snapshot,note:{...snapshot.note,id:'another-note',title:'Wrong original'}}}));expect(screen.getByLabelText('Note title')).toHaveValue(snapshot.note.title);expect(screen.getByLabelText('Note title')).not.toHaveValue('Wrong original');await act(async()=>mocks.events.get('kora-note-snapshot')!({payload:{...snapshot,note:{...snapshot.note,id:original,title:'Current original update'}}}));expect(screen.getByLabelText('Note title')).toHaveValue('Current original update');
 });

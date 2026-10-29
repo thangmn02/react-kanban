@@ -1,6 +1,6 @@
 import { useEffect, useEffectEvent, useRef } from 'react';
 import { isTauri } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import type { AppUser, WorkspaceSummary } from '../../types/auth.type';
 import { connectedNotesRepository,prepareConnectedNotesToClose } from './notes-repository';
 import { connectedNoteMedia } from './connected-note-media';
@@ -20,7 +20,7 @@ const base64 = async (blob: Blob) => { const bytes = new Uint8Array(await blob.a
 export default function NativeNotesOwner({ user, workspace, onManager, onOpenTask }: { user: AppUser | null; workspace: WorkspaceSummary | null; onManager: () => void; onOpenTask: (taskId: string, boardId: string) => void }) {
   const routes=useRef({onManager,onOpenTask});useEffect(()=>{routes.current={onManager,onOpenTask};},[onManager,onOpenTask]);const readUser=useEffectEvent(()=>user);
   useEffect(() => {
-    if (!isTauri()) return;const user=readUser();
+    if (!isTauri()) return;const user=readUser(),mainWindow=getCurrentWebviewWindow();
     let active=true; const subscriptions=new Map<string,{release:()=>void;unsubscribe:()=>void;repository:ReturnType<typeof connectedNotesRepository>} >(), media=new Map<string,NoteMedia>();
     const cleanups:(()=>void)[]=[];
     const localOwners=new Map<string,ReturnType<typeof deviceNotesRepository>>(),localReleases:(()=>void)[]=[];
@@ -80,8 +80,8 @@ export default function NativeNotesOwner({ user, workspace, onManager, onOpenTas
         verify(context);await nativeNotesControl('reply',{nonce:request.nonce,result,error:null});
       }catch(reason){await nativeNotesControl('reply',{nonce:request.nonce,result:null,error:reason instanceof Error?reason.message:'Note request failed.'}).catch(()=>{});}
     };
-    void listen<Request>('kora-note-request',event=>{void handle(event.payload);}).then(stop=>active?cleanups.push(stop):stop());
-    void listen<{action:string;label?:string}>('kora-notes-command',event=>{void(async()=>{
+    void mainWindow.listen<Request>('kora-note-request',event=>{void handle(event.payload);}).then(stop=>active?cleanups.push(stop):stop());
+    void mainWindow.listen<{action:string;label?:string}>('kora-notes-command',event=>{void(async()=>{
       await ready;if(!active)return;
       if(event.payload.action==='manager')routes.current.onManager();
       if(event.payload.action==='restore_catalog')await restoreCatalog();

@@ -1,0 +1,29 @@
+/** Real registered Windows frames, backed by generated staging originals. */
+import assert from 'node:assert/strict';
+import {readFile,writeFile,mkdir} from 'node:fs/promises';
+import {spawnSync} from 'node:child_process';
+import {createClient} from '@supabase/supabase-js';
+import {chromium,expect} from '@playwright/test';
+import {qualificationTarget} from './qualification-target.mjs';
+const arg=name=>process.argv.find(v=>v.startsWith('--'+name+'='))?.slice(name.length+3);
+const {config,root,staging}=await qualificationTarget('scratch/final-completion-261029/resume-native');assert.ok(staging);
+const evidence=arg('evidence');assert.match(evidence,/^scratch\/[a-z0-9/_-]+$/);await mkdir(evidence,{recursive:false});
+const fixture=JSON.parse(await readFile(root+'/owned-fixture.json','utf8'));assert.equal(fixture.target,config.API_URL);assert.match(fixture.email,/^native-qualification-[a-f0-9-]+@example\.invalid$/);
+const owner=JSON.parse(await readFile(arg('native-owner'),'utf8')),pid=owner.ProcessId;assert.ok(Number.isInteger(pid)&&pid>0);
+const inspected=spawnSync('powershell.exe',['-NoProfile','-Command',"$all=Get-CimInstance Win32_Process;$app=$all|Where-Object ProcessId -eq "+pid+";$ports=@(Get-NetTCPConnection -State Listen -LocalPort 9223);$owned=@();foreach($port in $ports){$ancestor=[int]$port.OwningProcess;$matched=$false;for($i=0;$i -lt 16;$i++){if($ancestor -eq "+pid+"){$matched=$true;break};$row=$all|Where-Object ProcessId -eq $ancestor;if(-not $row){break};$ancestor=[int]$row.ParentProcessId};$owned+=@{address=$port.LocalAddress;owned=$matched}};@{executable=$app.ExecutablePath;created=$app.CreationDate.ToUniversalTime().ToString('o');endpoints=$owned}|ConvertTo-Json -Depth 4 -Compress"],{encoding:'utf8',timeout:15000});assert.equal(inspected.status,0,'Native ownership inspection failed.');const live=JSON.parse(inspected.stdout);assert.equal(live.executable?.toLowerCase(),owner.ExecutablePath.toLowerCase());assert.equal(Date.parse(live.created),Date.parse(owner.CreationDate));for(const address of ['127.0.0.1','::1'])assert.ok(live.endpoints.some(p=>p.address===address&&p.owned),'Both owned native debug endpoints are required.');
+const admin=createClient(config.API_URL,config.SERVICE_ROLE_KEY,{auth:{persistSession:false,autoRefreshToken:false}}),read=async()=>{const r=await admin.from('notes').select('id,title,content,revision').eq('owner_user_id',fixture.userId);assert.ifError(r.error);return r.data;};
+let main,framesBrowser;const result={at:new Date().toISOString(),productionWrites:false,nativePid:pid};
+try{
+ main=await chromium.connectOverCDP('http://127.0.0.1:9223');framesBrowser=await chromium.connectOverCDP('http://[::1]:9223');const page=main.contexts().flatMap(c=>c.pages()).find(p=>p.url().startsWith('http://127.0.0.1:1420/')&&!p.url().includes('native-note'));assert.ok(page);
+ const registered=await page.evaluate(()=>window.__TAURI_INTERNALS__.invoke('native_notes_control',{action:'windows',payload:null}));assert.equal(registered.length,5,'Exactly five generated frames are required.');assert.ok(registered.every(w=>w.context.userId===fixture.userId),'A frame belongs to another actor.');
+ const before=await read(),frames=framesBrowser.contexts().flatMap(c=>c.pages()).filter(p=>p.url().includes('native-note'));assert.equal(frames.length,5);const mapped=[];
+ for(const frame of frames){const label=await frame.evaluate(()=>window.__TAURI_INTERNALS__.metadata.currentWindow.label),entry=registered.find(w=>w.label===label);assert.ok(entry);const note=before.find(n=>n.id===entry.context.noteId);assert.ok(note);await expect(frame.getByRole('textbox',{name:'Note title',exact:true})).toHaveValue(note.title);mapped.push({frame,label,note});}
+ result.registeredOriginalsVerified=5;
+ const selected=mapped.find(row=>row.note.title==='Combined native workload note 1');assert.ok(selected);const marker='Only this original changes '+Date.now();await selected.frame.getByRole('textbox',{name:'Note content',exact:true}).fill(marker);await expect(selected.frame.getByRole('status').last()).toContainText('All changes saved.',{timeout:20000});
+ const after=await read();for(const row of before.filter(n=>n.id!==selected.note.id))assert.deepEqual(after.find(n=>n.id===row.id),row,'An unrelated original changed.');assert.ok(JSON.stringify(after.find(n=>n.id===selected.note.id).content).includes(marker));result.otherOriginalsUnchanged=true;
+ const flags=new Map();for(const row of mapped)flags.set(row.label,await row.frame.getByRole('button',{name:'Always on Top',exact:true}).getAttribute('aria-pressed'));const own=selected.frame.getByRole('button',{name:'Always on Top',exact:true});await own.click();await expect(own).toHaveAttribute('aria-pressed',flags.get(selected.label)==='true'?'false':'true');for(const row of mapped.filter(row=>row!==selected))await expect(row.frame.getByRole('button',{name:'Always on Top',exact:true})).toHaveAttribute('aria-pressed',flags.get(row.label));await own.click();await expect(own).toHaveAttribute('aria-pressed',flags.get(selected.label));result.otherWindowFlagsUnchanged=true;
+ for(const row of mapped)await expect(row.frame.getByRole('textbox',{name:'Note title',exact:true})).toHaveValue(row.note.title);
+ if(process.argv.includes('--quit')){await page.getByRole('button',{name:'Close app',exact:true}).first().evaluate(button=>button.click());await expect.poll(()=>{try{process.kill(pid,0);return false;}catch(e){if(e.code==='ESRCH')return true;throw e;}},{timeout:20000}).toBe(true);result.normalGuardedQuit=true;}
+ result.status='PASS';
+}catch(error){result.status='FAIL';result.reason=error.message;process.exitCode=1;}
+finally{await framesBrowser?.close().catch(()=>{});await main?.close().catch(()=>{});await writeFile(evidence+'/result.json',JSON.stringify(result,null,2));console.log(JSON.stringify(result));}
