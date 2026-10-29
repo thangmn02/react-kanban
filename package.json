@@ -48,7 +48,7 @@
     "tailwindcss": "^4.2.2",
     "yup": "^1.7.1"
   },
-  "astryx":{"theme":"@astryxdesign/theme-neutral/built"},
+  "astryx":{"theme":"@astryxdesign/theme-neutral"},
   "devDependencies": {
     "@astryxdesign/cli": "0.1.9",
     "@eslint/js": "^9.39.4",
