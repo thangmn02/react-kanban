@@ -4,6 +4,7 @@ export interface PresentationDecision {
   at:number; key:string; band:string; stage:'seed'|'gate'|'play'|'commit'|'frame'|'cleanup';
   reason:string; deadlineMs?:number; owner?:string; profile?:string;
   cells?:number; hidden?:boolean; active?:boolean;
+  presentationTimeMs?:number;lateLivePreview?:boolean;
 }
 const capacity=6000;
 let records:PresentationDecision[]=[],overflow=0;

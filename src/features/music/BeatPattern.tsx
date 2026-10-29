@@ -56,15 +56,16 @@ interface BeatPatternProps {
   motionProfile?:MotionProfile|'legacy';
   motionReduced?:boolean;
   motionActive?:boolean;
+  lateLivePreview?:boolean;
 }
 
-export default function BeatPattern({ session, beat, colorMode = 'random', palette = 'bloom', orientation = 'horizontal', semanticOnly: requestedMode, melodyEnabled = false, independentRows = false, melodyEvents,motionProfile='legacy',motionReduced=false,motionActive=true }: BeatPatternProps) {
+export default function BeatPattern({ session, beat, colorMode = 'random', palette = 'bloom', orientation = 'horizontal', semanticOnly: requestedMode, melodyEnabled = false, independentRows = false, melodyEvents,motionProfile='legacy',motionReduced=false,motionActive=true,lateLivePreview=false }: BeatPatternProps) {
   const configuredMode = useSyncExternalStore(subscribeSemanticMode, getSemanticMode);
   const semanticOnly = requestedMode ?? configuredMode;
   const systemReduced=useMotionReduction();
   const reduced=motionReduced||systemReduced;
   if(motionProfile!=='legacy')return <SemanticMotionPattern session={session} beat={beat} profile={motionProfile} orientation={orientation}
-    melodyEnabled={melodyEnabled} semanticOnly={semanticOnly} melodyEvents={melodyEvents} active={motionActive} reduced={reduced}/>;
+    melodyEnabled={melodyEnabled} semanticOnly={semanticOnly} melodyEvents={melodyEvents} active={motionActive} reduced={reduced} lateLivePreview={lateLivePreview}/>;
   return semanticOnly ? <SemanticBeatPattern session={session} beat={beat} orientation={orientation} melodyEnabled={melodyEnabled} independentRows={independentRows} melodyEvents={melodyEvents} active={motionActive} reduced={reduced}/>
     : <NormalBeatPattern session={session} beat={beat} colorMode={colorMode} palette={palette} orientation={orientation} melodyEnabled={melodyEnabled} independentRows={independentRows} melodyEvents={melodyEvents} motionActive={motionActive} motionReduced={reduced}/>;
 }

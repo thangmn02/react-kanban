@@ -1,6 +1,6 @@
 import {afterEach,expect,it,vi} from 'vitest';
 import {act,cleanup,render} from '@testing-library/react';
-import {createSemanticMotion,envelopeAt,instrumentMotion,motionDuration,motionFrames,peakOpacity} from './semantic-motion';
+import {createSemanticMotion,envelopeAt,instrumentMotion,motionDuration,motionFrames,peakOpacity,lateLivePresentation,type VisualAttack} from './semantic-motion';
 import {SemanticMotionPattern} from './semantic-motion-pattern';
 import type {BeatBand} from './mediaBridge';
 import type {MusicBeatState} from './useMusicBeatSync';
@@ -8,6 +8,47 @@ import {activeSteps} from './beatVisuals';
 afterEach(()=>{cleanup();vi.restoreAllMocks();vi.useRealTimers();});
 const session={id:'source',title:'Authorized test',artist:'',source:'test',playing:true,paused:false,currentTime:0};
 const base:MusicBeatState={sessionId:'source',mode:'capture',captureId:'capture',synchronizationEpoch:'epoch',onsets:{}};
+it('permits explicit bounded late local drum presentation without changing acoustic timestamps',()=>{
+  const trace=Object.freeze({id:'real',source:'onset' as const,type:'hat' as const,confidence:1,detectedAt:1000,targetTime:800,targetClock:'epoch-ms' as const,eventSource:'local' as const});
+  const attack=Object.freeze({key:'real',band:'hat' as const,deadlineMs:800,trace});
+  expect(lateLivePresentation(attack,'focus',false,1000)).toBe(attack);
+  const shown=lateLivePresentation(attack,'focus',true,1000);
+  expect(shown.deadlineMs).toBe(1000);expect(shown.trace).toBe(trace);
+  expect(attack.deadlineMs).toBe(800);expect(trace.targetTime).toBe(800);
+  expect(lateLivePresentation(attack,'focus',true,1401)).toBe(attack);
+  expect(lateLivePresentation(attack,'focus',true,790)).toBe(attack);
+  for(const band of ['bass','melody'] as const){const tonal={...attack,band};expect(lateLivePresentation(tonal,'focus',true,1200)).toBe(tonal);}
+  const cached={...attack,trace:{...trace,eventSource:'cache' as const}};
+  expect(lateLivePresentation(cached,'focus',true,1000)).toBe(cached);
+  const missing={...attack,trace:undefined};expect(lateLivePresentation(missing,'focus',true,1000)).toBe(missing);
+});
+it('shows only fresh accepted late drum identities after opt-in and clears them on pause',()=>{
+  vi.useFakeTimers();vi.setSystemTime(1000);
+  const view=render(<SemanticMotionPattern session={session} beat={base} profile="focus"/>);
+  const animate=vi.fn(()=>({cancel:vi.fn(),onfinish:null,currentTime:0}) as unknown as Animation);
+  for(const cell of view.container.querySelectorAll<HTMLElement>('[data-motion-cell],.instrument-motion-layer'))cell.animate=animate;
+  const hit=(key:string,band:BeatBand):VisualAttack=>({key,band,deadlineMs:800,trace:{id:key,source:'onset',type:band==='clap'?'snare':band as 'kick'|'hat',confidence:1,detectedAt:1000,targetTime:800,targetClock:'epoch-ms',eventSource:'local'}});
+  const old=hit('expired-before-opt-in','hat');
+  view.rerender(<SemanticMotionPattern session={session} beat={{...base,visualAttacks:[old]}} profile="focus"/>);
+  expect(animate).not.toHaveBeenCalled();
+  view.rerender(<SemanticMotionPattern session={session} beat={{...base,visualAttacks:[old]}} profile="focus" lateLivePreview/>);
+  expect(animate).not.toHaveBeenCalled();
+  const attacks=[hit('real-kick','kick'),hit('real-snare','clap'),hit('real-hat','hat')];
+  const playing={...base,visualAttacks:attacks};
+  view.rerender(<SemanticMotionPattern session={session} beat={playing} profile="focus" lateLivePreview/>);
+  for(const band of ['kick','clap','hat']){
+    const shown=view.container.querySelector(`[data-motion-band="${band}"] [data-late-live-preview="true"]`);
+    expect(shown).toHaveAttribute('data-original-deadline','800');expect(shown).toHaveAttribute('data-presentation-time','1000');
+  }
+  expect(attacks.every(attack=>attack.deadlineMs===800&&attack.trace?.targetTime===800)).toBe(true);
+  const count=animate.mock.calls.length;
+  view.rerender(<SemanticMotionPattern session={session} beat={playing} profile="focus" lateLivePreview/>);
+  expect(animate).toHaveBeenCalledTimes(count);
+  expect(view.container.querySelector('[data-motion-band="melody"]')).toBeNull();
+  view.rerender(<SemanticMotionPattern session={{...session,paused:true,playing:false}} beat={playing} profile="focus" lateLivePreview/>);
+  expect(view.container.querySelector('[data-visual-attack]')).toBeNull();
+  expect(view.container.querySelector('[data-late-live-preview="true"].motion-body')).toBeNull();
+});
 function fixture(){
   const host=document.createElement('div');host.innerHTML=`<div data-motion-band="hat">${[0,1].map(i=>`<span data-motion-cell="${i}"><span class="instrument-motion-layer motion-body"></span><span class="instrument-motion-layer motion-edge"></span><span class="instrument-motion-layer motion-rim"></span></span>`).join('')}</div>`;document.body.append(host);
   const animations:{cancel:ReturnType<typeof vi.fn>;onfinish:null|(()=>void);currentTime:number}[]=[];

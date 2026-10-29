@@ -2,7 +2,7 @@ import {useLayoutEffect,useRef,useState,type CSSProperties} from 'react';
 import type {BrowserMusicSession,BeatBand} from './mediaBridge';
 import type {MusicBeatState} from './useMusicBeatSync';
 import {activeSteps,reshuffleEpoch} from './beatVisuals';
-import {createSemanticMotion,instrumentMotion,motionDuration,type MotionProfile} from './semantic-motion';
+import {createSemanticMotion,instrumentMotion,motionDuration,lateLivePresentation,type MotionProfile} from './semantic-motion';
 import {flashAttributes,recordCellFlash} from './beat-row-diagnostics';
 import {beatTelemetry} from '../../../extensions/kanban-music/beat-telemetry.js';
 import {beatPresentationDiagnostics} from './beat-presentation-diagnostics';
@@ -11,9 +11,10 @@ import {BeatHeartbeat} from './beat-heartbeat';
 
 const bands:BeatBand[]=['kick','clap','hat','bass','melody'];
 const telemetry=beatTelemetry.at('beat-renderer');
-export function SemanticMotionPattern({session,beat,profile,reduced=false,active=true,orientation='horizontal',melodyEnabled=false,semanticOnly=false,melodyEvents}: {
+export function SemanticMotionPattern({session,beat,profile,reduced=false,active=true,orientation='horizontal',melodyEnabled=false,semanticOnly=false,melodyEvents,lateLivePreview=false}: {
   session?:BrowserMusicSession;beat:MusicBeatState;profile:MotionProfile;reduced?:boolean;orientation?:'horizontal'|'vertical';
   melodyEnabled?:boolean;semanticOnly?:boolean;active?:boolean;melodyEvents?:readonly {id:string;duration:number}[];
+  lateLivePreview?:boolean;
 }){
   const root=useRef<HTMLDivElement>(null),renderer=useRef<ReturnType<typeof createSemanticMotion>|null>(null);
   const frames=useRef(new Set<number>());
@@ -48,7 +49,7 @@ export function SemanticMotionPattern({session,beat,profile,reduced=false,active
     const clearFrames=()=>{frames.current.forEach(id=>element.ownerDocument.defaultView?.cancelAnimationFrame(id));frames.current.clear();};
     const visibility=()=>{engine.reset();clearFrames();seed('visibility-reset');};element.ownerDocument.addEventListener('visibilitychange',visibility);
     return()=>{beatPresentationDiagnostics.record({key:'renderer-lifecycle',band:'all',stage:'cleanup',reason:'dispose',owner,profile});engine.dispose();clearFrames();element.ownerDocument.removeEventListener('visibilitychange',visibility);renderer.current=null;};
-  },[owner,profile,reduce,orientation,melodyEnabled]);
+  },[owner,profile,reduce,orientation,melodyEnabled,lateLivePreview]);
   useLayoutEffect(()=>{
     const element=root.current,engine=renderer.current;if(!element||!engine)return;
     const projected=[...(beat.visualAttacks||[])];
@@ -74,8 +75,10 @@ export function SemanticMotionPattern({session,beat,profile,reduced=false,active
       });
       const cell=cells[0],cellIndex=cellIndices[0];
       if(!cell){beatPresentationDiagnostics.record({key:attack.key,band:attack.band,stage:'gate',reason:'no-cell',deadlineMs:attack.deadlineMs,owner,profile,cells:0});continue;}
-      const result=engine.play(attack,cells);
+      const presentation=lateLivePresentation(attack,profile,lateLivePreview);
+      const result=engine.play(presentation,cells);
       beatPresentationDiagnostics.record({key:attack.key,band:attack.band,stage:'play',reason:result,deadlineMs:attack.deadlineMs,
+        presentationTimeMs:presentation.deadlineMs,lateLivePreview:presentation!==attack,
         owner,profile,cells:cells.length,hidden:element.ownerDocument.hidden,active});
       if(inspect){
         const sample=Date.now(),view=element.ownerDocument.defaultView,layer=cell.querySelector<HTMLElement>('.motion-body');
@@ -89,6 +92,9 @@ export function SemanticMotionPattern({session,beat,profile,reduced=false,active
       }
       if(result==='expired'||result==='hidden-or-invalid')continue;
       const traceElement=cell.querySelector<HTMLElement>('.motion-body')!;
+      traceElement.dataset.presentationTime=String(presentation.deadlineMs);
+      traceElement.dataset.originalDeadline=String(attack.deadlineMs);
+      traceElement.dataset.lateLivePreview=String(presentation!==attack);
       for(const [key,value]of Object.entries(flashAttributes(attack.trace,row,cellIndex))){if(value===undefined)traceElement.removeAttribute(key);else traceElement.setAttribute(key,String(value));}
       cell.dataset.visualAttack=attack.key;
       if(attack.trace){recordCellFlash(traceElement,'commit');telemetry.record('EVENT_COMMITTED',attack.trace,{semantic:true});
@@ -107,7 +113,7 @@ export function SemanticMotionPattern({session,beat,profile,reduced=false,active
               if(layers.some(layer=>Number(view.getComputedStyle(layer).opacity)>.001)){
                 recordCellFlash(traceElement,'animation');telemetry.record('EVENT_RENDERED',attack.trace,{semantic:true});
                 beatPresentationDiagnostics.record({key:attack.key,band:attack.band,stage:'frame',reason:'positive-opacity',deadlineMs:attack.deadlineMs,owner,profile});
-              }else if(Date.now()<attack.deadlineMs+motionDuration(attack,profile))observe();
+              }else if(Date.now()<presentation.deadlineMs+motionDuration(attack,profile))observe();
               else beatPresentationDiagnostics.record({key:attack.key,band:attack.band,stage:'frame',reason:'expired-without-positive-sample',deadlineMs:attack.deadlineMs,owner,profile});
             });frames.current.add(id);
           };observe();
@@ -121,10 +127,11 @@ export function SemanticMotionPattern({session,beat,profile,reduced=false,active
       selected.forEach(index=>{const cell=element.querySelector<HTMLElement>(`[data-motion-band="melody"] [data-motion-cell="${index}"]`);if(cell)melody.push(cell);});
     }
     engine.sustainMelody(melody,Boolean(owner)&&melodyEnabled&&beat.melody?.active&&beat.melody.note!==gate.current.melodyNote?beat.melody.level:0);
-  },[beat,owner,melodyEnabled,semanticOnly,session,melodyEvents,profile,inspect,active]);
+  },[beat,owner,melodyEnabled,semanticOnly,session,melodyEvents,profile,inspect,active,lateLivePreview]);
   const visible=bands.filter(b=>melodyEnabled||b!=='melody');
   return <div ref={root} className={`music-pattern semantic-motion ${orientation}${semanticOnly?' semantic-only':''}`} data-motion-profile={profile}
     data-motion-variant="opal-bloom"
+    data-late-live-preview={lateLivePreview}
     data-opal-variant={profile==='focus'?'balanced':'high-contrast'}
     data-motion-owner={owner?'active':!active?'inactive-view':!session?.playing||session.paused?'not-playing':beat.mode!=='capture'?'not-capturing':'wrong-session'}
     data-motion-inputs={beat.visualAttacks?.length||0}

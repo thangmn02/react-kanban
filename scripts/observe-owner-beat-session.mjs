@@ -21,12 +21,24 @@ try{
   result.companions=await page.evaluate(()=>window.__TAURI_INTERNALS__.invoke('native_music_request',{action:'companion.status'}));
   await page.evaluate(()=>{
     const telemetry=window.__koraBeatTelemetry;if(!telemetry)throw Error('Application telemetry unavailable.');
-    const state={records:[],flashes:[],overflow:0,priorEnabled:telemetry.enabled};telemetry.enable();
+    const state={records:[],flashes:[],frames:[],overflow:0,priorEnabled:telemetry.enabled};telemetry.enable();
     const add=(array,value)=>{if(array.length<20000)array.push(value);else state.overflow++;};
     state.unsubscribe=telemetry.subscribe(record=>add(state.records,record));
     state.animation=event=>{const element=event.target;if(!(element instanceof HTMLElement)||!element.dataset.beatTrace)return;add(state.flashes,{at:Date.now(),traceId:element.dataset.beatTrace,eventId:element.dataset.eventId,type:element.dataset.eventType,semantic:element.dataset.semantic==='true',origin:element.dataset.detectorOrigin,targetPlaybackTime:element.dataset.targetPlaybackTime,animation:event.animationName});};
     state.roots=new Set();state.findRoots=()=>{const roots=[document];for(const root of roots)for(const element of root.querySelectorAll('*'))if(element.shadowRoot)roots.push(element.shadowRoot);for(const root of roots)if(!state.roots.has(root)){state.roots.add(root);root.addEventListener('animationstart',state.animation);}return roots;};
-    state.findRoots();window.__koraOwnerObservation=state;
+    state.findRoots();
+    const frame=time=>{
+      if(state.lastFrame===undefined||time-state.lastFrame>=16){
+        state.lastFrame=time;
+        const cells=[...state.roots].filter(root=>root===document||root.host.isConnected).flatMap(root=>[...root.querySelectorAll('.motion-body[data-beat-trace],.semantic-beat-flash[data-beat-trace]')]);
+        for(const cell of cells.slice(0,24)){
+          const opacity=Number(getComputedStyle(cell).opacity);
+          if(opacity>.001&&cell.getClientRects().length)add(state.frames,{at:Date.now(),traceId:cell.dataset.beatTrace,type:cell.dataset.eventType,semantic:cell.dataset.semantic==='true',opacity,
+            originalDeadline:Number(cell.dataset.originalDeadline)||undefined,presentationTime:Number(cell.dataset.presentationTime)||undefined,lateLivePreview:cell.dataset.lateLivePreview==='true'});
+        }
+      }
+      state.raf=requestAnimationFrame(frame);
+    };state.raf=requestAnimationFrame(frame);window.__koraOwnerObservation=state;
   });
   await writeFile(output+'/process.json',JSON.stringify({pid:process.pid,command:process.argv,worktree:process.cwd(),startedAt:result.startedAt,nativeOwner:owner.ProcessId}));
   console.log('Owner observation ready. Actual native telemetry only; no audio, credentials or signed URLs are recorded.');
@@ -37,7 +49,7 @@ try{
       const response=await window.__TAURI_INTERNALS__.invoke('native_music_request',{action:'sessions.get'});
       const sessions=(response.sessions||[]).map(session=>({id:session.id,title:session.title,source:session.source,currentTime:session.currentTime,paused:session.paused,playing:session.playing}));
       const roots=state.findRoots();
-      return {at:Date.now(),sessions,records:state.records.splice(0),flashes:state.flashes.splice(0),overflow:state.overflow,status:roots.flatMap(root=>[...root.querySelectorAll('[role="status"]')]).map(element=>element.textContent).filter(Boolean).slice(0,25)};
+      return {at:Date.now(),sessions,records:state.records.splice(0),flashes:state.flashes.splice(0),frames:state.frames.splice(0),overflow:state.overflow,status:roots.flatMap(root=>[...root.querySelectorAll('[role="status"]')]).map(element=>element.textContent).filter(Boolean).slice(0,25)};
     });
     await appendFile(output+'/observations.private.jsonl',JSON.stringify(sample)+'\n');result.samples++;await writeFile(output+'/result.json',JSON.stringify(result,null,2));
     await new Promise(resolve=>setTimeout(resolve,2000));
@@ -45,6 +57,6 @@ try{
   result.status='OBSERVATION_ENDED';
 }catch(error){result.status='INCOMPLETE';result.reason=error.message;process.exitCode=1;}
 finally{
-  await page?.evaluate(()=>{const state=window.__koraOwnerObservation;if(!state)return;state.unsubscribe();for(const root of state.roots)root.removeEventListener('animationstart',state.animation);window.__koraBeatTelemetry.enable(state.priorEnabled);delete window.__koraOwnerObservation;}).catch(()=>{});
+  await page?.evaluate(()=>{const state=window.__koraOwnerObservation;if(!state)return;state.unsubscribe();cancelAnimationFrame(state.raf);for(const root of state.roots)root.removeEventListener('animationstart',state.animation);window.__koraBeatTelemetry.enable(state.priorEnabled);delete window.__koraOwnerObservation;}).catch(()=>{});
   await browser?.close();result.finishedAt=new Date().toISOString();await writeFile(output+'/result.json',JSON.stringify(result,null,2));console.log(JSON.stringify({status:result.status,samples:result.samples}));
 }

@@ -69,8 +69,13 @@ export function MusicGrid({ music, colorMode = 'random', palette = 'bloom', orie
   const {t}=useI18n();
   const systemReduced=useMotionReduction(),reduced=motionReduction==='reduced'||systemReduced;
   const [legacy,setLegacy]=useState(false);
+  const previewOwner=JSON.stringify([music.selected?.id,music.selected?.generation,music.selected?.asset?.provider,music.selected?.asset?.id,
+    music.beat.sourceGeneration,music.beat.captureId,music.beat.synchronizationEpoch]);
+  const [latePreview,setLatePreview]=useState({owner:previewOwner,enabled:false});
+  if(latePreview.owner!==previewOwner)setLatePreview({owner:previewOwner,enabled:false});
   const compareLegacy=legacy&&!reduced;
   const motionPreview=motionPreviewAllowed(music.selected?.syncState?.capability?.privateCandidate===true);
+  const lateLivePreview=motionPreview&&!compareLegacy&&!music.beta?.enabled&&Boolean(music.selected?.id)&&latePreview.owner===previewOwner&&latePreview.enabled;
   const showDebug = import.meta.env.DEV && new URLSearchParams(window.location.search).has('musicDebug');
   const [demo,setDemo]=useState(() => new URLSearchParams(window.location.search).get('musicDemo') === 'lead');
   const visibility = useRef<{ at: number; event: string; hidden: boolean }[]>([]);
@@ -99,11 +104,14 @@ export function MusicGrid({ music, colorMode = 'random', palette = 'bloom', orie
     :capability.livePreviewEligible?'Instrument preview is off for this source. Open Music → Private candidate → Live preview to enable it. Pause, seek and source changes turn preview off.'
     :null:null;
   const grid=<BeatPattern key={music.selected?.id} session={music.selected} beat={music.beat} colorMode={colorMode} palette={palette} orientation={orientation} semanticOnly={music.beta?.enabled?true:undefined} melodyEnabled={music.beta?.enabled&&music.beta.melody} independentRows={music.beta?.enabled} melodyEvents={music.beta?.enabled?music.beta.clip?.lead?.events:undefined}
-    motionProfile={motionPreview&&!compareLegacy?motionProfile:'legacy'} motionReduced={reduced} motionActive={visualActive}/>;
+    motionProfile={motionPreview&&!compareLegacy?motionProfile:'legacy'} motionReduced={reduced} motionActive={visualActive} lateLivePreview={lateLivePreview}/>;
   return <>
     {motionPreview&&<div className="music-motion-controls"><span>{t('dock.motion.preview')} · {compareLegacy?'Legacy':t(`dock.motion.${motionProfile}`)}</span>
       <button type="button" className="text-button motion-legacy" disabled={reduced} aria-pressed={compareLegacy} onClick={()=>setLegacy(value=>!value)}>{t(compareLegacy?'dock.motion.restore':'dock.motion.legacy')}</button>
+      {!music.beta?.enabled&&<button type="button" className="text-button motion-legacy" disabled={compareLegacy||!music.selected} aria-pressed={lateLivePreview}
+        onClick={()=>setLatePreview({owner:previewOwner,enabled:!lateLivePreview})}>{t(lateLivePreview?'music.lateLive.disable':'music.lateLive.enable')}</button>}
     </div>}
+    {motionPreview&&!music.beta?.enabled&&<p className="motion-reduction-note" role="status" aria-label={t('music.lateLive.status')}>{t(lateLivePreview?'music.lateLive.active':'music.lateLive.strict')}</p>}
     {motionPreview&&reduced&&<p className="motion-reduction-note">{t('dock.motion.reducedNote')}</p>}
     {previewStatus&&<p role="status" aria-label="Instrument preview status">{previewStatus}</p>}
     {music.beta?.enabled?<div className={`hybrid-grid-frame${music.beta.renderer==='short'?' hybrid-short-attack':''}`}>{grid}</div>:grid}

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { I18nProvider } from '../../i18n';
 import FloatingFocus, { type FloatingFocusProps } from '../../components/focus/FloatingFocus';
 import { MusicBridgeError, sendMusicRequest, sendBeatRequest, type BeatEvent } from './mediaBridge';
+import { decideBeatMode } from '../../../extensions/kanban-music/beat-mode.js';
 
 const beatReceiver = vi.hoisted(() => ({ receive: undefined as undefined | ((event: BeatEvent) => void) }));
 vi.mock('./mediaBridge', async (importOriginal) => ({ ...await importOriginal<typeof import('./mediaBridge')>(), sendMusicRequest: vi.fn(), sendBeatRequest: vi.fn(),
@@ -25,6 +26,27 @@ function renderPlayer() {
   fireEvent.click(screen.getByRole('tab', { name: 'Music' }));
   return view;
 }
+
+it('labels late-live preview explicitly and requires a fresh opt-in after source changes', async () => {
+  const source={...session,playing:true,syncState:{mode:'clock' as const,capability:decideBeatMode({privateCandidate:true})}};
+  vi.mocked(sendMusicRequest).mockResolvedValue([source]);
+  renderPlayer();await screen.findByRole('heading',{name:session.title});
+  fireEvent.click(screen.getByRole('tab',{name:'Beat grid'}));
+  const enable=screen.getByRole('button',{name:'Enable late-live drum preview'});
+  expect(enable).toHaveAttribute('aria-pressed','false');fireEvent.click(enable);
+  expect(screen.getByRole('button',{name:'Disable late-live drum preview'})).toHaveAttribute('aria-pressed','true');
+  expect(screen.getByRole('status',{name:'Drum display timing'})).toHaveTextContent('synchronization is unverified');
+  vi.mocked(sendMusicRequest).mockResolvedValue([{...source,generation:2}]);
+  act(()=>window.dispatchEvent(new Event('focus')));
+  await waitFor(()=>expect(screen.getByRole('button',{name:'Enable late-live drum preview'})).toHaveAttribute('aria-pressed','false'));
+  fireEvent.click(screen.getByRole('button',{name:'Enable late-live drum preview'}));
+  expect(screen.getByRole('button',{name:'Disable late-live drum preview'})).toHaveAttribute('aria-pressed','true');
+  vi.mocked(sendMusicRequest).mockResolvedValue([{...source,id:'another-source',title:'Another source'}]);
+  act(()=>window.dispatchEvent(new Event('focus')));
+  await waitFor(()=>expect(screen.getByRole('button',{name:'Enable late-live drum preview'})).toHaveAttribute('aria-pressed','false'));
+  vi.mocked(sendMusicRequest).mockResolvedValue([source]);act(()=>window.dispatchEvent(new Event('focus')));
+  await waitFor(()=>expect(screen.getByRole('button',{name:'Enable late-live drum preview'})).toHaveAttribute('aria-pressed','false'));
+});
 
 it('offers a guided install without asking for an extension ID', async () => {
   vi.mocked(sendMusicRequest).mockRejectedValue(new MusicBridgeError('not-installed'));

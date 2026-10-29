@@ -24,6 +24,13 @@ export function motionDuration(attack:VisualAttack,profile:MotionProfile){
   const token=instrumentMotion[attack.band],base=profile==='focus'?token.duration:token.dynamicDuration;
   return attack.band==='bass'||attack.band==='melody'?Math.max(base,Math.min(10000,attack.durationMs||0)):base;
 }
+/** Optional presentation only; retain the original attack and acoustic trace. */
+export function lateLivePresentation(attack:VisualAttack,profile:MotionProfile,enabled:boolean,now=Date.now()):VisualAttack {
+  const age=now-attack.deadlineMs;
+  return enabled&&['kick','clap','hat'].includes(attack.band)&&attack.trace?.source==='onset'
+    &&attack.trace.eventSource==='local'&&Number.isFinite(age)&&age>=motionDuration(attack,profile)&&age<=600
+    ?{...attack,deadlineMs:now}:attack;
+}
 export function envelopeAt(elapsed:number,duration:number,band:BeatBand){
   if(elapsed<0||elapsed>=duration)return 0;
   // Sustained tonal events settle gently, then release; percussion decays fast.
@@ -56,7 +63,7 @@ export function motionFrames(attack:VisualAttack,profile:MotionProfile,accent:bo
 
 export function createSemanticMotion(root:HTMLElement,profile:MotionProfile,reduced:boolean,now=Date.now){
   const clearTrace=(element:HTMLElement)=>{
-    for(const attribute of ['data-beat-trace','data-beat-row','data-beat-cell','data-event-id','data-event-type','data-event-source','data-target-playback-time','data-semantic','data-presentation','data-detector-origin','data-capture-id','data-parent-id'])element.removeAttribute(attribute);
+    for(const attribute of ['data-beat-trace','data-beat-row','data-beat-cell','data-event-id','data-event-type','data-event-source','data-target-playback-time','data-semantic','data-presentation','data-detector-origin','data-capture-id','data-parent-id','data-presentation-time','data-original-deadline','data-late-live-preview'])element.removeAttribute(attribute);
   };
   const rows=new Map<BeatBand,{cells:readonly HTMLElement[];animations:Animation[]}>(),timers=new Set<ReturnType<typeof setTimeout>>();
   const asCells=(target:HTMLElement|readonly HTMLElement[]):readonly HTMLElement[]=>Array.isArray(target)?target:[target as HTMLElement];
