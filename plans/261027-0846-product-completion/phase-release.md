@@ -26,3 +26,13 @@ Production database recovery is verified from one shared read-only snapshot in a
 ## Verification and rollback
 
 Use final full unit/native tests, the built-product browser matrix, real staging service/browser suites, actual native lifecycle evidence, protected hashes and bundle checks. Retain current public deploy/feed/installer identities before promotion. Web rollback restores the prior Netlify deploy and matching feed/artifacts; it does not roll back database history. Production recovery must cover owning rows, policies/grants/triggers, migration history, Storage bytes and a separately verified restore target before applying additive changes.
+
+## Final completion wave — October 29
+
+The owner’s completion brief supersedes the short deployment request: no production promotion or data/schema writes. Continue in the existing clean checkout on `codex/final-completion-wave`, based on `76903bb`; keep the original checkout and Brave research installation unchanged. The opening acceptance remains the full P0–P4/native/Companion matrix above, with physical/device/rights limitations independently stated.
+
+Execution order: implement and rehearse offline production recovery/reconciliation and bounded signed-object backup; prepare CAS-protected historical review; close demonstrated runtime/asset/event defects; execute complete connected workflow and native/resource qualification; rebuild one exact-lock candidate and rerun final playback/compatibility. Update owning reports with exact evidence instead of relabeling older runs. External permissions/equipment are asked for only after their implementation/local rehearsal exists.
+
+The owner requested checkpoint/owned-process cleanup and normal computer shutdown at 1% remaining in the five-hour window, or immediately on actual completion if earlier. Check live usage between increments; never force unsaved applications closed. Initial remaining allowance: 46%. No shutdown was pending when work resumed.
+
+October 29 recovery execution: exact 31-object inventory (30 private, one public) backed up via owner-dashboard scoped downloads, encrypted and verified through the compatible pinned isolated Storage API. Two portable archives were uploaded to the owner-authorized private cloud folder, downloaded/hash checked and decrypted in a separate networkless Linux process without DPAPI. The key stays separate; owner escrow confirmation is pending. Offline production-history rehearsal passes all 12 additive migrations with original rows/history preserved and contact ACL drift guards. No production writes or deployment occurred. Continue runtime/package fixes, connected/native workload and exact-candidate playback qualification; release remains NO-GO.

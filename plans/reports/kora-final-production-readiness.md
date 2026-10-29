@@ -8,7 +8,7 @@
 |---|---|
 | Astryx Design System | PASS within the agreed bounded integration |
 | P0 Data Durability | PASS within tested transactional/local-acknowledgment boundaries |
-| P0 Security & Recovery | PARTIAL; database recovery verified, private Storage bytes unverified |
+| P0 Security & Recovery | PASS for the retained snapshot and isolated rehearsals; independent owner key escrow pending |
 | P1 Workflow & Collaboration | PARTIAL for the full combined release flow; individual local/staging workflows pass |
 | P2 Windows Native | PARTIAL; actual external-window tests pass, hardware and final-release matrix remain open |
 | P3 Beat Grid Preservation | FAIL as a final-artifact gate: scoped preservation passes, required final full-song replay is unverified |
@@ -46,11 +46,15 @@ Staging is `enzzyuhchizfmruxhfhg`; production is independently verified as `lthl
 
 Production inspection used TLS verification and read-only transactions. Database recovery now uses one exported read-only repeatable snapshot for metadata, row fingerprints and `pg_dump`, allowing live Auth refreshes without an inconsistent dump. An isolated, networkless restore verifies all owning row values/counts, schemas, policies/grants/triggers, provider metadata and publication membership. Source double formatting and regclass schema qualification are explicitly normalized on both sides; strict hashes remain enforced. The complete database archive is DPAPI-encrypted with a user-only ACL outside OneDrive.
 
-Database recovery is not Storage byte recovery. Production has 31 private Storage objects. Those bytes have **not** been backed up/restored: the image-backend secret is not reused for this purpose. Full recovery remains blocked until separate authorized object-backup access and isolated byte/reference verification exist. DPAPI CurrentUser also requires this Windows identity or an independently secured recovery route; the local archive is not an off-device disaster-recovery claim.
+Database and Storage recovery were verified separately on October 29. The exact inventory contains 30 private beat-event objects and one already-public task cover. Owner-dashboard actions generated 30 object-specific 30-minute download capabilities; the public object retained its existing public route. All 31 downloaded byte streams matched the database snapshot's MD5 eTags, sizes and subsequent SHA-256 checks. The temporary signed-URL file was removed; the private-image backend key was not reused.
+
+An isolated, networkless Storage API restore recovered all 31 logical bucket/path references and original bytes, retained application rows and original policies, denied public and unrelated authenticated access to all 30 private objects, and allowed the one public cover. The recovered provider catalog matched the snapshot exactly. Storage API 1.62.5 failed its legacy conflict-index assumption; the pinned version-aware 1.84.32 image passed. Provider uploads generate new object IDs/versions; identical provider-internal IDs are not claimed. Exact runtime digest and failed-attempt evidence remain in private receipts.
+
+Portable AES-256-GCM archives of the database dump and Storage bundle were copied to the owner-authorized Documents and private Google Drive locations. Both cloud downloads matched ciphertext hashes, then a separate networkless Linux process decrypted them without DPAPI and verified the dump and all 31 object hashes. The recovery key was not uploaded; the owner has a separate private local handoff file. Independent owner key escrow remains unconfirmed. Recovery covers the original October 28 17:13:50 UTC snapshot, not subsequent production changes.
 
 Private recovery manifest: `%LOCALAPPDATA%/Kora/backups/production/evidence/1793207547437/backup-manifest.json`. Detailed records remain private; no backup credentials or user records belong in Git.
 
-An updated production historical preview inspected 24 tasks without writes: 14 findings across nine tasks, comprising nine completion/timestamp mismatches and five completed tasks in active lists. The detailed before-images/proposals are encrypted in private AppData. Historical completion times remain unknown; no repair time is invented and no reconciliation is performed. The product owner must review this preview separately before authorizing repairs.
+An updated production historical preview inspected 24 tasks without writes: 14 findings across nine tasks, comprising nine completion/timestamp mismatches and five completed tasks in active lists. The detailed full-row before-images, list/sibling snapshots and CAS review are retained under restricted private AppData access and covered by the encrypted source snapshot. Historical completion times remain unknown; no repair time is invented and no reconciliation is performed. The product owner must review this preview separately before authorizing repairs.
 
 ## Workflow and native qualification
 
@@ -104,8 +108,8 @@ Relevant commands are `pnpm exec vitest run`, `cargo test --manifest-path src-ta
 
 Production records `20260713000000`, `20260913120000` and `20261007080000_sparse_beat_cache`. The last version is historical and absent from the current 14-file source set. Twelve current source versions have no matching history entry, but absence from history is not proof that every object is absent: production already contains the contact tables, while the source contact migration uses unconditional `CREATE TABLE`. The history is not an exact prefix, so neither initial staging initialization nor blind incremental replay is appropriate.
 
-1. Complete independent Storage recovery and retain the verified encrypted database snapshot. Define recovery-point limitations and approved provider/off-device recovery.
-2. Compare existing recurrence/contact/beat-cache definitions and retain all three historical entries. Rehearse an explicit reconciliation/additive plan on the recovered production clone. Do not reapply the squashed baseline, drop existing tables or rewrite user rows.
+1. Retain the verified database/Storage archives and cloud verification receipts; confirm the owner has independently stored the separate recovery key. Respect the recorded snapshot recovery point.
+2. The recovered networkless clone passed the explicit 12-migration additive rehearsal, preserving all three original history records and every existing application row. Existing contacts were skipped only after exact definition, owner, grant, schema-usage and RLS equivalence checks; three negative authorization-drift checks passed. Review the retained exact source-hash plan before separate authorization.
 3. Review task transition/profile/Realtime and the seven Notes-related migrations, task comments/history/references and image policies. Record exact hashes and expected object/policy/publication changes. Preserve existing contact and cache data.
 4. Obtain separate owner authorization for the exact migration/reconciliation set. Historical task repairs need a separate reviewed before-image/CAS decision and are not implicit in migration approval.
 5. After all mandatory gates pass, propose the matching function configuration, connected web build and signed Windows installer/feed promotion. Netlify Functions reads `SUPABASE_SERVICE_ROLE_KEY` at runtime; no `VITE_` service secret is permitted. Preserve the existing HTTPS updater origin and atomic installer/feed workflow.

@@ -1,12 +1,13 @@
 /** Inspect the actual Git index. Never echo credential values or matched lines. */
 import {execFileSync} from 'node:child_process';
-import {readFile} from 'node:fs/promises';
+import {readFile,readdir} from 'node:fs/promises';
 import {parseEnv} from 'node:util';
 import {join} from 'node:path';
 const git=args=>execFileSync('git',args,{maxBuffer:64e6});
 const paths=git(['diff','--cached','--name-only','--diff-filter=ACMR','-z']).toString().split('\0').filter(Boolean);
 if(!paths.length)throw Error('Stage the exact release files before running this check.');
-const privatePath=path=>/(^|\/)(?:\.env(?:\.|$)|scratch\/|\.netlify\/|\.signing\/)|\.(?:key|pem|p12|pfx|dpapi|dump)$|(?:^|\/)(?:credentials|service-account[^/]*)\.json$/i.test(path)&&!/(?:^|\/)\.env(?:\.[a-z-]+)?\.(?:example|sample|template)$/i.test(path);
+const recoveryPath=path=>/(?:^|\/)(?:signed-object-access|kora-signed-object-access-[^/]+|owner-review\.private)\.json$|(?:^|\/)kora-recovery-key-[^/]+\.txt$/i.test(path);
+const privatePath=path=>recoveryPath(path)||/(^|\/)(?:\.env(?:\.|$)|scratch\/|\.netlify\/|\.signing\/)|\.(?:key|pem|p12|pfx|dpapi|dump|kora-backup)$|(?:^|\/)(?:credentials|service-account[^/]*)\.json$/i.test(path)&&!/(?:^|\/)\.env(?:\.[a-z-]+)?\.(?:example|sample|template)$/i.test(path);
 const credentials=[];
 function privateConfiguration(name,value){
   if(value.length<8)return false;
@@ -21,6 +22,7 @@ for(const path of ['.env','.env.local','.env.staging.local','.env.production.loc
   }}catch(error){if(error.code!=='ENOENT')throw Error('A private configuration source could not be safely scanned; values withheld.');}
 }
 if(process.env.LOCALAPPDATA){try{credentials.push(await readFile(join(process.env.LOCALAPPDATA,'Kora/signing/kora.key'),'utf8'));}catch(error){if(error.code!=='ENOENT')throw Error('Signing key scan source could not be read; value withheld.');}}
+if(process.env.LOCALAPPDATA){const keyRoot=join(process.env.LOCALAPPDATA,'Kora/secrets');let names=[];try{names=await readdir(keyRoot);}catch(error){if(error.code!=='ENOENT')throw Error('Recovery key scan source unavailable; details withheld.');}for(const name of names.filter(name=>/^kora-recovery-key-\d{4}-\d{2}-\d{2}\.txt$/.test(name))){const handoff=await readFile(join(keyRoot,name),'utf8');const key=handoff.split(/\r?\n/).find(line=>/^[A-Za-z0-9+/]{43}=$/.test(line.trim()));if(!key)throw Error('Recovery key scan source has an unexpected format; values withheld.');credentials.push(key.trim());}}
 const failures=[];
 for(const path of git(['ls-files','-z']).toString().split('\0').filter(Boolean))if(privatePath(path))failures.push({path,rule:'private file in index'});
 for(const path of paths){

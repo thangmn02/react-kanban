@@ -1,0 +1,2 @@
+/** Owner preparation uses the dashboard handoff; broad Auth/service credentials are never loaded. */
+console.log(JSON.stringify({status:'OWNER_DASHBOARD_REQUIRED',projectRef:'lthlvntvjgnornrdxnms',objects:31,manualJson:false,requiredAction:'Sign into the production project in the Codex in-app browser and authorize exact object-scoped signed downloads. Codex runs dashboard-storage-signing.mjs through its supported browser session.',credentialsLoaded:false,networkRequests:0}));
