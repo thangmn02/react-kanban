@@ -13,7 +13,7 @@ const nativeWindow = vi.hoisted(() => ({ setSize: vi.fn().mockResolvedValue(unde
   isMaximized: vi.fn().mockResolvedValue(false), toggleMaximize: vi.fn().mockResolvedValue(undefined),
   unmaximize: vi.fn().mockResolvedValue(undefined), onResized: vi.fn().mockResolvedValue(() => {}) }));
 const nativeInvoke = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
-vi.mock('@tauri-apps/api/core', () => ({ invoke: nativeInvoke }));
+vi.mock('@tauri-apps/api/core', () => ({ invoke: nativeInvoke, isTauri: () => true }));
 vi.mock('@tauri-apps/api/window', () => ({ getCurrentWindow: () => nativeWindow, currentMonitor: async () => null, Effect: { Blur: 'blur' },
   LogicalSize: class { width: number; height: number; constructor(width: number, height: number) { this.width = width; this.height = height; } } }));
 vi.mock('../music/useBrowserMusic', () => ({ useBrowserMusic: () => ({ sessions: [], connected: true, checking: false,

@@ -364,6 +364,17 @@ pub async fn native_music_request(
     native_audio: Option<bool>,
     value: Option<f64>,
 ) -> Result<Value, String> {
+    if action == "companion.status" {
+        let peers: Vec<_> = music.peers.lock().unwrap().keys().cloned().collect();
+        let replies = join_all(peers.iter().map(|peer| music.ask(peer, json!({"action":"companion.status"})))).await;
+        let companions: Vec<_> = peers.iter().zip(replies).map(|(peer, reply)| {
+            let version = reply.ok().filter(|reply| reply["ok"] == true)
+                .and_then(|reply| reply["version"].as_str().map(str::to_owned))
+                .filter(|version| crate::companion_setup::version_parts(version).is_some());
+            json!({"peerId":peer,"version":version,"verified":version.is_some()})
+        }).collect();
+        return Ok(json!({"ok":true,"companions":companions}));
+    }
     if action == "sessions.get" {
         let peers: Vec<_> = music.peers.lock().unwrap().keys().cloned().collect();
         if peers.is_empty() {

@@ -41,11 +41,16 @@ export async function requestNativeMusic(action: string, sessionId?: string, sub
   if (action === 'dock.beat.sync.stop' && sessionId && subscriptionId) audio.stop(sessionId, subscriptionId);
   // Desktop includes the learned runtime and observes Windows process PCM.
   // Keep browser playback untouched; Companion provides discovery and clock.
-  const response = await invoke<Record<string, unknown>>('native_music_request', { action, sessionId, subscriptionId,
-    ...(value !== undefined ? { value } : {}),
-    ...(action === 'dock.beat.sync.start' ? { nativeAudio: true } : {}) });
-  if (response.ok === true && starting && audioOwner === starting) audio.activate(starting.sessionId, starting.subscriptionId);
-  return response;
+  // Companion may emit browser policy before its start response. Reserve the
+  // native owner first, while retaining acknowledgement-gated PCM activation.
+  const release = starting && audioOwner === starting ? audio.reserve(starting.sessionId, starting.subscriptionId) : undefined;
+  try {
+    const response = await invoke<Record<string, unknown>>('native_music_request', { action, sessionId, subscriptionId,
+      ...(value !== undefined ? { value } : {}),
+      ...(action === 'dock.beat.sync.start' ? { nativeAudio: true } : {}) });
+    if (response.ok === true && starting && audioOwner === starting) audio.activate(starting.sessionId, starting.subscriptionId);
+    return response;
+  } finally { release?.(); }
 }
 export function subscribeNativeMusic(receive: (value: unknown) => void) {
   receivers.add(receive);

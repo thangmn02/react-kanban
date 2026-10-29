@@ -19,6 +19,19 @@ function clock(sessionId = 'browser:song', currentTime = 1, playing = true) {
   return { sessionId, subscriptionId:'subscription', kind:'clock', emittedAt:Date.now(),
     clock:{playing,paused:!playing,currentTime,playbackRate:1,sampledAt:Date.now()} };
 }
+it('withholds browser capture policy during native admission without starting PCM before acknowledgement', async () => {
+  const feed = createNativeAudioFeed(vi.fn());
+  const release = feed.reserve('browser:song', 'subscription');
+  expect(feed.companion({...clock(),kind:'sync.state',mode:'clock',capability:{privateCandidate:true,allowTypedPreview:false}})).toBe(false);
+  expect(feed.companion(clock())).toBe(true);
+  expect(engine.start).not.toHaveBeenCalled();
+  feed.activate('browser:song','subscription');release();
+  await vi.waitFor(() => expect(engine.start).toHaveBeenCalledOnce());
+  expect(feed.companion({...clock(),kind:'sync.state',mode:'clock'})).toBe(false);
+  feed.stop('browser:song','subscription');
+  const cancel = feed.reserve('browser:song','subscription');cancel();
+  expect(feed.companion({...clock(),kind:'sync.state',mode:'clock'})).toBe(true);
+});
 it.each(['expired', 'capture-disconnected', 'audio-backlog'])('recovers active %s capture on the next fresh clock', async (reason) => {
   const feed = createNativeAudioFeed(vi.fn()); feed.companion(clock()); feed.activate('browser:song', 'subscription');
   await vi.waitFor(() => expect(transport.channels).toHaveLength(1));

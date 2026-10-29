@@ -8,26 +8,34 @@ import type { NativeAudioCallbacks } from '../../../extensions/kanban-music/nati
 import { LEAD_ANALYSIS_VERSION } from '../music/lead-events';
 import { beatTelemetry } from '../../../extensions/kanban-music/beat-telemetry.js';
 import { invoke } from '@tauri-apps/api/core';
+import { MusicTrack } from '../music/MusicPlayer';
 
 const native = vi.hoisted(() => ({ receive: new Map<string, (event: { payload: unknown }) => void>(), subscription: '',
-  cached: false, learned: false,
+  cached: false, learned: false, privateDuringStart: false,
   detectors: [] as { options: NativeAudioCallbacks; id: string }[] }));
 vi.mock('../../../extensions/kanban-music/native-audio-engine.js', () => ({ createNativeAudioEngine(options: NativeAudioCallbacks) {
   const detector={options,id:''};native.detectors.push(detector);
   return {start:async (id: string)=>{detector.id=id;return true;},push:()=>true,renew:()=>true,stop:()=>{}};
 } }));
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => true, Channel: class { onmessage: (data: ArrayBuffer) => void = () => {}; }, invoke: vi.fn(async (_command, args) => {
-  if (args.action === 'dock.beat.sync.start') native.subscription = args.subscriptionId;
+  if (args.action === 'dock.beat.sync.start') {
+    native.subscription = args.subscriptionId;
+    if (native.privateDuringStart) native.receive.get('native-music-beat')?.({payload:{
+      sessionId:'native:song',subscriptionId:args.subscriptionId,emittedAt:Date.now(),kind:'sync.state',mode:'clock',
+      capability:{version:1,mode:'unsupported',support:'unsupported',reason:'capture-unproven',privateCandidate:true,allowSemantic:false,allowTypedPreview:false},
+    }});
+  }
   return { ok: true, sessions: [{ id: 'native:song', title: 'Browser song', artist: 'Artist', source: 'music.youtube.com', paused: false, playing: true,
     learnedPercussion: native.learned,
+    ...(native.privateDuringStart ? {syncState:{mode:'clock',capability:{version:1,mode:'unsupported',support:'unsupported',reason:'capture-unproven',privateCandidate:true}}} : {}),
     ...(native.cached ? { asset:{provider:'youtube',id:'abcdefghijk'},duration:30 } : {}) }] };
 }) }));
 vi.mock('@tauri-apps/api/event', () => ({ listen: vi.fn(async (name, receive) => { native.receive.set(name,receive); return () => native.receive.delete(name); }) }));
-beforeEach(() => { native.subscription = '';native.detectors.length=0;native.cached=false;native.learned=false; });
+beforeEach(() => { native.subscription = '';native.detectors.length=0;native.cached=false;native.learned=false;native.privateDuringStart=false; });
 afterEach(() => { cleanup();vi.restoreAllMocks();vi.unstubAllEnvs();beatTelemetry.enable(false);beatTelemetry.clear(); });
-function Harness({demand=false,melodyEnabled=false}:{demand?:boolean;melodyEnabled?:boolean}) {
+function Harness({demand=false,melodyEnabled=false,showControls=false}:{demand?:boolean;melodyEnabled?:boolean;showControls?:boolean}) {
   const music = useBrowserMusic(demand);
-  return <><span>{music.source}</span><span data-testid="lead-status">{music.beat.leadAvailability} {music.beat.lead?.source} {music.beat.lead?.kind}</span><BeatPattern melodyEnabled={melodyEnabled} session={music.selected} beat={music.beat} /></>;
+  return <><span>{music.source}</span><span data-testid="lead-status">{music.beat.leadAvailability} {music.beat.lead?.source} {music.beat.lead?.kind}</span>{showControls&&<MusicTrack music={music}/>}<BeatPattern melodyEnabled={melodyEnabled} session={music.selected} beat={music.beat} /></>;
 }
 function emit(event: object, emittedAt = Date.now()) {
   native.receive.get('native-music-beat')?.({ payload: { sessionId: 'native:song', subscriptionId: native.subscription, emittedAt, ...event } });
@@ -57,6 +65,15 @@ it('uses Desktop PCM with the learned model even when Companion supports its own
   expect(native.detectors).toHaveLength(1);
   act(() => emit({ kind: 'clock', clock: { playing: false, paused: true, currentTime: 1.2, playbackRate: 1, sampledAt: Date.now() } }));
   expect(view.container.querySelectorAll('.beat-square.onset')).toHaveLength(0);
+});
+it('keeps native instrument rows live when research Companion policy arrives before start acknowledgement', async () => {
+  native.privateDuringStart = true;
+  const view = render(<I18nProvider><Harness showControls /></I18nProvider>);
+  await waitFor(() => expect(native.subscription).not.toBe(''));
+  const detector = await startDetector();
+  expect(view.container.querySelector('details[aria-label="Private Beat Grid candidate"]')).toBeNull();
+  act(() => detector.options.onBeat(detector.id, ['kick','clap','hat']));
+  await waitFor(() => expect(view.container.querySelectorAll('[data-channel] .beat-square.onset').length).toBeGreaterThanOrEqual(3));
 });
 it('pops native onset rows, ignores companion fallback events, and clears on silence', async () => {
   const view = render(<I18nProvider><Harness /></I18nProvider>);

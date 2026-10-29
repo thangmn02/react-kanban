@@ -60,7 +60,7 @@ export function MusicTrack({ music }: { music: BrowserMusicController }) {
       </span>
     </div>
     <MusicPlaybackControls key={selected?.id} music={music} />
-    {selected&&<ExperimentalBeatControl key={`experimental:${selected.id}`} session={selected} refresh={music.refresh}/>}
+    {selected&&!isNativeWidget()&&<ExperimentalBeatControl key={`experimental:${selected.id}`} session={selected} refresh={music.refresh}/>}
     {sessions.length > 1 && <select className="music-sessions" aria-label={t('music.choose')} value={selected?.id || ''} onChange={(event) => setSelectedId(event.target.value)}>{sessions.map((session) => <option key={session.id} value={session.id}>{session.title} · {session.source}</option>)}</select>}
   </>;
 }
@@ -92,7 +92,7 @@ export function MusicGrid({ music, colorMode = 'random', palette = 'bloom', orie
     <Suspense fallback={<p>Loading private Melody comparison…</p>}><PrivateMelodyDemo /></Suspense>
   </div>;
   const capability=music.selected?.syncState?.capability;
-  const previewStatus=!music.beta?.enabled&&capability?.privateCandidate
+  const previewStatus=!isNativeWidget()&&!music.beta?.enabled&&capability?.privateCandidate
     ?capability.reason==='protected-source'?'Instrument flashes are unavailable for this protected source. Music playback controls still work.'
     :capability.reason==='provider-policy'?'Instrument flashes are unavailable for this provider under the private test policy. Music playback controls still work.'
     :capability.allowTypedPreview?'Unverified instrument preview is on. Flashes can lag or be incorrect.'

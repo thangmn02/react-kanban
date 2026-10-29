@@ -27,6 +27,7 @@ export function decodeNativeAudio(value: unknown): { sequence: number; samples: 
 export function createNativeAudioFeed(publish: (message: Message) => void,
   onAudio?: (sessionId: string, samples: Float32Array, clock: PlaybackClock) => void) {
   let current: Subscription | undefined;
+  let pending: { sessionId: string; subscriptionId: string } | undefined;
   const clocks = new Map<string, Message>();
   const key = (session: string, subscription: string) => `${session}/${subscription}`;
   const emit = (owner: Subscription, fields: Message) => {
@@ -121,6 +122,10 @@ export function createNativeAudioFeed(publish: (message: Message) => void,
     else void begin(owner);
   }
   return {
+    reserve(sessionId: string, subscriptionId: string) {
+      const owner = { sessionId, subscriptionId }; pending = owner;
+      return () => { if (pending === owner) pending = undefined; };
+    },
     companion(message: unknown): boolean {
       if (!message || typeof message !== 'object') return true;
       const data = message as Message;
@@ -148,7 +153,8 @@ export function createNativeAudioFeed(publish: (message: Message) => void,
       }
       // The Companion remains the clock/control transport. Its clock-only
       // status cannot overwrite analyser-confirmed native capture.
-      const overridden = current?.sessionId === data.sessionId && current.subscriptionId === data.subscriptionId && data.kind !== 'clock';
+      const overridden = (current?.sessionId === data.sessionId && current.subscriptionId === data.subscriptionId
+        || pending?.sessionId === data.sessionId && pending.subscriptionId === data.subscriptionId) && data.kind !== 'clock';
       if (overridden) telemetry.mark('EVENT_DROPPED', parseBeatTraces(data.telemetry), { reason: 'native-override' });
       return !overridden;
     },

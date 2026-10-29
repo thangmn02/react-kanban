@@ -2,7 +2,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { requestNativeMusic } from './nativeMusic';
 import { invoke } from '@tauri-apps/api/core';
 
-const feed = vi.hoisted(() => ({ activate: vi.fn(), stop: vi.fn(), companion: vi.fn(), ended: vi.fn() }));
+const feed = vi.hoisted(() => ({ reserve: vi.fn(() => vi.fn()), activate: vi.fn(), stop: vi.fn(), companion: vi.fn(), ended: vi.fn() }));
 vi.mock('./nativeAudio', () => ({ createNativeAudioFeed: () => feed }));
 vi.mock('@tauri-apps/api/event', () => ({ listen: vi.fn().mockResolvedValue(() => {}) }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn().mockResolvedValue({ ok: true }) }));
