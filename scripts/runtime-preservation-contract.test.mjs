@@ -1,0 +1,3 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';import {execFileSync} from 'node:child_process';import {readFile} from 'node:fs/promises';import {restoreRuntimeMaintenance} from './runtime-preservation-contract.mjs';
+const baseline='76903bb7d404982e928b01df2ef8420a2bea60ff';
+for(const name of ['capture-engine.js','offscreen.js','percussion-worker.js'])test('preserves frozen runtime decisions through '+name+' maintenance',async()=>{const path='extensions/kanban-music/'+name,before=execFileSync('git',['show',baseline+':'+path],{encoding:'utf8'}).replaceAll('\r\n','\n'),after=await readFile(path,'utf8');assert.equal(restoreRuntimeMaintenance(path,after),before);assert.notEqual(restoreRuntimeMaintenance(path,after+'\n// unapproved change'),before);});

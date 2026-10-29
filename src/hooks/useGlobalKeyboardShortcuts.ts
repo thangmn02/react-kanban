@@ -31,6 +31,7 @@ export function useGlobalKeyboardShortcuts({
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
       const isCommandKey = event.metaKey || event.ctrlKey;
 
       if (isCommandKey && event.key.toLowerCase() === 'k') {
@@ -43,7 +44,7 @@ export function useGlobalKeyboardShortcuts({
         return;
       }
 
-      if (event.key.toLowerCase() === 'n') {
+      if (!isCommandKey && !event.altKey && event.key.toLowerCase() === 'n') {
         event.preventDefault();
         onQuickAddTask();
         return;

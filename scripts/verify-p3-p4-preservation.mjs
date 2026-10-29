@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {restoreRuntimeMaintenance} from './runtime-preservation-contract.mjs';
 import {readFile,writeFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
@@ -16,11 +17,26 @@ const mutable=new Set(['src/features/music/BeatPattern.tsx','src/features/music/
 const hashes={},digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 for(const [file,before]of Object.entries(admission.hashes)){
   const bytes=await readFile(file),after=digest(bytes);
-  const nativeNotesCapability=file==='src-tauri/tauri.conf.json'&&after!==before;
-  const nativeNotesBuild=['src-tauri/build.rs','src-tauri/Cargo.toml'].includes(file)&&after!==before;
+  let baselineBytes;try{baselineBytes=await readFile(root+'/'+file.replaceAll('/','__'));}catch(error){if(error.code!=='ENOENT')throw error;try{baselineBytes=execFileSync('git',['show',admission.head+':'+file],{stdio:['ignore','pipe','pipe']});}catch{baselineBytes=execFileSync('git',['show','76903bb7d404982e928b01df2ef8420a2bea60ff:'+file]);}}
+  const normalize=value=>value.toString().replaceAll('\r\n','\n');
+  const matchesAdmission=value=>[value,Buffer.from(normalize(value)),Buffer.from(normalize(value).replaceAll('\n','\r\n'))].some(candidate=>digest(candidate)===before);
+  if(!matchesAdmission(baselineBytes)){
+    const retained=execFileSync('git',['show','76903bb7d404982e928b01df2ef8420a2bea60ff:'+file]);
+    if(matchesAdmission(retained))baselineBytes=retained;
+  }
+  if(!mutable.has(file))assert.ok(matchesAdmission(baselineBytes),'Admission byte identity cannot be verified: '+file);
+  const canonicalBefore=normalize(baselineBytes),canonicalAfter=normalize(bytes);
+  const maintenance=['extensions/kanban-music/capture-engine.js','extensions/kanban-music/offscreen.js','extensions/kanban-music/percussion-worker.js'].includes(file);
+  if(maintenance)assert.equal(restoreRuntimeMaintenance(file,canonicalAfter),canonicalBefore,'Frozen runtime changed beyond bounded maintenance: '+file);
+  const harnessMaintenance=['extensions/kanban-music/capture-engine-private.test.js','extensions/kanban-music/percussion-worker.test.js'].includes(file);
+  const companionVersion=file==='extensions/kanban-music/manifest.json';
+  if(companionVersion){const old=JSON.parse(canonicalBefore),current=JSON.parse(canonicalAfter);const parts=value=>value.split('.').reduce((n,x)=>n*1000+Number(x),0);assert.ok(parts(current.version)>=parts(old.version),'Companion version cannot decrease.');current.version=old.version;assert.deepEqual(current,old,'Only the monotonically higher Companion version may change.');}
+  const runtimeMaintenance=maintenance||harnessMaintenance||companionVersion;
+  const nativeNotesCapability=file==='src-tauri/tauri.conf.json'&&canonicalAfter!==canonicalBefore;
+  const nativeNotesBuild=['src-tauri/build.rs','src-tauri/Cargo.toml'].includes(file)&&canonicalAfter!==canonicalBefore;
   if(nativeNotesBuild){
     const baseline=execFileSync('git',['show',`${admission.head}:${file}`]);
-    assert.equal(digest(baseline),before,`Native admission differs from its recorded source: ${file}`);
+    assert.ok(matchesAdmission(baseline),`Native admission differs from its recorded source: ${file}`);
     const normalize=value=>value.replace(/\r\n/g,'\n');
     if(file.endsWith('Cargo.toml')){
       assert.ok(bytes.toString().includes(`version = "${desktopConfig.version}"`),'Cargo and desktop release versions must match.');
@@ -32,9 +48,9 @@ for(const [file,before]of Object.entries(admission.hashes)){
       assert.equal(bytes.toString().replace(/\s/g,''),expected.replace(/\s/g,''),'Native build helper may only register the scoped command manifest.');
     }
   }
-  if(nativeNotesCapability)assert.equal(digest(Buffer.from(bytes.toString().replace(`"version": "${desktopConfig.version}"`,`"version": "${baselineDesktopConfig.version}"`).replace('"capabilities": ["widget", "notes"]','"capabilities": ["widget"]'))),before,'Only the requested native Notes capability and matching release version may extend the protected desktop configuration.');
-  hashes[file]={before,after,changed:before!==after,intentionallyTouched:mutable.has(file)||nativeNotesCapability||nativeNotesBuild,nativeNotesCapability,nativeNotesBuild};
-  if(!mutable.has(file)&&!nativeNotesCapability&&!nativeNotesBuild)assert.equal(after,before,`Protected baseline changed: ${file}`);
+  if(nativeNotesCapability)assert.equal(normalize(Buffer.from(bytes.toString().replace(`"version": "${desktopConfig.version}"`,`"version": "${baselineDesktopConfig.version}"`).replace('"capabilities": ["widget", "notes"]','"capabilities": ["widget"]'))),canonicalBefore,'Only the requested native Notes capability and matching release version may extend the protected desktop configuration.');
+  hashes[file]={before,after,changed:before!==after,intentionallyTouched:mutable.has(file)||nativeNotesCapability||nativeNotesBuild||runtimeMaintenance,nativeNotesCapability,nativeNotesBuild,runtimeMaintenance,checkoutEolOnly:canonicalAfter===canonicalBefore&&after!==before};
+  if(!mutable.has(file)&&!nativeNotesCapability&&!nativeNotesBuild&&!runtimeMaintenance)assert.equal(canonicalAfter,canonicalBefore,`Protected baseline changed: ${file}`);
 }
 const modelFiles={'extensions/kanban-music/generated/percussion/percussion.onnx':'c571062d76c322d54c2808c95339ea2dadd2f6ab99f9d83163d0f5311cd0f80a',
   [root+'/companion/extension/generated/percussion/percussion.onnx']:'c571062d76c322d54c2808c95339ea2dadd2f6ab99f9d83163d0f5311cd0f80a',

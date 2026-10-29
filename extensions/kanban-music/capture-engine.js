@@ -8,7 +8,6 @@ import { createLeadAudioTap } from './lead-audio-tap.js';
 import { createDelayedAudioOutput } from './delayed-audio-output.js';
 import { privateBeatCandidate, privatePercussionDiagnostics, privatePercussionClassifier,semanticPrecisionGuards,privateHatLabelMapping } from './beat-candidate.js';
 import {ADTOF_CLASS_NAMES} from './percussion-label-contract.js';
-import {LiveDiagnosticRecorder} from './live-diagnostic-recorder.js';
 const telemetry = beatTelemetry.at('capture-engine');
 const percussionTelemetry = beatTelemetry.at('percussion-classifier');
 
@@ -22,6 +21,7 @@ export function tabConstraints(streamId) {
 export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, onStop, onAudible = () => {},
   onTempo = () => {}, onTempoTick = () => {},
   monitorOnly = false,
+  createDiagnosticRecorder,
   createPercussion = createPercussionRuntime,
   createHybrid = createHybridPercussionRuntime,
   createAudioTap = createLeadAudioTap,
@@ -480,12 +480,12 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
       catch{stop('failed');return false;}
     },
     diagnosticCapture(captureId,operation,recordingId,durationSeconds=30){
-      if(!privateBeatCandidate||typeof recordingId!=='string'||!/^[a-zA-Z0-9_-]{1,80}$/.test(recordingId))return {ok:false,error:'unavailable'};
+      if(!privateBeatCandidate||typeof createDiagnosticRecorder!=='function'||typeof recordingId!=='string'||!/^[a-zA-Z0-9_-]{1,80}$/.test(recordingId))return {ok:false,error:'unavailable'};
       if(![30,60,90].includes(durationSeconds))return {ok:false,error:'unavailable'};
       const state=active;
       if(operation==='start'){
         if(recording?.active||!state?.candidate||state.captureId!==captureId||!state.percussionOwner?.runtime?.recordDiagnostics)return {ok:false,error:'detector-not-ready'};
-        recording=new LiveDiagnosticRecorder({recordingId,captureId,sourceId:state.sourceId,sourceGeneration:state.sourceGeneration,
+        recording=createDiagnosticRecorder({recordingId,captureId,sourceId:state.sourceId,sourceGeneration:state.sourceGeneration,
           synchronizationEpoch:state.synchronizationEpoch,audioContextStart:state.context.currentTime+1,windowLeadMs:1000,
           configuredAudioDelayMs:state.bufferMs,classifier:state.percussionClassifier,
           hybridMode:state.hybridMode,durationSeconds,

@@ -1,3 +1,5 @@
+import {loadFrozenPercussionModel} from './model-assets.js';
+import {withOwnedInference} from './inference-resources.js';
 import { PercussionClassifier } from './percussion-classifier.js';
 import { CausalPercussionClassifier } from './causal-percussion-classifier.js';
 import { EarlyPercussionClassifier } from './early-percussion-classifier.js';
@@ -29,8 +31,8 @@ async function drain() {
         for (let j = 0; j < frames.length; j++) input.set(frames[j].data, (offset + j) * config.bins);
         const began = performance.now();
         const inferenceStartedAt = config.diagnostics || config.telemetry ? Date.now() : undefined;
-        const output = await session.run({ [config.input]: new ort.Tensor('float32', input,
-          [1, config.windowFrames, config.bins, 1]) });
+        await withOwnedInference(session, { [config.input]: new ort.Tensor('float32', input,
+          [1, config.windowFrames, config.bins, 1]) }, output => {
         if (stopped) return;
         const inferenceEndedAt = config.diagnostics || config.telemetry ? Date.now() : undefined;
         const scores = output[config.output].data;
@@ -106,6 +108,7 @@ async function drain() {
           } } : {}),
           ...(config.diagnostics ? { diagnostics, postedAt: block.postedAt, workerReceivedAt: block.receivedAt,
             availableAudioTime: block.availableAudioTime, inferenceStartedAt, inferenceEndedAt } : {}) });
+        });
       }
     }
   } catch { self.postMessage({ kind: 'failed',ownership:config?.ownership,...(diagnosticRecordingId?{diagnosticRecordingId}:{}) }); stopped = true; }
@@ -134,7 +137,8 @@ self.onmessage = async ({ data }) => {
         mjs: new URL('./vendor/percussion/ort-wasm-simd-threaded.mjs', import.meta.url).href,
         wasm: new URL('./vendor/percussion/ort-wasm-simd-threaded.wasm', import.meta.url).href,
       };
-      session = await ort.InferenceSession.create(data.model, { executionProviders: ['wasm'] });
+      const modelBytes=await loadFrozenPercussionModel(data.model,config);
+      session = await ort.InferenceSession.create(modelBytes, { executionProviders: ['wasm'] });
       self.postMessage({ kind: 'ready',ownership:config.ownership }); void drain();
     } catch { self.postMessage({ kind: 'failed',ownership:config?.ownership }); stopped = true; }
   }

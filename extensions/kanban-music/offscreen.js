@@ -1,4 +1,5 @@
 import { createCaptureEngine } from './capture-engine.js';
+import {LiveDiagnosticRecorder} from './live-diagnostic-recorder.js';
 import { beatTelemetry } from './beat-telemetry.js';
 import { privateBeatCandidate, privatePercussionDiagnostics } from './beat-candidate.js';
 const telemetry = beatTelemetry.at('offscreen');
@@ -6,6 +7,7 @@ const telemetry = beatTelemetry.at('offscreen');
 const send = (message) => { telemetry.mark('EVENT_SENT', message.telemetry); void chrome.runtime.sendMessage({ target: 'beat-worker', ...message }).catch(() => { telemetry.mark('EVENT_DROPPED', message.telemetry, { reason: 'transport' }); }); };
 const metadata = (telemetry, timing) => ({ ...(telemetry ? { telemetry } : {}), ...(timing || {}) });
 const engine = createCaptureEngine({
+  createDiagnosticRecorder: options => new LiveDiagnosticRecorder(options),
   getUserMedia: (constraints) => navigator.mediaDevices.getUserMedia(constraints),
   createAudioContext: () => new AudioContext({ sampleRate: 44100 }),
   onBeat: (captureId, bands, trace, timing) => send({ kind: 'onset', captureId, bands, ...metadata(trace, timing) }),

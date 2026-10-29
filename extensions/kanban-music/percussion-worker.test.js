@@ -6,29 +6,32 @@ import {EarlyPercussionClassifier} from './early-percussion-classifier.js';
 import {CausalPercussionClassifier} from './causal-percussion-classifier.js';
 import {PrecisionEvidenceRing,precisionConfiguration,precisionDecision} from './semantic-precision-guards.js';
 import {ADTOF_CLASS_NAMES,labelProvenance,mappedPercussionKind,validateHatLabelMode} from './percussion-label-contract.js';
+import {withOwnedInference} from './inference-resources.js';
+import {loadFrozenPercussionModel,frozenPercussionSha256} from './model-assets.js';
 const session={run:vi.fn()};
 const ownership={captureId:'test',sourceId:'song',sourceGeneration:3,synchronizationEpoch:'epoch'};
 const row=time=>({audioTime:time,complete:true,valid:true,rms:time===.12?.1:0,
   backgroundRms:.01,flux:[1,1,1,1],contrast:[2,2,2,2]});
 afterEach(()=>{vi.unstubAllGlobals();vi.resetModules();session.run.mockReset();});
 async function worker({hatLabelMapping='off',classifier='onset-guided',head=3}={}){
+  const frozenBytes=readFileSync('extensions/kanban-music/generated/percussion/percussion.onnx');vi.stubGlobal('fetch',vi.fn(async()=>new Response(frozenBytes)));
   const messages=[],scope={postMessage:value=>messages.push(value)};
   session.run.mockImplementation(async({audio})=>{
     const end=audio.data.at(-1),scores=new Float32Array(500);
     for(let j=0;j<100;j++)scores[j*5+head]=end-100+j===12?.9:.01;
-    return {scores:{data:scores}};
+    return {scores:{data:scores,dispose:vi.fn()}};
   });
   // Execute the actual Worker orchestration with a controlled inference backend.
   // Native frozen-model inference is exercised separately by the corpus benchmark.
   const source=readFileSync('extensions/kanban-music/percussion-worker.js','utf8')
     .replace(/^import .*;\r?\n/gm,'').replaceAll('import.meta.url',"'file:///percussion-worker.js'")
     .replace('ort = await import(/* @vite-ignore */ runtimeUrl);','ort = testOrt;');
-  const testOrt={env:{wasm:{}},Tensor:class {constructor(type,data,dims){Object.assign(this,{type,data,dims});}},InferenceSession:{create:async()=>session}};
-  runInNewContext(source,{self:scope,URL,performance,Date,PercussionClassifier,EarlyPercussionClassifier,CausalPercussionClassifier,
+  const testOrt={env:{wasm:{}},Tensor:class {constructor(type,data,dims){Object.assign(this,{type,data,dims,dispose:vi.fn()});}},InferenceSession:{create:async()=>session}};
+  runInNewContext(source,{self:scope,URL,performance,Date,withOwnedInference,loadFrozenPercussionModel,PercussionClassifier,EarlyPercussionClassifier,CausalPercussionClassifier,
     PrecisionEvidenceRing,precisionConfiguration,precisionDecision,ADTOF_CLASS_NAMES,labelProvenance,mappedPercussionKind,validateHatLabelMode,testOrt});
   await scope.onmessage({data:{kind:'init',model:new Uint8Array(),config:{ownership,
     bins:1,windowFrames:100,stepFrames:5,rightContext:10,input:'audio',output:'scores',
-    classifier,hatLabelMapping,diagnostics:true,sha256:'test-model',semanticPrecisionGuards:{mode:'shadow'}}}});
+    classifier,hatLabelMapping,diagnostics:true,sha256:frozenPercussionSha256,semanticPrecisionGuards:{mode:'shadow'}}}});
   expect(messages).toEqual([{kind:'ready',ownership}]);
   return {scope,messages};
 }

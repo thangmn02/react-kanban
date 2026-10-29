@@ -104,3 +104,7 @@ Cleanup is verified in [cleanup.json](../../scratch/p3-p4-261026-1706/cleanup.js
 **PRODUCTION RELEASE:** BLOCKED
 
 The smallest remaining closure work is target-platform30-minute evidence on a stable authorized YouTube source, supported authenticated/authorized Spotify coverage under the existing policy, isolated native/owner-browser execution, a weaker supported device and approved performance baselines, calibrated physical A/V measurements, and the existing acoustic/rights/release evidence. No new detector research is proposed as part of this assignment. No publication or installation is authorized or performed.
+
+## October 29 maintenance qualification
+
+The local 0.3.27 candidate separates the private recorder capability from stable packaging, validates the unchanged frozen ADTOF bytes before initialization and releases inference tensors across all exit paths. Exact reversal contracts compare the three runtime-maintenance files to immutable source, while the preservation verifier binds LF/CRLF witnesses to the recorded admission hashes. Both fresh 50-case presentation matrices pass; physical/full-song/final-embedded acceptance remains separate. The final production readiness report owns the current whole-product checkpoint and remaining gates.

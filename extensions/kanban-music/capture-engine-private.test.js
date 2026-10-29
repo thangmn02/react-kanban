@@ -2,10 +2,11 @@ import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 const flags=vi.hoisted(()=>({privateBeatCandidate:true,privatePercussionDiagnostics:false,privatePercussionClassifier:'onset-guided',semanticPrecisionGuards:{mode:'off'},privateHatLabelMapping:'off'}));
 vi.mock('./beat-candidate.js',()=>flags);
 import {createCaptureEngine} from './capture-engine.js';
+import {LiveDiagnosticRecorder} from './live-diagnostic-recorder.js';
 import {beatTelemetry} from './beat-telemetry.js';
 beforeEach(()=>{vi.useFakeTimers();flags.privatePercussionDiagnostics=false;flags.privateHatLabelMapping='off';});
 afterEach(()=>{vi.useRealTimers();vi.restoreAllMocks();beatTelemetry.enable(false);beatTelemetry.clear();});
-function fixture() {
+function fixture({recordDiagnostics=true}={}) {
   const nodes=[],node=()=>{const n={connect:vi.fn(),disconnect:vi.fn()};nodes.push(n);return n;};
   const source=node(),gain=()=>Object.assign(node(),{gain:{value:1,setTargetAtTime:vi.fn()}});
   const track={stop:vi.fn(),readyState:'live',addEventListener:vi.fn()},stream={getTracks:()=>[track],getAudioTracks:()=>[track],getVideoTracks:()=>[]};
@@ -17,6 +18,7 @@ function fixture() {
   const deps={getUserMedia:vi.fn().mockResolvedValue(stream),createAudioContext:()=>context,onBeat:vi.fn(),onStop:vi.fn(),
     createPercussion:vi.fn(async options=>{model=options;return {stop:vi.fn(),recordDiagnostics:vi.fn(()=>true)};}),createAudioTap:vi.fn(async()=>({stop:vi.fn()}))};
   deps.createHybrid=vi.fn(async options=>{model=options;return {stop:vi.fn(),recordDiagnostics:vi.fn(()=>true)};});
+  if(recordDiagnostics)deps.createDiagnosticRecorder=options=>new LiveDiagnosticRecorder(options);
   const engine=createCaptureEngine(deps);
   return {engine,deps,source,nodes,track,context,model:()=>model,event:(audioTime=time-.25)=>model.onEvent({band:'clap',audioTime,confidence:.9,classMargin:.4}),advance:value=>{time+=value;}};
 }
@@ -220,4 +222,10 @@ it('switches only the drum worker and fences old callbacks during L1 and L0 roll
   expect(f.engine.configureSynchronization('owner',{...settings,detectorVariant:'unknown'})).toBe(false);
   expect(f.engine.configureSynchronization('owner',{...settings,live:false,detectorVariant:'L1-gap0'})).toBe(false);
   f.engine.stop();await vi.advanceTimersByTimeAsync(20);
+});
+
+it('cannot record without the separately supplied private recorder capability',async()=>{
+  const f=fixture({recordDiagnostics:false});await f.engine.start('stream','owner',{candidate:true});await Promise.resolve();
+  expect(f.engine.diagnosticCapture('owner','start','record')).toEqual({ok:false,error:'unavailable'});
+  expect(beatTelemetry.enabled).toBe(false);f.engine.stop();await vi.advanceTimersByTimeAsync(20);
 });

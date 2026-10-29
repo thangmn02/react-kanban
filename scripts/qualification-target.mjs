@@ -4,6 +4,8 @@ import { readFile, readdir, mkdir } from 'node:fs/promises';
 import { parseEnv } from 'node:util';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
+import {verifyMigrationSourceHistory} from './migration-source-history.mjs';
+import {join} from 'node:path';
 import { authorizedProject } from './staging-qualification-contract.mjs';
 
 const arg = name => process.argv.find(value => value.startsWith(`--${name}=`))?.slice(name.length + 3);
@@ -21,7 +23,7 @@ export async function qualificationTarget(defaultOutput) {
     if(backup.storageObjectBytesRequired){assert.ok(backup.assetsArchive);assert.equal(createHash('sha256').update(await readFile(backup.assetsArchive)).digest('hex'),backup.assetsArchiveSha256);}
     const source = parseEnv(await readFile('.env.staging.local', 'utf8')); assert.equal(source.KORA_STAGING_PROJECT_REF, authorizedProject);
     const applied = JSON.parse(await readFile(arg('history-receipt')||'scratch/product-completion-261027-0846/staging-migration-result.json', 'utf8')); assert.equal(applied.committed, true); assert.equal(applied.verification, 'PASS'); assert.equal(applied.authorizedProject, authorizedProject);
-    const names=(await readdir('supabase/migrations')).filter(name=>/^\d{14}_[a-z0-9_]+\.sql$/.test(name)).sort();const migrations=await Promise.all(names.map(async name=>({name,sha256:createHash('sha256').update(await readFile(`supabase/migrations/${name}`)).digest('hex')})));assert.deepEqual(migrations,applied.migrations,'Qualification must use the exact committed source schema.');
+    const names=(await readdir('supabase/migrations')).filter(name=>/^\d{14}_[a-z0-9_]+\.sql$/.test(name)).sort();const migrations=await Promise.all(names.map(async name=>({name,sha256:createHash('sha256').update(await readFile(`supabase/migrations/${name}`)).digest('hex')})));const historySource=arg('history-source-directory');const normalization=await verifyMigrationSourceHistory(applied.migrations,await Promise.all(names.map(async name=>({name,bytes:await readFile('supabase/migrations/'+name)}))),historySource?name=>readFile(join(historySource,name)):undefined);if(normalization.length)await import('node:fs/promises').then(fs=>fs.writeFile(root+'/migration-source-eol-proof.json',JSON.stringify({at:new Date().toISOString(),committedHistoryUnchanged:true,normalization},null,2)));
     assert.equal(backup.counts['supabase_migrations.schema_migrations'],migrations.length,'The restored fixture backup must include the committed migration history.');
     config = { API_URL: `https://${authorizedProject}.supabase.co`, ANON_KEY: source.KORA_STAGING_ANON_KEY, SERVICE_ROLE_KEY: source.KORA_STAGING_SERVICE_ROLE_KEY };
   } else {

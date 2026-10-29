@@ -108,13 +108,19 @@ names.push('companion-update.js', 'spotify-player.js');
 names.push('beat-mode.js','beat-candidate.js');
 names.push('delayed-audio-output.js');
 names.push('semantic-precision-guards.js');
-names.push('percussion-label-contract.js');
-names.push('live-diagnostic-recorder.js');
+names.push('percussion-label-contract.js','inference-resources.js','model-assets.js');
+if(privateCandidate)names.push('live-diagnostic-recorder.js');
 names.push('hybrid-percussion-runtime.js','hybrid-live-contract.js');
 const files = await Promise.all(names.map(async (name) => ({ name, bytes: await readFile(join(extension, name)) })));
 function replaceExactlyOnce(source, before, after) {
   if (source.split(before).length !== 2) throw new Error(`Expected one package sentinel: ${before}`);
   return source.replace(before, after);
+}
+if(!privateCandidate){
+  const offscreen=files.find(file=>file.name==='offscreen.js');
+  let source=replaceExactlyOnce(offscreen.bytes.toString().replaceAll('\r\n','\n'),"import {LiveDiagnosticRecorder} from './live-diagnostic-recorder.js';\n",'');
+  source=replaceExactlyOnce(source,'  createDiagnosticRecorder: options => new LiveDiagnosticRecorder(options),\n','');
+  offscreen.bytes=Buffer.from(source);
 }
 if(privateCandidate) {
   const candidate=files.find(file=>file.name==='beat-candidate.js');
