@@ -20,7 +20,7 @@ At October 29 22:20 the owner accepts the full “Some (Sped Up)” track at 170
 | P4 Engineering | BLOCKED for full advertised production scope |
 | Companion Compatibility | PARTIAL |
 | Companion Version Decision | BLOCK — no proposed replacement artifact is fully qualified |
-| Release Artifact Security | FAIL as a complete release gate; credential/signature checks pass, distribution rights remain unresolved |
+| Release Artifact Security | PARTIAL; source/staging secret scans and non-commercial notice packaging pass, latest signed-native artifact qualification remains open |
 | Staging Qualification | Prior 14-migration/service/browser qualification retained; six deployed preview checks PASS |
 | Kora 0.1.31 Migration Compatibility | PASS for offline schema/RLS rehearsal and actual legacy sign-in/task read/edit/reload; remaining old-client features are not implied |
 | Production Release | NO-GO |
@@ -128,13 +128,25 @@ Production records `20260713000000`, `20260913120000` and `20261007080000_sparse
 | Fresh recovery | The retained snapshot's 31 objects, isolated restore and off-device ciphertext checks pass. Owner confirms separate key storage. Before future migration execution, repeat fresh DB and separate Storage recovery checks. | Release engineer + database operator |
 | Non-prefix migration history/existing contact objects | Major: reviewed exact schema/history plan and successful isolated rehearsal, followed by explicit authorization. | Release engineer + database owner |
 | Nine historical task records | Explicitly excluded from this release execution. Retain the read-only findings; a separate decision is required for any repair. | Product owner |
-| Final native/Companion/display/lifecycle matrix | Major for advertised native scope: actual target hardware/version combinations, monitor/DPI/sleep, restart/reconnect and 30-minute representative workload, with measured limits and cleanup. | Desktop QA + product owner |
+| Final native/Companion/display/lifecycle matrix | The October 30 native Notes/Focus plus browser-generated-control 30-minute workload passes. Supported-provider native capture, final artifact combinations, monitor/DPI/sleep and restart/reconnect remain separate gates. | Desktop QA + product owner |
 | Companion artifact identity/versioning | Major: resolve the public/generated same-version difference, qualify actual Brave 0.3.25 against the proposed app, and select a correctly versioned production artifact with the complete compatibility matrix. | Release engineer + product owner |
 | Physical timing/weaker-device budget | Major for advertised timing/performance: calibrated source-to-display distribution, late/missing/rapid-hit counts and approved supported-device thresholds. | Product/audio QA |
 | Model/runtime distribution scope | Exact ADTOF weight provenance and complete attribution/license packaging pass within their scope. Verify every final shipped asset and non-commercial terms; do not infer commercial clearance or ship unqualified private CNN/SoXR assets. | Release engineer + product owner |
 | Coherent final signed release artifact | Major: clean source/web/Linux backend reproduction now passes; rebuild/qualify the signed native artifact with the approved Companion and locked dependencies, then rerun required final playback/lifecycle gates. | Release engineer |
 
 No production migration, user-data repair, restore, function-secret update, web deployment, installer/feed or Companion replacement is authorized by this report. The next release decision remains **NO-GO — BLOCKED** until the listed mandatory gates close; changing the supported product scope requires explicit owner review.
+
+## October 30 staging and endurance checkpoint
+
+Commits `9a17ba6`, `9ddfce0` and `f3e66f9` are pushed on `codex/final-completion-wave`; the later repeatability fix is `4d0d7fe`. Source and staged-content scans reject private paths, configured credentials and privileged token formats. All dotenv/private evidence remains ignored. No Production operation or personal browser automation occurred.
+
+Fresh staging database and object-byte backup/isolated recovery pass before generated test writes. The latest deployed preview passes all six actual checks with zero page exceptions. The repeated verifier now waits for the loaded Notes view, identifies only the new note, scopes image assertions to that original, uses the real image picker and verifies prior notes remain unchanged. Failed DNS/selector attempts are retained and do not become product or recovery passes.
+
+The new combined workload passes 1,800.278 seconds with five original native notes, image rendering and repeated collapse/restore, 28 independently server-verified content saves without unrelated-note changes, a progressing native Focus timer, and continuing real browser Companion 0.3.27 capture of generated CC0 control audio. There are 109 resource samples; observed event delivery rises from seven to 5,336 onsets. Aggregate native plus owned-browser private memory peaks at approximately 1,668 MiB and ends at 1,634 MiB. These measurements are not a weaker-device budget, physical timing calibration or a supported-provider native-capture soak. The app exits through normal guarded quit, its owned browser/source/frontend close and its exact generated identity/workspace/images are cleaned. The separate owner staging-preview fixture remains available. No listener remains on 1420, 5174, 9223, 9224 or 47635 at cleanup.
+
+The actual rebuilt stable evaluation Companion contains 58 runtime files, including all five attribution/license/provenance copies. Its local ZIP SHA-256 is `99677a1e6285fdf16383b78804ff16781a3bceb609df9dfd4aa4ed796022bf2d`. Exact full-notice copies, ZIP inclusion and frozen model hash pass; private diagnostic recorder, Hybrid CNN weights and SoXR assets are absent. It remains an unpublished 0.3.27 candidate, distinct from the earlier 53-file candidate and the already-loaded private 0.3.28 owner experiment. Source notice preparation does not relabel old installers or provide commercial clearance.
+
+Private receipts: `scratch/final-completion-261030/staging-backup-ready/`, `staging-preview-current/`, `staging-preview-current-ready-check/`, `native-final/workload/result.json` and `stable-companion/result.json`. User records, profile contents, credentials and recovery material remain private. The public Windows path still differs from the accepted private tab-delay experiment; a release-capable audible route requires an explicit product decision rather than silently removing its debug restriction.
 
 ## October 29 completion checkpoint
 
