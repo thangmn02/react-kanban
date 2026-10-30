@@ -9,6 +9,7 @@ import { useI18n } from '../../i18n';
 import './nativeSurface.css';
 import NativeUpdateDialog from './NativeUpdateDialog';
 import { useCompanionSetup } from './use-companion-setup';
+import {nativeCompanionPreviewEnabled} from './runtime';
 
 async function updateNativeShape(rounded: boolean) {
   const radius = await invoke<number>('native_dock_shape', { rounded });
@@ -123,7 +124,7 @@ export default function NativeSurface({ dock, onToggle, focusProps, children }: 
       <div className="native-dock-scroll"><NativeDock props={{ ...focusProps, onReturnToTab: onToggle ? switchSurface : undefined,
         returnLabel: vi ? 'Công việc' : 'Tasks',
         onDragStart: () => action(() => getCurrentWindow().startDragging()),
-        onMusicSetup: () => void companion.run(),
+        onMusicSetup: nativeCompanionPreviewEnabled()?undefined:() => void companion.run(),
         musicSetupPending: companion.updating,
         musicSetupMessage: companion.message,
         nativeControls: <>

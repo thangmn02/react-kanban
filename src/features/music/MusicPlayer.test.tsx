@@ -27,6 +27,18 @@ function renderPlayer() {
   return view;
 }
 
+it('enables the staged Opal presentation for an ordinary source without enabling private audio controls or inventing hits', async () => {
+  vi.stubEnv('VITE_ENABLE_BEAT_GRID_PREVIEW','true');
+  vi.mocked(sendMusicRequest).mockResolvedValue([{...session,playing:true}]);
+  const view=renderPlayer();await screen.findByRole('heading',{name:session.title});
+  fireEvent.click(screen.getByRole('tab',{name:'Beat grid'}));
+  expect(view.container.querySelector('.semantic-motion')).not.toBeNull();
+  expect(view.container.querySelectorAll('[data-motion-band]')).toHaveLength(4);
+  expect(screen.getByRole('button',{name:'Compare legacy animation'})).toBeVisible();
+  expect(screen.queryByRole('heading',{name:'Audio Delay Compensation — Experimental'})).not.toBeInTheDocument();
+  expect(view.container.querySelectorAll('[data-event-id]')).toHaveLength(0);
+});
+
 it('labels late-live preview explicitly and requires a fresh opt-in after source changes', async () => {
   const source={...session,playing:true,syncState:{mode:'clock' as const,capability:decideBeatMode({privateCandidate:true})}};
   vi.mocked(sendMusicRequest).mockResolvedValue([source]);

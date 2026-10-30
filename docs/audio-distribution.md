@@ -1,0 +1,13 @@
+# Audio asset distribution
+
+The release currently targets the owner's approved non-commercial evaluation scope. Production publication and Companion replacement still require separate authorization and qualification. Kora's code license does not change the model's terms.
+
+The original [ADTOF project](https://github.com/MZehren/ADTOF) identifies CC BY-NC-SA 4.0. The [full terms](https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode.en) permit non-commercial sharing and adaptation subject to attribution, modification notices and ShareAlike requirements for adapted material. Keep the original authors, conversion attribution, source links, full license and modification record with the model. Do not describe a non-commercial permission as commercial clearance.
+
+The frozen ONNX model is traced to the pinned upstream PyTorch checkpoint by [the tensor verifier](../scripts/verify-adtof-provenance.py). It uses restricted weight loading and accounts for all 50 checkpoint tensors and all 35 ONNX initializers after representation changes. The public [proof](../public/third-party/adtof-model-provenance.json) records checkpoint/model hashes, source commit and transformations. It does not recover the historical exporter or certify legal scope.
+
+[The attribution notice](../public/third-party/README.txt), complete ADTOF license, pinned ONNX Runtime 1.30.0 MIT license and upstream runtime notices live in `public/third-party/`. Web/native frontends copy that public directory. [Companion packaging](../scripts/package-music-extension.mjs) also copies all five files into `extension/third-party/` in both unpacked resources and ZIPs. The packaging regression verifies complete byte equality, ZIP inclusion and model/proof identity. Preserve LF for these source files to keep their qualified bytes stable across checkouts.
+
+The stable candidate excludes the private Hybrid CNN weights and SoXR runtime. Their AGPL/checkpoint/data or LGPL/source/relinking questions remain relevant to those private experiments, not evidence that the stable candidate ships those assets. The existing research notice is retained. Any future change in assets, upstream versions or commercial scope requires a new inventory and review.
+
+The current immutable staging preview predates the latest tensor-proof notice. Its retained initial attribution and full upstream licenses are distinct from newer source/package receipts. Never relabel that preview, a previously signed installer or an already loaded Companion as rebuilt from changed source. [The release report](../plans/reports/kora-final-production-readiness.md) owns the remaining gates and exact artifact provenance.

@@ -3,7 +3,7 @@ import { useI18n } from '../../i18n';
 import { MusicBridgeError, sendMusicRequest, type BrowserMusicSession, type MusicClock, type MusicAction } from './mediaBridge';
 import { useMusicBeatSync } from './useMusicBeatSync';
 import { mergeMusicSessions } from './mergeMusicSessions';
-import { getBeatSource, isNativeWidget } from '../native/runtime';
+import { getBeatSource, isNativeWidget, nativeCompanionPreviewEnabled } from '../native/runtime';
 import { beatCapabilities } from './beat-capabilities';
 import { leadPulseEnabled, leadProcessingEnabled } from './lead-feature';
 import { companionLeadInputEnabled } from './companion-lead-audio';
@@ -84,7 +84,7 @@ export function useBrowserMusic(beatDemand = false) {
   const canAnalyze = selected?.canAnalyze, duration = selected?.duration;
   const eventOptions = useMemo(() => ({ asset: provider && mediaId && provider !== 'spotify' ? { provider, id: mediaId } : undefined,
     privateCandidate: import.meta.env.VITE_PRIVATE_BEAT_CANDIDATE === 'true',
-    capturedInput: provider !== 'spotify' && (isNativeWidget() ? !leadPulseEnabled() || leadProcessingEnabled()
+    capturedInput: !nativeCompanionPreviewEnabled() && provider !== 'spotify' && (isNativeWidget() ? !leadPulseEnabled() || leadProcessingEnabled()
       : companionLeadInputEnabled(provider && mediaId ? { provider, id: mediaId } : undefined)),
     duration, capabilities: beatCapabilities(isNativeWidget(), canAnalyze !== false),
   }), [provider, mediaId, duration, canAnalyze]);

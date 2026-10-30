@@ -1,4 +1,6 @@
 //! Companion metadata/onsets only. Native PCM never crosses this WebSocket.
+#[path = "native_delay_preview.rs"]
+mod native_delay_preview;
 use futures_util::{
     future::{join_all, select, Either},
     SinkExt, StreamExt,
@@ -363,7 +365,18 @@ pub async fn native_music_request(
     subscription_id: Option<String>,
     native_audio: Option<bool>,
     value: Option<f64>,
+    companion_capture: Option<bool>,
+    configuration: Option<Value>,
 ) -> Result<Value, String> {
+    let private_delay = native_delay_preview::allowed(cfg!(debug_assertions), option_env!("KORA_PRIVATE_NATIVE_COMPANION_CAPTURE"), &music.app.config().identifier);
+    if companion_capture == Some(true) && !private_delay { return Err("Private Companion capture is unavailable".into()); }
+    let delay_configuration = if action == "beat.experimental.configure" {
+        if !private_delay || companion_capture != Some(true) { return Err("Private delay configuration is unavailable".into()); }
+        Some(native_delay_preview::configuration(configuration.ok_or("Missing private delay configuration")?)?)
+    } else {
+        if configuration.is_some() { return Err("Unexpected music configuration".into()); }
+        None
+    };
     if action == "companion.status" {
         let peers: Vec<_> = music.peers.lock().unwrap().keys().cloned().collect();
         let replies = join_all(peers.iter().map(|peer| music.ask(peer, json!({"action":"companion.status"})))).await;
@@ -376,7 +389,12 @@ pub async fn native_music_request(
         return Ok(json!({"ok":true,"companions":companions}));
     }
     if action == "sessions.get" {
-        let peers: Vec<_> = music.peers.lock().unwrap().keys().cloned().collect();
+        let mut peers: Vec<_> = music.peers.lock().unwrap().keys().cloned().collect();
+        if companion_capture == Some(true) {
+            let statuses = join_all(peers.iter().map(|peer| music.ask(peer, json!({"action":"companion.status"})))).await;
+            peers = peers.into_iter().zip(statuses).filter_map(|(peer, status)|
+                status.ok().filter(|status| status["ok"] == true && status["version"] == "0.3.28").map(|_|peer)).collect();
+        }
         if peers.is_empty() {
             return Ok(json!({"ok":false,"error":"not-installed"}));
         }
@@ -419,6 +437,7 @@ pub async fn native_music_request(
             | "instrument.setup"
             | "dock.beat.sync.start"
             | "dock.beat.sync.stop"
+            | "beat.experimental.configure"
     ) {
         return Err("Unsupported music action".into());
     }
@@ -431,6 +450,10 @@ pub async fn native_music_request(
         .filter(|s| s.len() <= 300)
         .ok_or("Missing session")?;
     let (peer, session) = session.split_once(':').ok_or("Invalid session")?;
+    if companion_capture == Some(true) && action != "dock.beat.sync.stop" {
+        let status = music.ask(peer, json!({"action":"companion.status"})).await?;
+        if status["ok"] != true || status["version"] != "0.3.28" { return Err("The isolated test Companion 0.3.28 is required".into()); }
+    }
     if action.starts_with("dock.")
         && !subscription_id
             .as_ref()
@@ -438,12 +461,9 @@ pub async fn native_music_request(
     {
         return Err("Invalid subscription".into());
     }
-    let mut result = music
-        .ask(
-            peer,
-            json!({"action":action,"sessionId":session,"subscriptionId":subscription_id,"nativeAudio":native_audio.unwrap_or(false),"value":value}),
-        )
-        .await?;
+    let mut request = json!({"action":action,"sessionId":session,"subscriptionId":subscription_id,"nativeAudio":native_audio.unwrap_or(false),"value":value});
+    if let Some(configuration) = delay_configuration { request["configuration"] = configuration; }
+    let mut result = music.ask(peer, request).await?;
     if let Some(sessions) = result["sessions"].as_array_mut() {
         for s in sessions {
             if let Some(id) = s["id"].as_str() {

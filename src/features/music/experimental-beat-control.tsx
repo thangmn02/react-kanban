@@ -3,12 +3,17 @@ import { configureExperimentalSynchronization, type BrowserMusicSession } from '
 import ExperimentalLivePreviewControl from './experimental-live-preview-control';
 import AudioDelayCompensationControl from './audio-delay-compensation-control';
 
-export default function ExperimentalBeatControl({session,refresh,initiallyOpen=false}:{session:BrowserMusicSession;refresh:()=>void;initiallyOpen?:boolean}) {
+export default function ExperimentalBeatControl({session,refresh,initiallyOpen=false,compensationOnly=false}:{session:BrowserMusicSession;refresh:()=>void;initiallyOpen?:boolean;compensationOnly?:boolean}) {
   const [consent,setConsent]=useState({intentionalDelay:false,outputHeard:false,authorizedAudio:false,preview:false});
   const [busy,setBusy]=useState(false),[message,setMessage]=useState('');
   const activationStatusId=useId();
   const capability=session.syncState?.capability;
   if(!capability?.privateCandidate)return null;
+  if(compensationOnly)return <details open={initiallyOpen} className="muted" aria-label="Private native tab delay">
+    <summary>Private native tab-owned audio delay · L0 · experimental</summary>
+    <p role="status">Companion owns this captured tab's output and analysis. Windows PCM is off. Physical synchronization is unverified.</p>
+    <AudioDelayCompensationControl session={session} refresh={refresh}/>
+  </details>;
   const policyBlocker=capability.reason==='protected-source'?'Audio analysis and calibrated delay are unavailable for this protected source. Playback controls remain available.'
     :capability.reason==='provider-policy'?'Audio analysis and calibrated delay are unavailable for this provider under the private test policy. Playback controls remain available.':'';
   const enabled=capability.bufferMs>0;

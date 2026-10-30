@@ -1,0 +1,332 @@
+{
+  "status": "PASS",
+  "upstreamRepository": "https://github.com/xavriley/ADTOF-pytorch",
+  "upstreamCommit": "85c192e78f716ea0b111cc8a5ee4a8f6a3a4f8a9",
+  "checkpointPath": "data/adtof_frame_rnn_pytorch_weights.pth",
+  "checkpointSha256": "1bc986e596ec47ba0b44916f87cd4a39f0b2bec23596df3fb5d0e87749217320",
+  "modelSha256": "c571062d76c322d54c2808c95339ea2dadd2f6ab99f9d83163d0f5311cd0f80a",
+  "modelProducer": "pytorch",
+  "modelProducerVersion": "2.0.1",
+  "checkpointTensors": 50,
+  "initializers": [
+    {
+      "initializer": "cnn_blocks.0.0.weight",
+      "shape": [
+        32,
+        1,
+        3,
+        3
+      ],
+      "sha256": "66d3754dbea0df06daf9a528962701db54a2edfa94f01d6f0d1874d6cad0102a",
+      "exactFloat32Match": true
+    },
+    {
+      "initializer": "cnn_blocks.0.0.bias",
+      "shape": [
+        32
+      ],
+      "sha256": "8a1a0083c9ca5512b3ac1e30eaae3a9c221d3d674077a89aedb1d7dfcb35c675",
+      "exactFloat32Match": true
+    },
+    {
+      "initializer": "cnn_blocks.0.2.weight",
+      "shape": [
+        32
+      ],
+      "sha256": "f7163a2af76c32fbdac23050ea0757b9fb3b3b56e0acabe86a3d77dff5bd1b39",
+      "exactFloat32Match": true
+    },
+    {
+      "initializer": "cnn_blocks.0.2.bias",
+      "shape": [
+        32
+      ],
+      "sha256": "1e4cd5b9497eb5ac4fccf27cc2af67f375b992cdde3cd0e341156d4774f548ef",
+      "exactFloat32Match": true
+    },
+    {
+      "initializer": "cnn_blocks.0.2.running_mean",
+      "shape": [
+        32
+      ],
+      "sha256": "694b21e11f96420710f063aea86fdc2af354b1c0d64fb76fb6c37f6ee38f1548",
+      "exactFloat32Match": true
+    },
+    {
+      "initializer": "cnn_blocks.0.2.running_var",
+      "shape": [
+        32
+      ],
+      "sha256": "e37859450bac83bf982a912a4ed659f623cc9ab0273dea1f219fd356f99ac256",
+      "exactFloat32Match": true
+    },
+    {
+      "initializer": "cnn_blocks.0.3.weight",
+      "shape": [
+        32,
+        32,
+        3,
+        3
+      ],
+      "sha256": "19ad6d157ddeb09f93e059ae52acef446068a9f4a738ec46708a42d3955d5196",
+      "exactFloat32Match": true
+    },
+    {
+      "initializer": "cnn_blocks.0.3.bias",
+      "shape": [
+        32
+      ],
+      "sha256": "bae41697a82df8b4d525af23f1ea01bf8697746efa28c0b2c155207f26b21052",
+      "exactFloat32Match": true
+    },
+    {
+      "initializer": "cnn_blocks.0.5.weight",
+      "shape": [
+        32
+      ],
+      "sha256": "583440e9f6c2ab1c740f30b1b96dd9f53d691bc4ed6fa0d26d91fac21eeb66f4",
+      "exactFloat32Match": true
+    },
+    {
+      "initializer": "cnn_blocks.0.5.bias",
+      "shape": [
+        32
+      ],
+      "sha256": "5bae4d4e8ed3789429c30bcd29dbbfc6001dc0393969dea5716374127700eb33",
+      "exactFloat32Match": true
+    },
+    {
+      "initializer": "cnn_blocks.0.5.running_mean",
+      "shape": [
+        32
+      ],
+      "sha256": "7afea8d6752543045ffe87098b4270b636c43f5fab07420c6a9984a78ff2700c",
+      "exactFloat32Match": true
+    },
+    {
+      "initializer": "cnn_blocks.0.5.running_var",
+      "shape": [
+        32
+      ],
+      "sha256": "939ebbd42fb0dd00ff7d40494331305ea57d9a979853116e2653a39926696748",
+      "exactFloat32Match": true
+    },
+    {
+      "initializer": "cnn_blocks.1.0.weight",
+      "shape": [
+        64,
+        32,
+        3,
+        3
+      ],
+      "sha256": "3348cf90f00a6aa0ba8ba228f43c19bc5f0dc64940170470148085840a15db83",
+      "exactFloat32Match": true
+    },
+    {
+      "initializer": "cnn_blocks.1.0.bias",
+      "shape": [
+        64
+      ],
+      "sha256": "1ca3e9238915b83a80929a257be4cec1de3bc53c73d42ac0c205707ffcbeb809",
+      "exactFloat32Match": true
+    },
+    {
+      "initializer": "cnn_blocks.1.2.weight",
+      "shape": [
+        64
+      ],
+      "sha256": "30c87529ea2a8b0118b5ddc0bd1f4bfc03f2ee7fbcc776f5a3fc263e825a0cdb",
+      "exactFloat32Match": true
+    },
+    {
+      "initializer": "cnn_blocks.1.2.bias",
+      "shape": [
+        64
+      ],
+      "sha256": "e3c1752e24c6f29e280ee4bc1b44d0a8e0642172f3e62ef6b1a398489ee14112",
+      "exactFloat32Match": true
+    },
+    {
+      "initializer": "cnn_blocks.1.2.running_mean",
+      "shape": [
+        64
+      ],
+      "sha256": "cd2149c85398a17618ce144992cd0113e39041f559686ac01a559277baddeda8",
+      "exactFloat32Match": true
+    },
+    {
+      "initializer": "cnn_blocks.1.2.running_var",
+      "shape": [
+        64
+      ],
+      "sha256": "b278428fa76d336fbe818c14e58beedc20ad4544cd06491824346d24c00e3f59",
+      "exactFloat32Match": true
+    },
+    {
+      "initializer": "cnn_blocks.1.3.weight",
+      "shape": [
+        64,
+        64,
+        3,
+        3
+      ],
+      "sha256": "e6109119cf249a99b4dc5da6320946391a101153919145f5d042455c52f5af22",
+      "exactFloat32Match": true
+    },
+    {
+      "initializer": "cnn_blocks.1.3.bias",
+      "shape": [
+        64
+      ],
+      "sha256": "ed3ea4fbc5101556cfc7418b064a4a3f3bb2f9490c34bd30c7de981838513eae",
+      "exactFloat32Match": true
+    },
+    {
+      "initializer": "cnn_blocks.1.5.weight",
+      "shape": [
+        64
+      ],
+      "sha256": "39ca526559d40cf07789f8c7b55586a3a42b84c53527a92c2fac50200a40eded",
+      "exactFloat32Match": true
+    },
+    {
+      "initializer": "cnn_blocks.1.5.bias",
+      "shape": [
+        64
+      ],
+      "sha256": "8b8122c818fd7e31314f8f2c9d0755e3a51ab5882e0e4ebc9dc91bd60b86c95b",
+      "exactFloat32Match": true
+    },
+    {
+      "initializer": "cnn_blocks.1.5.running_mean",
+      "shape": [
+        64
+      ],
+      "sha256": "a8373481d2c8465cc8bbcfc9a0ddee27ab9f1bf6a6e4687f86cd7b1c8dea8058",
+      "exactFloat32Match": true
+    },
+    {
+      "initializer": "cnn_blocks.1.5.running_var",
+      "shape": [
+        64
+      ],
+      "sha256": "270faa2ecaa7787681d94b393b6b06ba0056f86251c0cb1011a6dded5b9065df",
+      "exactFloat32Match": true
+    },
+    {
+      "initializer": "output_layer.bias",
+      "shape": [
+        5
+      ],
+      "sha256": "14d778e5cc5921baf6ba39a795c00401f900397de560d81e9c6d7e17063207cf",
+      "exactFloat32Match": true
+    },
+    {
+      "initializer": "onnx::GRU_615",
+      "shape": [
+        2,
+        360
+      ],
+      "sha256": "3524a54a58f8cac982e3af1003ef69406b1db51ca46b1d1c4da55c5488ea6f92",
+      "exactFloat32Match": true
+    },
+    {
+      "initializer": "onnx::GRU_616",
+      "shape": [
+        2,
+        180,
+        640
+      ],
+      "sha256": "fb388e6e56477a507a9f13f9b1bb94150084d010abdf97248f4f421a88375fe5",
+      "exactFloat32Match": true
+    },
+    {
+      "initializer": "onnx::GRU_617",
+      "shape": [
+        2,
+        180,
+        60
+      ],
+      "sha256": "aa23b134042bf5129ffa4e8b96f1455bf64d95f804abe2c5de003fc4b3e8425e",
+      "exactFloat32Match": true
+    },
+    {
+      "initializer": "onnx::GRU_660",
+      "shape": [
+        2,
+        360
+      ],
+      "sha256": "34d1f30fb6e430e7ea262277210ca6ff42845f09abab3238b810e3828705998c",
+      "exactFloat32Match": true
+    },
+    {
+      "initializer": "onnx::GRU_661",
+      "shape": [
+        2,
+        180,
+        120
+      ],
+      "sha256": "83d71348297dbffdc9cc6e4939931c790507d0f5c1885b80f61c763b0136bdc9",
+      "exactFloat32Match": true
+    },
+    {
+      "initializer": "onnx::GRU_662",
+      "shape": [
+        2,
+        180,
+        60
+      ],
+      "sha256": "9f742e5c360f5dd558761fe23bfd9ceae87d4538f7122113ac54bed679307695",
+      "exactFloat32Match": true
+    },
+    {
+      "initializer": "onnx::GRU_705",
+      "shape": [
+        2,
+        360
+      ],
+      "sha256": "5d0d445fc4d9ee7c9e0165a743979d2e61e55f8c68f11d9443db121578d4217f",
+      "exactFloat32Match": true
+    },
+    {
+      "initializer": "onnx::GRU_706",
+      "shape": [
+        2,
+        180,
+        120
+      ],
+      "sha256": "669c918cdb1826e7a1f7a827f9de523ec1fe8f6474043e78c7132d07f045849e",
+      "exactFloat32Match": true
+    },
+    {
+      "initializer": "onnx::GRU_707",
+      "shape": [
+        2,
+        180,
+        60
+      ],
+      "sha256": "4d53837beedd4728a54de35920a1fcfc91051a6d84c411faf823e1b48bb7b0f8",
+      "exactFloat32Match": true
+    },
+    {
+      "initializer": "onnx::MatMul_708",
+      "shape": [
+        120,
+        5
+      ],
+      "sha256": "59ce08ad6a248aa1fcb549b4d895d98bb80a2f937c85869eda15fec414e348f7",
+      "exactFloat32Match": true
+    }
+  ],
+  "transformations": [
+    "float64 checkpoint to float32 ONNX",
+    "GRU reset/update gate packing reordered to ONNX update/reset",
+    "bidirectional GRU tensors stacked",
+    "output matrix transposed"
+  ],
+  "allWeightsAccountedFor": true,
+  "audioInferencePerformed": false,
+  "modelChanged": false,
+  "originalExportScriptRecovered": false,
+  "licenseClearanceClaimed": false
+}

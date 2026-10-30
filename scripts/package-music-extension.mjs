@@ -1,4 +1,5 @@
-import { mkdir, readFile, writeFile, rm } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, rm, lstat } from 'node:fs/promises';
+import {prepareNativeCompanionDelay,assertNativeDelayGuide} from './native-companion-delay-package.mjs';
 import { fileURLToPath } from 'node:url';
 import { join,resolve,relative,isAbsolute } from 'node:path';
 import { deflateSync } from 'node:zlib';
@@ -7,6 +8,7 @@ import {createHash} from 'node:crypto';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const extension = join(root, 'extensions', 'kanban-music');
 const privateCandidate = process.argv.includes('--private');
+const nativeDelayCandidate=process.argv.includes('--native-delay');
 const hybridCandidate=process.argv.includes('--hybrid-live');
 if(hybridCandidate&&!privateCandidate)throw Error('Hybrid Live requires --private');
 const diagnosticCandidate=process.argv.includes('--diagnostic-capture');
@@ -23,10 +25,19 @@ if(diagnosticCandidate&&(labelMode||precisionMode||xoCandidate||hatCandidate))th
 if(hatCandidate&&(!privateCandidate||xoCandidate||!['A','R'].includes(hatCandidate)))throw Error('--hat=A or --hat=R requires --private and cannot combine with --xo');
 if(hybridCandidate&&(labelMode||precisionMode||xoCandidate||hatCandidate))throw Error('Hybrid Live preserves the original ADTOF classifier and guard settings');
 const requestedOutput=process.argv.find(arg=>arg.startsWith('--output-root='))?.slice(14);
+if(nativeDelayCandidate&&(!privateCandidate||!requestedOutput||hybridCandidate||diagnosticCandidate||labelMode||precisionMode||xoCandidate||hatCandidate))throw Error('Native delay requires a separate private output and unchanged L0 detector.');
 const outputRelative=requestedOutput?relative(resolve(root,'scratch'),resolve(root,requestedOutput)):undefined;
 if(requestedOutput&&(!privateCandidate||!outputRelative||outputRelative==='..'||outputRelative.startsWith('..\\')||outputRelative.startsWith('../')||isAbsolute(outputRelative)))throw Error('Custom packages must be private research outputs inside scratch');
 const output = requestedOutput?resolve(root,requestedOutput):hybridCandidate?join(root,'scratch','companion-hybrid-live','candidate'):diagnosticCandidate?join(root,'scratch','cross-track-hat-capture','candidate'):labelMode?join(root,'scratch','hat-label-contract','candidate-'+labelMode):precisionMode?join(root,'scratch','semantic-precision','candidate-'+precisionMode):hatCandidate?join(root,'scratch','hat-playback-discrepancy','candidate-'+hatCandidate):xoCandidate?join(root,'scratch','xo-percussion-recovery','candidate-'+xoCandidate)
   :privateCandidate ? join(root,'scratch','browser-first-candidate') : join(root, 'public', 'downloads');
+if(nativeDelayCandidate){
+  await lstat(output).then(()=>{throw Error('Native delay output must be fresh.');},error=>{if(error.code!=='ENOENT')throw error;});
+  for(let path=resolve(root,'scratch');path!==output;){
+    const metadata=await lstat(path).catch(error=>{if(error.code!=='ENOENT')throw error;return null;});
+    if(metadata?.isSymbolicLink())throw Error('Native delay output cannot traverse links.');
+    const next=relative(path,output).split(/[\\/]/)[0];if(!next||next==='..')throw Error('Invalid native delay path');path=join(path,next);
+  }
+}
 
 // Rebuild release resources; the explicit inventory excludes private/retired
 // models without deleting an existing developer's optional inference assets.
@@ -131,7 +142,7 @@ if(privateCandidate) {
     candidateSource=replaceExactlyOnce(candidateSource,'privatePercussionDiagnostics = false','privatePercussionDiagnostics = true');
   }
   if(precisionMode)candidateSource=replaceExactlyOnce(candidateSource,"semanticPrecisionGuards = Object.freeze({mode:'off'})",`semanticPrecisionGuards = Object.freeze({mode:'${precisionMode}'})`);
-  if(!xoCandidate&&!hatCandidate)candidateSource=replaceExactlyOnce(candidateSource,'earlyDecisionAvailable:false','earlyDecisionAvailable:true');
+  if(!xoCandidate&&!hatCandidate&&!nativeDelayCandidate)candidateSource=replaceExactlyOnce(candidateSource,'earlyDecisionAvailable:false','earlyDecisionAvailable:true');
   if(xoCandidate||hatCandidate)for(const [before,after] of [
     ['privatePercussionDiagnostics = false','privatePercussionDiagnostics = true'],
     ["privatePercussionClassifier = 'onset-guided'",`privatePercussionClassifier = '${xoCandidate==='B'?'local-prominence':'onset-guided'}'`],
@@ -145,6 +156,7 @@ if(privateCandidate) {
   if(labelMode){value.name+=` Hat Label ${labelMode} (UNQUALIFIED)`;value.version_name=value.version+` Hat Label ${labelMode} PRIVATE RESEARCH`;}
   if(diagnosticCandidate){value.name+=' Live Diagnostics (UNQUALIFIED)';value.version_name=value.version+' continuous score capture PRIVATE RESEARCH';}
   if(hybridCandidate){value.version='0.3.26';value.name+=' Hybrid Live (UNQUALIFIED)';value.version_name='0.3.26 L0 / H-SHADOW / H-LIVE PRIVATE';}
+  if(nativeDelayCandidate){value.version='0.3.28';value.name+=' Native Tab Delay (UNQUALIFIED)';value.version_name='0.3.28 private native tab-owned delay · L0 unchanged';}
   if(xoCandidate){value.name+=xoCandidate==='A'?' XO Baseline A':' XO Candidate B (NO-GO)';value.version_name=value.version+` xo-${xoCandidate} UNVERIFIED DETECTOR PREVIEW`;}
   if(hatCandidate){value.name+=hatCandidate==='A'?' Hat Baseline A':' Hat Visual Recovery R';value.version_name=value.version+` hat-${hatCandidate} UNVERIFIED DETECTOR PREVIEW`;}
   manifest.bytes=Buffer.from(JSON.stringify(value,null,2)+'\n');
@@ -166,6 +178,10 @@ for (const name of ['generated/percussion/percussion.json', 'generated/percussio
   'vendor/percussion/ort.wasm.min.mjs', 'vendor/percussion/ort-wasm-simd-threaded.mjs',
   'vendor/percussion/ort-wasm-simd-threaded.wasm', 'MODEL-NOTICE.txt']) {
   files.push({ name, bytes: await readFile(join(extension, name)) });
+}
+// Keep attribution and full upstream terms beside the model in every package.
+for(const name of ['README.txt','ADTOF-LICENSE.txt','ONNX-RUNTIME-LICENSE.txt','ONNX-RUNTIME-NOTICES.txt','adtof-model-provenance.json']){
+  files.push({name:'third-party/'+name,bytes:await readFile(join(root,'public','third-party',name))});
 }
 if(hybridCandidate){
   const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
@@ -204,6 +220,7 @@ if(hybridCandidate){
     assets:files.map(({name,bytes})=>({name,bytes:bytes.length,sha256:digest(bytes)})),
   },null,2))});
 }
+if(nativeDelayCandidate)files.push({name:'NATIVE-DELAY-PROVENANCE.json',bytes:Buffer.from(JSON.stringify(prepareNativeCompanionDelay(files),null,2))});
 const packagedNames = new Set(files.map(({ name }) => name));
 for (const { name, bytes } of files.filter(({ name }) => name.endsWith('.js'))) {
   for (const match of bytes.toString().matchAll(/from\s+["']\.\/([^"']+)["']/g)) {
@@ -226,7 +243,7 @@ for (const { name, bytes } of files) {
 const manifest = JSON.parse(files.find((file) => file.name === 'manifest.json').bytes.toString());
 const setup = await readFile(join(root, 'src-tauri', 'companion-setup.html'), 'utf8');
 await writeFile(join(bundledCompanion, 'Install Music Companion.html'), setup.replaceAll('__COMPANION_VERSION__', manifest.version));
-if(privateCandidate)await writeFile(join(output,'Private listening guide.html'),`<!doctype html><meta charset="utf-8"><title>Private Beat Grid candidate</title>
+if(privateCandidate&&!nativeDelayCandidate)await writeFile(join(output,'Private listening guide.html'),`<!doctype html><meta charset="utf-8"><title>Private Beat Grid candidate</title>
 <body style="max-width:850px;margin:50px auto;font:18px/1.6 system-ui"><h1>Private Beat Grid candidate</h1>
 <p>Local experiment. Accuracy, model release rights, physical synchronization and user listening acceptance remain unverified. Do not publish this package.</p>
 <p>Use one Kora Music grid owner in this browser while testing. Close other Music grids; simultaneous ownership is not qualified.</p>
@@ -238,7 +255,7 @@ if(privateCandidate)await writeFile(join(output,'Private listening guide.html'),
 <li>Use pause, seek and source changes to investigate. A source/generation change revokes the experiment. Video, uncertain output, native capture and Spotify cannot enable this buffer.</li>
 <li>Report the approximate song time, row and observed failure. Provisional annotations remain investigation-only. Generic degraded visuals make no instrument claim.</li></ol>
 <p>No web deployment, extension-store update or installer publication is included. Model weights remain local evaluation assets.</p></body>`);
-if(privateCandidate&&!xoCandidate&&!hatCandidate&&!hybridCandidate)await writeFile(join(output,'Private listening guide.html'),`<!doctype html><html lang="en"><meta charset="utf-8"><title>Kora private L0 / L1 listening</title>
+if(privateCandidate&&!nativeDelayCandidate&&!xoCandidate&&!hatCandidate&&!hybridCandidate)await writeFile(join(output,'Private listening guide.html'),`<!doctype html><html lang="en"><meta charset="utf-8"><title>Kora private L0 / L1 listening</title>
 <body style="max-width:850px;margin:40px auto;padding:20px;font:18px/1.6 system-ui"><h1>Private live L0 / L1 listening</h1>
 <p>Local evaluation only. L0 remains the default. L1 is earlier ADTOF peak finalization, not offline H0 or a new model. Recognition, physical synchronization, resource qualification and user acceptance are incomplete. Do not publish.</p>
 <ol><li>Use the browser with your working Companion (Brave in this session). Reload this unpacked extension, verify <b>Kora Music Companion Private ${manifest.version}</b>, then refresh the music source and Kora. Enable only one Companion and one Kora grid.</li>
@@ -337,4 +354,14 @@ if(xoCandidate){
 await writeFile(join(bundledCompanion, 'package-files.json'), JSON.stringify([
   ...files.map(({ name }) => `extension/${name}`), 'Install Music Companion.html',
 ], null, 2) + '\n');
+if(nativeDelayCandidate)await writeFile(join(output,'Private listening guide.html'),`<!doctype html><meta charset="utf-8"><title>Isolated native tab delay</title>
+<h1>Private native tab-owned delay · Companion 0.3.28</h1>
+<p>Use only the dedicated automation browser/profile and Kora 0.1.32 Owner Preview. Keep your installed Kora and Brave research Companion unchanged. Do not disable, reload or replace personal-browser extensions.</p>
+<ol><li>Choose one familiar, authorized, unprotected YouTube song in the dedicated test browser. Play it normally and click this profile's Companion toolbar action to grant capture.</li>
+<li>In the real Kora preview, verify the exact track and open Music → Private native tab delay. Windows PCM must be off; source-owned tab capture and audible single output must be proven.</li>
+<li>Listen for one output without echo. Pause the source, choose an existing measured delay preset, and accept the explicit audio/delay consent only when true. Enable compensation and wait for its acknowledged Active audio delay status.</li>
+<li>Resume and use Beat grid with late-live arrival presentation OFF. Send song timestamps for missing, extra, early or late flashes. Video sound intentionally trails its picture. Physical synchronization remains unverified.</li>
+<li>Turn compensation OFF immediately if needed; verify the acknowledgement. Seek, source/generation or output-device changes revoke compensation. Stop the dedicated browser/preview through their owning controls.</li></ol>
+<p>This is an isolated L0 experiment, not a production-qualified combination. No model, global compensation, production service or installed research files were changed.</p>`);
+if(nativeDelayCandidate)assertNativeDelayGuide(await readFile(join(output,'Private listening guide.html'),'utf8'));
 console.log(`Music companion packaged: ${files.length} files → ${output}`);

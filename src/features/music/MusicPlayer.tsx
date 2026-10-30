@@ -11,7 +11,7 @@ import { patternAt } from './beatVisuals';
 import type { BeatColorMode, BeatPalette } from './beatVisuals';
 import BeatPattern from './BeatPattern';
 import { useCompanionSetup } from '../native/use-companion-setup';
-import { isNativeWidget } from '../native/runtime';
+import { isNativeWidget, nativeCompanionPreviewEnabled } from '../native/runtime';
 import { beatRowDiagnostics, fourRowBaseline } from './beat-row-diagnostics';
 import { beatTelemetry } from '../../../extensions/kanban-music/beat-telemetry.js';
 import { leadPulseEnabled, leadAvailabilityText } from './lead-feature';
@@ -60,7 +60,7 @@ export function MusicTrack({ music }: { music: BrowserMusicController }) {
       </span>
     </div>
     <MusicPlaybackControls key={selected?.id} music={music} />
-    {selected&&!isNativeWidget()&&<ExperimentalBeatControl key={`experimental:${selected.id}`} session={selected} refresh={music.refresh}/>}
+    {selected&&(!isNativeWidget()||nativeCompanionPreviewEnabled())&&<ExperimentalBeatControl key={`experimental:${selected.id}`} session={selected} refresh={music.refresh} compensationOnly={nativeCompanionPreviewEnabled()}/>}
     {sessions.length > 1 && <select className="music-sessions" aria-label={t('music.choose')} value={selected?.id || ''} onChange={(event) => setSelectedId(event.target.value)}>{sessions.map((session) => <option key={session.id} value={session.id}>{session.title} · {session.source}</option>)}</select>}
   </>;
 }
@@ -74,8 +74,9 @@ export function MusicGrid({ music, colorMode = 'random', palette = 'bloom', orie
   const [latePreview,setLatePreview]=useState({owner:previewOwner,enabled:false});
   if(latePreview.owner!==previewOwner)setLatePreview({owner:previewOwner,enabled:false});
   const compareLegacy=legacy&&!reduced;
-  const motionPreview=motionPreviewAllowed(music.selected?.syncState?.capability?.privateCandidate===true);
-  const lateLivePreview=motionPreview&&!compareLegacy&&!music.beta?.enabled&&Boolean(music.selected?.id)&&latePreview.owner===previewOwner&&latePreview.enabled;
+  const privateNativeDelay=nativeCompanionPreviewEnabled();
+  const motionPreview=import.meta.env.VITE_ENABLE_BEAT_GRID_PREVIEW==='true'||motionPreviewAllowed(music.selected?.syncState?.capability?.privateCandidate===true);
+  const lateLivePreview=motionPreview&&!privateNativeDelay&&!compareLegacy&&!music.beta?.enabled&&Boolean(music.selected?.id)&&latePreview.owner===previewOwner&&latePreview.enabled;
   const showDebug = import.meta.env.DEV && new URLSearchParams(window.location.search).has('musicDebug');
   const [demo,setDemo]=useState(() => new URLSearchParams(window.location.search).get('musicDemo') === 'lead');
   const visibility = useRef<{ at: number; event: string; hidden: boolean }[]>([]);
@@ -97,10 +98,12 @@ export function MusicGrid({ music, colorMode = 'random', palette = 'bloom', orie
     <Suspense fallback={<p>Loading private Melody comparison…</p>}><PrivateMelodyDemo /></Suspense>
   </div>;
   const capability=music.selected?.syncState?.capability;
-  const previewStatus=!isNativeWidget()&&!music.beta?.enabled&&capability?.privateCandidate
+  const previewStatus=(!isNativeWidget()||nativeCompanionPreviewEnabled())&&!music.beta?.enabled&&capability?.privateCandidate
     ?capability.reason==='protected-source'?'Instrument flashes are unavailable for this protected source. Music playback controls still work.'
     :capability.reason==='provider-policy'?'Instrument flashes are unavailable for this provider under the private test policy. Music playback controls still work.'
+    :privateNativeDelay&&capability.bufferMs>0?`Intentional audio delay: ${capability.bufferMs} ms. Instrument predictions and physical synchronization are unverified.`
     :capability.allowTypedPreview?'Unverified instrument preview is on. Flashes can lag or be incorrect.'
+    :privateNativeDelay&&capability.compensationEligible?'Instrument preview is off. Open Music → Audio Delay Compensation, pause playback and enable your chosen delay. Seeking or changing the source resets it to OFF.'
     :capability.livePreviewEligible?'Instrument preview is off for this source. Open Music → Private candidate → Live preview to enable it. Pause, seek and source changes turn preview off.'
     :null:null;
   const grid=<BeatPattern key={music.selected?.id} session={music.selected} beat={music.beat} colorMode={colorMode} palette={palette} orientation={orientation} semanticOnly={music.beta?.enabled?true:undefined} melodyEnabled={music.beta?.enabled&&music.beta.melody} independentRows={music.beta?.enabled} melodyEvents={music.beta?.enabled?music.beta.clip?.lead?.events:undefined}
@@ -108,10 +111,10 @@ export function MusicGrid({ music, colorMode = 'random', palette = 'bloom', orie
   return <>
     {motionPreview&&<div className="music-motion-controls"><span>{t('dock.motion.preview')} · {compareLegacy?'Legacy':t(`dock.motion.${motionProfile}`)}</span>
       <button type="button" className="text-button motion-legacy" disabled={reduced} aria-pressed={compareLegacy} onClick={()=>setLegacy(value=>!value)}>{t(compareLegacy?'dock.motion.restore':'dock.motion.legacy')}</button>
-      {!music.beta?.enabled&&<button type="button" className="text-button motion-legacy" disabled={compareLegacy||!music.selected} aria-pressed={lateLivePreview}
+      {!music.beta?.enabled&&!privateNativeDelay&&<button type="button" className="text-button motion-legacy" disabled={compareLegacy||!music.selected} aria-pressed={lateLivePreview}
         onClick={()=>setLatePreview({owner:previewOwner,enabled:!lateLivePreview})}>{t(lateLivePreview?'music.lateLive.disable':'music.lateLive.enable')}</button>}
     </div>}
-    {motionPreview&&!music.beta?.enabled&&<p className="motion-reduction-note" role="status" aria-label={t('music.lateLive.status')}>{t(lateLivePreview?'music.lateLive.active':'music.lateLive.strict')}</p>}
+    {motionPreview&&!music.beta?.enabled&&!privateNativeDelay&&<p className="motion-reduction-note" role="status" aria-label={t('music.lateLive.status')}>{t(lateLivePreview?'music.lateLive.active':'music.lateLive.strict')}</p>}
     {motionPreview&&reduced&&<p className="motion-reduction-note">{t('dock.motion.reducedNote')}</p>}
     {previewStatus&&<p role="status" aria-label="Instrument preview status">{previewStatus}</p>}
     {music.beta?.enabled?<div className={`hybrid-grid-frame${music.beta.renderer==='short'?' hybrid-short-attack':''}`}>{grid}</div>:grid}
@@ -188,6 +191,10 @@ export function MusicSetup({ music }: { music: BrowserMusicController }) {
   const companion = useCompanionSetup();
   const beta=localHybridEnabled()&&music.beta?<HybridBetaControl beta={music.beta}/>:null;
   if (music.connected || music.checking) return beta;
+  if(nativeCompanionPreviewEnabled())return <div className="music-setup" role="status">
+    <p>Private test Companion 0.3.28 is unavailable. Open the dedicated test browser; preserve your existing installed extensions.</p>
+    <button type="button" className="text-button" onClick={music.refresh}>{t('music.checkAgain')}</button>
+  </div>;
   return <>{beta}<div className="music-setup">
     {music.error && <p className="muted" role="status">{music.error}</p>}
     <div className="music-connect-actions">

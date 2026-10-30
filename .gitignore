@@ -127,6 +127,7 @@ Thumbs.db
 # =========================================================
 /docs/*
 !/docs/design-system.md
+!/docs/audio-distribution.md
 
 # =========================================================
 # Third-party source repositories

@@ -2,6 +2,8 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { createNativeAudioFeed } from './nativeAudio';
 import { beatTelemetry, parseBeatTraces } from '../../../extensions/kanban-music/beat-telemetry.js';
+import {nativeCompanionPreviewEnabled} from './runtime';
+import type {SyncConfiguration} from '../../../extensions/kanban-music/beat-mode.js';
 import type { PlaybackClock } from '../../../extensions/kanban-music/beat-timing.js';
 
 const receivers = new Set<(value: unknown) => void>();
@@ -19,7 +21,7 @@ let ready: Promise<unknown> | undefined;
 let audioOwner: { sessionId: string; subscriptionId: string } | undefined;
 function ensureFeed() {
   return ready ??= (async () => {
-    const stop = await listen<unknown>('native-music-beat', ({ payload }) => { if (audio.companion(payload)) publish(payload); });
+    const stop = await listen<unknown>('native-music-beat', ({ payload }) => { if (nativeCompanionPreviewEnabled() || audio.companion(payload)) publish(payload); });
     try { await listen<unknown>('native-audio-ended', ({ payload }) => audio.ended(payload)); }
     catch (error) { stop(); throw error; }
     // An optional diagnostic listener must not block capture/control setup.
@@ -32,9 +34,11 @@ function ensureFeed() {
     }).catch(() => {});
   })().catch((error) => { ready = undefined; throw error; });
 }
-export async function requestNativeMusic(action: string, sessionId?: string, subscriptionId?: string, value?: number): Promise<Record<string, unknown>> {
+export async function requestNativeMusic(action: string, sessionId?: string, subscriptionId?: string, value?: number, configuration?:SyncConfiguration): Promise<Record<string, unknown>> {
+  const companionCapture=nativeCompanionPreviewEnabled();
+  if(companionCapture&&audioOwner){audio.stop(audioOwner.sessionId,audioOwner.subscriptionId);audioOwner=undefined;}
   const starting = action === 'dock.beat.sync.start' && sessionId && subscriptionId
-    ? { sessionId, subscriptionId } : undefined;
+    && !companionCapture ? { sessionId, subscriptionId } : undefined;
   if (starting) audioOwner = starting;
   if (action === 'dock.beat.sync.stop' && audioOwner?.sessionId === sessionId && audioOwner?.subscriptionId === subscriptionId) audioOwner = undefined;
   await ensureFeed();
@@ -47,7 +51,9 @@ export async function requestNativeMusic(action: string, sessionId?: string, sub
   try {
     const response = await invoke<Record<string, unknown>>('native_music_request', { action, sessionId, subscriptionId,
       ...(value !== undefined ? { value } : {}),
-      ...(action === 'dock.beat.sync.start' ? { nativeAudio: true } : {}) });
+      ...(companionCapture?{companionCapture:true}:{}),
+      ...(configuration?{configuration}:{}),
+      ...(action === 'dock.beat.sync.start' ? { nativeAudio: !companionCapture } : {}) });
     if (response.ok === true && starting && audioOwner === starting) audio.activate(starting.sessionId, starting.subscriptionId);
     return response;
   } finally { release?.(); }

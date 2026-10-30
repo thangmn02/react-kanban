@@ -75,6 +75,16 @@ it('keeps native instrument rows live when research Companion policy arrives bef
   act(() => detector.options.onBeat(detector.id, ['kick','clap','hat']));
   await waitFor(() => expect(view.container.querySelectorAll('[data-channel] .beat-square.onset').length).toBeGreaterThanOrEqual(3));
 });
+it('offers only source-owned delay controls in the explicit private Companion route without starting Windows PCM',async()=>{
+  vi.stubEnv('VITE_PRIVATE_NATIVE_COMPANION_CAPTURE','true');native.privateDuringStart=true;
+  const view=render(<I18nProvider><Harness showControls /></I18nProvider>);
+  await waitFor(()=>expect(native.subscription).not.toBe(''));
+  expect(invoke).toHaveBeenCalledWith('native_music_request',expect.objectContaining({action:'dock.beat.sync.start',nativeAudio:false,companionCapture:true}));
+  expect(native.detectors).toHaveLength(0);
+  expect(view.container.querySelector('section[aria-label="Audio Delay Compensation — Experimental"]')).not.toBeNull();
+  expect(view.container.querySelector('section[aria-label="Live instrument preview"]')).toBeNull();
+  expect(view.container.textContent).toContain('Windows PCM is off');
+});
 it('pops native onset rows, ignores companion fallback events, and clears on silence', async () => {
   const view = render(<I18nProvider><Harness /></I18nProvider>);
   await waitFor(() => expect(native.subscription).not.toBe(''));

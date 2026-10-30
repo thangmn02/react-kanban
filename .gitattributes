@@ -1,3 +1,4 @@
 # Keep qualified migration and dependency fingerprints stable across platforms.
 supabase/migrations/*.sql text eol=lf
 package-lock.json text eol=lf
+public/third-party/* text eol=lf
