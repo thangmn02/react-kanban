@@ -1,6 +1,10 @@
-# Kora final production readiness — October 29, 2026
+# Kora final production readiness — October 30, 2026
 
-**NO-GO — BLOCKED.** The full product source is prepared, with a signed 0.1.32 candidate retained locally. Production web assets, installer, updater feed, Companion and database have not been replaced. This report does not authorize deployment. The earlier commit/push request remains separate from production promotion.
+**Production NO-GO; staging preview available.** The owner's October 29 22:01 correction explicitly withholds Production migrations and deployment. The twelve reviewed migration operations remain prepared, and historical task repairs remain excluded. The signed 0.1.32 artifact below predates the latest private experiment and is not relabeled as the current qualified release. The earlier commit/push authorization remains separate from Production promotion.
+
+The [staging test preview](https://6ae361faf19268432b992acf--kanthangboard.netlify.app) connects only to `enzzyuhchizfmruxhfhg`. Six deployed checks pass: target identity, image access rejection, authenticated Notes save, actual Linux image processing/private rendering, reload recovery and idle Opal four-row presentation. The generated login remains in the restricted `%LOCALAPPDATA%/Kora/secrets/staging-preview-login.txt`; fixture credentials and uploaded test content stay out of Git. Production published deploy `6aceb65d7544427364f295f3` was unchanged at publication. Existing Companions do not admit the draft hostname, so its idle grid is not live-music qualification.
+
+At October 29 22:20 the owner accepts the full “Some (Sped Up)” track at 170 ms in the isolated native Owner Preview with private Companion 0.3.28: four rows appear, alignment feels good and there is no echo. This closes that listening case only. Actual copied Kora 0.1.31 also passes staging sign-in, task read, edit/save and reload, with 32 real forwarded requests, normal quit and independently verified generated-task removal. No installed application/profile was changed. See the [P3/P4 report](p3-p4-implementation-and-qualification.md) and [prepared execution sequence](../261027-0846-product-completion/production-execution-sequence.md).
 
 ## Release matrix
 
@@ -8,20 +12,22 @@
 |---|---|
 | Astryx Design System | PASS within the agreed bounded integration |
 | P0 Data Durability | PASS within tested transactional/local-acknowledgment boundaries |
-| P0 Security & Recovery | PASS for the retained snapshot and isolated rehearsals; independent owner key escrow pending |
+| P0 Security & Recovery | PASS for the retained snapshot and isolated rehearsals; owner confirms separate key storage on October 30 |
 | P1 Workflow & Collaboration | PARTIAL for the full combined release flow; individual local/staging workflows pass |
 | P2 Windows Native | PARTIAL; actual external-window tests pass, hardware and final-release matrix remain open |
-| P3 Beat Grid Preservation | FAIL as a final-artifact gate: scoped preservation passes, required final full-song replay is unverified |
+| P3 Beat Grid Preservation | Scoped source/model preservation PASS; final signed-artifact replay remains open |
+| P4 Real Kora Owner Acceptance | PASS for the isolated full-track 170 ms case; no echo and four rows |
 | P4 Engineering | BLOCKED for full advertised production scope |
 | Companion Compatibility | PARTIAL |
 | Companion Version Decision | BLOCK — no proposed replacement artifact is fully qualified |
 | Release Artifact Security | FAIL as a complete release gate; credential/signature checks pass, distribution rights remain unresolved |
-| Staging Qualification | PASS for 14 committed migrations, 22 service groups and 13 browser scenarios |
+| Staging Qualification | Prior 14-migration/service/browser qualification retained; six deployed preview checks PASS |
+| Kora 0.1.31 Migration Compatibility | PASS for offline schema/RLS rehearsal and actual legacy sign-in/task read/edit/reload; remaining old-client features are not implied |
 | Production Release | NO-GO |
 
 ## Baseline and workstream inventory
 
-Admission HEAD is `513d7e5a0158443c221eb8e1dd5a3da4fc1df178` on `codex/product-ux-upgrade`; GitHub main is an older baseline. Product source was committed/pushed as `2b6500f`, followed by clean-reproduction fix `747e95267b54d396e87b8c95f305a901d1159f9d`. The latter is the software source candidate; subsequent readiness-only documentation does not change its application code. Unrelated acoustic research remains excluded. An earlier binary or receipt is not relabeled as the final connected candidate.
+Admission HEAD is `513d7e5a0158443c221eb8e1dd5a3da4fc1df178` on `codex/product-ux-upgrade`; GitHub main is an older baseline. Product source was committed/pushed as `2b6500f`, followed by clean-reproduction fix `747e95267b54d396e87b8c95f305a901d1159f9d`. Later completion work on `codex/final-completion-wave` changes source; the earlier candidate receipts below retain their original provenance. Current-source verification passes 1,265 application tests and 29 Rust tests, plus the six private transformed-module/package checks and 82 protected files/three model hashes. Unrelated acoustic research remains excluded. An earlier binary or receipt is not relabeled as the final connected candidate.
 
 | Workstream | Inventory and production relevance |
 |---|---|
@@ -50,7 +56,7 @@ Database and Storage recovery were verified separately on October 29. The exact 
 
 An isolated, networkless Storage API restore recovered all 31 logical bucket/path references and original bytes, retained application rows and original policies, denied public and unrelated authenticated access to all 30 private objects, and allowed the one public cover. The recovered provider catalog matched the snapshot exactly. Storage API 1.62.5 failed its legacy conflict-index assumption; the pinned version-aware 1.84.32 image passed. Provider uploads generate new object IDs/versions; identical provider-internal IDs are not claimed. Exact runtime digest and failed-attempt evidence remain in private receipts.
 
-Portable AES-256-GCM archives of the database dump and Storage bundle were copied to the owner-authorized Documents and private Google Drive locations. Both cloud downloads matched ciphertext hashes, then a separate networkless Linux process decrypted them without DPAPI and verified the dump and all 31 object hashes. The recovery key was not uploaded; the owner has a separate private local handoff file. Independent owner key escrow remains unconfirmed. Recovery covers the original October 28 17:13:50 UTC snapshot, not subsequent production changes.
+Portable AES-256-GCM archives of the database dump and Storage bundle were copied to the owner-authorized Documents and private Google Drive locations. Both cloud downloads matched ciphertext hashes, then a separate networkless Linux process decrypted them without DPAPI and verified the dump and all 31 object hashes. The recovery key was not uploaded. On October 30 at 13:22 Asia/Saigon, the owner confirms saving the separately handed-off key in a separate secure store. This is owner attestation; no secret value or store contents were requested or inspected. Recovery covers the original October 28 17:13:50 UTC snapshot, not subsequent production changes.
 
 Private recovery manifest: `%LOCALAPPDATA%/Kora/backups/production/evidence/1793207547437/backup-manifest.json`. Detailed records remain private; no backup credentials or user records belong in Git.
 
@@ -68,7 +74,7 @@ Debug text-window measurements show approximately 257 MiB additional private mem
 
 Fresh preservation checks pass for 88 protected source boundaries and three frozen model hashes, allowing only scoped native dependencies/capabilities and a matching monotonic release-version increment. The verifier uses the recorded admission commit, not a moving HEAD. Unit/browser tests retain event identity, deduplication, exclusive ownership, reduced motion and Focus routing. Previous 50-case 60/120 software matrices and full-song evidence retain their original source/build provenance.
 
-The new connected 0.1.32 artifact has not completed the final full-song/difficult-region, physical timing or long-session/platform matrix. Gate E therefore remains incomplete (FAIL as a release gate), despite preserved scoped P3 PASS evidence and no observed new material renderer regression. Existing P4 evidence cannot be relabeled as this artifact's soak. [The owning P3/P4 report](p3-p4-implementation-and-qualification.md) records unresolved calibrated A/V timing, target-platform/Spotify policy coverage, weaker-device budgets and model/distribution rights. ADTOF's shipped notice explicitly retains unresolved CC-BY-NC-SA rights; CNN/checkpoint/data and SoXR obligations also require clearance. No model selection or compensation change is proposed to bypass these gates.
+The new connected 0.1.32 signed artifact has not completed the final full-song/difficult-region, physical timing or long-session/platform matrix. Gate E therefore remains incomplete, despite scoped P3 preservation and the separately accepted private 170 ms full-track case. Existing P4 evidence cannot be relabeled as this artifact's soak. [The owning P3/P4 report](p3-p4-implementation-and-qualification.md) records unresolved calibrated A/V timing, target-platform/Spotify policy coverage and weaker-device budgets. Exact ADTOF weight provenance now passes; full upstream terms, attribution and runtime notices are prepared for non-commercial distribution. The [asset guide](../../docs/audio-distribution.md) distinguishes those obligations from the private Hybrid CNN/SoXR assets that the stable candidate does not ship. No commercial grant or complete release clearance is inferred.
 
 The clean build also reports deferred runtime URLs for `generated/hybrid/`. Worker compilation does not establish availability of the approved CNN/SoXR assets or qualification of a live hybrid mode. That asset route, exact hashes, supported mode and rights belong to the open Companion/P4 gate; private flags were not enabled to manufacture availability.
 
@@ -119,13 +125,13 @@ Production records `20260713000000`, `20260913120000` and `20261007080000_sparse
 
 | Issue | Severity, impact and measurable acceptance | Owner |
 |---|---|---|
-| Private Storage recovery | Critical for migration approval: recover all 31 object bytes/references under approved access and verify hashes/permissions in isolation. | Product owner + database operator |
+| Fresh recovery | The retained snapshot's 31 objects, isolated restore and off-device ciphertext checks pass. Owner confirms separate key storage. Before future migration execution, repeat fresh DB and separate Storage recovery checks. | Release engineer + database operator |
 | Non-prefix migration history/existing contact objects | Major: reviewed exact schema/history plan and successful isolated rehearsal, followed by explicit authorization. | Release engineer + database owner |
-| Nine historical task records | Major correctness review: approve exact before-image/CAS proposals and historical timestamp policy; no automatic repair. | Product owner |
+| Nine historical task records | Explicitly excluded from this release execution. Retain the read-only findings; a separate decision is required for any repair. | Product owner |
 | Final native/Companion/display/lifecycle matrix | Major for advertised native scope: actual target hardware/version combinations, monitor/DPI/sleep, restart/reconnect and 30-minute representative workload, with measured limits and cleanup. | Desktop QA + product owner |
 | Companion artifact identity/versioning | Major: resolve the public/generated same-version difference, qualify actual Brave 0.3.25 against the proposed app, and select a correctly versioned production artifact with the complete compatibility matrix. | Release engineer + product owner |
 | Physical timing/weaker-device budget | Major for advertised timing/performance: calibrated source-to-display distribution, late/missing/rapid-hit counts and approved supported-device thresholds. | Product/audio QA |
-| Model/runtime rights | Critical publication blocker: documented permission and fulfilled attribution/source/distribution obligations for each shipped asset/runtime. | Product owner/rights holder |
+| Model/runtime distribution scope | Exact ADTOF weight provenance and complete attribution/license packaging pass within their scope. Verify every final shipped asset and non-commercial terms; do not infer commercial clearance or ship unqualified private CNN/SoXR assets. | Release engineer + product owner |
 | Coherent final signed release artifact | Major: clean source/web/Linux backend reproduction now passes; rebuild/qualify the signed native artifact with the approved Companion and locked dependencies, then rerun required final playback/lifecycle gates. | Release engineer |
 
 No production migration, user-data repair, restore, function-secret update, web deployment, installer/feed or Companion replacement is authorized by this report. The next release decision remains **NO-GO — BLOCKED** until the listed mandatory gates close; changing the supported product scope requires explicit owner review.

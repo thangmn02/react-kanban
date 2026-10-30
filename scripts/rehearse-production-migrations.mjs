@@ -5,6 +5,7 @@ import {join} from 'node:path';
 import {withProductionClone,sha256} from './production-clone.mjs';
 import {verifyPreservedRows} from './migration-reconciliation.mjs';
 import {applicationFingerprintSql,publicationStateSql} from './staging-state-contract.mjs';
+import {legacySchemaSnapshot,verifyLegacySchema,exerciseLegacyTaskWrites} from './legacy-client-compatibility.mjs';
 const arg=name=>process.argv.find(value=>value.startsWith('--'+name+'='))?.slice(name.length+3);
 assert.ok(arg('manifest')&&arg('output'),'Supply --manifest=<verified private backup> and --output=<new private evidence directory>.');
 const contactSql=schema=>`select jsonb_build_object(
@@ -42,6 +43,7 @@ await withProductionClone({manifestFile:arg('manifest'),output:arg('output')},as
  const owningTables=Object.keys(manifest.counts).filter(name=>/^(public|app_private)\./.test(name));
  const rowQuery="select jsonb_object_agg(name,rows order by name) from ("+owningTables.map(name=>{const [schema,table]=name.split('.');assert.match(table,/^[a-z_][a-z0-9_]*$/);return `select '${name}' name,coalesce(jsonb_agg(to_jsonb(t) order by to_jsonb(t)::text collate "C"),'[]') rows from "${schema}"."${table}" t`;}).join(' union all ')+") data";
  const beforeRows=JSON.parse(sql(rowQuery));
+ const legacyBefore=legacySchemaSnapshot(sql);
  let transaction='begin;\n';for(const row of pending){
   // The contact DDL is skipped only after exact isolated definition equivalence.
   if(row!==contact)transaction+=row.body+'\n';
@@ -50,6 +52,8 @@ await withProductionClone({manifestFile:arg('manifest'),output:arg('output')},as
  await writeFile(join(output,'reconciliation.sql'),transaction);
  sql(transaction);
  const afterRows=JSON.parse(sql(rowQuery));verifyPreservedRows(beforeRows,afterRows,{'public.tasks':['repeat_interval']});
+ const legacyCompatibility={preservedContracts:verifyLegacySchema(legacyBefore,legacySchemaSnapshot(sql)),writes:exerciseLegacyTaskWrites(sql),scope:'Existing SQL/RLS and 0.1.31 task request shapes; not an installed-binary compatibility claim.'};
+ await writeFile(join(output,'legacy-compatibility.json'),JSON.stringify(legacyCompatibility,null,2));
  const afterHistory=JSON.parse(sql("select json_agg(jsonb_build_object('version',version,'name',name,'statements',statements) order by version) from supabase_migrations.schema_migrations"));
  for(const entry of history)assert.deepEqual(afterHistory.find(row=>row.version===entry.version),entry,'Existing history must remain byte-for-byte equivalent.');
  const result={at:new Date().toISOString(),sourceCommit:arg('source-commit')||null,status:'PASS',hostedConnections:false,hostedWrites:false,network:'none',backupSha256:manifest.sha256,historyBefore:history.map(row=>row.version),historyAfter:afterHistory.map(row=>row.version),contactDdl:'Skipped only after definition/owner/ACL equivalence',authorizationDriftGuards:guards.length,historicalTaskRowsUnchanged:true,owningTablesPreserved:owningTables.length,planSha256:sha256(transaction),migrations:pending.map(row=>({name:row.name,sha256:sha256(row.body),operation:row===contact?'record verified-equivalent existing definitions':'apply additive source'})),applicationFingerprintAfter:sql('set search_path=pg_catalog;'+applicationFingerprintSql),publicationStateAfter:JSON.parse(sql('set search_path=pg_catalog;'+publicationStateSql)),productionAuthorization:'Not granted; SQL retained privately for exact owner review.'};
