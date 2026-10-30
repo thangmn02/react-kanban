@@ -29,6 +29,7 @@ try{
   await page.goto(base+'/auth/sign-in');await page.getByLabel('Email',{exact:true}).fill(fixture.email);await page.getByLabel('Password',{exact:true}).fill(fixture.password);
   await page.getByRole('button',{name:'Sign in',exact:true}).last().click();await expect(page.getByRole('button',{name:'Open user menu'})).toBeVisible();
   await page.goto(base+'/notes');await expect(page.getByRole('heading',{name:'Notes',exact:true,level:1})).toBeVisible();
+  await expect(page.getByRole('button',{name:'New note',exact:true})).toBeEnabled();
   const title='Staging preview check '+randomUUID().slice(0,8);
   const previous=await client.from('notes').select('id,title,content,revision').eq('owner_user_id',fixture.userId);assert.ok(!previous.error);
   await page.getByLabel('Note title',{exact:true}).evaluateAll(inputs=>inputs.forEach(input=>input.setAttribute('data-existing-preview-note','true')));
