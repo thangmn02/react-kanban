@@ -88,13 +88,20 @@ const {version}=JSON.parse(await readFile('src-tauri/tauri.conf.json','utf8'));a
 
 const manifest=JSON.parse(await readFile(join(functionsRoot,'manifest.json'),'utf8'));
 assert.equal(manifest.system.platform,'linux');assert.equal(manifest.system.arch,'x64');
-const functions={},functionsConfig={},zips={};
+const functions={},functionsConfig={},zips={},modes={};
 for(const fn of manifest.functions){
   assert.ok(['beat-event-cache','note-images','task-breakdown'].includes(fn.name));assert.equal(fn.runtimeVersion,'nodejs24.x');
   const zip=await readFile(join(functionsRoot,fn.name+'.zip'));assert.ok(!credentials.some(value=>zip.includes(Buffer.from(value))),'Credential in a function bundle; values withheld.');
-  functions[fn.name]=hash(zip);functionsConfig[fn.name]={build_data:fn.buildData,priority:fn.priority};zips[fn.name]=zip;
+  functions[fn.name]=hash(zip);functionsConfig[fn.name]={build_data:fn.buildData,priority:fn.priority};zips[fn.name]=zip;modes[fn.name]=fn.invocationMode;
 }
 assert.equal(functions['note-images'],'e0f8b0e45281eda9571dac4fed9d7bff1b03060f76a0b4381b54bc40b279f06b','Only the image function verified on Linux is admitted.');
+// Netlify reuses an uploaded function by hash, including its invocation mode. These two bundles were once uploaded
+// without stream mode, so give them a release-specific archive comment: identical entries, new hash, fresh upload.
+function withZipComment(zip,text){
+  const end=zip.lastIndexOf(Buffer.from([0x50,0x4b,0x05,0x06]));assert.ok(end>=0&&zip.readUInt16LE(end+20)===0&&end+22===zip.length,'Unexpected archive trailer.');
+  const comment=Buffer.from(text),copy=Buffer.from(zip);copy.writeUInt16LE(comment.length,end+20);return Buffer.concat([copy,comment]);
+}
+for(const name of ['beat-event-cache','task-breakdown']){zips[name]=withZipComment(zips[name],`kora ${version} stream`);functions[name]=hash(zips[name]);}
 
 const deploy=await api('/sites/'+siteId+'/deploys?title='+encodeURIComponent(`Kora ${version} release ${sourceCommit.slice(0,7)}`),{method:'POST',body:{draft:true,async:false,files,functions,functions_config:functionsConfig}});
 assert.equal(deploy.site_id,siteId);assert.ok(!deploy.published_at,'The new deploy must start unpublished.');
@@ -103,7 +110,8 @@ const receipt={at:new Date().toISOString(),siteId,deployId:deploy.id,sourceCommi
 await writeFile(join(output,'draft.json'),JSON.stringify(receipt,null,2));await writeFile(join(output,'inventory.json'),JSON.stringify(inventory,null,2));
 for(const sha of deploy.required||[]){const file=bytesBySha.get(sha);assert.ok(file,'Unknown requested file.');await api('/deploys/'+deploy.id+'/files'+file.path,{method:'PUT',bytes:file.bytes});}
 for(const[name,sha]of Object.entries(functions))if((deploy.required_functions||[]).includes(sha))
-  await api('/deploys/'+deploy.id+'/functions/'+name+'?runtime=nodejs24.x'+(name==='note-images'?'&invocation_mode=stream':''),{method:'PUT',bytes:zips[name]});
+  // Runtime API v2 functions return a Response and must be uploaded in their built invocation mode.
+  await api('/deploys/'+deploy.id+'/functions/'+name+'?runtime=nodejs24.x'+(modes[name]?'&invocation_mode='+modes[name]:''),{method:'PUT',bytes:zips[name]});
 let ready;
 for(let attempt=0;attempt<180&&!ready;attempt++){const current=await api('/deploys/'+deploy.id);assert.notEqual(current.state,'error','Deploy processing failed; details withheld.');if(current.state==='ready')ready=current;else await new Promise(done=>setTimeout(done,1000));}
 assert.ok(ready,'Draft did not become ready within the bounded wait.');
