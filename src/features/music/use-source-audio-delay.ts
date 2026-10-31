@@ -7,7 +7,9 @@ import {prepareNativeSourceAudioDelay,sourceKey,stopNativeSourceAudioDelay} from
 export const SOURCE_AUDIO_DELAY_MS=170;
 const DELAY_HOSTS=['youtube.com','www.youtube.com','m.youtube.com','music.youtube.com','soundcloud.com','www.soundcloud.com','m.soundcloud.com',
   // Signed-out previews are plain audio; signed-in DRM tracks are refused by the Companion's protected-media check.
-  'music.apple.com'];
+  'music.apple.com',
+  // Owner-preview builds only: the loopback test player for authorized local files.
+  ...(import.meta.env.VITE_OWNER_PREVIEW_LOOPBACK==='true'?['127.0.0.1']:[])];
 export type SourceAudioDelayStatus='off'|'preparing'|'active'|'turning-off'|'error';
 type Pending='on'|'off'|undefined;
 

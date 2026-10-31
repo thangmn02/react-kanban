@@ -72,6 +72,11 @@ fn allowed_origin(origin: &str) -> bool {
 }
 
 fn allowed_source(source: &str) -> bool {
+    // Owner-preview builds only: a loopback test player lets the owner play an authorized local file
+    // through the real capture path. Never compiled into ordinary or Production builds.
+    if option_env!("KORA_OWNER_PREVIEW_LOOPBACK") == Some("1") && source == "127.0.0.1" {
+        return true;
+    }
     matches!(
         source,
         "youtube.com"
@@ -531,6 +536,9 @@ mod tests {
         }
         assert!(allowed_source("music.youtube.com"));
         assert!(allowed_source("music.apple.com"));
+        // Loopback players are admitted only by an explicit owner-preview build flag.
+        assert_eq!(allowed_source("127.0.0.1"), option_env!("KORA_OWNER_PREVIEW_LOOPBACK") == Some("1"));
+        assert!(!allowed_source("localhost"));
     }
     #[test]
     fn rejects_wrong_host_path_and_missing_origin() {

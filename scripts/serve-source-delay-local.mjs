@@ -10,7 +10,8 @@ const root=arg('output');assert.match(root??'',/^scratch\/[a-z0-9/_-]+$/,'--outp
 await mkdir(root,{recursive:false});const site=resolve(root,'site');
 // Explicit values win over any .env file; no Supabase URL or key reaches the build.
 Object.assign(process.env,{VITE_AUTH_MODE:'mock',VITE_SUPABASE_URL:'',VITE_SUPABASE_ANON_KEY:'',VITE_ENABLE_SOURCE_AUDIO_DELAY:'true',
-  VITE_PRIVATE_NATIVE_COMPANION_CAPTURE:'false',VITE_PRIVATE_BEAT_CANDIDATE:'false',VITE_ENABLE_BEAT_GRID_PREVIEW:'false'});
+  VITE_PRIVATE_NATIVE_COMPANION_CAPTURE:'false',VITE_PRIVATE_BEAT_CANDIDATE:'false',VITE_ENABLE_BEAT_GRID_PREVIEW:'false',
+  VITE_OWNER_PREVIEW_LOOPBACK:'true'});
 await build({logLevel:'error',build:{outDir:site}});
 const types={'.html':'text/html','.js':'text/javascript','.mjs':'text/javascript','.wasm':'application/wasm','.css':'text/css','.json':'application/json','.png':'image/png','.svg':'image/svg+xml','.onnx':'application/octet-stream','.woff2':'font/woff2'};
 const server=createServer(async(req,res)=>{

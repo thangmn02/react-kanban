@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lead Annotation Editor</title>
+<style>
+:root{--bg:#f3f5f9;--panel:#fff;--ink:#1e293b;--muted:#64748b;--line:#d6dde8;--wave:#94a3b8;--accept:#16a34a;--reject:#dc2626;--uncertain:#d97706;--pending:#64748b;--select:#2563eb;--play:#e11d48}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e131b;--panel:#171f2b;--ink:#e2e8f0;--muted:#94a3b8;--line:#2b3747;--wave:#52627a}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:1280px;margin:0 auto;padding:16px}h1{font-size:20px;margin:0}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:10px}
+.bar label{display:flex;gap:6px;align-items:center;color:var(--muted)}
+input[type=number]{width:84px}input,select,button{font:inherit;color:inherit;background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:4px 8px}
+button{cursor:pointer}button.primary{background:var(--select);border-color:var(--select);color:#fff}button:disabled{opacity:.45;cursor:default}
+.grid{display:grid;grid-template-columns:1fr 300px;gap:10px;margin-top:10px}@media(max-width:900px){.grid{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+canvas{width:100%;display:block;border-radius:8px;cursor:crosshair;touch-action:none}
+.stat{font-variant-numeric:tabular-nums}.muted{color:var(--muted)}.legend span{display:inline-flex;align-items:center;gap:4px;margin-right:10px}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block}kbd{border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 4px;font-size:12px}
+table{border-collapse:collapse;width:100%}td{padding:2px 0;vertical-align:top}td:first-child{color:var(--muted);width:42%}
+.ok{color:var(--accept);font-weight:600}.warn{color:var(--uncertain);font-weight:600}
+</style>
+</head>
+<body>
+<main>
+  <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px">
+    <h1>Lead Annotation Editor</h1>
+    <span class="muted">Audio stays in this browser. Only reviewed annotations are exported.</span>
+  </div>
+  <div class="bar">
+    <input type="file" id="file" accept="audio/*" aria-label="Audio file">
+    <label>Region start <input type="number" id="start" step="0.1" min="0" value="0"></label>
+    <label>Length <input type="number" id="length" step="1" min="10" max="30" value="24"> s</label>
+    <button class="primary" id="analyse" disabled>Analyse region</button>
+    <label><input type="file" id="draft" accept="application/json"> Import draft taps</label>
+    <label><input type="file" id="load" accept="application/json"> Open annotation</label>
+    <span id="audioInfo" class="muted"></span>
+  </div>
+  <div class="bar">
+    <button id="play" disabled>Play region ⏵</button>
+    <label>Speed <select id="rate"><option value="1">1×</option><option value="0.75">0.75×</option><option value="0.5">0.5×</option></select></label>
+    <label><input type="checkbox" id="loopRegion" checked> Loop region</label>
+    <label><input type="checkbox" id="click" checked> Click at markers</label>
+    <label>View <select id="view"><option value="spec">Spectrogram</option><option value="wave">Waveform</option></select></label>
+    <button id="zoomIn">Zoom +</button><button id="zoomOut">Zoom −</button><button id="zoomAll">Whole region</button>
+    <label><input type="checkbox" id="showTaps" checked> Draft taps lane</label>
+    <label><input type="checkbox" id="showCandidates"> Candidate lanes (comparison only)</label>
+    <label>Suggestion band <input type="number" id="bandLo" value="300" step="50" style="width:70px">–<input type="number" id="bandHi" value="3000" step="100" style="width:76px"> Hz</label>
+  </div>
+  <div class="grid">
+    <div class="card">
+      <canvas id="canvas" width="1400" height="560" aria-label="Region view with markers"></canvas>
+      <div class="legend muted" style="margin-top:6px">
+        <span><i class="dot" style="background:var(--pending)"></i>unreviewed</span><span><i class="dot" style="background:var(--accept)"></i>accepted</span>
+        <span><i class="dot" style="background:var(--uncertain)"></i>uncertain</span><span><i class="dot" style="background:var(--reject)"></i>rejected</span>
+        <span>● proposal ▲ draft tap ■ added by you · faint ▲ under the view = optional suggestion</span>
+      </div>
+      <p class="muted" style="margin:6px 0 0">Click to select or seek · drag a marker to move it · Shift-drag to select a range · wheel to zoom, Shift+wheel to pan.</p>
+    </div>
+    <div class="card">
+      <h3 style="margin:0 0 6px;font-size:15px">Selected marker</h3>
+      <table id="detail"><tr><td>None selected</td><td></td></tr></table>
+      <div class="bar" style="margin:8px 0 0;padding:6px">
+        <button id="accept">Accept (A)</button><button id="reject">Reject (R)</button><button id="uncertain">Uncertain (U)</button>
+        <label>Time <input type="number" id="timeEdit" step="0.001" style="width:96px"></label>
+        <button id="nudgeL">−5 ms</button><button id="nudgeR">+5 ms</button>
+      </div>
+      <h3 style="margin:12px 0 6px;font-size:15px">Lead region label</h3>
+      <div class="bar" style="margin:0;padding:6px">
+        <select id="lead"><option>Vocal</option><option>Synth/Electronic</option><option>Piano</option><option>Guitar</option><option>Other</option><option>Unknown</option><option>No Clear Lead</option></select>
+        <button id="setLead">Set from playhead</button>
+      </div>
+      <h3 style="margin:12px 0 6px;font-size:15px">Review progress</h3>
+      <table id="progress"></table>
+      <div class="bar" style="margin:8px 0 0;padding:6px">
+        <button id="snap">Snap my notes to onsets</button><button id="rejectRest">Reject the rest…</button><button id="reset">Reset region…</button>
+        <button id="batch">Accept selected range…</button><button id="undo">Undo</button><button id="redo">Redo</button>
+        <button class="primary" id="export">Export annotation</button>
+      </div>
+      <details style="margin-top:10px"><summary>Shortcuts</summary>
+        <p class="muted"><kbd>Space</kbd> play/pause · <kbd>A</kbd> accept · <kbd>R</kbd> reject · <kbd>U</kbd> uncertain · <kbd>N</kbd>/<kbd>→</kbd> next · <kbd>P</kbd>/<kbd>←</kbd> previous · <kbd>L</kbd> loop around marker · <kbd>M</kbd> tap along: confirms the detected onset just before your tap (or adds an uncertain note) · <kbd>Del</kbd> remove your note · <kbd>[</kbd>/<kbd>]</kbd> nudge 5 ms (Shift: 1 ms) · <kbd>Ctrl+Z</kbd>/<kbd>Ctrl+Y</kbd></p></details>
+    </div>
+  </div>
+</main>
+<script type="module" src="./editor.js"></script>
+</body>
+</html>
