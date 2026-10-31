@@ -9,6 +9,8 @@ export interface BeatMode {
   earlyDecisionAvailable?:boolean;
   compensationEligible?:boolean;
   hybridLiveAvailable?:boolean;
+  /** The Companion's causal Lead tracker is running for this capture. */
+  leadLive?:boolean;
   hybridMode?:'L0'|'H-SHADOW'|'H-LIVE';
   hybridFailure?:string|null;
 }

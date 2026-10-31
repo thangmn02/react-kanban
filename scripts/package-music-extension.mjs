@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile, rm, lstat } from 'node:fs/promises';
 import {prepareNativeCompanionDelay,assertNativeDelayGuide} from './native-companion-delay-package.mjs';
 import {prepareSourceAudioDelay,prepareHatProminence} from './source-audio-delay-package.mjs';
+import {prepareLiveLead,liveLeadFiles} from './live-lead-package.mjs';
 import { fileURLToPath } from 'node:url';
 import { join,resolve,relative,isAbsolute } from 'node:path';
 import { deflateSync } from 'node:zlib';
@@ -14,6 +15,8 @@ const sourceDelayCandidate=process.argv.includes('--source-audio-delay');
 // Owner A/B only: hat-only local prominence on top of the source-delay candidate.
 const hatProminenceCandidate=process.argv.includes('--hat-prominence');
 if(hatProminenceCandidate&&!sourceDelayCandidate)throw Error('Hat prominence is an owner A/B of the source-delay candidate.');
+const liveLeadCandidate=process.argv.includes('--live-lead');
+if(liveLeadCandidate&&!sourceDelayCandidate)throw Error('Live Lead is an owner evaluation of the source-delay candidate.');
 const hybridCandidate=process.argv.includes('--hybrid-live');
 if(hybridCandidate&&!privateCandidate)throw Error('Hybrid Live requires --private');
 const diagnosticCandidate=process.argv.includes('--diagnostic-capture');
@@ -125,6 +128,7 @@ names.push('companion-update.js', 'spotify-player.js');
 names.push('beat-mode.js','beat-candidate.js');
 names.push('delayed-audio-output.js');
 if(sourceDelayCandidate)names.push('source-delay-audio-output.js');
+if(liveLeadCandidate)names.push(...liveLeadFiles);
 names.push('semantic-precision-guards.js');
 names.push('percussion-label-contract.js','inference-resources.js','model-assets.js');
 if(privateCandidate)names.push('live-diagnostic-recorder.js');
@@ -230,6 +234,7 @@ if(hybridCandidate){
 }
 if(nativeDelayCandidate)files.push({name:'NATIVE-DELAY-PROVENANCE.json',bytes:Buffer.from(JSON.stringify(prepareNativeCompanionDelay(files),null,2))});
 if(hatProminenceCandidate){sourceDelayProof.hatProminence=prepareHatProminence(files);sourceDelayProof.files.push({name:'percussion-classifier.js'});}
+if(liveLeadCandidate){sourceDelayProof.liveLead=prepareLiveLead(files);for(const entry of sourceDelayProof.liveLead.files)if(!sourceDelayProof.files.some(file=>file.name===entry.name))sourceDelayProof.files.push({name:entry.name});}
 if(sourceDelayProof){
   for(const entry of sourceDelayProof.files)entry.outputSha256=createHash('sha256').update(files.find(file=>file.name===entry.name).bytes).digest('hex');
   files.push({name:'SOURCE-AUDIO-DELAY-PROVENANCE.json',bytes:Buffer.from(JSON.stringify(sourceDelayProof,null,2))});

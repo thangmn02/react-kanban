@@ -105,3 +105,10 @@ it.each([{playing:false,paused:true},{playing:false,paused:false},{playing:true,
   const f=facts();Object.assign(f.experiment,{live:true,latencyAccepted:true,bufferMs:0});Object.assign(f.clock,clock);
   expect(decideBeatMode(f,10000)).toMatchObject({livePreviewEligible:false,livePreviewReason:'not-playing',allowTypedPreview:false,bufferMs:0});
 });
+it('reports live Lead only for a private capture whose tracker is running, and parses it for Kora',()=>{
+  const running=decideBeatMode({...facts(),health:{leadLive:true}},10000);
+  expect(running.leadLive).toBe(true);expect(parseBeatMode(running).leadLive).toBe(true);
+  expect(decideBeatMode(facts(),10000).leadLive).toBe(false);
+  expect(decideBeatMode({...facts(),privateCandidate:false,health:{leadLive:true}},10000).leadLive).toBe(false);
+  expect(parseBeatMode({...running,leadLive:'yes'}).leadLive).toBe(false);
+});

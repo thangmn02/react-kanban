@@ -3,6 +3,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import {useMotionReduction} from './use-motion-reduction';
 import type {MotionProfile,MotionReduction} from './semantic-motion';
 import {motionPreviewAllowed} from './semantic-motion';
+import {liveLeadAvailable} from './live-lead';
 import { getMusicInstallUrl } from './mediaBridge';
 import ExperimentalBeatControl from './experimental-beat-control';
 import SourceAudioDelayControl from './source-audio-delay-control';
@@ -100,6 +101,7 @@ export function MusicGrid({ music, colorMode = 'random', palette = 'bloom', orie
     <Suspense fallback={<p>Loading private Melody comparison…</p>}><PrivateMelodyDemo /></Suspense>
   </div>;
   const capability=music.selected?.syncState?.capability;
+  const liveLead=liveLeadAvailable(capability,music.beat.mode,music.beta?.enabled);
   const previewStatus=(!isNativeWidget()||privateNativeDelay)&&!music.beta?.enabled&&capability?.privateCandidate
     ?capability.reason==='protected-source'?'Instrument flashes are unavailable for this protected source. Music playback controls still work.'
     :capability.reason==='provider-policy'?'Instrument flashes are unavailable for this provider under the private test policy. Music playback controls still work.'
@@ -108,7 +110,7 @@ export function MusicGrid({ music, colorMode = 'random', palette = 'bloom', orie
     :privateNativeDelay&&capability.compensationEligible?'Instrument preview is off. Open Music → Audio Delay Compensation, pause playback and enable your chosen delay. Seeking or changing the source resets it to OFF.'
     :capability.livePreviewEligible?'Instrument preview is off for this source. Open Music → Private candidate → Live preview to enable it. Pause, seek and source changes turn preview off.'
     :null:null;
-  const grid=<BeatPattern key={music.selected?.id} session={music.selected} beat={music.beat} colorMode={colorMode} palette={palette} orientation={orientation} semanticOnly={music.beta?.enabled?true:undefined} melodyEnabled={music.beta?.enabled&&music.beta.melody} independentRows={music.beta?.enabled} melodyEvents={music.beta?.enabled?music.beta.clip?.lead?.events:undefined}
+  const grid=<BeatPattern key={music.selected?.id} session={music.selected} beat={music.beat} colorMode={colorMode} palette={palette} orientation={orientation} semanticOnly={music.beta?.enabled?true:undefined} melodyEnabled={music.beta?.enabled?music.beta.melody:liveLead} independentRows={music.beta?.enabled} melodyEvents={music.beta?.enabled?music.beta.clip?.lead?.events:undefined}
     motionProfile={motionPreview&&!compareLegacy?motionProfile:'legacy'} motionReduced={reduced} motionActive={visualActive} lateLivePreview={lateLivePreview}/>;
   return <>
     {motionPreview&&<div className="music-motion-controls"><span>{t('dock.motion.preview')} · {compareLegacy?'Legacy':t(`dock.motion.${motionProfile}`)}</span>

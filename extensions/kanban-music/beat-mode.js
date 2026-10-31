@@ -60,6 +60,7 @@ export function decideBeatMode(facts={},now=Date.now()) {
     detectorRights:detector.privateUseAllowed===true}}:{}),
     version:1,privateCandidate:privateMode,earlyDecisionAvailable:privateMode&&detector.earlyDecisionAvailable===true,
     hybridLiveAvailable:privateMode&&detector.hybridLiveAvailable===true,
+    leadLive:privateMode&&facts.health?.leadLive===true,
     hybridMode:experiment.enabled&&['H-SHADOW','H-LIVE'].includes(experiment.detectorVariant)?experiment.detectorVariant:'L0',
     hybridFailure:typeof facts.health?.hybridFailure==='string'?facts.health.hybridFailure.slice(0,160):null,
     mode:'degraded',support:'experimental',reason:'detector-unqualified',bufferReason,
@@ -114,7 +115,7 @@ export function parseBeatMode(value) {
     detectorId:String(value.detectorId||'unavailable').slice(0,100),detectorVersion:String(value.detectorVersion||'unknown').slice(0,100)};
   result.hybridMode=['H-SHADOW','H-LIVE'].includes(value.hybridMode)?value.hybridMode:'L0';
   result.hybridFailure=typeof value.hybridFailure==='string'?value.hybridFailure.slice(0,160):null;
-  for(const key of ['privateCandidate','earlyDecisionAvailable','hybridLiveAvailable','outputOwned','singleSource','noVideo','noFrames','clockHealthy','captureHealthy','allowCapture','allowAnalysis','allowSemantic','allowTypedPreview','bufferEligible','compensationEligible','livePreviewEligible','physicalVerified'])
+  for(const key of ['privateCandidate','earlyDecisionAvailable','hybridLiveAvailable','leadLive','outputOwned','singleSource','noVideo','noFrames','clockHealthy','captureHealthy','allowCapture','allowAnalysis','allowSemantic','allowTypedPreview','bufferEligible','compensationEligible','livePreviewEligible','physicalVerified'])
     result[key]=value[key]===true;
   for(const key of ['bufferMs','requiredBufferMs','latencySamples','measuredP95Ms','measuredP99Ms','generation','droppedSemanticEvents'])
     result[key]=Number.isFinite(value[key])&&value[key]>=0?value[key]:key.startsWith('measured')?null:0;
