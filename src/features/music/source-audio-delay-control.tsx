@@ -1,38 +1,34 @@
 import {useState} from 'react';
-import Button from '../../components/atoms/Button';
 import type {SourceAudioDelayStatus} from './use-source-audio-delay';
+import {useEnhancedBeatSyncPreference} from './use-source-audio-delay';
 import type {BrowserMusicController} from './useBrowserMusic';
 
-const STATUS:Record<SourceAudioDelayStatus,string>={off:'Off',preparing:'Preparing',active:'Active','turning-off':'Turning off',error:'Error'};
+const STATUS:Record<SourceAudioDelayStatus,string>={off:'Off',preparing:'Preparing',on:'On',unavailable:'Unavailable',error:'Error'};
 
+/** Compact Music-tab status. The setting itself lives in dock settings; this line appears only while it is on or failing. */
 export default function SourceAudioDelayControl({music}:{music:BrowserMusicController}){
-  const [consentOwner,setConsentOwner]=useState('');
-  const route=music.sourceAudioDelay,session=music.selected;
-  if(!route||!session&&!route.enabled)return null;
-  const consent=consentOwner===route.owner;
-  // OFF stays reachable while preparing, active, failing or still turning off.
-  const on=route.enabled||route.status==='preparing'||route.status==='turning-off';
-  const mode=session?.syncState?.capability;
-  const hint=route.status==='preparing'&&route.enabled
-    ?!session?.syncState?.captureId?'Play the song, then click the Kora Music Companion icon in the browser toolbar on that tab so it can take over the sound.'
-      :mode&&!mode.compensationEligible?'Not eligible yet: a visible video keeps its normal timing. Switch the browser to another tab, or use audio-only music.'
-      :session.paused?'Applying the delay…':'Pause to apply the delay.'
-    :route.status==='active'?`Sound plays ${route.delayMs} ms later. Turning off may skip a moment of audio.`:undefined;
-  return <section className="muted" aria-label="Enhanced Beat Sync">
-    <h2>Enhanced Beat Sync</h2>
-    <p>Audio may play slightly later to match Beat Grid.</p>
-    <p role="status" aria-label="Enhanced Beat Sync status">{STATUS[route.status]}{route.transitioning?' — restoring the previous song’s sound.':''}</p>
-    {hint&&<p>{hint}</p>}
-    {!on&&<>
-      {!route.supported&&<p>Not available for this source. Playback controls still work.</p>}
-      {route.supported&&<label><input type="checkbox" checked={consent} onChange={event=>setConsentOwner(event.target.checked?route.owner:'')}/>
-        I may analyze this song, and accept that its sound plays about {route.delayMs} ms later.</label>}
-      {route.supported&&!session?.paused&&<p>Pause the song to turn this on.</p>}
-      <Button text="Turn on Enhanced Beat Sync" variant="outline"
-        disabled={!route.supported||!session?.paused||!consent} onClick={()=>void route.setEnabled(true)}/>
-    </>}
-    {on&&<Button text={route.status==='turning-off'?'Turning off…':'Turn off'} variant="outline"
-      disabled={route.status==='turning-off'} onClick={()=>void route.setEnabled(false)}/>}
-    {route.error&&<p role="alert">{route.error}</p>}
+  const route=music.sourceAudioDelay;
+  if(!route||!route.preferred&&!route.error&&route.status==='off')return null;
+  return <section className="music-sync-status muted" aria-label="Enhanced Beat Sync">
+    <p><span>Enhanced Beat Sync</span> · <span role="status" aria-label="Enhanced Beat Sync status">{STATUS[route.status]}</span></p>
+    {route.error?<p role="alert">{route.error}</p>:route.hint&&<p>{route.hint}</p>}
   </section>;
+}
+
+/** Dock setting: one approval, remembered until turned off. */
+export function EnhancedBeatSyncSetting(){
+  const preference=useEnhancedBeatSyncPreference();
+  const [confirming,setConfirming]=useState(false);
+  if(!preference.available)return null;
+  return <fieldset className="dock-sync-setting">
+    <legend>Enhanced Beat Sync</legend>
+    <label><input type="checkbox" checked={preference.enabled||confirming}
+      onChange={event=>{if(event.target.checked)setConfirming(true);else{setConfirming(false);preference.setEnabled(false);}}}/> Line the Beat Grid up with the beat</label>
+    {confirming&&!preference.enabled?<div role="group" aria-label="Turn on Enhanced Beat Sync">
+      <p className="muted">Supported music will play about 0.17 s later, so drum flashes land on the beat.
+        Kora pauses a playing song for a moment to switch it on. You can turn it off at any time.</p>
+      <button type="button" onClick={()=>{preference.setEnabled(true);setConfirming(false);}}>Turn on</button>{' '}
+      <button type="button" onClick={()=>setConfirming(false)}>Cancel</button>
+    </div>:<p className="muted">{preference.enabled?'On for supported music sources.':'Off. Music plays without delay.'}</p>}
+  </fieldset>;
 }

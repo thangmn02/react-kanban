@@ -44,15 +44,18 @@ it('stops the previous Windows owner and keeps private Companion capture exclusi
   expect(invoke).toHaveBeenLastCalledWith('native_music_request',expect.objectContaining({action:'beat.experimental.configure',configuration,companionCapture:true}));
 });
 
-it('requires the optional build gate and the selected exact release-candidate peer',async()=>{
+it('requires the build gate and a verified delay-capable Companion on the selected tab',async()=>{
   await expect(prepareNativeSourceAudioDelay('candidate:song')).rejects.toThrow('unavailable');
   vi.stubEnv('VITE_ENABLE_SOURCE_AUDIO_DELAY','true');
-  for(const peer of [{peerId:'candidate',version:'0.3.28',verified:true},{peerId:'foreign',version:'0.3.29',verified:true},{peerId:'candidate',version:'0.3.29',verified:false}]){
+  for(const peer of [{peerId:'candidate',version:'0.3.28',verified:true},{peerId:'candidate',version:'0.3.30',verified:true},{peerId:'foreign',version:'0.3.31',verified:true},{peerId:'candidate',version:'0.3.31',verified:false}]){
     vi.mocked(invoke).mockResolvedValue({ok:true,companions:[peer]});
-    await expect(prepareNativeSourceAudioDelay('candidate:song')).rejects.toThrow('0.3.29');
+    await expect(prepareNativeSourceAudioDelay('candidate:song')).rejects.toThrow('0.3.31 or newer');
   }
-  vi.mocked(invoke).mockResolvedValue({ok:true,companions:[{peerId:'candidate',version:'0.3.29',verified:true}]});
-  await expect(prepareNativeSourceAudioDelay('candidate:song')).resolves.toBeUndefined();
+  for(const version of ['0.3.29','0.3.31','0.4.0']){
+    vi.mocked(invoke).mockResolvedValue({ok:true,companions:[{peerId:'candidate',version,verified:true}]});
+    await expect(prepareNativeSourceAudioDelay('candidate:song')).resolves.toBeUndefined();
+    await stopNativeSourceAudioDelay('candidate:song');
+  }
 });
 
 it('keeps Windows capture as the default and sends exclusive source capture only after explicit opt-in',async()=>{

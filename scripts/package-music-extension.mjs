@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile, rm, lstat } from 'node:fs/promises';
 import {prepareNativeCompanionDelay,assertNativeDelayGuide} from './native-companion-delay-package.mjs';
+import {prepareEnhancedBeatSync} from './enhanced-beat-sync-package.mjs';
 import {prepareSourceAudioDelay,prepareHatProminence} from './source-audio-delay-package.mjs';
 import {prepareLiveLead,liveLeadFiles,contourLeadFiles} from './live-lead-package.mjs';
 import { fileURLToPath } from 'node:url';
@@ -12,6 +13,9 @@ const extension = join(root, 'extensions', 'kanban-music');
 const privateCandidate = process.argv.includes('--private');
 const nativeDelayCandidate=process.argv.includes('--native-delay');
 const sourceDelayCandidate=process.argv.includes('--source-audio-delay');
+// The public Companion with Enhanced Beat Sync; it writes the public download and the bundled Windows copy.
+const enhancedBeatSync=process.argv.includes('--enhanced-beat-sync');
+if(enhancedBeatSync&&(privateCandidate||sourceDelayCandidate||process.argv.some(arg=>arg.startsWith('--')&&arg!=='--enhanced-beat-sync')))throw Error('--enhanced-beat-sync builds only the public Companion.');
 // Owner A/B only: hat-only local prominence on top of the source-delay candidate.
 const hatProminenceCandidate=process.argv.includes('--hat-prominence');
 if(hatProminenceCandidate&&!sourceDelayCandidate)throw Error('Hat prominence is an owner A/B of the source-delay candidate.');
@@ -128,7 +132,7 @@ const names = ['manifest.json', 'background.js', 'widget-bridge.js', 'sites.js',
 names.push('companion-update.js', 'spotify-player.js');
 names.push('beat-mode.js','beat-candidate.js');
 names.push('delayed-audio-output.js');
-if(sourceDelayCandidate)names.push('source-delay-audio-output.js');
+if(sourceDelayCandidate||enhancedBeatSync)names.push('source-delay-audio-output.js');
 if(liveLeadCandidate)names.push(...liveLeadFiles,...(liveLeadVariant==='contour'?contourLeadFiles:[]));
 names.push('semantic-precision-guards.js');
 names.push('percussion-label-contract.js','inference-resources.js','model-assets.js');
@@ -139,7 +143,8 @@ function replaceExactlyOnce(source, before, after) {
   if (source.split(before).length !== 2) throw new Error(`Expected one package sentinel: ${before}`);
   return source.replace(before, after);
 }
-const sourceDelayProof=sourceDelayCandidate?prepareSourceAudioDelay(files):undefined;
+const sourceDelayProof=sourceDelayCandidate||enhancedBeatSync?prepareSourceAudioDelay(files):undefined;
+if(enhancedBeatSync)sourceDelayProof.enhancedBeatSync=prepareEnhancedBeatSync(files);
 if(!privateCandidate){
   const offscreen=files.find(file=>file.name==='offscreen.js');
   let source=replaceExactlyOnce(offscreen.bytes.toString().replaceAll('\r\n','\n'),"import {LiveDiagnosticRecorder} from './live-diagnostic-recorder.js';\n",'');

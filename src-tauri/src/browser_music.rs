@@ -378,7 +378,7 @@ pub async fn native_music_request(
     let source_delay = source_audio_delay == Some(true) && native_delay_preview::source_delay_allowed(option_env!("KORA_ENABLE_SOURCE_AUDIO_DELAY"), &music.app.config().identifier);
     if source_audio_delay == Some(true) && !source_delay { return Err("Optional source audio delay is unavailable".into()); }
     if companion_capture == Some(true) && !(private_delay || source_delay) { return Err("Companion capture is unavailable".into()); }
-    let required_version = if source_delay { "0.3.29" } else { "0.3.28" };
+    let required_version = if source_delay { "0.3.31" } else { "0.3.28" };
     let delay_configuration = if action == "beat.experimental.configure" {
         if !(private_delay || source_delay) || companion_capture != Some(true) { return Err("Source delay configuration is unavailable".into()); }
         Some(native_delay_preview::configuration(configuration.ok_or("Missing private delay configuration")?)?)
@@ -402,7 +402,7 @@ pub async fn native_music_request(
         if companion_capture == Some(true) {
             let statuses = join_all(peers.iter().map(|peer| music.ask(peer, json!({"action":"companion.status"})))).await;
             peers = peers.into_iter().zip(statuses).filter_map(|(peer, status)|
-                status.ok().filter(|status| status["ok"] == true && status["version"] == required_version).map(|_|peer)).collect();
+                status.ok().filter(|status| status["ok"] == true && status["version"].as_str().is_some_and(|version| companion_supports(version, source_delay))).map(|_|peer)).collect();
         }
         if peers.is_empty() {
             return Ok(json!({"ok":false,"error":"not-installed"}));
@@ -461,7 +461,7 @@ pub async fn native_music_request(
     let (peer, session) = session.split_once(':').ok_or("Invalid session")?;
     if companion_capture == Some(true) && action != "dock.beat.sync.stop" {
         let status = music.ask(peer, json!({"action":"companion.status"})).await?;
-        if status["ok"] != true || status["version"] != required_version { return Err(format!("Companion {required_version} is required for this source delay route")); }
+        if status["ok"] != true || !status["version"].as_str().is_some_and(|version| companion_supports(version, source_delay)) { return Err(format!("Companion {required_version} or newer is required for this source delay route")); }
     }
     if action.starts_with("dock.")
         && !subscription_id
@@ -558,5 +558,24 @@ mod tests {
             .body(())
             .unwrap();
         assert!(handshake(&invalid, Response::new(())).is_err());
+    }
+}
+
+/// Enhanced Beat Sync needs the 0.3.29 evaluation Companion or a public Companion from 0.3.31 (0.3.30 has no delay);
+/// the private native-capture preview stays pinned to its exact 0.3.28 build.
+pub(crate) fn companion_supports(version: &str, source_delay: bool) -> bool {
+    if !source_delay { return version == "0.3.28"; }
+    version == "0.3.29" || crate::companion_setup::version_parts(version).is_some_and(|parts| Some(parts) >= crate::companion_setup::version_parts("0.3.31"))
+}
+
+#[cfg(test)]
+mod companion_support_tests {
+    use super::companion_supports;
+    #[test]
+    fn source_delay_accepts_the_evaluation_build_and_public_releases_from_0_3_31() {
+        for version in ["0.3.29", "0.3.31", "0.3.40", "0.4.0"] { assert!(companion_supports(version, true), "{version}"); }
+        for version in ["0.3.24", "0.3.28", "0.3.30", "not-a-version"] { assert!(!companion_supports(version, true), "{version}"); }
+        assert!(companion_supports("0.3.28", false));
+        assert!(!companion_supports("0.3.31", false));
     }
 }

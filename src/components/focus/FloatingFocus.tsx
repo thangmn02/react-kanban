@@ -6,6 +6,7 @@ import { formatPomodoroTime } from '../../utils/pomodoroTime';
 import { useI18n } from '../../i18n';
 import { MusicFeedback, MusicGrid, MusicSetup, MusicTrack, MusicNowPlaying } from '../../features/music/MusicPlayer';
 import { useBrowserMusic } from '../../features/music/useBrowserMusic';
+import { EnhancedBeatSyncSetting } from '../../features/music/source-audio-delay-control';
 import { useDockPreferences, beatPalettes } from './useDockPreferences';
 
 export interface FloatingFocusProps {
@@ -144,6 +145,7 @@ export default function FloatingFocus(props: FloatingFocusProps) {
                 <option value="system">{t('dock.motion.system')}</option><option value="reduced">{t('dock.motion.reduced')}</option>
               </select></label>
             </>
+            <EnhancedBeatSyncSetting />
             {props.onMusicSetup && <button type="button" disabled={props.musicSetupPending} onClick={props.onMusicSetup}>
               {t(props.musicSetupPending ? 'music.companionUpdating' : 'music.installCompanion')}</button>}
             {props.musicSetupMessage && <p role="status" className="muted" style={{ overflowWrap: 'anywhere' }}>{props.musicSetupMessage}</p>}

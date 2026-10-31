@@ -101,11 +101,17 @@ async function performNativeMusicRequest(action:string,sessionId?:string,subscri
     return response;
   } finally { release?.(); }
 }
+/** Mirrors the native gate: the 0.3.29 evaluation build, or a public Companion from 0.3.31 (0.3.30 has no delay). */
+export function companionSupportsSourceDelay(version:string){
+  if(version==='0.3.29')return true;
+  const parts=version.split('.').map(Number);if(parts.length!==3||parts.some(part=>!Number.isInteger(part)||part<0))return false;
+  return parts[0]>0||parts[1]>3||parts[1]===3&&parts[2]>=31;
+}
 export async function prepareNativeSourceAudioDelay(sessionId:string){
   if(!nativeSourceAudioDelayEnabled())throw Error('Optional source audio delay is unavailable.');
   const response=await requestNativeMusic('companion.status');
   const companions=response.companions as {peerId:string;version:string;verified:boolean}[]|undefined;
-  if(!companions?.some(peer=>peer.peerId===sessionId.split(':')[0]&&peer.verified&&peer.version==='0.3.29'))throw Error('This source needs the separate Companion 0.3.29 release candidate. Your installed extensions have not been changed.');
+  if(!companions?.some(peer=>peer.peerId===sessionId.split(':')[0]&&peer.verified&&companionSupportsSourceDelay(peer.version)))throw Error('Enhanced Beat Sync needs Music Companion 0.3.31 or newer. Use Install or update Companion, then reload it in your browser.');
   if([...sourceIntents].some(([key,intent])=>key!==sourceKey(sessionId)&&intent.enabled))throw Error('Stop the previous source audio route before preparing another.');
   sourceIntents.set(sourceKey(sessionId),{epoch:++sourceIntentEpoch,enabled:true});
 }

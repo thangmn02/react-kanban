@@ -1,46 +1,38 @@
 import {cleanup,fireEvent,render,screen} from '@testing-library/react';
-import {afterEach,expect,it,vi} from 'vitest';
-import SourceAudioDelayControl from './source-audio-delay-control';
+import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 import type {BrowserMusicController} from './useBrowserMusic';
 
+vi.mock('../native/runtime',()=>({nativeSourceAudioDelayEnabled:()=>true}));
+const {default:SourceAudioDelayControl,EnhancedBeatSyncSetting}=await import('./source-audio-delay-control');
+const {readEnhancedBeatSyncPreference}=await import('./use-source-audio-delay');
+
+beforeEach(()=>localStorage.clear());
 afterEach(cleanup);
-function controller(patch:Record<string,unknown>={},session:Record<string,unknown>={}){
- return {selected:{id:'source',title:'Song',source:'www.youtube.com',paused:true,...session},refresh:vi.fn(),
-  sourceAudioDelay:{owner:'source:1',enabled:false,status:'off',delayMs:170,supported:true,busy:false,error:'',transitioning:false,setEnabled:vi.fn(),...patch}} as unknown as BrowserMusicController;
+function controller(patch:Record<string,unknown>={}){
+ return {selected:{id:'source',title:'Song',source:'music.youtube.com',paused:false},refresh:vi.fn(),
+  sourceAudioDelay:{owner:'source',enabled:false,preferred:false,status:'off',delayMs:170,supported:true,busy:false,error:'',setPreferred:vi.fn(),...patch}} as unknown as BrowserMusicController;
 }
-it('defaults Off, explains the consequence and needs explicit consent while paused',()=>{
- const music=controller();render(<SourceAudioDelayControl music={music}/>);
- expect(screen.getByRole('status',{name:'Enhanced Beat Sync status'})).toHaveTextContent('Off');
- expect(screen.getByText('Audio may play slightly later to match Beat Grid.')).toBeVisible();
- const on=screen.getByRole('button',{name:'Turn on Enhanced Beat Sync'});expect(on).toBeDisabled();
- fireEvent.click(screen.getByRole('checkbox'));fireEvent.click(on);expect(music.sourceAudioDelay!.setEnabled).toHaveBeenCalledWith(true);
+it('stays out of the Music tab while Off',()=>{
+ render(<SourceAudioDelayControl music={controller()}/>);expect(screen.queryByRole('region',{name:'Enhanced Beat Sync'})).not.toBeInTheDocument();
 });
-it('cannot turn on while playing or for an unsupported source',()=>{
- render(<SourceAudioDelayControl music={controller({},{paused:false})}/>);fireEvent.click(screen.getByRole('checkbox'));
- expect(screen.getByRole('button',{name:'Turn on Enhanced Beat Sync'})).toBeDisabled();cleanup();
- render(<SourceAudioDelayControl music={controller({supported:false})}/>);
- expect(screen.getByText(/Playback controls still work/)).toBeVisible();expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+it('shows one compact status with a short hint, and no research or delay controls',()=>{
+ render(<SourceAudioDelayControl music={controller({preferred:true,enabled:true,status:'preparing',hint:'Click the Kora Music Companion icon on the music tab once so it can take over the sound.'})}/>);
+ expect(screen.getByRole('status',{name:'Enhanced Beat Sync status'})).toHaveTextContent('Preparing');
+ expect(screen.getByText(/Click the Kora Music Companion icon/)).toBeVisible();
+ expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();expect(screen.queryByText(/170 ms|capture|buffer|candidate/i)).not.toBeInTheDocument();
+ cleanup();render(<SourceAudioDelayControl music={controller({preferred:true,enabled:true,status:'on'})}/>);
+ expect(screen.getByRole('status',{name:'Enhanced Beat Sync status'})).toHaveTextContent('On');
 });
-it('offers OFF during preparation and playback without another consent',()=>{
- for(const patch of [{status:'preparing',busy:true},{enabled:true,status:'active'}]){
-  const music=controller(patch,{paused:false});render(<SourceAudioDelayControl music={music}/>);
-  expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:'Turn off'}));
-  expect(music.sourceAudioDelay!.setEnabled).toHaveBeenCalledWith(false);cleanup();
- }
+it('shows an error even after the setting is turned off',()=>{
+ render(<SourceAudioDelayControl music={controller({status:'error',error:'Turning off is not confirmed.'})}/>);
+ expect(screen.getByRole('alert')).toHaveTextContent('not confirmed');
 });
-it('keeps a failed OFF visible with a retry',()=>{
- const music=controller({enabled:true,status:'error',error:'Turning off is not confirmed.'});render(<SourceAudioDelayControl music={music}/>);
- expect(screen.getByRole('status',{name:'Enhanced Beat Sync status'})).toHaveTextContent('Error');
- expect(screen.getByRole('alert')).toHaveTextContent('not confirmed');expect(screen.getByRole('button',{name:'Turn off'})).toBeEnabled();
-});
-it('requires fresh consent when the source changes',()=>{
- const view=render(<SourceAudioDelayControl music={controller()}/>);fireEvent.click(screen.getByRole('checkbox'));
- view.rerender(<SourceAudioDelayControl music={controller({owner:'another-source:2'})}/>);
- expect(screen.getByRole('checkbox')).not.toBeChecked();
-});
-it('keeps the previous source turning off visible after discovery loses the selection',()=>{
- const music=controller({enabled:true,status:'turning-off',transitioning:true});music.selected=undefined;
- render(<SourceAudioDelayControl music={music}/>);
- expect(screen.getByRole('status',{name:'Enhanced Beat Sync status'})).toHaveTextContent('Turning off — restoring');
- expect(screen.getByRole('button',{name:'Turning off…'})).toBeDisabled();
+it('asks once before turning on, remembers the approval and turns off immediately',()=>{
+ render(<EnhancedBeatSyncSetting/>);
+ const toggle=screen.getByRole('checkbox',{name:/Line the Beat Grid up/});expect(toggle).not.toBeChecked();
+ fireEvent.click(toggle);expect(screen.getByText(/about 0.17 s later/)).toBeVisible();expect(readEnhancedBeatSyncPreference()).toBeUndefined();
+ fireEvent.click(screen.getByRole('button',{name:'Cancel'}));expect(readEnhancedBeatSyncPreference()).toBeUndefined();
+ fireEvent.click(toggle);fireEvent.click(screen.getByRole('button',{name:'Turn on'}));
+ expect(readEnhancedBeatSyncPreference()).toMatchObject({approvedDelayMs:170});expect(screen.getByRole('checkbox',{name:/Line the Beat Grid up/})).toBeChecked();
+ fireEvent.click(screen.getByRole('checkbox',{name:/Line the Beat Grid up/}));expect(readEnhancedBeatSyncPreference()).toBeUndefined();
 });

@@ -79,7 +79,9 @@ export function MusicGrid({ music, colorMode = 'random', palette = 'bloom', orie
   const compareLegacy=legacy&&!reduced;
   const privateNativeDelay=nativeCompanionPreviewEnabled()||music.sourceAudioDelay?.enabled===true;
   // The Kinetic grid is the release presentation; the preview flag only adds developer comparison and late-live controls.
-  const motionPreview=import.meta.env.VITE_ENABLE_BEAT_GRID_PREVIEW==='true'||motionPreviewAllowed(music.selected?.syncState?.capability?.privateCandidate===true);
+  // Enhanced Beat Sync reports the same capability as research candidates; it is a release feature, so never show research controls for it.
+  const researchCapability=music.selected?.syncState?.capability?.privateCandidate===true&&!music.sourceAudioDelay;
+  const motionPreview=import.meta.env.VITE_ENABLE_BEAT_GRID_PREVIEW==='true'||motionPreviewAllowed(researchCapability);
   const lateLivePreview=motionPreview&&!privateNativeDelay&&!compareLegacy&&!music.beta?.enabled&&Boolean(music.selected?.id)&&latePreview.owner===previewOwner&&latePreview.enabled;
   const showDebug = import.meta.env.DEV && new URLSearchParams(window.location.search).has('musicDebug');
   const [demo,setDemo]=useState(() => new URLSearchParams(window.location.search).get('musicDemo') === 'lead');
@@ -103,7 +105,7 @@ export function MusicGrid({ music, colorMode = 'random', palette = 'bloom', orie
   </div>;
   const capability=music.selected?.syncState?.capability;
   const liveLead=liveLeadAvailable(capability,music.beat.mode,music.beta?.enabled);
-  const previewStatus=(!isNativeWidget()||privateNativeDelay)&&!music.beta?.enabled&&capability?.privateCandidate
+  const previewStatus=researchCapability&&(!isNativeWidget()||privateNativeDelay)&&!music.beta?.enabled&&capability?.privateCandidate
     ?capability.reason==='protected-source'?'Instrument flashes are unavailable for this protected source. Music playback controls still work.'
     :capability.reason==='provider-policy'?'Instrument flashes are unavailable for this provider under the private test policy. Music playback controls still work.'
     :privateNativeDelay&&capability.bufferMs>0?`Intentional audio delay: ${capability.bufferMs} ms. Instrument predictions and physical synchronization are unverified.`
