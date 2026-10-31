@@ -64,6 +64,24 @@ async function collect(directory){
   }
 }
 await collect(dist);
+// API deploys do not read netlify.toml; publish its redirects and headers as _redirects/_headers so SPA routes,
+// function routes and download caching match a CLI deploy.
+export function netlifyRules(toml){
+  const blocks=[];let current;
+  for(const raw of toml.split(/\r?\n/)){const line=raw.trim();if(!line||line.startsWith('#'))continue;
+    if(line==='[[redirects]]'||line==='[[headers]]'){current={kind:line.slice(2,-2),values:{}};blocks.push(current);continue;}
+    if(line.startsWith('[')){current=line==='[headers.values]'&&current?.kind==='headers'?current:undefined;continue;}
+    const match=current&&line.match(/^([A-Za-z-]+)\s*=\s*(?:"([^"]*)"|(\S+))$/);if(match)current.values[match[1]]=match[2]??match[3];}
+  const redirects=blocks.filter(b=>b.kind==='redirects').map(({values:v})=>{assert.ok(v.from&&v.to&&v.status,'Unsupported redirect rule.');return `${v.from} ${v.to} ${v.status}${v.force==='true'?'!':''}`;});
+  const headers=blocks.filter(b=>b.kind==='headers').map(({values:{for:path,...rest}})=>{assert.ok(path,'Unsupported header rule.');return [path,...Object.entries(rest).map(([key,value])=>`  ${key}: ${value}`)].join('\n');});
+  return {redirects:redirects.join('\n')+'\n',headers:headers.join('\n')+'\n'};
+}
+const rules=netlifyRules(await readFile('netlify.toml','utf8'));
+assert.ok(rules.redirects.includes('/* /index.html 200\n')&&rules.redirects.includes('/api/note-images /.netlify/functions/note-images 200!'),'Routing rules are incomplete.');
+for(const[path,text]of [['/_redirects',rules.redirects],['/_headers',rules.headers]]){
+  assert.ok(!files[path],`${path} already exists in dist.`);const bytes=Buffer.from(text),sha=hash(bytes,'sha1');
+  files[path]=sha;bytesBySha.set(sha,{path,bytes});inventory.push({path,sha256:hash(bytes),size:bytes.length});
+}
 assert.ok(files['/index.html']&&files['/downloads/Kora-setup.exe']&&files['/downloads/latest.json'],'Build the web release after staging the installer and feed.');
 const feed=JSON.parse(bytesBySha.get(files['/downloads/latest.json']).bytes);
 const {version}=JSON.parse(await readFile('src-tauri/tauri.conf.json','utf8'));assert.equal(feed.version,version,'The updater feed must announce this release.');
