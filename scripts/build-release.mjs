@@ -1,8 +1,9 @@
 /** Build the public Kora release (web or signed Windows) from committed source with production public settings.
  *  Only browser-safe values (Supabase URL/publishable key, Turnstile site key) are read; nothing is printed. */
 import assert from 'node:assert/strict';
-import {readFile} from 'node:fs/promises';
+import {readFile,writeFile,rm,cp,mkdtemp} from 'node:fs/promises';
 import {join} from 'node:path';
+import {tmpdir} from 'node:os';
 import {parseEnv} from 'node:util';
 import {execFileSync,spawnSync} from 'node:child_process';
 
@@ -24,6 +25,23 @@ const env={...process.env,
   VITE_PRIVATE_LOCAL_HYBRID:'false',VITE_PRIVATE_BEAT_CANDIDATE:'false',VITE_OWNER_PREVIEW_LOOPBACK:'false',VITE_ENABLE_DESIGN_LAB:'false',
   ...(target==='windows'?{VITE_NOTE_IMAGES_URL:'https://koraspace.online/api/note-images'}:{VITE_NOTE_IMAGES_URL:''})};
 for(const name of ['KORA_OWNER_PREVIEW_LOOPBACK','GEMINI_API_KEY','SUPABASE_SERVICE_ROLE_KEY'])delete env[name];
-const command=target==='web'?['npm',['run','build']]:['npx',['tauri','build']];
+// The installer bundles the public Companion that Kora installs on request. Bundle an explicitly supplied, already
+// published package instead of regenerating the branch's unreleased Companion.
+const companion=process.argv.find(value=>value.startsWith('--companion-bundle='))?.slice(19);
+let tauriArgs=['tauri','build'];
+if(target==='windows'){
+  assert.ok(companion,'Supply --companion-bundle with the published Companion package the installer should carry.');
+  const files=JSON.parse(await readFile(join(companion,'package-files.json'),'utf8'));
+  assert.ok(Array.isArray(files)&&files.includes('extension/manifest.json'));
+  const {version}=JSON.parse(await readFile(join(companion,'extension/manifest.json'),'utf8'));
+  assert.match(version,/^\d+\.\d+\.\d+$/);
+  const generated=join('src-tauri','generated','music-companion');
+  await rm(generated,{recursive:true,force:true});await cp(companion,generated,{recursive:true,errorOnExist:true});
+  const override=join(await mkdtemp(join(tmpdir(),'kora-release-')),'tauri.release.json');
+  await writeFile(override,JSON.stringify({build:{beforeBuildCommand:'npx tsc -b && npx vite build'}}));
+  tauriArgs=[...tauriArgs,'--config',override];
+  console.log(`Bundling published Companion ${version}.`);
+}
+const command=target==='web'?['npm',['run','build']]:['npx',tauriArgs];
 const result=spawnSync(command[0],command[1],{env,stdio:'inherit',shell:true});
 process.exit(result.status??1);
