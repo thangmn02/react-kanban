@@ -6,8 +6,7 @@ import { formatPomodoroTime } from '../../utils/pomodoroTime';
 import { useI18n } from '../../i18n';
 import { MusicFeedback, MusicGrid, MusicSetup, MusicTrack, MusicNowPlaying } from '../../features/music/MusicPlayer';
 import { useBrowserMusic } from '../../features/music/useBrowserMusic';
-import { useDockPreferences, beatColorModes, beatPalettes } from './useDockPreferences';
-import {motionPreviewAllowed} from '../../features/music/semantic-motion';
+import { useDockPreferences, beatPalettes } from './useDockPreferences';
 
 export interface FloatingFocusProps {
   initialTab?: 'focus' | 'beat' | 'music';
@@ -134,18 +133,17 @@ export default function FloatingFocus(props: FloatingFocusProps) {
               </label>)}
               {timerState.startedAt !== null && <p className="muted">{t('focus.timer.settingsApplyNext')}</p>}
             </fieldset>}
-            <label>{t('dock.colors')}<select value={preferences.colorMode} onChange={(event) => preferences.setColorMode(event.target.value as typeof preferences.colorMode)}>
-              {beatColorModes.map((value) => <option key={value} value={value}>{t(`dock.colors.${value}`)}</option>)}</select></label>
+            {/* The Kinetic grid owns its per-instrument colours, so the legacy colour-mode choice is no longer offered. */}
             <label>{t('dock.palette')}<select value={preferences.palette} onChange={(event) => preferences.setPalette(event.target.value as typeof preferences.palette)}>
               {beatPalettes.map((value) => <option key={value} value={value}>{t(`dock.palette.${value}`)}</option>)}</select></label>
-            {motionPreviewAllowed(music.selected?.syncState?.capability?.privateCandidate===true)&&<>
+            <>
               <label>{t('dock.visualStyle')}<select value={preferences.motionProfile} onChange={event=>preferences.setMotionProfile(event.target.value as typeof preferences.motionProfile)}>
                 <option value="focus">{t('dock.motion.focus')}</option><option value="dynamic">{t('dock.motion.dynamic')}</option>
               </select></label>
               <label>{t('dock.motionReduction')}<select value={preferences.motionReduction} onChange={event=>preferences.setMotionReduction(event.target.value as typeof preferences.motionReduction)}>
                 <option value="system">{t('dock.motion.system')}</option><option value="reduced">{t('dock.motion.reduced')}</option>
               </select></label>
-            </>}
+            </>
             {props.onMusicSetup && <button type="button" disabled={props.musicSetupPending} onClick={props.onMusicSetup}>
               {t(props.musicSetupPending ? 'music.companionUpdating' : 'music.installCompanion')}</button>}
             {props.musicSetupMessage && <p role="status" className="muted" style={{ overflowWrap: 'anywhere' }}>{props.musicSetupMessage}</p>}

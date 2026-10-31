@@ -122,22 +122,42 @@ it('guides users to update an old site-blocking companion without inventing beat
   expect(screen.queryByLabelText('Beat sync debug')).not.toBeInTheDocument();
 });
 
-it.each(['www.youtube.com', 'music.youtube.com', 'soundcloud.com', 'open.spotify.com', 'music.apple.com', 'www.deezer.com', 'listen.tidal.com'])('lights %s squares only on confirmed onsets and returns them to gray when capture is silent', async (source) => {
-  vi.mocked(sendMusicRequest).mockResolvedValue([{ ...session, source, playing: true }]);
-  const view = renderPlayer();
-  await screen.findByRole('heading', { name: session.title });
-  fireEvent.click(screen.getByRole('tab',{name:'Beat grid'}));
-  await act(async () => {});
-  expect(view.container.querySelectorAll('.beat-square.onset')).toHaveLength(0);
-  act(() => beatReceiver.receive?.({ kind: 'sync.state', mode: 'capture', captureId: 'spotify-live' }));
-  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
-  act(() => beatReceiver.receive?.({ kind: 'onset', captureId: 'spotify-live', sequence: 1, bands: ['kick'] }));
-  await waitFor(() => expect(view.container.querySelector('[data-channel="drum"] .beat-square.onset')).not.toBeNull());
-  expect(view.container.querySelectorAll('.channel-icon.lit')).toHaveLength(0);
-  act(() => beatReceiver.receive?.({ kind: 'sync.state', mode: 'clock', reason: 'silent' }));
-  expect(screen.getByText('Live beats unavailable for this track.')).toBeVisible();
-  expect(view.container.querySelectorAll('.beat-square.onset')).toHaveLength(0);
-  expect(screen.getByRole('button', { name: 'Pause music' })).toBeEnabled();
+it('presents the release Kinetic grid with four rows and no developer comparison controls', async () => {
+  vi.mocked(sendMusicRequest).mockResolvedValue([{ ...session, playing: true }]);
+  const view = renderPlayer(); await screen.findByRole('heading', { name: session.title });
+  fireEvent.click(screen.getByRole('tab', { name: 'Beat grid' }));
+  expect(view.container.querySelector('.semantic-motion')).not.toBeNull();
+  expect(view.container.querySelectorAll('[data-motion-band]')).toHaveLength(4);
+  expect(view.container.querySelector('[data-motion-band="melody"]')).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Compare legacy animation' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Enable late-live drum preview' })).not.toBeInTheDocument();
+});
+
+it.each(['www.youtube.com', 'music.youtube.com', 'soundcloud.com', 'open.spotify.com', 'music.apple.com', 'www.deezer.com', 'listen.tidal.com'])('lights %s cells only on confirmed onsets and clears them when capture is silent', async (source) => {
+  const animate = vi.fn(() => ({ startTime: null, cancel: vi.fn(), finished: Promise.resolve(), onfinish: null }) as unknown as Animation);
+  Object.defineProperty(Element.prototype, 'animate', { configurable: true, value: animate });
+  try {
+    vi.mocked(sendMusicRequest).mockResolvedValue([{ ...session, source, playing: true }]);
+    const view = renderPlayer();
+    await screen.findByRole('heading', { name: session.title });
+    fireEvent.click(screen.getByRole('tab',{name:'Beat grid'}));
+    await act(async () => {});
+    expect(view.container.querySelectorAll('[data-motion-active]')).toHaveLength(0);
+    act(() => beatReceiver.receive?.({ kind: 'sync.state', mode: 'capture', captureId: 'spotify-live' }));
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    // The shipped Companion attaches the source playback clock to every onset, with or without tracing.
+    const now = Date.now(), playbackClock = { currentTime: 10, sampledAt: now, playbackRate: 1, playing: true, paused: false };
+    act(() => beatReceiver.receive?.({ kind: 'clock', clock: playbackClock }));
+    act(() => beatReceiver.receive?.({ kind: 'onset', captureId: 'spotify-live', sequence: 1, bands: ['kick'], targetPlaybackTime: 10.05, playbackClock }));
+    await waitFor(() => expect(view.container.querySelector('[data-motion-band="kick"] [data-motion-active]')).not.toBeNull());
+    expect(view.container.querySelectorAll('[data-motion-band]:not([data-motion-band="kick"]) [data-motion-active]')).toHaveLength(0);
+    act(() => beatReceiver.receive?.({ kind: 'sync.state', mode: 'clock', reason: 'silent' }));
+    expect(screen.getByText('Live beats unavailable for this track.')).toBeVisible();
+    await waitFor(() => expect(view.container.querySelectorAll('[data-motion-active]')).toHaveLength(0));
+    expect(screen.getByRole('button', { name: 'Pause music' })).toBeEnabled();
+  } finally {
+    delete (Element.prototype as { animate?: unknown }).animate;
+  }
 });
 
 it('offers manual recovery if opening the music tab fails', async () => {
@@ -406,17 +426,16 @@ it('keeps unsupported controls disabled and shows only a strip outside Music whi
   await waitFor(() => expect(view.container.querySelector('.mini-player-content')).toHaveAttribute('aria-hidden', 'true'));
 });
 
-it('keeps color and palette pickers in an accessible settings popover', async () => {
+it('keeps the palette and Kinetic style pickers in an accessible settings popover', async () => {
   vi.mocked(sendMusicRequest).mockResolvedValue([session]);
   renderPlayer();
   await screen.findByRole('heading', { name: session.title });
-  expect(screen.queryByRole('combobox', { name: 'Beat colors' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('combobox', { name: 'Palette' })).not.toBeInTheDocument();
   const settings = screen.getByRole('button', { name: 'Dock settings' });
   fireEvent.click(settings);
   expect(settings).toHaveAttribute('aria-expanded', 'true');
-  fireEvent.change(screen.getByRole('combobox', { name: 'Beat colors' }), { target: { value: 'flow' } });
+  expect(screen.queryByRole('combobox', { name: 'Beat colors' })).not.toBeInTheDocument();
   fireEvent.change(screen.getByRole('combobox', { name: 'Palette' }), { target: { value: 'ultraviolet' } });
-  expect(localStorage.getItem('floatingDock.colors')).toBe('flow');
   expect(localStorage.getItem('floatingDock.palette')).toBe('ultraviolet');
   fireEvent.keyDown(document, { key: 'Escape' });
   expect(settings).toHaveAttribute('aria-expanded', 'false');

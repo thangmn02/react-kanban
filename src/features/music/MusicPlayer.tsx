@@ -78,6 +78,7 @@ export function MusicGrid({ music, colorMode = 'random', palette = 'bloom', orie
   if(latePreview.owner!==previewOwner)setLatePreview({owner:previewOwner,enabled:false});
   const compareLegacy=legacy&&!reduced;
   const privateNativeDelay=nativeCompanionPreviewEnabled()||music.sourceAudioDelay?.enabled===true;
+  // The Kinetic grid is the release presentation; the preview flag only adds developer comparison and late-live controls.
   const motionPreview=import.meta.env.VITE_ENABLE_BEAT_GRID_PREVIEW==='true'||motionPreviewAllowed(music.selected?.syncState?.capability?.privateCandidate===true);
   const lateLivePreview=motionPreview&&!privateNativeDelay&&!compareLegacy&&!music.beta?.enabled&&Boolean(music.selected?.id)&&latePreview.owner===previewOwner&&latePreview.enabled;
   const showDebug = import.meta.env.DEV && new URLSearchParams(window.location.search).has('musicDebug');
@@ -111,7 +112,7 @@ export function MusicGrid({ music, colorMode = 'random', palette = 'bloom', orie
     :capability.livePreviewEligible?'Instrument preview is off for this source. Open Music → Private candidate → Live preview to enable it. Pause, seek and source changes turn preview off.'
     :null:null;
   const grid=<BeatPattern key={music.selected?.id} session={music.selected} beat={music.beat} colorMode={colorMode} palette={palette} orientation={orientation} semanticOnly={music.beta?.enabled?true:undefined} melodyEnabled={music.beta?.enabled?music.beta.melody:liveLead} independentRows={music.beta?.enabled} melodyEvents={music.beta?.enabled?music.beta.clip?.lead?.events:undefined}
-    motionProfile={motionPreview&&!compareLegacy?motionProfile:'legacy'} motionReduced={reduced} motionActive={visualActive} lateLivePreview={lateLivePreview}/>;
+    motionProfile={compareLegacy?'legacy':motionProfile} motionReduced={reduced} motionActive={visualActive} lateLivePreview={lateLivePreview}/>;
   return <>
     {motionPreview&&<div className="music-motion-controls"><span>{t('dock.motion.preview')} · {compareLegacy?'Legacy':t(`dock.motion.${motionProfile}`)}</span>
       <button type="button" className="text-button motion-legacy" disabled={reduced} aria-pressed={compareLegacy} onClick={()=>setLegacy(value=>!value)}>{t(compareLegacy?'dock.motion.restore':'dock.motion.legacy')}</button>

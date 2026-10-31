@@ -68,8 +68,9 @@ it.each(['island', 'mixer', 'split', 'tabs', 'deck'])('opens only Tabs with the 
   }
   fireEvent.click(screen.getByRole('button', { name: 'Dock settings' }));
   expect(screen.queryByRole('combobox', { name: 'Dock style' })).toBeNull();
-  expect(screen.getAllByRole('combobox').filter((element) => !element.classList.contains('dock-task-select'))).toHaveLength(2);
-  expect(screen.getByRole('combobox', { name: 'Beat colors' })).toHaveValue('pastel');
+  // Palette plus the Kinetic visual style and motion choices; the legacy colour mode does not affect Kinetic.
+  expect(screen.getAllByRole('combobox').filter((element) => !element.classList.contains('dock-task-select'))).toHaveLength(3);
+  expect(screen.queryByRole('combobox', { name: 'Beat colors' })).toBeNull();
   expect(screen.getByRole('combobox', { name: 'Palette' })).toHaveValue('ultraviolet');
 });
 it('drags from header whitespace and its label, while buttons and settings remain interactive', () => {
