@@ -1,6 +1,20 @@
 # Kora 0.1.33 release report (November 1, 2026)
 
-**Status: database released; web and Windows ready, awaiting the owner-run publish.**
+**Status: RELEASED.** Production deploy `6ae62d9c4ec969dfab60877b` was published on November 1, 2026, replacing `6aceb65d7544427364f295f3` (0.1.31).
+
+Release verification (the first two drafts were rejected by smoke tests and never published):
+
+- **Pages and functions:**
+  - `/today`, `/notes`, `/focus` and board links return 200.
+  - `note-images`, `beat-events` and `task-breakdown` answer exactly as on 0.1.31.
+- **Feed and installer:**
+  - `koraspace.online` and `kanthangboard.netlify.app` both serve the 0.1.33 feed.
+  - The live installer has SHA-256 `726305b9…273f`.
+  - It verifies against the live feed signature and the installed updater key, so 0.1.31 clients will update.
+- **Companion download:** unchanged at 0.3.24.
+- **GitHub:** branch `codex/final-completion-wave` (`f2ca50a`) and tag `v0.1.33` are pushed.
+
+Earlier draft status, kept for history:
 
 - **Production database:** migrated.
 - **Signed Windows installer and production web build:** built, verified and committed (tag `v0.1.33` → `7f0d073`).
