@@ -35,7 +35,7 @@ if(arg('publish')){
   process.exit(0);
 }
 
-assert.ok(process.argv.includes('--draft'),'Use --draft to stage, or --publish=<deployId> to promote a verified draft.');
+assert.ok(process.argv.includes('--draft')||arg('production-after-draft'),'Use --draft to stage, --publish=<deployId> to promote, or --production-after-draft=<deployId>.');
 const sourceCommit=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
 assert.equal(execFileSync('git',['status','--porcelain','--untracked-files=no'],{encoding:'utf8'}),'','Publish only from a committed tree.');
 const dist=resolve('dist'),functionsRoot=resolve(arg('linux-functions')||'');
