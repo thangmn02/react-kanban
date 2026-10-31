@@ -109,19 +109,53 @@ function withZipComment(zip,text){
 }
 for(const name of ['beat-event-cache','task-breakdown']){zips[name]=withZipComment(zips[name],`kora ${version} stream`);functions[name]=hash(zips[name]);}
 
-const deploy=await api('/sites/'+siteId+'/deploys?title='+encodeURIComponent(`Kora ${version} release ${sourceCommit.slice(0,7)}`),{method:'POST',body:{draft:true,async:false,files,functions,functions_config:functionsConfig}});
+// Secret function variables are withheld from unpublished drafts (deploy-preview context). --production-after-draft
+// deploys the exact content of an already verified draft in production context, then verifies it live and rolls back
+// automatically on any failure.
+const verifiedDraft=arg('production-after-draft');
+if(verifiedDraft){
+  const tested=JSON.parse(await readFile(join(output,'draft.json'),'utf8'));
+  assert.equal(tested.deployId,verifiedDraft,'Name the draft this release created and tested.');
+  assert.deepEqual(tested.functions,functions,'Function bundles differ from the tested draft.');
+  assert.equal(tested.installerSha256,inventory.find(row=>row.path==='/downloads/Kora-setup.exe').sha256,'Installer differs from the tested draft.');
+  const testedInventory=JSON.parse(await readFile(join(output,'inventory.json'),'utf8'));
+  assert.deepEqual(testedInventory.map(row=>row.path+row.sha256).sort(),inventory.map(row=>row.path+row.sha256).sort(),'Site files differ from the tested draft.');
+}
+const deploy=await api('/sites/'+siteId+'/deploys?title='+encodeURIComponent(`Kora ${version} release ${sourceCommit.slice(0,7)}`),{method:'POST',body:{draft:!verifiedDraft,async:false,files,functions,functions_config:functionsConfig}});
 assert.equal(deploy.site_id,siteId);assert.ok(!deploy.published_at,'The new deploy must start unpublished.');
 const receipt={at:new Date().toISOString(),siteId,deployId:deploy.id,sourceCommit,version,productionDeployBefore:site.published_deploy.id,files:inventory.length,
-  installerSha256:inventory.find(row=>row.path==='/downloads/Kora-setup.exe').sha256,companionRetained:hash(live),functions};
-await writeFile(join(output,'draft.json'),JSON.stringify(receipt,null,2));await writeFile(join(output,'inventory.json'),JSON.stringify(inventory,null,2));
+  installerSha256:inventory.find(row=>row.path==='/downloads/Kora-setup.exe').sha256,companionRetained:hash(live),functions,...(verifiedDraft?{verifiedDraft}:{})};
+const receiptFile=join(output,verifiedDraft?'production.json':'draft.json');
+await writeFile(receiptFile,JSON.stringify(receipt,null,2));if(!verifiedDraft)await writeFile(join(output,'inventory.json'),JSON.stringify(inventory,null,2));
 for(const sha of deploy.required||[]){const file=bytesBySha.get(sha);assert.ok(file,'Unknown requested file.');await api('/deploys/'+deploy.id+'/files'+file.path,{method:'PUT',bytes:file.bytes});}
 for(const[name,sha]of Object.entries(functions))if((deploy.required_functions||[]).includes(sha))
   // Runtime API v2 functions return a Response and must be uploaded in their built invocation mode.
   await api('/deploys/'+deploy.id+'/functions/'+name+'?runtime=nodejs24.x'+(modes[name]?'&invocation_mode='+modes[name]:''),{method:'PUT',bytes:zips[name]});
 let ready;
 for(let attempt=0;attempt<180&&!ready;attempt++){const current=await api('/deploys/'+deploy.id);assert.notEqual(current.state,'error','Deploy processing failed; details withheld.');if(current.state==='ready')ready=current;else await new Promise(done=>setTimeout(done,1000));}
-assert.ok(ready,'Draft did not become ready within the bounded wait.');
-assert.equal((await api('/sites/'+siteId)).published_deploy.id,site.published_deploy.id,'Production changed before promotion.');
-Object.assign(receipt,{ready:true,url:ready.deploy_ssl_url||ready.deploy_url});
-await writeFile(join(output,'draft.json'),JSON.stringify(receipt,null,2));
-console.log(JSON.stringify({status:'DRAFT_READY',deployId:deploy.id,url:receipt.url,productionUnchanged:true}));
+assert.ok(ready,'Deploy did not become ready within the bounded wait.');
+if(!verifiedDraft){
+  assert.equal((await api('/sites/'+siteId)).published_deploy.id,site.published_deploy.id,'Production changed before promotion.');
+  Object.assign(receipt,{ready:true,url:ready.deploy_ssl_url||ready.deploy_url});
+  await writeFile(receiptFile,JSON.stringify(receipt,null,2));
+  console.log(JSON.stringify({status:'DRAFT_READY',deployId:deploy.id,url:receipt.url,productionUnchanged:true}));
+}else{
+  const previous=site.published_deploy.id;
+  if((await api('/sites/'+siteId)).published_deploy.id!==deploy.id)await api('/sites/'+siteId+'/deploys/'+deploy.id+'/restore',{method:'POST'});
+  // Live checks against the production host; any failure restores the previous release.
+  const live='https://koraspace.online',failures=[];
+  const check=async(name,run)=>{try{if(!await run())failures.push(name);}catch{failures.push(name);}};
+  await new Promise(done=>setTimeout(done,5000));
+  for(const path of ['/','/today','/notes','/focus?tab=beat'])await check(path,async()=>(await fetch(live+path,{signal:AbortSignal.timeout(30000)})).status===200);
+  await check('feed',async()=>(await (await fetch(live+'/downloads/latest.json?'+Date.now())).json()).version===version);
+  const expectations={'/api/note-images':[401,'Sign in'],'/api/beat-events':[400,'invalid_asset'],'/api/task-breakdown':[415,'invalid_request']};
+  for(const[path,[status,text]]of Object.entries(expectations))await check(path,async()=>{const response=await fetch(live+path,{method:'POST',signal:AbortSignal.timeout(30000)});return response.status===status&&(await response.text()).includes(text);});
+  if(failures.length){
+    await api('/sites/'+siteId+'/deploys/'+previous+'/restore',{method:'POST'});
+    Object.assign(receipt,{status:'ROLLED_BACK',failures,restored:previous});await writeFile(receiptFile,JSON.stringify(receipt,null,2));
+    throw Error('Live verification failed ('+failures.join(', ')+'); the previous release was restored.');
+  }
+  Object.assign(receipt,{status:'PUBLISHED',verifiedLive:true,previousDeployId:previous,rollback:`POST /sites/${siteId}/deploys/${previous}/restore`});
+  await writeFile(receiptFile,JSON.stringify(receipt,null,2));
+  console.log(JSON.stringify({status:'PUBLISHED',deployId:deploy.id,previousDeployId:previous,verifiedLive:true}));
+}
