@@ -140,6 +140,8 @@ test('keyboard task movement settles and persists without opening the editor', a
   await page.keyboard.press('Space');
   await expect.poll(() => task.locator('xpath=ancestor::*[@data-list-id]').getAttribute('data-list-id')).not.toBe(original);
   const moved = await task.locator('xpath=ancestor::*[@data-list-id]').getAttribute('data-list-id');
+  // The move is optimistic; reload only after the save is acknowledged, as the unload guard would otherwise ask.
+  await expect(page.getByRole('status').filter({ hasText: 'Saving changes' })).toHaveCount(0);
   await page.reload();
   await expect(task.locator('xpath=ancestor::*[@data-list-id]')).toHaveAttribute('data-list-id', moved!);
   await expect(page.getByRole('dialog', { name: 'Edit task' })).toBeHidden();
@@ -160,6 +162,7 @@ test('pointer drag changes columns and retains the result after reload', async (
   await expect(page.locator('[id^="DndLiveRegion"]')).toContainText(new RegExp(`moved over droppable area (${targetId}|task-list-list2)`));
   await page.mouse.up();
   await expect(task.locator('xpath=ancestor::*[@data-list-id]')).toHaveAttribute('data-list-id', 'list2');
+  await expect(page.getByRole('status').filter({ hasText: 'Saving changes' })).toHaveCount(0);
   await page.reload();
   await expect(task.locator('xpath=ancestor::*[@data-list-id]')).toHaveAttribute('data-list-id', 'list2');
 });

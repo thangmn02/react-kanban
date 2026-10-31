@@ -6,7 +6,10 @@ import { isDesignLabEnabled, shouldMountDesignLab } from './design-lab/isDesignL
 import { isTauri } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 
+// The entry module renders, it does not export components; fast refresh does not apply.
+// eslint-disable-next-line react-refresh/only-export-components
 const MainApp = lazy(() => import('./app/main-app'));
+// eslint-disable-next-line react-refresh/only-export-components
 const NativeNoteWindow = lazy(() => import('./features/notes/native-note-window'));
 const isNoteWindow = isTauri() && getCurrentWindow().label.startsWith('note-');
 

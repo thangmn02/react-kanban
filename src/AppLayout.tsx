@@ -96,14 +96,18 @@ function AppLayout() {
 
   const taskEditorState = useTaskEditorState();
   const { closeTaskDialog: closeEditor, openEditTaskDialog: openEditor, state: editorState } = taskEditorState;
+  // A close can arrive before the router renders the task link it just pushed; remember the dismissal so the
+  // link-sync effect strips that late link instead of reopening the drawer.
+  const dismissedContextTask = useRef<string | null>(null);
   const closeContextTask = useCallback(() => {
+    dismissedContextTask.current = editorState.editingTask?.id ?? null;
     closeEditor();
     const query = new URLSearchParams(location.search);
     if (query.has('task')) {
       query.delete('task'); query.delete('taskBoard');
       navigate(`${location.pathname}${query.size ? `?${query}` : ''}${location.hash}`, { replace: true });
     }
-  }, [closeEditor, location, navigate]);
+  }, [closeEditor, editorState.editingTask?.id, location, navigate]);
   const taskEditor = { ...taskEditorState, closeTaskDialog: closeContextTask };
   const { focusViewId } = useHomeFocusView(user?.id, activeWorkspaceId);
   const boardDialogs = useBoardDialogState();
@@ -188,6 +192,13 @@ function AppLayout() {
     setActiveWorkspaceId,
     board: boardController,
   });
+  // A task move or edit is shown optimistically before the server acknowledges it; warn before leaving mid-save.
+  useEffect(() => {
+    if (!isSavingBoard) return;
+    const guard = (event: BeforeUnloadEvent) => { event.preventDefault(); };
+    window.addEventListener('beforeunload', guard);
+    return () => window.removeEventListener('beforeunload', guard);
+  }, [isSavingBoard]);
   const contextTaskId = new URLSearchParams(location.search).get('task');
   const contextBoardId = new URLSearchParams(location.search).get('taskBoard');
   const contextTask = routing.isTaskContextReady && !boardController.isBoardLoading && !boardController.boardErrorMessage && contextBoardId === activeBoardId
@@ -203,8 +214,10 @@ function AppLayout() {
   useEffect(() => {
     if (previousContextTask.current && !contextTaskId) closeEditor();
     previousContextTask.current = contextTaskId;
-    if (contextTask && editorState.editingTask?.id !== contextTask.id) openEditor(contextTask);
-  }, [contextTask, contextTaskId, editorState.editingTask?.id, openEditor, closeEditor]);
+    if (contextTask && editorState.editingTask?.id === contextTask.id) dismissedContextTask.current = null;
+    else if (contextTask && dismissedContextTask.current === contextTask.id) { dismissedContextTask.current = null; closeContextTask(); }
+    else if (contextTask) openEditor(contextTask);
+  }, [contextTask, contextTaskId, editorState.editingTask?.id, openEditor, closeEditor, closeContextTask]);
   const {
     activeView,
     goToView: setActiveViewWithPath,
