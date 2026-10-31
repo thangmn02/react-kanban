@@ -2,7 +2,7 @@ import {useLayoutEffect,useRef,useState,type CSSProperties} from 'react';
 import type {BrowserMusicSession,BeatBand} from './mediaBridge';
 import type {MusicBeatState} from './useMusicBeatSync';
 import {activeSteps,reshuffleEpoch} from './beatVisuals';
-import {createSemanticMotion,instrumentMotion,motionDuration,lateLivePresentation,type MotionProfile} from './semantic-motion';
+import {burstIntervalMs,createSemanticMotion,instrumentMotion,motionDuration,lateLivePresentation,patternCells,patternNames,type MotionProfile} from './semantic-motion';
 import {flashAttributes,recordCellFlash} from './beat-row-diagnostics';
 import {beatTelemetry} from '../../../extensions/kanban-music/beat-telemetry.js';
 import {beatPresentationDiagnostics} from './beat-presentation-diagnostics';
@@ -23,6 +23,7 @@ export function SemanticMotionPattern({session,beat,profile,reduced=false,active
   const [forcedColors,setForcedColors]=useState(()=>window.matchMedia?.('(forced-colors: active)').matches===true);
   const reduce=reduced||forcedColors;
   const gate=useRef({owner:'',seen:new Set<string>(),melodyNote:undefined as number|undefined,initialized:false});
+  const bursts=useRef({owner:'',next:undefined as number|undefined,index:0});
   const generation=beat.sourceGeneration??session?.generation;
   const generationMatches=beat.sourceGeneration===undefined||session?.generation===undefined||beat.sourceGeneration===session.generation;
   const owner=active&&session?.playing&&!session.paused&&!session.buffering&&!session.seeking&&beat.mode==='capture'&&beat.sessionId===session.id&&generationMatches
@@ -75,7 +76,21 @@ export function SemanticMotionPattern({session,beat,profile,reduced=false,active
       });
       const cell=cells[0],cellIndex=cellIndices[0];
       if(!cell){beatPresentationDiagnostics.record({key:attack.key,band:attack.band,stage:'gate',reason:'no-cell',deadlineMs:attack.deadlineMs,owner,profile,cells:0});continue;}
-      const presentation=lateLivePresentation(attack,profile,lateLivePreview);
+      const presentation=lateLivePresentation(attack,lateLivePreview);
+      if(bursts.current.owner!==owner)bursts.current={owner,next:undefined,index:bursts.current.index};
+      const interval=burstIntervalMs(beat.tempo?.locked?beat.tempo.bpm:null);
+      if(attack.band==='kick'&&!semanticOnly&&!reduce){
+        const gateBurst=bursts.current;
+        if(gateBurst.next===undefined)gateBurst.next=presentation.deadlineMs+interval;
+        else if(presentation.deadlineMs>=gateBurst.next){
+          const name=patternNames[gateBurst.index%patternNames.length],visibleBands=bands.filter(b=>melodyEnabled||b!=='melody');
+          const lit=patternCells(name,visibleBands.length).flatMap(({row,step,delay})=>{
+            const target=element.querySelector<HTMLElement>(`[data-motion-band="${visibleBands[row]}"] [data-motion-cell="${step}"]`);return target?[{cell:target,delay}]:[];});
+          const shown=engine.burst(name,presentation.deadlineMs,lit);
+          beatPresentationDiagnostics.record({key:attack.key,band:attack.band,stage:'play',reason:shown==='pattern'?'pattern-burst:'+name:shown,deadlineMs:attack.deadlineMs,owner,profile,cells:lit.length});
+          if(shown==='pattern'){gateBurst.index++;gateBurst.next=presentation.deadlineMs+interval;continue;}
+        }
+      }
       const result=engine.play(presentation,cells);
       beatPresentationDiagnostics.record({key:attack.key,band:attack.band,stage:'play',reason:result,deadlineMs:attack.deadlineMs,
         presentationTimeMs:presentation.deadlineMs,lateLivePreview:presentation!==attack,
@@ -90,7 +105,7 @@ export function SemanticMotionPattern({session,beat,profile,reduced=false,active
           layer:style?{display:style.display,visibility:style.visibility,opacity:style.opacity,backgroundImage:style.backgroundImage,width:style.width,height:style.height}:null}].slice(-8);
         element.dataset.motionInspection=JSON.stringify(motionInspection.current);
       }
-      if(result==='expired'||result==='hidden-or-invalid')continue;
+      if(result==='expired'||result==='hidden-or-invalid'||result==='pattern-exclusive')continue;
       const traceElement=cell.querySelector<HTMLElement>('.motion-body')!;
       traceElement.dataset.presentationTime=String(presentation.deadlineMs);
       traceElement.dataset.originalDeadline=String(attack.deadlineMs);
@@ -113,7 +128,7 @@ export function SemanticMotionPattern({session,beat,profile,reduced=false,active
               if(layers.some(layer=>Number(view.getComputedStyle(layer).opacity)>.001)){
                 recordCellFlash(traceElement,'animation');telemetry.record('EVENT_RENDERED',attack.trace,{semantic:true});
                 beatPresentationDiagnostics.record({key:attack.key,band:attack.band,stage:'frame',reason:'positive-opacity',deadlineMs:attack.deadlineMs,owner,profile});
-              }else if(Date.now()<presentation.deadlineMs+motionDuration(attack,profile))observe();
+              }else if(Date.now()<presentation.deadlineMs+motionDuration(attack))observe();
               else beatPresentationDiagnostics.record({key:attack.key,band:attack.band,stage:'frame',reason:'expired-without-positive-sample',deadlineMs:attack.deadlineMs,owner,profile});
             });frames.current.add(id);
           };observe();
@@ -127,25 +142,28 @@ export function SemanticMotionPattern({session,beat,profile,reduced=false,active
       selected.forEach(index=>{const cell=element.querySelector<HTMLElement>(`[data-motion-band="melody"] [data-motion-cell="${index}"]`);if(cell)melody.push(cell);});
     }
     engine.sustainMelody(melody,Boolean(owner)&&melodyEnabled&&beat.melody?.active&&beat.melody.note!==gate.current.melodyNote?beat.melody.level:0);
-  },[beat,owner,melodyEnabled,semanticOnly,session,melodyEvents,profile,inspect,active,lateLivePreview]);
+  },[beat,owner,melodyEnabled,semanticOnly,session,melodyEvents,profile,inspect,active,lateLivePreview,reduce]);
   const visible=bands.filter(b=>melodyEnabled||b!=='melody');
   return <div ref={root} className={`music-pattern semantic-motion ${orientation}${semanticOnly?' semantic-only':''}`} data-motion-profile={profile}
-    data-motion-variant="opal-bloom"
+    data-motion-variant="kinetic"
     data-late-live-preview={lateLivePreview}
-    data-opal-variant={profile==='focus'?'balanced':'high-contrast'}
+    data-optical={profile==='focus'?'hybrid':'eclipse'}
     data-motion-owner={owner?'active':!active?'inactive-view':!session?.playing||session.paused?'not-playing':beat.mode!=='capture'?'not-capturing':'wrong-session'}
     data-motion-inputs={beat.visualAttacks?.length||0}
     data-motion-reduced={reduce} style={{'--beat-rows':visible.length} as CSSProperties} role="img"
     aria-label={`Instrument activity: ${visible.map(b=>instrumentMotion[b].name).join(', ')}. Cells are not rhythmic subdivisions.`}>
     {!semanticOnly&&<BeatHeartbeat owner={owner} beat={beat} reduced={reduce}/>}
     {visible.map(band=><div key={band} className="beat-channel" data-channel={band==='kick'?'drum':band} data-track={instrumentMotion[band].name}
-      data-motion-band={band} style={{'--instrument-color':instrumentMotion[band].color,
-        ...Object.fromEntries(instrumentMotion[band].opal.map((color,i)=>[`--opal-${i+1}`,color]))} as CSSProperties}>
+      data-motion-band={band} style={{'--instrument-color':instrumentMotion[band].color,'--c-deep':instrumentMotion[band].deep,'--c-mid':instrumentMotion[band].color,
+        '--c-bright':instrumentMotion[band].bright,'--c-hot':instrumentMotion[band].hot,'--c-glow':instrumentMotion[band].glow} as CSSProperties}>
       <span className="channel-icon" title={instrumentMotion[band].name}>{({kick:'●',clap:'⌁',hat:'⌃',bass:'∿',melody:'~'})[band]}</span>
       {Array.from({length:8},(_,i)=><span key={i} className="beat-square" data-motion-cell={i}>
-        <span className="instrument-motion-layer motion-body"/>
-        <span className="instrument-motion-layer motion-edge"/>
-        <span className="instrument-motion-layer motion-rim"/>
+        <span className="motion-shock"/>
+        <span className="motion-clip">
+          <span className="instrument-motion-layer motion-body"/>
+          <span className="instrument-motion-layer motion-edge"/>
+          <span className="instrument-motion-layer motion-rim"/>
+        </span>
       </span>)}
     </div>)}
   </div>;

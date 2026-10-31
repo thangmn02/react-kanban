@@ -27,7 +27,7 @@ function renderPlayer() {
   return view;
 }
 
-it('enables the staged Opal presentation for an ordinary source without enabling private audio controls or inventing hits', async () => {
+it('enables the staged Kinetic presentation for an ordinary source without enabling private audio controls or inventing hits', async () => {
   vi.stubEnv('VITE_ENABLE_BEAT_GRID_PREVIEW','true');
   vi.mocked(sendMusicRequest).mockResolvedValue([{...session,playing:true}]);
   const view=renderPlayer();await screen.findByRole('heading',{name:session.title});
@@ -422,3 +422,4 @@ it('keeps color and palette pickers in an accessible settings popover', async ()
   expect(settings).toHaveAttribute('aria-expanded', 'false');
   expect(settings).toHaveFocus();
 });
+

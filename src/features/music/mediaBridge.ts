@@ -1,4 +1,4 @@
-import { isNativeWidget, nativeCompanionPreviewEnabled } from '../native/runtime';
+import { isNativeWidget, nativeCompanionPreviewEnabled, nativeSourceAudioDelayEnabled } from '../native/runtime';
 import { requestNativeMusic, subscribeNativeMusic } from '../native/nativeMusic';
 import { beatTelemetry, parseBeatTraces, type BeatTrace } from '../../../extensions/kanban-music/beat-telemetry.js';
 import { parsePlaybackTiming, parsePlaybackClock, playbackDeadline, sourceFence, sameSourceFence, type SourceFence, type PlaybackTiming, type PlaybackClock } from '../../../extensions/kanban-music/beat-timing.js';
@@ -100,9 +100,9 @@ function isSyncState(value: unknown): boolean {
     && (state.capability === undefined || Boolean(parseBeatMode(state.capability)));
 }
 
-function requestBridge(action: MusicAction | BeatAction | AudioAction | 'beat.experimental.configure' | 'beat.diagnostics', sessionId?: string, subscriptionId?: string, value?: number, configuration?: SyncConfiguration, diagnostic?:LiveDiagnosticRequest): Promise<Record<string, unknown>> {
-  if ((action === 'dock.audio.read' || action === 'beat.experimental.configure' && !nativeCompanionPreviewEnabled()) && isNativeWidget()) return Promise.reject(new MusicBridgeError('unavailable'));
-  if (isNativeWidget()) return requestNativeMusic(action as MusicAction | BeatAction, sessionId, subscriptionId, value, configuration).then((response) => {
+function requestBridge(action: MusicAction | BeatAction | AudioAction | 'beat.experimental.configure' | 'beat.diagnostics', sessionId?: string, subscriptionId?: string, value?: number, configuration?: SyncConfiguration, diagnostic?:LiveDiagnosticRequest,sourceAudioDelay=false): Promise<Record<string, unknown>> {
+  if ((action === 'dock.audio.read' || action === 'beat.experimental.configure' && !nativeCompanionPreviewEnabled()&&!nativeSourceAudioDelayEnabled()) && isNativeWidget()) return Promise.reject(new MusicBridgeError('unavailable'));
+  if (isNativeWidget()) return requestNativeMusic(action as MusicAction | BeatAction, sessionId, subscriptionId, value, configuration,sourceAudioDelay).then((response) => {
     if (response.ok !== true) throw new MusicBridgeError(response.error === 'not-installed' ? 'not-installed' : 'unavailable');
     return response;
   }).catch((error) => {
@@ -140,8 +140,8 @@ export async function sendMusicRequest(action: MusicAction, sessionId?: string, 
   return response.sessions;
 }
 
-export async function sendBeatRequest(action: BeatAction, sessionId: string, subscriptionId: string): Promise<void> {
-  await requestBridge(action, sessionId, subscriptionId);
+export async function sendBeatRequest(action: BeatAction, sessionId: string, subscriptionId: string,sourceAudioDelay=false): Promise<void> {
+  await requestBridge(action, sessionId, subscriptionId,undefined,undefined,undefined,sourceAudioDelay);
 }
 
 export async function configureExperimentalSynchronization(sessionId: string, configuration: SyncConfiguration): Promise<void> {

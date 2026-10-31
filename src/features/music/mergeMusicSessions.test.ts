@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
-import { mergeMusicSessions } from './mergeMusicSessions';
+import { isInterfaceClip, mergeMusicSessions } from './mergeMusicSessions';
+import type { BrowserMusicSession } from './mediaBridge';
 
 it('keeps the newest playback observation without retaining vanished sessions or old metadata', () => {
   const session = { id: 'one', title: 'Old title', artist: '', source: 'youtube.com', paused: true,
@@ -22,4 +23,10 @@ it('retains the complete newest playback lifecycle over stale discovery', () => 
     playing: false, currentTime: 17, sampledAt: 200, muted: true, buffering: true, seeking: true, generation: 2 };
   const stale = { ...latest, sampledAt: 100, muted: false, buffering: false, seeking: false, generation: 1 };
   expect(mergeMusicSessions([latest], [stale])[0]).toMatchObject(latest);
+});
+
+it('treats sub-second page sounds as interface clips, never as music', () => {
+  const session = (duration?: number) => ({ id: 'peer:tab:doc:1', title: 'Song', source: 'www.youtube.com', duration }) as BrowserMusicSession;
+  expect(isInterfaceClip(session(0.49))).toBe(true);
+  for (const duration of [undefined, 0, Infinity, 155.7]) expect(isInterfaceClip(session(duration))).toBe(false);
 });

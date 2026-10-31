@@ -6,6 +6,10 @@ pub fn allowed(debug: bool, flag: Option<&str>, identifier: &str) -> bool {
     debug && flag == Some("1") && identifier == "app.kanthangboard.ownerpreview"
 }
 
+pub fn source_delay_allowed(flag: Option<&str>, identifier: &str) -> bool {
+    flag == Some("1") && matches!(identifier, "app.kanthangboard.focus" | "app.kanthangboard.qualification" | "app.kanthangboard.ownerpreview")
+}
+
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Configuration {
@@ -45,6 +49,13 @@ mod tests {
         assert!(!allowed(false,Some("1"),"app.kanthangboard.ownerpreview"));
         assert!(!allowed(true,None,"app.kanthangboard.ownerpreview"));
         assert!(!allowed(true,Some("1"),"app.kanthangboard.focus"));
+    }
+    #[test]
+    fn admits_optional_release_route_only_with_its_build_gate_and_known_identity() {
+        assert!(source_delay_allowed(Some("1"), "app.kanthangboard.focus"));
+        assert!(source_delay_allowed(Some("1"), "app.kanthangboard.qualification"));
+        assert!(!source_delay_allowed(None, "app.kanthangboard.focus"));
+        assert!(!source_delay_allowed(Some("1"), "another.application"));
     }
     #[test]
     fn validates_bounded_consented_l0_configuration_and_explicit_off() {

@@ -366,12 +366,16 @@ pub async fn native_music_request(
     native_audio: Option<bool>,
     value: Option<f64>,
     companion_capture: Option<bool>,
+    source_audio_delay: Option<bool>,
     configuration: Option<Value>,
 ) -> Result<Value, String> {
     let private_delay = native_delay_preview::allowed(cfg!(debug_assertions), option_env!("KORA_PRIVATE_NATIVE_COMPANION_CAPTURE"), &music.app.config().identifier);
-    if companion_capture == Some(true) && !private_delay { return Err("Private Companion capture is unavailable".into()); }
+    let source_delay = source_audio_delay == Some(true) && native_delay_preview::source_delay_allowed(option_env!("KORA_ENABLE_SOURCE_AUDIO_DELAY"), &music.app.config().identifier);
+    if source_audio_delay == Some(true) && !source_delay { return Err("Optional source audio delay is unavailable".into()); }
+    if companion_capture == Some(true) && !(private_delay || source_delay) { return Err("Companion capture is unavailable".into()); }
+    let required_version = if source_delay { "0.3.29" } else { "0.3.28" };
     let delay_configuration = if action == "beat.experimental.configure" {
-        if !private_delay || companion_capture != Some(true) { return Err("Private delay configuration is unavailable".into()); }
+        if !(private_delay || source_delay) || companion_capture != Some(true) { return Err("Source delay configuration is unavailable".into()); }
         Some(native_delay_preview::configuration(configuration.ok_or("Missing private delay configuration")?)?)
     } else {
         if configuration.is_some() { return Err("Unexpected music configuration".into()); }
@@ -393,7 +397,7 @@ pub async fn native_music_request(
         if companion_capture == Some(true) {
             let statuses = join_all(peers.iter().map(|peer| music.ask(peer, json!({"action":"companion.status"})))).await;
             peers = peers.into_iter().zip(statuses).filter_map(|(peer, status)|
-                status.ok().filter(|status| status["ok"] == true && status["version"] == "0.3.28").map(|_|peer)).collect();
+                status.ok().filter(|status| status["ok"] == true && status["version"] == required_version).map(|_|peer)).collect();
         }
         if peers.is_empty() {
             return Ok(json!({"ok":false,"error":"not-installed"}));
@@ -452,7 +456,7 @@ pub async fn native_music_request(
     let (peer, session) = session.split_once(':').ok_or("Invalid session")?;
     if companion_capture == Some(true) && action != "dock.beat.sync.stop" {
         let status = music.ask(peer, json!({"action":"companion.status"})).await?;
-        if status["ok"] != true || status["version"] != "0.3.28" { return Err("The isolated test Companion 0.3.28 is required".into()); }
+        if status["ok"] != true || status["version"] != required_version { return Err(format!("Companion {required_version} is required for this source delay route")); }
     }
     if action.starts_with("dock.")
         && !subscription_id

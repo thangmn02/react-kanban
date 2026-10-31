@@ -13,3 +13,8 @@ export function mergeMusicSessions(previous: BrowserMusicSession[], next: Browse
         .map(key => [key, latest[key as keyof BrowserMusicSession]])) };
   });
 }
+
+// Pages such as YouTube keep sub-second interface sounds in media elements. They are
+// never music, and must not steal the automatic selection from the song.
+export const isInterfaceClip = (session: BrowserMusicSession) =>
+  Number.isFinite(session.duration) && session.duration! > 0 && session.duration! < 3;

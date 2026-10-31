@@ -5,6 +5,7 @@ import type {MotionProfile,MotionReduction} from './semantic-motion';
 import {motionPreviewAllowed} from './semantic-motion';
 import { getMusicInstallUrl } from './mediaBridge';
 import ExperimentalBeatControl from './experimental-beat-control';
+import SourceAudioDelayControl from './source-audio-delay-control';
 import MusicPlaybackControls from './music-playback-controls';
 import type { BrowserMusicController } from './useBrowserMusic';
 import { patternAt } from './beatVisuals';
@@ -60,6 +61,7 @@ export function MusicTrack({ music }: { music: BrowserMusicController }) {
       </span>
     </div>
     <MusicPlaybackControls key={selected?.id} music={music} />
+    {selected&&music.sourceAudioDelay&&<SourceAudioDelayControl key={music.sourceAudioDelay.owner} music={music}/>}
     {selected&&(!isNativeWidget()||nativeCompanionPreviewEnabled())&&<ExperimentalBeatControl key={`experimental:${selected.id}`} session={selected} refresh={music.refresh} compensationOnly={nativeCompanionPreviewEnabled()}/>}
     {sessions.length > 1 && <select className="music-sessions" aria-label={t('music.choose')} value={selected?.id || ''} onChange={(event) => setSelectedId(event.target.value)}>{sessions.map((session) => <option key={session.id} value={session.id}>{session.title} · {session.source}</option>)}</select>}
   </>;
@@ -74,7 +76,7 @@ export function MusicGrid({ music, colorMode = 'random', palette = 'bloom', orie
   const [latePreview,setLatePreview]=useState({owner:previewOwner,enabled:false});
   if(latePreview.owner!==previewOwner)setLatePreview({owner:previewOwner,enabled:false});
   const compareLegacy=legacy&&!reduced;
-  const privateNativeDelay=nativeCompanionPreviewEnabled();
+  const privateNativeDelay=nativeCompanionPreviewEnabled()||music.sourceAudioDelay?.enabled===true;
   const motionPreview=import.meta.env.VITE_ENABLE_BEAT_GRID_PREVIEW==='true'||motionPreviewAllowed(music.selected?.syncState?.capability?.privateCandidate===true);
   const lateLivePreview=motionPreview&&!privateNativeDelay&&!compareLegacy&&!music.beta?.enabled&&Boolean(music.selected?.id)&&latePreview.owner===previewOwner&&latePreview.enabled;
   const showDebug = import.meta.env.DEV && new URLSearchParams(window.location.search).has('musicDebug');
@@ -98,7 +100,7 @@ export function MusicGrid({ music, colorMode = 'random', palette = 'bloom', orie
     <Suspense fallback={<p>Loading private Melody comparison…</p>}><PrivateMelodyDemo /></Suspense>
   </div>;
   const capability=music.selected?.syncState?.capability;
-  const previewStatus=(!isNativeWidget()||nativeCompanionPreviewEnabled())&&!music.beta?.enabled&&capability?.privateCandidate
+  const previewStatus=(!isNativeWidget()||privateNativeDelay)&&!music.beta?.enabled&&capability?.privateCandidate
     ?capability.reason==='protected-source'?'Instrument flashes are unavailable for this protected source. Music playback controls still work.'
     :capability.reason==='provider-policy'?'Instrument flashes are unavailable for this provider under the private test policy. Music playback controls still work.'
     :privateNativeDelay&&capability.bufferMs>0?`Intentional audio delay: ${capability.bufferMs} ms. Instrument predictions and physical synchronization are unverified.`
@@ -190,12 +192,13 @@ export function MusicSetup({ music }: { music: BrowserMusicController }) {
   const { t, language } = useI18n();
   const companion = useCompanionSetup();
   const beta=localHybridEnabled()&&music.beta?<HybridBetaControl beta={music.beta}/>:null;
-  if (music.connected || music.checking) return beta;
+  const delayRecovery=!music.selected&&music.sourceAudioDelay?.enabled?<SourceAudioDelayControl music={music}/>:null;
+  if (music.connected || music.checking) return <>{beta}{delayRecovery}</>;
   if(nativeCompanionPreviewEnabled())return <div className="music-setup" role="status">
     <p>Private test Companion 0.3.28 is unavailable. Open the dedicated test browser; preserve your existing installed extensions.</p>
     <button type="button" className="text-button" onClick={music.refresh}>{t('music.checkAgain')}</button>
   </div>;
-  return <>{beta}<div className="music-setup">
+  return <>{beta}{delayRecovery}<div className="music-setup">
     {music.error && <p className="muted" role="status">{music.error}</p>}
     <div className="music-connect-actions">
       {isNativeWidget()

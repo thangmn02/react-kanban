@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useI18n } from '../../i18n';
 import { MusicBridgeError, sendMusicRequest, type BrowserMusicSession, type MusicClock, type MusicAction } from './mediaBridge';
 import { useMusicBeatSync } from './useMusicBeatSync';
-import { mergeMusicSessions } from './mergeMusicSessions';
+import { isInterfaceClip, mergeMusicSessions } from './mergeMusicSessions';
 import { getBeatSource, isNativeWidget, nativeCompanionPreviewEnabled } from '../native/runtime';
+import {useSourceAudioDelay} from './use-source-audio-delay';
 import { beatCapabilities } from './beat-capabilities';
 import { leadPulseEnabled, leadProcessingEnabled } from './lead-feature';
 import { companionLeadInputEnabled } from './companion-lead-audio';
@@ -18,7 +19,7 @@ interface MusicSelection {
 const isPlaying = (session: BrowserMusicSession | undefined) => Boolean(session && !session.paused && session.playing !== false && !session.muted);
 
 function updateSelection(current: MusicSelection, next: BrowserMusicSession[], toolbar = false): MusicSelection {
-  const sessions = mergeMusicSessions(current.sessions, next);
+  const sessions = mergeMusicSessions(current.sessions, next).filter(item => !isInterfaceClip(item));
   const clicked = toolbar ? sessions.find(item => item.selectionToken) : undefined;
   const freshClick = clicked?.selectionToken && clicked.selectionToken !== current.selectionToken;
   const selectionToken = clicked?.selectionToken || current.selectionToken;
@@ -70,6 +71,8 @@ export function useBrowserMusic(beatDemand = false) {
   }, [attempt, t]);
 
   const selected = sessions.find((item) => item.id === selectedId);
+  const sourceDelay=useSourceAudioDelay(selected,()=>setAttempt(value=>value+1));
+  const sourceDelayActive=sourceDelay.routed;
   const setSelectedId = (id: string) => setMusic((current) => ({ ...current, selectedId: id, explicitSelection: true }));
   const updateClock = useCallback((sessionId: string, clock: MusicClock) => {
     setMusic((current) => {
@@ -84,10 +87,11 @@ export function useBrowserMusic(beatDemand = false) {
   const canAnalyze = selected?.canAnalyze, duration = selected?.duration;
   const eventOptions = useMemo(() => ({ asset: provider && mediaId && provider !== 'spotify' ? { provider, id: mediaId } : undefined,
     privateCandidate: import.meta.env.VITE_PRIVATE_BEAT_CANDIDATE === 'true',
-    capturedInput: !nativeCompanionPreviewEnabled() && provider !== 'spotify' && (isNativeWidget() ? !leadPulseEnabled() || leadProcessingEnabled()
+    sourceAudioDelay:sourceDelayActive,
+    capturedInput: !nativeCompanionPreviewEnabled() && !sourceDelayActive && provider !== 'spotify' && (isNativeWidget() ? !leadPulseEnabled() || leadProcessingEnabled()
       : companionLeadInputEnabled(provider && mediaId ? { provider, id: mediaId } : undefined)),
     duration, capabilities: beatCapabilities(isNativeWidget(), canAnalyze !== false),
-  }), [provider, mediaId, duration, canAnalyze]);
+  }), [provider, mediaId, duration, canAnalyze,sourceDelayActive]);
   const beat = useMusicBeatSync(beta.enabled?undefined:selected?.id, updateClock, eventOptions, beatDemand&&!beta.enabled);
   async function toggle() {
     if (!selected || busy) return;
@@ -120,7 +124,8 @@ export function useBrowserMusic(beatDemand = false) {
   const refresh = () => { setChecking(true); setAttempt((value) => value + 1); };
   return { ...(beta.enabled?beta.controller:{ sessions, selected, setSelectedId, connected, checking, error, busy, toggle, openMusicTab, refresh, beat, control,
     source: getBeatSource(connected),
-    playing: Boolean(selected && !selected.paused && selected.playing !== false) }),beta };
+    playing: Boolean(selected && !selected.paused && selected.playing !== false) }),beta,
+    ...(sourceDelay.controller&&!beta.enabled?{sourceAudioDelay:sourceDelay.controller}:{}) };
 }
 
 export type BrowserMusicController = ReturnType<typeof useBrowserMusic>;

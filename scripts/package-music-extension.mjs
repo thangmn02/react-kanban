@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile, rm, lstat } from 'node:fs/promises';
 import {prepareNativeCompanionDelay,assertNativeDelayGuide} from './native-companion-delay-package.mjs';
+import {prepareSourceAudioDelay,prepareHatProminence} from './source-audio-delay-package.mjs';
 import { fileURLToPath } from 'node:url';
 import { join,resolve,relative,isAbsolute } from 'node:path';
 import { deflateSync } from 'node:zlib';
@@ -9,6 +10,10 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const extension = join(root, 'extensions', 'kanban-music');
 const privateCandidate = process.argv.includes('--private');
 const nativeDelayCandidate=process.argv.includes('--native-delay');
+const sourceDelayCandidate=process.argv.includes('--source-audio-delay');
+// Owner A/B only: hat-only local prominence on top of the source-delay candidate.
+const hatProminenceCandidate=process.argv.includes('--hat-prominence');
+if(hatProminenceCandidate&&!sourceDelayCandidate)throw Error('Hat prominence is an owner A/B of the source-delay candidate.');
 const hybridCandidate=process.argv.includes('--hybrid-live');
 if(hybridCandidate&&!privateCandidate)throw Error('Hybrid Live requires --private');
 const diagnosticCandidate=process.argv.includes('--diagnostic-capture');
@@ -27,10 +32,11 @@ if(hybridCandidate&&(labelMode||precisionMode||xoCandidate||hatCandidate))throw 
 const requestedOutput=process.argv.find(arg=>arg.startsWith('--output-root='))?.slice(14);
 if(nativeDelayCandidate&&(!privateCandidate||!requestedOutput||hybridCandidate||diagnosticCandidate||labelMode||precisionMode||xoCandidate||hatCandidate))throw Error('Native delay requires a separate private output and unchanged L0 detector.');
 const outputRelative=requestedOutput?relative(resolve(root,'scratch'),resolve(root,requestedOutput)):undefined;
-if(requestedOutput&&(!privateCandidate||!outputRelative||outputRelative==='..'||outputRelative.startsWith('..\\')||outputRelative.startsWith('../')||isAbsolute(outputRelative)))throw Error('Custom packages must be private research outputs inside scratch');
+if(sourceDelayCandidate&&(!requestedOutput||privateCandidate||nativeDelayCandidate||hybridCandidate||diagnosticCandidate||labelMode||precisionMode||xoCandidate||hatCandidate))throw Error('Source audio delay requires a fresh isolated output and unchanged L0 detector.');
+if(requestedOutput&&(!(privateCandidate||sourceDelayCandidate)||!outputRelative||outputRelative==='..'||outputRelative.startsWith('..\\')||outputRelative.startsWith('../')||isAbsolute(outputRelative)))throw Error('Custom packages must be isolated outputs inside scratch');
 const output = requestedOutput?resolve(root,requestedOutput):hybridCandidate?join(root,'scratch','companion-hybrid-live','candidate'):diagnosticCandidate?join(root,'scratch','cross-track-hat-capture','candidate'):labelMode?join(root,'scratch','hat-label-contract','candidate-'+labelMode):precisionMode?join(root,'scratch','semantic-precision','candidate-'+precisionMode):hatCandidate?join(root,'scratch','hat-playback-discrepancy','candidate-'+hatCandidate):xoCandidate?join(root,'scratch','xo-percussion-recovery','candidate-'+xoCandidate)
   :privateCandidate ? join(root,'scratch','browser-first-candidate') : join(root, 'public', 'downloads');
-if(nativeDelayCandidate){
+if(nativeDelayCandidate||sourceDelayCandidate){
   await lstat(output).then(()=>{throw Error('Native delay output must be fresh.');},error=>{if(error.code!=='ENOENT')throw error;});
   for(let path=resolve(root,'scratch');path!==output;){
     const metadata=await lstat(path).catch(error=>{if(error.code!=='ENOENT')throw error;return null;});
@@ -41,7 +47,7 @@ if(nativeDelayCandidate){
 
 // Rebuild release resources; the explicit inventory excludes private/retired
 // models without deleting an existing developer's optional inference assets.
-for (const path of privateCandidate ? [] : ['public/music-analysis', 'src-tauri/generated/music-companion']) {
+for (const path of privateCandidate||sourceDelayCandidate ? [] : ['public/music-analysis', 'src-tauri/generated/music-companion']) {
   const target = join(root, path);
   if (!target.startsWith(root)) throw new Error('Generated resource outside project');
   await rm(target, { recursive: true, force: true });
@@ -118,6 +124,7 @@ const names = ['manifest.json', 'background.js', 'widget-bridge.js', 'sites.js',
 names.push('companion-update.js', 'spotify-player.js');
 names.push('beat-mode.js','beat-candidate.js');
 names.push('delayed-audio-output.js');
+if(sourceDelayCandidate)names.push('source-delay-audio-output.js');
 names.push('semantic-precision-guards.js');
 names.push('percussion-label-contract.js','inference-resources.js','model-assets.js');
 if(privateCandidate)names.push('live-diagnostic-recorder.js');
@@ -127,6 +134,7 @@ function replaceExactlyOnce(source, before, after) {
   if (source.split(before).length !== 2) throw new Error(`Expected one package sentinel: ${before}`);
   return source.replace(before, after);
 }
+const sourceDelayProof=sourceDelayCandidate?prepareSourceAudioDelay(files):undefined;
 if(!privateCandidate){
   const offscreen=files.find(file=>file.name==='offscreen.js');
   let source=replaceExactlyOnce(offscreen.bytes.toString().replaceAll('\r\n','\n'),"import {LiveDiagnosticRecorder} from './live-diagnostic-recorder.js';\n",'');
@@ -221,6 +229,11 @@ if(hybridCandidate){
   },null,2))});
 }
 if(nativeDelayCandidate)files.push({name:'NATIVE-DELAY-PROVENANCE.json',bytes:Buffer.from(JSON.stringify(prepareNativeCompanionDelay(files),null,2))});
+if(hatProminenceCandidate){sourceDelayProof.hatProminence=prepareHatProminence(files);sourceDelayProof.files.push({name:'percussion-classifier.js'});}
+if(sourceDelayProof){
+  for(const entry of sourceDelayProof.files)entry.outputSha256=createHash('sha256').update(files.find(file=>file.name===entry.name).bytes).digest('hex');
+  files.push({name:'SOURCE-AUDIO-DELAY-PROVENANCE.json',bytes:Buffer.from(JSON.stringify(sourceDelayProof,null,2))});
+}
 const packagedNames = new Set(files.map(({ name }) => name));
 for (const { name, bytes } of files.filter(({ name }) => name.endsWith('.js'))) {
   for (const match of bytes.toString().matchAll(/from\s+["']\.\/([^"']+)["']/g)) {
@@ -234,7 +247,7 @@ await writeFile(join(output, 'kanban-music-companion.zip'), archive);
 await writeFile(join(output, 'kora-music-companion.zip'), archive);
 
 // Ship only runtime files with Windows, already unpacked for Load unpacked.
-const bundledCompanion = privateCandidate ? output : join(root, 'src-tauri', 'generated', 'music-companion');
+const bundledCompanion = privateCandidate||sourceDelayCandidate ? output : join(root, 'src-tauri', 'generated', 'music-companion');
 for (const { name, bytes } of files) {
   const target = join(bundledCompanion, 'extension', name);
   await mkdir(join(target, '..'), { recursive: true });

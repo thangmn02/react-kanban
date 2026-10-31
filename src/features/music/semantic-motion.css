@@ -1,41 +1,45 @@
-/* Opal Bloom: fixed material, moving reflective bands and a clipped white rim. */
-.music-pattern.semantic-motion { --motion-surface:#e2e6e8; --motion-border:#d0d7dc; --opal-rim:.78; --opal-depth:.12; --opal-bloom:.42; isolation:isolate; }
-.ultraviolet .semantic-motion, [data-theme='dark'] .semantic-motion, .dark .semantic-motion { --motion-surface:#27313b; --motion-border:#3b4a55; }
-.music-pattern.semantic-motion .beat-channel { color:var(--instrument-color); }
-.music-pattern.semantic-motion .channel-icon { opacity:1; font-size:16px; text-align:center; line-height:1; }
+/* Kinetic Grid: frosted quartz pads, per-row palettes and signature pulses; geometric shapes own the whole grid while they bloom. */
+.music-pattern.semantic-motion { isolation:isolate; }
+.music-pattern.semantic-motion .beat-channel { color:var(--c-mid); }
+.music-pattern.semantic-motion .channel-icon { opacity:1; font-size:16px; text-align:center; line-height:1; text-shadow:0 0 8px color-mix(in srgb,var(--c-glow) 55%,transparent); }
 .music-pattern.semantic-motion .beat-square {
-  background:var(--motion-surface); border:1px solid var(--motion-border);
-  overflow:clip; contain:paint; isolation:isolate; animation:none; transition:none; transform:none; box-shadow:none;
+  /* Frosted quartz: milky translucent glass that matches the dock's light glass panels. */
+  background:linear-gradient(180deg,rgba(255,255,255,.72) 0%,rgba(236,240,247,.5) 100%); border:1px solid rgba(255,255,255,.85);
+  backdrop-filter:blur(10px) saturate(1.4); -webkit-backdrop-filter:blur(10px) saturate(1.4);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.95),inset 0 -1px 3px rgba(148,163,184,.22),0 1px 3px rgba(29,39,78,.08);
+  overflow:visible; isolation:isolate; animation:none; transition:none; transform-origin:center; will-change:transform,box-shadow;
 }
+.ultraviolet .semantic-motion .beat-square,[data-theme='dark'] .semantic-motion .beat-square,.dark .semantic-motion .beat-square {
+  background:linear-gradient(180deg,rgba(51,65,85,.55) 0%,rgba(30,41,59,.45) 100%); border-color:rgba(255,255,255,.14);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.14),inset 0 -1px 3px rgba(2,6,23,.3),0 1px 3px rgba(2,6,23,.25); }
+.semantic-motion .motion-clip { position:absolute; inset:0; border-radius:inherit; overflow:hidden; pointer-events:none; }
+.semantic-motion .motion-clip::before { content:''; position:absolute; inset:0; z-index:1; background-image:radial-gradient(rgba(148,163,184,.14) 1px,transparent 1px); background-size:6px 6px; }
 .instrument-motion-layer { position:absolute; inset:0; box-sizing:border-box; border-radius:inherit; pointer-events:none; opacity:0; transform-origin:center; }
-.semantic-motion .motion-body {
-  background:radial-gradient(ellipse at 36% 18%,rgba(255,255,255,var(--opal-bloom)),transparent 68%),
-    linear-gradient(155deg,rgba(255,255,255,.28),transparent 42%,rgba(23,25,52,var(--opal-depth))),
-    conic-gradient(from 207deg at 46% 48%,var(--opal-3),var(--opal-2),var(--opal-4),var(--opal-1),var(--opal-3));
-}
-.semantic-motion .motion-edge {
-  inset:-25%; border-radius:0;
-  background:linear-gradient(117deg,transparent 0 20%,rgba(255,255,255,.78) 21% 26%,transparent 27% 47%,rgba(255,255,255,.47) 48% 50%,transparent 51% 80%,rgba(255,255,255,.4) 81% 84%,transparent 85%);
-  mix-blend-mode:screen;
-}
-.semantic-motion .motion-rim {
-  border:1px solid rgba(255,255,255,var(--opal-rim)); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--instrument-color) 42%,white);
-  background:radial-gradient(ellipse at 36% 38%,rgba(255,255,255,var(--opal-bloom)),transparent 66%);
-}
-.semantic-motion [data-motion-band='kick'] { --opal-bloom:.72; }
-.semantic-motion [data-motion-band='clap'] { --opal-bloom:.48; }
-.semantic-motion [data-motion-band='hat'] { --opal-bloom:.27; }
-.semantic-motion [data-motion-band='bass'] { --opal-bloom:.34; }
-.semantic-motion [data-motion-band='melody'] { --opal-bloom:.38; }
-.semantic-motion[data-opal-variant='high-contrast'] { --motion-surface:#d5dce1; --motion-border:#bac6cf; --opal-rim:1; --opal-depth:.32; }
-.ultraviolet .semantic-motion[data-opal-variant='high-contrast'],[data-theme='dark'] .semantic-motion[data-opal-variant='high-contrast'],.dark .semantic-motion[data-opal-variant='high-contrast'] { --motion-surface:#202a34; --motion-border:#495a68; }
-.semantic-motion[data-opal-variant='high-contrast'] .motion-body {
-  background:radial-gradient(ellipse at 32% 18%,rgba(255,255,255,.54),transparent 48%),
-    linear-gradient(160deg,transparent 28%,rgba(16,20,48,var(--opal-depth))),
-    conic-gradient(from 207deg at 46% 48%,var(--opal-3) 0deg,var(--opal-2) 65deg,var(--opal-4) 152deg,var(--opal-1) 245deg,var(--opal-3) 360deg);
-}
-.semantic-motion[data-opal-variant='high-contrast'] .motion-rim { border-width:2px; box-shadow:inset 0 0 0 1px var(--instrument-color); }
-.semantic-motion[data-opal-variant='high-contrast'] [data-motion-band='kick'] { --opal-bloom:.92; }
+.semantic-motion .motion-body { z-index:2; }
+.semantic-motion .motion-edge { z-index:3; }
+.semantic-motion .motion-rim { z-index:4; border:1.5px solid transparent; }
+.semantic-motion .motion-shock { position:absolute; inset:-2px; border-radius:inherit; border:1.5px solid var(--c-bright); opacity:0; pointer-events:none; z-index:0; }
+.semantic-motion .beat-square[data-motion-active],.semantic-motion .beat-square[data-pattern-hit] { z-index:10; }
+.semantic-motion .beat-square[data-pattern-hit] { z-index:15; }
+/* A triggered shape recolors its own cells. */
+.semantic-motion .beat-square[data-pat-theme='heart'] { --c-deep:#831843; --c-mid:#ec4899; --c-bright:#f9a8d4; --c-hot:#fdf2f8; --c-glow:rgba(236,72,153,.75); }
+.semantic-motion .beat-square[data-pat-theme='star'] { --c-deep:#713f12; --c-mid:#eab308; --c-bright:#fef08a; --c-hot:#fefce8; --c-glow:rgba(250,204,21,.75); }
+.semantic-motion .beat-square[data-pat-theme='diamond'] { --c-deep:#1e3a8a; --c-mid:#38bdf8; --c-bright:#bae6fd; --c-hot:#f0f9ff; --c-glow:rgba(56,189,248,.75); }
+.semantic-motion .beat-square[data-pat-theme='nova'] { --c-deep:#4c1d95; --c-mid:#c084fc; --c-bright:#f5d0fe; --c-hot:#faf5ff; --c-glow:rgba(192,132,252,.75); }
+/* 1+3 Horizon Eclipse: dark core over a rising horizon of row color. */
+.semantic-motion[data-optical='hybrid'] .motion-body { background:radial-gradient(56% 50% at 50% 52%,color-mix(in srgb,color-mix(in srgb,var(--c-bright) 70%,var(--c-hot)) 70%,transparent) 0%,transparent 76%),
+  radial-gradient(130% 110% at 50% 108%,var(--c-bright) 0%,var(--c-mid) 50%,color-mix(in srgb,var(--c-mid) 72%,var(--c-deep)) 100%); }
+.semantic-motion[data-optical='hybrid'] .motion-edge { inset:3px; border-radius:inherit; border:1px solid rgba(255,255,255,.34);
+  background:radial-gradient(42% 38% at 50% 54%,color-mix(in srgb,color-mix(in srgb,var(--c-bright) 75%,var(--c-hot)) 62%,transparent) 0%,transparent 100%),radial-gradient(60% 32% at 50% 100%,var(--c-hot) 0%,transparent 100%);
+  box-shadow:inset 0 -2px 8px color-mix(in srgb,var(--c-bright) 70%,transparent); }
+.semantic-motion[data-optical='hybrid'] .motion-rim { border-color:color-mix(in srgb,var(--c-bright) 74%,transparent); box-shadow:inset 0 0 10px color-mix(in srgb,var(--c-glow) 80%,transparent); }
+/* 3 Eclipse Halo: dark centre ringed by row color. */
+.semantic-motion[data-optical='eclipse'] .motion-body { background:radial-gradient(40% 40% at 50% 50%,color-mix(in srgb,var(--c-bright) 70%,transparent) 0%,transparent 100%),
+  radial-gradient(circle at 50% 50%,color-mix(in srgb,var(--c-mid) 55%,var(--c-deep)) 20%,var(--c-mid) 70%,var(--c-bright) 100%); }
+.semantic-motion[data-optical='eclipse'] .motion-edge { inset:4px; border-radius:inherit; border:1.5px solid color-mix(in srgb,var(--c-hot) 80%,transparent); box-shadow:0 0 10px color-mix(in srgb,var(--c-bright) 75%,transparent),inset 0 0 14px var(--c-mid); }
+.semantic-motion[data-optical='eclipse'] .motion-rim { border-color:color-mix(in srgb,var(--c-bright) 74%,transparent); box-shadow:inset 0 0 10px color-mix(in srgb,var(--c-glow) 80%,transparent); }
+/* Exclusive shape: no heartbeat or row clutter around the silhouette. */
+.semantic-motion[data-presentation-state='EXCLUSIVE_ACTIVE'] .kinetic-heartbeat { opacity:0 !important; animation:none !important; }
 .semantic-motion [data-reduced-marker]::after { content:''; position:absolute; inset:auto 25% 4px; height:2px; background:var(--instrument-color); border-radius:2px; }
 .semantic-motion[data-motion-reduced='true'] .instrument-motion-layer { display:none; }
 .music-motion-controls { display:flex; align-items:center; flex-wrap:wrap; gap:8px 14px; margin:0 0 12px; font-size:11px; }
