@@ -4,8 +4,10 @@
 
 .floating-focus, .floating-focus * { box-sizing: border-box; }
 
-.floating-focus button, .floating-focus input, .floating-focus select { font: inherit; }
-.floating-focus button { cursor: pointer; border: 1px solid #e4e4e9; background: #f5f5f7; color: #1a1a1a; border-radius: 10px; padding: 8px 12px; font-size: 12px; font-weight: 600; }
+/* Element defaults carry zero specificity so every component class (.dock-icon-button, .music-skip, ...) overrides them.
+   As `.floating-focus button` they outranked single-class rules and forced 24px of padding into 26-30px icon buttons. */
+:where(.floating-focus) :where(button, input, select) { font: inherit; }
+:where(.floating-focus) :where(button) { cursor: pointer; border: 1px solid #e4e4e9; background: #f5f5f7; color: #1a1a1a; border-radius: 10px; padding: 8px 12px; font-size: 12px; font-weight: 600; }
 .floating-focus button:hover:not(:disabled) { filter: brightness(.95); }
 .floating-focus button:disabled { opacity: .4; cursor: not-allowed; }
 .floating-focus button:focus-visible, .floating-focus select:focus-visible, .floating-focus input:focus-visible, .floating-focus [role="tabpanel"]:focus-visible { outline: 2px solid #647fbc; outline-offset: 3px; }
@@ -199,6 +201,9 @@
 .mini-player-wrapper { box-sizing:content-box; height:50px; flex-shrink:0; }
 .mini-player-content { height:100%; }
 .mini-player-content[aria-hidden='true'] { visibility:hidden; pointer-events:none; }
+/* The strip slot is reserved only while a session exists and another tab is active, so play/pause never shifts the dock;
+   the Music tab already shows the full player and an idle dock has nothing to reserve. */
+.mini-player-wrapper[data-reserved='false'] { display:none; }
 .tab-content-area { grid-area:content; min-width:0; max-height:min(400px,calc(100dvh - 390px)); overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; }
 .floating-focus .tab-content-area { scrollbar-width:thin; scrollbar-color:rgba(66,57,90,.35) transparent; }
 .floating-focus .tab-content-area::-webkit-scrollbar { display:block; width:5px; }
@@ -206,11 +211,6 @@
 .floating-focus[data-style='tabs'] .dock-work-pane, .floating-focus[data-style='tabs'] .dock-beat-pane { margin:12px var(--dock-space); border-radius:14px; background:rgba(255,255,255,.62); border:1px solid rgba(255,255,255,.8); box-shadow:0 3px 10px rgba(29,39,78,.07); }
 .floating-focus[data-style='tabs'] .eyebrow, .floating-focus[data-style='tabs'] .muted, .floating-focus[data-style='tabs'] .music-debug { color:var(--dock-dim); }
 .floating-focus[data-style='tabs'] button:focus-visible, .floating-focus[data-style='tabs'] input:focus-visible, .floating-focus[data-style='tabs'] select:focus-visible { outline:2px solid #6651ad; outline-offset:3px; }
-.mini-player-wrapper { box-sizing:content-box; height:50px; flex-shrink:0; }
-.mini-player-content { height:100%; }
-.mini-player-content[aria-hidden='true'] { visibility:hidden; pointer-events:none; }
-.tab-content-area { grid-area:content; min-width:0; max-height:min(400px,calc(100dvh - 390px)); overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; }
-.floating-focus .tab-content-area { scrollbar-width:thin; scrollbar-color:rgba(66,57,90,.35) transparent; }
 .floating-focus .tab-content-area::-webkit-scrollbar { display:block; width:5px; }
 .floating-focus .tab-content-area::-webkit-scrollbar-thumb { border-radius:99px; background:rgba(66,57,90,.35); }
 .floating-focus[data-style='tabs'] .dock-work-pane, .floating-focus[data-style='tabs'] .dock-beat-pane { margin:12px var(--dock-space); border-radius:14px; background:rgba(255,255,255,.62); border:1px solid rgba(255,255,255,.8); box-shadow:0 3px 10px rgba(29,39,78,.07); }
@@ -311,8 +311,6 @@
   .floating-focus[data-style='tabs'] .tab-content-area > .dock-panel:not(.dock-focus-pane) { padding:8px 10px; }
   .floating-focus[data-style='tabs'] .dock-track-pane { margin:8px 10px; gap:4px; }
   .dock-now-playing { padding:4px 10px 0; }
-  .mini-player-wrapper { height:32px; }
-  .tab-content-area { max-height:min(400px,calc(100dvh - 220px)); }
   .mini-player-wrapper { height:32px; }
   .tab-content-area { max-height:min(400px,calc(100dvh - 220px)); }
   .music-strip-play { width:26px; height:26px; }

@@ -199,7 +199,7 @@ export default function FloatingFocus(props: FloatingFocusProps) {
             <button className="dock-next" type="button" disabled={!taskId || !onMarkDoneAndNext || activeTask?.isDone} onClick={() => onMarkDoneAndNext?.(taskId)}>{t('floating.completeNext')}</button>
           </div>
         </motion.section>
-        <div className="dock-now-playing mini-player-wrapper">
+        <div className="dock-now-playing mini-player-wrapper" data-reserved={hasMusic && activeTab !== 'music'}>
           <div className="mini-player-content" aria-hidden={activeTab === 'music' || !music.playing} inert={activeTab === 'music' || !music.playing}>
             {hasMusic && <MusicNowPlaying music={music} />}
           </div>
