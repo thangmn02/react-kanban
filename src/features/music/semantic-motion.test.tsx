@@ -152,14 +152,14 @@ it('keeps valid Melody flow through level changes and cancels it on reset',()=>{
     expect(f.cells[0].querySelector<HTMLElement>('.motion-rim')!.style.opacity).toBe('0');
   }finally{engine.dispose();f.remove();}
 });
-it('ages late attacks, suppresses expired attacks and cancels old animations on same-cell rapid retriggers',()=>{
+it('starts late attacks on arrival, suppresses stale attacks and cancels old animations on same-cell rapid retriggers',()=>{
   const f=fixture(),engine=createSemanticMotion(f.host,'focus',false,()=>1000);
   try{
     expect(engine.play({key:'late',band:'hat',deadlineMs:970},f.cells[0])).toBe('animated');
-    expect(f.animations[0].currentTime).toBe(30);const firstNode=f.cells[0];
+    expect(f.animations[0].currentTime).toBe(0);const firstNode=f.cells[0];
     expect(engine.play({key:'next',band:'hat',deadlineMs:1000},f.cells[0])).toBe('animated');
     expect(f.cells[0]).toBe(firstNode);expect(f.animations.slice(0,3).every(a=>a.cancel.mock.calls.length===1)).toBe(true);expect(f.animations[3].currentTime).toBe(0);
-    expect(engine.play({key:'expired',band:'hat',deadlineMs:700},f.cells[1])).toBe('expired');expect(f.animations).toHaveLength(6);
+    expect(engine.play({key:'expired',band:'hat',deadlineMs:300},f.cells[1])).toBe('expired');expect(f.animations).toHaveLength(6);
     engine.reset();expect(f.animations[3].cancel).toHaveBeenCalledOnce();expect(f.host.querySelector('[data-motion-active]')).toBeNull();
   }finally{engine.dispose();f.remove();}
 });
@@ -191,7 +191,7 @@ it('illuminates the existing cell group with one attack and cancels the entire g
   const f=fixture(),engine=createSemanticMotion(f.host,'focus',false,()=>1000);
   try{
     engine.play({key:'group',band:'hat',deadlineMs:970},f.cells);
-    expect(f.animations).toHaveLength(6);expect(f.animations.every(a=>a.currentTime===30)).toBe(true);
+    expect(f.animations).toHaveLength(6);expect(f.animations.every(a=>a.currentTime===0)).toBe(true);
     expect(f.cells.every(cell=>cell.dataset.motionActive==='group')).toBe(true);
     const oldFinish=f.animations.at(-1)!.onfinish;
     engine.play({key:'next',band:'hat',deadlineMs:1000},[f.cells[1]]);

@@ -14,11 +14,11 @@ const ease={kick:'cubic-bezier(0.16,1,0.3,1)',clap:'cubic-bezier(0.18,1,0.32,1)'
 const none='0 0 0 0 transparent';
 /** Kinetic Grid pads: each row owns a five-step palette and a signature pulse. */
 export const instrumentMotion = {
-  kick:{name:'Kick',color:'#f43f5e',deep:'#7f1d1d',bright:'#fda4af',hot:'#fff1f2',glow:'rgba(244,63,94,.62)',duration:520,signature:'impact',
+  kick:{name:'Kick',color:'#f43f5e',deep:'#7f1d1d',bright:'#fb7185',hot:'#fff1f2',glow:'rgba(244,63,94,.62)',duration:520,signature:'impact',
     cell:[{transform:'scale(.92)',boxShadow:`${none},${none}`},{offset:.16,transform:'scale(1.135)',boxShadow:'0 8px 26px -6px var(--c-glow),0 0 30px -4px var(--c-glow)'},{offset:.42,transform:'scale(1.04)'},{transform:'scale(1)',boxShadow:`${none},${none}`}] as Frame[]},
-  clap:{name:'Snare / Clap',color:'#f59e0b',deep:'#78350f',bright:'#fde68a',hot:'#fffbeb',glow:'rgba(245,158,11,.62)',duration:440,signature:'snap',
+  clap:{name:'Snare / Clap',color:'#f59e0b',deep:'#78350f',bright:'#fbbf24',hot:'#fffbeb',glow:'rgba(245,158,11,.62)',duration:440,signature:'snap',
     cell:[{transform:'scale(.94)',boxShadow:none},{offset:.14,transform:'scale(1.1,1.08)',boxShadow:'0 8px 24px -4px var(--c-glow)'},{transform:'scale(1)',boxShadow:none}] as Frame[]},
-  hat:{name:'Hi-Hat',color:'#06b6d4',deep:'#0c4a6e',bright:'#a5f3fc',hot:'#ecfeff',glow:'rgba(6,182,212,.58)',duration:220,signature:'glint',
+  hat:{name:'Hi-Hat',color:'#06b6d4',deep:'#0c4a6e',bright:'#22d3ee',hot:'#ecfeff',glow:'rgba(6,182,212,.58)',duration:220,signature:'glint',
     cell:[{transform:'scale(.96)',boxShadow:none},{offset:.2,transform:'scale(1.055)',boxShadow:'0 0 14px var(--c-glow)'},{transform:'scale(1)',boxShadow:none}] as Frame[]},
   bass:{name:'Bass',color:'#9333ea',deep:'#3b0764',bright:'#e879f9',hot:'#fdf4ff',glow:'rgba(168,85,247,.6)',duration:780,signature:'resonance',
     cell:[{transform:'scale(.96)',boxShadow:none},{offset:.24,transform:'scale(1.085,1.06)',boxShadow:'0 8px 26px -2px var(--c-glow)'},{transform:'scale(1)',boxShadow:none}] as Frame[]},
@@ -27,7 +27,8 @@ export const instrumentMotion = {
 } as const;
 /** Inner layers: aura (color), hotspot (core light), rim (edge). Hat and Bass reuse their row duration. */
 const layerFrames:Frame[][]=[
-  [{opacity:1,transform:'scale(.92)',filter:'brightness(1.52) saturate(1.12)'},{offset:.18,opacity:1,transform:'scale(1.04)'},{opacity:0,transform:'scale(.96)',filter:'brightness(1) saturate(1)'}],
+  // The colour holds through mid-flash so short Kick/Snare/Hat hits read as solidly as the longer Bass.
+  [{opacity:1,transform:'scale(.92)',filter:'brightness(1.52) saturate(1.12)'},{offset:.18,opacity:1,transform:'scale(1.04)'},{offset:.5,opacity:.85},{opacity:0,transform:'scale(.96)',filter:'brightness(1) saturate(1)'}],
   [{opacity:1,transform:'scale(1.06)'},{offset:.3,opacity:.8},{opacity:0,transform:'scale(.9)'}],
   [{opacity:1},{offset:.35,opacity:.85},{opacity:0}],
 ];
@@ -58,6 +59,8 @@ export const geometricPatterns:Record<PatternName,{theme:'heart'|'star'|'diamond
   wave:{theme:'diamond',glow:'rgba(56,189,248,.75)',center:[2,0],five:['00110000','01111001','11001111','10000110','00000000'],four:['00110000','01111001','11001111','10000110']},
 };
 export const PATTERN_CELL_MS=720,PATTERN_RIPPLE_MS=24;
+/** A detection arriving later than this after its audio deadline is stale and not shown. */
+export const LATE_ARRIVAL_MS=600;
 /** Shape bursts land on a real Kick every 16 beats of a locked tempo, else every 8 s. */
 export const burstIntervalMs=(bpm?:number|null)=>bpm&&bpm>=60&&bpm<=200?16*60000/bpm:8000;
 /** Lit cells of a shape with their center-out ripple delays. */
@@ -162,8 +165,11 @@ export function createSemanticMotion(root:HTMLElement,profile:MotionProfile,redu
       if(disposed||root.ownerDocument.hidden||!Number.isFinite(attack.deadlineMs))return 'hidden-or-invalid';
       const cells=asCells(target);if(!cells.length)return 'hidden-or-invalid';
       const elapsed=now()-attack.deadlineMs,duration=motionDuration(attack);
-      if(elapsed>=duration)return 'expired';
+      // Live percussion reaches the grid ~200 ms after its audio deadline. Scheduling it at that past deadline played
+      // only the faded tail (a 220 ms hat was invisible), so a late arrival flashes from its start on arrival instead.
+      if(elapsed>=Math.max(duration,LATE_ARRIVAL_MS))return 'expired';
       if(owned(attack.deadlineMs))return 'pattern-exclusive';
+      const startAt=Math.max(attack.deadlineMs,now());
       if(reduced||typeof cells[0].animate!=='function'){
         const band=root.querySelector(`[data-motion-band="${attack.band}"]`);
         band?.querySelectorAll<HTMLElement>('.instrument-motion-layer').forEach(clearTrace);
@@ -179,10 +185,10 @@ export function createSemanticMotion(root:HTMLElement,profile:MotionProfile,redu
       clearRow(attack.band);
       const token=instrumentMotion[attack.band];
       const animations=cells.flatMap(cell=>{
-        const own=[schedule(cell.animate(token.cell,{duration:token.duration,easing:ease[attack.band],fill:'none'}),attack.deadlineMs),
-          ...layers(cell).map((element,index)=>schedule(element.animate(layerFrames[index],{...layerTiming(attack.band,index),fill:'forwards'}),attack.deadlineMs))];
+        const own=[schedule(cell.animate(token.cell,{duration:token.duration,easing:ease[attack.band],fill:'none'}),startAt),
+          ...layers(cell).map((element,index)=>schedule(element.animate(layerFrames[index],{...layerTiming(attack.band,index),fill:'forwards'}),startAt))];
         const shock=attack.band==='kick'?cell.querySelector<HTMLElement>('.motion-shock'):null;
-        if(shock&&typeof shock.animate==='function')own.push(schedule(shock.animate(shockFrames,{duration:520,easing:ease.kick,fill:'none'}),attack.deadlineMs));
+        if(shock&&typeof shock.animate==='function')own.push(schedule(shock.animate(shockFrames,{duration:520,easing:ease.kick,fill:'none'}),startAt));
         return own;
       });
       cells.forEach(cell=>{cell.dataset.motionActive=attack.key;});rows.set(attack.band,{cells:[...cells],animations});
