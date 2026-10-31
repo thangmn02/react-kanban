@@ -46,9 +46,15 @@ for(const[name,value]of Object.entries(production))if(/SERVICE_ROLE|DB_URL|PASSW
 if(production.KORA_PRODUCTION_DB_URL)credentials.push(decodeURIComponent(new URL(production.KORA_PRODUCTION_DB_URL).password));
 for(const file of ['.env.staging.local']){try{for(const[name,value]of Object.entries(parseEnv(await readFile(file,'utf8'))))if(/SERVICE_ROLE|DB_URL|SECRET/.test(name)&&value?.length>=8)credentials.push(value);}catch(error){if(error.code!=='ENOENT')throw error;}}
 
-// The public Companion is outside this release: publish the live bytes unchanged.
-const live=Buffer.from(await (await fetch('https://koraspace.online/downloads/kora-music-companion.zip',{signal:AbortSignal.timeout(120000)})).arrayBuffer());
-assert.ok(live.length>1_000_000,'Could not retain the live Companion download.');
+// The public Companion changes only when the release names its qualified version; otherwise the live bytes are kept.
+const companionVersion=arg('companion-version');
+const companionVersionOf=file=>JSON.parse(execFileSync(join(process.env.SystemRoot,'System32','tar.exe'),['-xOf',file,'manifest.json'],{encoding:'utf8'})).version;
+let live;
+if(companionVersion){
+  for(const name of ['kora-music-companion.zip','kanban-music-companion.zip'])assert.equal(companionVersionOf(join(dist,'downloads',name)),companionVersion,`dist ${name} is not Companion ${companionVersion}.`);
+  live=await readFile(join(dist,'downloads','kora-music-companion.zip'));
+}else live=Buffer.from(await (await fetch('https://koraspace.online/downloads/kora-music-companion.zip',{signal:AbortSignal.timeout(120000)})).arrayBuffer());
+assert.ok(live.length>1_000_000,'Could not prepare the Companion download.');
 const files={},bytesBySha=new Map(),inventory=[];
 async function collect(directory){
   for(const name of await readdir(directory)){
