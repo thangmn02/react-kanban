@@ -5,9 +5,10 @@ const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 export const enhancedBeatSyncVersion='0.3.31';
 
 /** Public Enhanced Beat Sync, layered on the source-audio-delay transform (run that first).
- *  The 0.3.29 evaluation route forgot an approved delay whenever a seek or track change restarted capture, so every
- *  song needed a fresh paused activation. Here an approval from Kora stands for the rest of that Kora subscription:
- *  when a restarted capture proves audible output, the Companion re-applies the approved delay at that boundary.
+ *  Kora's approval stands for its subscription. When a seek, track change or recovery restarts capture, the
+ *  Companion re-applies the approved delay right at that boundary, using the two steps its audio engine accepts:
+ *  hold the new output paused with the delay set, then resume into the delayed output. One attempt per capture;
+ *  a refusal falls back to normal output (never a capture restart, which looped) and Kora re-applies it later.
  *  Turning it off, ending the subscription or losing eligibility still restores normal output. */
 export function prepareEnhancedBeatSync(files){
   const get=name=>{const matches=files.filter(file=>file.name===name);assert.equal(matches.length,1,name);return matches[0];};
@@ -22,32 +23,51 @@ export function prepareEnhancedBeatSync(files){
     replace('        current.experiment=experiment;current.delaySeconds=next.bufferMs/1000;\n',
       '        current.experiment=experiment;current.delaySeconds=next.bufferMs/1000;\n'
       +'        current.standingDelay=configuration.enabled&&Number.isInteger(configuration.compensationMs)&&configuration.compensationMs>0?{compensationMs:configuration.compensationMs}:undefined;\n');
-    // A restarted capture (seek, track change, recovery) re-applies the standing delay once audible output is proven.
     replace('    current.fallbackReason = undefined;\n    publishState(current);\n  }\n',
-      '    current.fallbackReason = undefined;\n    publishState(current);\n    restoreStandingDelay(current);\n  }\n\n'
-      +`  function restoreStandingDelay(current) {
-    const standing=current.standingDelay,clock=current.clock;
-    if(!standing||!delayCandidate(current)||current.delaySeconds>0||!current.captureId||!clock?.playing||clock.seeking||clock.buffering)return;
+      '    current.fallbackReason = undefined;\n    publishState(current);\n    current.captureConfirmedAt=Date.now();void restoreStandingDelay(current);\n  }\n\n'
+      +`  async function restoreStandingDelay(current) {
+    const standing=current.standingDelay,clock=current.clock,captureId=current.captureId;
+    // Only right after a capture (re)starts, i.e. at the seek or track boundary, never later in the song.
+    if(!standing||!delayCandidate(current)||current.delaySeconds>0||!captureId||current.restoreAttempt===captureId
+      ||!(Date.now()-(current.captureConfirmedAt||0)<1500)||!clock?.playing||clock.seeking||clock.buffering)return;
     const available=capability(current);if(!available?.compensationEligible)return;
-    const captureId=current.captureId;
     const experiment={enabled:true,compensationMs:standing.compensationMs,intentionalDelay:true,outputHeard:true,authorizedAudio:true,preview:true,
       captureId,generation:clock.generation||0,detectorVariant:'L0',bufferMs:standing.compensationMs,calibration:{...current.calibration}};
     const next=decideBeatMode({...modeFacts(current),experiment});
     if(next.mode!=='experimental-buffered'||!(next.bufferMs>0))return;
+    current.restoreAttempt=captureId;
+    const settings={bufferMs:next.bufferMs,allowTypedPreview:next.allowTypedPreview,eligible:true,flush:true,detectorVariant:'L0'};
+    const step=async(extra)=>{const epoch=crypto.randomUUID();current.synchronizationEpoch=epoch;
+      const result=await timeout(offscreenMessage({kind:'synchronization',captureId,settings:{...settings,...extra,epoch}}),1500).catch(()=>undefined);
+      return state===current&&current.captureId===captureId&&current.synchronizationEpoch===epoch&&result?.ok===true;};
+    // Hold the fresh output paused with the delay, then resume into it: one gap, at the boundary.
+    if(await step({paused:true})&&await step({paused:false,resume:true})){
+      current.experiment=experiment;current.delaySeconds=next.bufferMs/1000;
+      telemetry.record('COMPENSATION_RESTORED',undefined,{captureId,configuredAudioDelayMs:next.bufferMs});
+      publish(current,{kind:'clock',clock:audibleClock(fencedClock(current),current.delaySeconds)});publishState(current);return;
+    }
+    if(state!==current||current.captureId!==captureId)return;
     const epoch=crypto.randomUUID();current.synchronizationEpoch=epoch;
-    void timeout(offscreenMessage({kind:'synchronization',captureId,settings:{bufferMs:next.bufferMs,allowTypedPreview:next.allowTypedPreview,
-      eligible:true,paused:false,resume:true,flush:true,epoch,detectorVariant:'L0'}}),1500).then(result=>{
-        if(state!==current||current.captureId!==captureId||current.synchronizationEpoch!==epoch)return;
-        if(result?.ok!==true){cancelCapture(current);return;}
-        current.experiment=experiment;current.delaySeconds=next.bufferMs/1000;
-        telemetry.record('COMPENSATION_RESTORED',undefined,{captureId,configuredAudioDelayMs:next.bufferMs});
-        publish(current,{kind:'clock',clock:audibleClock(fencedClock(current),current.delaySeconds)});publishState(current);
-      },()=>{if(state===current&&current.synchronizationEpoch===epoch)cancelCapture(current);});
+    void timeout(offscreenMessage({kind:'synchronization',captureId,settings:{bufferMs:0,eligible:false,allowTypedPreview:false,flush:true,paused:false,epoch}}),1500).catch(()=>{});
+    publishState(current);
   }
 `);
+    // A capture can be proven audible while the page still reports seeking; retry on the next clock samples.
+    replace('      if (resumed) current.retryAt = 0;\n','      if (resumed) current.retryAt = 0;\n      void restoreStandingDelay(current);\n');
+    // A new source in the same tab replaces the session state; carry the approval for the same owner, tab and document.
+    // Every ending (replacement, Kora unsubscribing, or the page emptying its media at a track change) remembers the
+    // approval briefly; the next state for the same owner, tab and document resumes it.
+    replace("  async function stopCurrent(keepOffscreen = false,reason='stopped') {\n    const previous = state;\n",
+      "  let recentStanding;\n  const standingKeyOf=(owner,session)=>`${owner.native||owner.tabId}:${session.tabId}:${session.documentId}`;\n"
+      +"  async function stopCurrent(keepOffscreen = false,reason='stopped') {\n    const previous = state;\n"
+      +"    if(previous?.standingDelay)recentStanding={key:standingKeyOf(previous.owner,previous.session),standing:previous.standingDelay,at:Date.now()};\n");
+    replace("          tabMuted: session.tabMuted, clock: session };\n        state = current;\n",
+      "          tabMuted: session.tabMuted, clock: session,\n"
+      +"          standingDelay:recentStanding?.key===standingKeyOf(owner,session)&&Date.now()-recentStanding.at<10000?recentStanding.standing:undefined };\n"
+      +"        recentStanding=undefined;\n        state = current;\n");
   });
   const manifest=get('manifest.json'),metadata=JSON.parse(manifest.bytes);
   Object.assign(metadata,{version:enhancedBeatSyncVersion,name:'Kora Music Companion'});delete metadata.version_name;
   manifest.bytes=Buffer.from(JSON.stringify(metadata,null,2)+'\n');
-  return {enhancedBeatSync:true,standingApproval:'kora-subscription',files:proof};
+  return {enhancedBeatSync:true,approval:'kora-subscription, boundary restore once per capture',files:proof};
 }

@@ -39,7 +39,7 @@ it('stays Off and never routes without the approval',async()=>{
 });
 it('routes automatically after the approval and applies the delay with a brief pause while playing',async()=>{
   let current=session({syncState:owned(0)});
-  native.media.mockImplementation(async(action:string)=>{if(action==='media.pause')current={...current,paused:true,playing:false};if(action==='media.play')current={...current,paused:false,playing:true};return [];});
+  native.media.mockImplementation(async(action:string)=>{if(action==='media.pause')current={...current,paused:true,playing:false};if(action==='media.play')current={...current,paused:false,playing:true};return [current];});
   const {result,rerender}=renderHook(()=>useSourceAudioDelay(current,vi.fn()));
   turnOn();
   await waitFor(()=>expect(result.current.routed).toBe(true));

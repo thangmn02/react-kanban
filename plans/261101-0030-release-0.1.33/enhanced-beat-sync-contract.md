@@ -84,3 +84,43 @@ No 170 ms field, no capture, buffer or route wording, no candidate text.
 - no repeated consent or pause cycles after the first opt-in.
 
 **If seamless activation can't meet this:** keep a boundary-only activation, or leave the feature experimental.
+
+## Implementation and measurements (November 1, 2026)
+
+**Status:** implemented. Engineering qualification passes, but the owner listening test is still pending, so the feature is not released.
+
+**Kora** (`src/features/music/use-source-audio-delay.ts`, `source-audio-delay-control.tsx`):
+- **Approval:** one approval, `kora.music.enhancedBeatSync.v1`, holding `{enabled, approvedDelayMs: 170, scope, approvedAt}`. Off by default; any other delay needs a new approval.
+- **Route:** belongs to the music tab, not to a song. Only turning the setting off or selecting another tab ends it.
+- **Automatic activation:** with the approval, Kora routes eligible sources itself. It applies the delay once per capture; if the song is playing, it briefly pauses it, applies the delay and resumes. Failed starts retry after 5 s.
+- **UI:**
+  - dock setting with a single explanation;
+  - compact Music-tab status: Off, Preparing, On, Unavailable or Error;
+  - one-time Companion-click hint;
+  - no research controls.
+
+**Companion 0.3.31** (`scripts/enhanced-beat-sync-package.mjs`, `--enhanced-beat-sync`) is the 0.3.29 delay route plus these changes:
+- **Standing approval:** stands for the Kora subscription, survives state replacement for the same owner, tab and document, and is remembered for 10 s across endings.
+- **Boundary restore:** after a seek or track change, the delay is re-applied at the boundary in the two steps the audio engine accepts: hold the output paused with the delay set, then resume into it. One attempt per capture, only within 1.5 s of the capture starting.
+- **Refusal handling:** a refusal falls back to normal output; it never restarts capture.
+
+**A rejected first attempt:** re-applying the delay mid-playback was refused by the engine, and capture restarted every ~190 ms (audible stutter, then 3 s of silence). Tests now guard against that loop.
+
+**Real playback**, measured on:
+- the isolated qualification build (`app.kanthangboard.qualification`);
+- Companion 0.3.31 in a temporary Playwright Chromium profile;
+- a steady 440 Hz test tone;
+- a passive tap on everything the Companion's output sends to the speakers, sampled every 10 ms (`scripts/qualify-enhanced-beat-sync.mjs`).
+
+| Transition | Kora action | Silence heard | Assessment |
+|---|---|---|---|
+| Turning on while playing | one 30 ms pause | 190 ms (+30 ms) | once per music tab |
+| Seek | none | 170 ms + 171 ms (≈0.34 s) | at the seek; above the 170 ms target |
+| Track change (new src) | none | none ≥ 15 ms | pass |
+| Pause / resume | none | only the pause itself | pass |
+| Doubling or echo | — | 0 samples above twice the steady level | pass |
+| Turning off | stop route | not measurable with this tap (offscreen closes) | needs listening; the 0.3.29 output fades over 12 ms before release |
+
+**Remaining before release:**
+1. Owner listening on real YouTube, YouTube Music and SoundCloud tracks, including turning it off mid-song.
+2. Decide whether the ≈0.34 s seek gap is acceptable, or start a restored capture already delayed (one gap instead of two). That second option needs an engine change.

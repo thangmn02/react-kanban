@@ -55,33 +55,33 @@ export function sourceDelayStatus({preferred,routed,pending,error,supported,sess
   return routed&&mode&&mode.bufferMs>0&&mode.outputOwned?'on':'preparing';
 }
 
-const settle=(test:()=>boolean,timeoutMs:number)=>new Promise<boolean>(resolve=>{
-  const started=Date.now(),check=()=>{if(test())resolve(true);else if(Date.now()-started>=timeoutMs)resolve(false);else setTimeout(check,50);};check();
-});
-
 export function useSourceAudioDelay(selected:BrowserMusicSession|undefined,refresh:()=>void){
   const preference=useEnhancedBeatSyncPreference(),available=preference.available;
   // The route belongs to the music tab, not to a song: track changes and seeks keep it.
   const owner=selected?sourceKey(selected.id):'';
   const latest=useRef({owner,session:selected});latest.current={owner,session:selected};
   const [route,setRoute]=useState<{owner:string;sessionId?:string;enabled:boolean}>({owner:'',enabled:false});
-  const [pending,setPending]=useState<Pending>(),[failure,setFailure]=useState({owner:'',capture:'',message:''});
+  const [pending,setPending]=useState<Pending>(),[failure,setFailure]=useState({owner:'',capture:'',message:'',retryAt:0});
   // Every request takes a token; a completion whose token was superseded never touches route state.
   const token=useRef(0);
   const supported=sourceDelaySupported(selected);
   const routed=available&&route.enabled&&Boolean(owner)&&route.owner===owner;
   const mode=selected?.syncState?.capability,captureId=selected?.syncState?.captureId;
   const error=failure.owner===owner&&(!failure.capture||failure.capture===captureId)?failure.message:'';
+  // A failed start retries on its own after a short wait; a busy Companion during capture restart is transient.
+  const [now,setNow]=useState(Date.now);
+  useEffect(()=>{if(!failure.retryAt)return;const wait=setTimeout(()=>setNow(Date.now()),Math.max(0,failure.retryAt-Date.now()));return()=>clearTimeout(wait);},[failure.retryAt]);
+  const retryDue=Boolean(failure.retryAt)&&now>=failure.retryAt;
 
   async function start(session:BrowserMusicSession){
     const mine=++token.current,key=sourceKey(session.id);
-    setPending('on');setFailure({owner:'',capture:'',message:''});
+    setPending('on');setFailure({owner:'',capture:'',message:'',retryAt:0});
     try{
       await prepareNativeSourceAudioDelay(session.id);
       // OFF or a source change arrived meanwhile: retire the intent this request just created.
       if(token.current!==mine||latest.current.owner!==key){await stopNativeSourceAudioDelay(session.id).catch(()=>{});return;}
       setRoute({owner:key,sessionId:session.id,enabled:true});
-    }catch(reason){if(token.current===mine)setFailure({owner:key,capture:'',message:reason instanceof Error?reason.message:'Enhanced Beat Sync could not start.'});}
+    }catch(reason){if(token.current===mine)setFailure({owner:key,capture:'',message:reason instanceof Error?reason.message:'Enhanced Beat Sync could not start.',retryAt:Date.now()+5000});}
     finally{if(token.current===mine)setPending(undefined);}
   }
   async function stop(){
@@ -90,19 +90,21 @@ export function useSourceAudioDelay(selected:BrowserMusicSession|undefined,refre
     try{
       if(sessionId)await stopNativeSourceAudioDelay(sessionId);
       if(token.current===mine)setRoute({owner:'',enabled:false});
-    }catch{if(token.current===mine)setFailure({owner:previous,capture:'',message:'Turning off is not confirmed. Close the music tab to restore normal sound, or try again.'});}
+    }catch{if(token.current===mine)setFailure({owner:previous,capture:'',message:'Turning off is not confirmed. Close the music tab to restore normal sound, or try again.',retryAt:Date.now()+5000});}
     finally{if(token.current===mine)setPending(undefined);}
   }
 
   // Reconcile the route with the standing preference and the selected music tab.
   useEffect(()=>{
     if(!available||pending)return;
-    const wanted=preference.enabled&&supported&&Boolean(owner);
-    if(route.enabled&&(!wanted||route.owner!==owner)){if(!(failure.owner===route.owner&&failure.message))void stop();return;}
-    if(!route.enabled&&wanted&&!error&&selected)void start(selected);
+    // Only turning the setting off or selecting a different tab ends the route. A seek, a refresh that briefly
+    // drops the selection or a momentarily ineligible source keeps it; the Companion itself withholds the delay.
+    const otherTab=Boolean(owner)&&route.owner!==owner;
+    if(route.enabled&&(!preference.enabled||otherTab)){if(!(failure.owner===route.owner&&failure.message&&!retryDue))void stop();return;}
+    if(!route.enabled&&preference.enabled&&supported&&owner&&selected&&(!error||retryDue))void start(selected);
   });
   // A new approval (or turning it off) clears an earlier failure so the next attempt is clean.
-  useEffect(()=>{setFailure({owner:'',capture:'',message:''});},[preference.enabled]);
+  useEffect(()=>{setFailure({owner:'',capture:'',message:'',retryAt:0});},[preference.enabled]);
 
   // Apply the approved delay once per capture. Applying needs a paused source, so a playing song pauses briefly first.
   const applied=useRef('');
@@ -116,19 +118,20 @@ export function useSourceAudioDelay(selected:BrowserMusicSession|undefined,refre
       let applied=false;
       try{
         if(wasPlaying){
-          await sendMusicRequest('media.pause',sessionId);
-          // The Companion accepts the delay only after its own clock has seen the pause.
-          if(!await settle(()=>current()?.paused===true,2000))throw Error('pause');
+          // The pause reply is the source's own state; Kora's polled copy can lag by seconds.
+          const after=await sendMusicRequest('media.pause',sessionId);
+          if(after.find(item=>item.id===sessionId)?.paused!==true)throw Error('pause');
         }
-        for(let attempt=0;attempt<3&&!applied&&token.current===mine;attempt++){
-          const session=current(),facts=session?.syncState?.capability,id=session?.syncState?.captureId;
-          if(!session||!facts||!id||id!==capture)break;
-          applied=await configureExperimentalSynchronization(sessionId,{enabled:true,captureId:id,generation:facts.generation,
+        // The Companion accepts the delay once its clock has seen the pause (about one 100 ms sample), so retry briefly.
+        const generation=current()?.syncState?.capability?.generation??mode.generation;
+        for(let attempt=0;attempt<8&&!applied&&token.current===mine;attempt++){
+          if(current()?.syncState?.captureId&&current()!.syncState!.captureId!==capture)break;
+          applied=await configureExperimentalSynchronization(sessionId,{enabled:true,captureId:capture,generation,
             compensationMs:SOURCE_AUDIO_DELAY_MS,intentionalDelay:true,authorizedAudio:true,outputHeard:true,preview:true}).then(()=>true,()=>false);
-          if(!applied)await new Promise(done=>setTimeout(done,200));
+          if(!applied)await new Promise(done=>setTimeout(done,100));
         }
-        if(!applied&&token.current===mine)setFailure({owner,capture,message:'The delay could not start on this song. It will try again on the next one.'});
-      }catch{if(token.current===mine)setFailure({owner,capture,message:'The delay could not start on this song. It will try again on the next one.'});}
+        if(!applied&&token.current===mine)setFailure({owner,capture,message:'The delay could not start on this song. It will try again on the next one.',retryAt:0});
+      }catch{if(token.current===mine)setFailure({owner,capture,message:'The delay could not start on this song. It will try again on the next one.',retryAt:0});}
       finally{
         // Resume a song this paused, even if the pause has not been reported back yet.
         if(wasPlaying)await sendMusicRequest('media.play',sessionId).catch(()=>{});
