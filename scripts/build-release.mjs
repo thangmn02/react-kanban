@@ -20,11 +20,12 @@ assert.match(local.VITE_SUPABASE_ANON_KEY,/^sb_publishable_/,'Only the browser-s
 const env={...process.env,
   VITE_AUTH_MODE:'supabase',VITE_SUPABASE_URL:local.VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY:local.VITE_SUPABASE_ANON_KEY,
   VITE_TURNSTILE_SITE_KEY:shared.VITE_TURNSTILE_SITE_KEY||'',VITE_ENABLE_NOTES_PREVIEW:'true',
-  // Experiments stay off in every public build.
-  VITE_ENABLE_BEAT_GRID_PREVIEW:'false',VITE_ENABLE_SOURCE_AUDIO_DELAY:'false',VITE_PRIVATE_NATIVE_COMPANION_CAPTURE:'false',
+  // Experiments stay off in every public build. Enhanced Beat Sync ships in Windows only, Off until the owner turns it on.
+  VITE_ENABLE_BEAT_GRID_PREVIEW:'false',VITE_ENABLE_SOURCE_AUDIO_DELAY:target==='windows'?'true':'false',VITE_PRIVATE_NATIVE_COMPANION_CAPTURE:'false',
   VITE_PRIVATE_LOCAL_HYBRID:'false',VITE_PRIVATE_BEAT_CANDIDATE:'false',VITE_OWNER_PREVIEW_LOOPBACK:'false',VITE_ENABLE_DESIGN_LAB:'false',
   ...(target==='windows'?{VITE_NOTE_IMAGES_URL:'https://koraspace.online/api/note-images'}:{VITE_NOTE_IMAGES_URL:''})};
 for(const name of ['KORA_OWNER_PREVIEW_LOOPBACK','GEMINI_API_KEY','SUPABASE_SERVICE_ROLE_KEY'])delete env[name];
+if(target==='windows')env.KORA_ENABLE_SOURCE_AUDIO_DELAY='1';else delete env.KORA_ENABLE_SOURCE_AUDIO_DELAY;
 // The installer bundles the public Companion that Kora installs on request. Bundle an explicitly supplied, already
 // published package instead of regenerating the branch's unreleased Companion.
 const companion=process.argv.find(value=>value.startsWith('--companion-bundle='))?.slice(19);
