@@ -11,7 +11,8 @@ const nativeWindow = vi.hoisted(() => ({ setSize: vi.fn().mockResolvedValue(unde
   setEffects: vi.fn().mockResolvedValue(undefined), clearEffects: vi.fn().mockResolvedValue(undefined),
   minimize: vi.fn().mockResolvedValue(undefined), close: vi.fn().mockResolvedValue(undefined), startDragging: vi.fn().mockResolvedValue(undefined),
   isMaximized: vi.fn().mockResolvedValue(false), toggleMaximize: vi.fn().mockResolvedValue(undefined),
-  unmaximize: vi.fn().mockResolvedValue(undefined), onResized: vi.fn().mockResolvedValue(() => {}) }));
+  unmaximize: vi.fn().mockResolvedValue(undefined), onResized: vi.fn().mockResolvedValue(() => {}),
+  onFocusChanged: vi.fn().mockResolvedValue(() => {}) }));
 const nativeInvoke = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: nativeInvoke, isTauri: () => true }));
 vi.mock('@tauri-apps/api/window', () => ({ getCurrentWindow: () => nativeWindow, currentMonitor: async () => null, Effect: { Blur: 'blur' },
@@ -177,5 +178,27 @@ it('badges the update button and offers one quiet note for a Kora update, then f
     await waitFor(() => expect(nativeInvoke).toHaveBeenCalledWith('native_music_setup'));
     expect(view.queryByRole('status')).toBeNull();
     expect(shadow.querySelector('.dock-update-badge')).not.toBeNull();
+  } finally { vi.useRealTimers(); }
+});
+
+it('pins the dock above other windows again when focus moves away and every minute, and only while docked', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  try {
+    let focusChanged: ((event: { payload: boolean }) => void) | undefined;
+    nativeWindow.onFocusChanged.mockImplementation(async (listener: (event: { payload: boolean }) => void) => { focusChanged = listener; return () => {}; });
+    const view = render(<I18nProvider><NativeSurface dock focusProps={props}>Workspace</NativeSurface></I18nProvider>);
+    await waitFor(() => expect(focusChanged).toBeTypeOf('function'));
+    const pins = () => nativeWindow.setAlwaysOnTop.mock.calls.filter(([enabled]) => enabled === true).length;
+    expect(pins()).toBe(1);
+    act(() => focusChanged!({ payload: true }));
+    expect(pins()).toBe(1);
+    act(() => focusChanged!({ payload: false }));
+    expect(pins()).toBe(2);
+    await act(async () => { vi.advanceTimersByTime(60_000); });
+    expect(pins()).toBe(3);
+    view.rerender(<I18nProvider><NativeSurface dock={false} focusProps={props}>Workspace</NativeSurface></I18nProvider>);
+    await waitFor(() => expect(nativeWindow.setAlwaysOnTop).toHaveBeenLastCalledWith(false));
+    await act(async () => { vi.advanceTimersByTime(120_000); });
+    expect(nativeWindow.setAlwaysOnTop).toHaveBeenLastCalledWith(false);
   } finally { vi.useRealTimers(); }
 });

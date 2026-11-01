@@ -102,8 +102,18 @@ export default function NativeSurface({ dock, onToggle, focusProps, children }: 
   }, [dock]);
   useEffect(() => {
     // Tasks is a normal app window; only the compact dock stays above other apps.
-    void getCurrentWindow().setAlwaysOnTop(dock).catch(() =>
+    const nativeWindow = getCurrentWindow();
+    const pin = () => void nativeWindow.setAlwaysOnTop(dock).catch(() =>
       setError(vi ? 'Không thể cập nhật cửa sổ.' : 'Window action failed.'));
+    pin();
+    if (!dock) return;
+    // Windows can drop the topmost flag (another always-on-top app, a fullscreen app, a display change),
+    // so the dock pins itself again whenever focus moves to another window, and once a minute.
+    let active = true, stop: (() => void) | undefined;
+    void nativeWindow.onFocusChanged(({ payload: focused }) => { if (!focused) pin(); })
+      .then(unlisten => { if (active) stop = unlisten; else unlisten(); }).catch(() => {});
+    const timer = setInterval(pin, 60_000);
+    return () => { active = false; stop?.(); clearInterval(timer); };
   }, [dock, vi]);
   useEffect(() => {
     let active = true;
