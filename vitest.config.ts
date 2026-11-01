@@ -4,7 +4,7 @@ import releaseVersion from './release-version.json' with { type: 'json' };
 
 // https://vite.dev/config/
 export default defineConfig({
-  define: { __KORA_VERSION__: JSON.stringify(releaseVersion.display) },
+  define: { __KORA_VERSION__: JSON.stringify(releaseVersion.display), __KORA_BUILD_ID__: JSON.stringify('test-build'), __KORA_COMPANION_VERSION__: JSON.stringify('0.3.36') },
   plugins: [react()],
   test: {
     environment: 'jsdom',

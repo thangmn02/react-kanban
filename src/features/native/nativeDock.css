@@ -33,3 +33,7 @@
 .floating-focus[data-appearance='dark'].glass { background:linear-gradient(165deg,rgba(40,40,46,.86),rgba(22,22,26,.82) 48%,rgba(32,32,38,.86)); border-color:rgba(255,255,255,.12); }
 .floating-focus[data-style='tabs'][data-appearance='dark'] { --dock-glass-face:linear-gradient(165deg,rgba(40,40,46,.86),rgba(22,22,26,.82) 48%,rgba(32,32,38,.86)); border-color:rgba(255,255,255,.12); }
 .floating-focus[data-appearance='dark'] .dock-settings { background:rgba(36,36,40,.97); }
+/* A Kora update is ready: a small dot on the dock's update button. */
+.dock-update-badge { position:relative; }
+.dock-update-badge::after { content:''; position:absolute; top:5px; right:5px; width:7px; height:7px; border-radius:50%; background:#0a84ff; box-shadow:0 0 0 2px rgba(255,255,255,.9); }
+.floating-focus[data-appearance='dark'] .dock-update-badge::after { box-shadow:0 0 0 2px rgba(28,28,32,.95); }

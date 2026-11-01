@@ -6,14 +6,25 @@ import {localHybridDevelopmentPlugin} from './server/vite-local-hybrid-plugin'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { copyFile, rm } from 'node:fs/promises'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import releaseVersion from './release-version.json' with { type: 'json' }
+
+// One id per build. A running web tab compares it with /build.json to offer a reload after a deploy.
+const buildId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+// The Companion this build carries; music:package and build-release refresh this folder before every build.
+const companionManifest = resolve('src-tauri/generated/music-companion/extension/manifest.json')
+const bundledCompanion: string = existsSync(companionManifest) ? JSON.parse(readFileSync(companionManifest, 'utf8')).version ?? '' : ''
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
   // Shown to people; the internal Kora/Companion numbers keep rising so updates still install.
-  define: { __KORA_VERSION__: JSON.stringify(releaseVersion.display) },
+  define: { __KORA_VERSION__: JSON.stringify(releaseVersion.display), __KORA_BUILD_ID__: JSON.stringify(buildId),
+    __KORA_COMPANION_VERSION__: JSON.stringify(bundledCompanion) },
   plugins: [
+    { name: 'kora-build-id', apply: 'build', generateBundle() {
+      this.emitFile({ type: 'asset', fileName: 'build.json', source: JSON.stringify({ id: buildId }) })
+    } },
     localHybridDevelopmentPlugin(process.env.VITE_PRIVATE_LOCAL_HYBRID==='true'),
     react(),
     noteImagesDevelopmentPlugin({ ...loadEnv(mode, process.cwd(), ''), ...process.env } as Record<string, string>),

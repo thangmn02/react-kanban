@@ -19,3 +19,16 @@ html[data-native-surface], html[data-native-surface] body, html[data-native-surf
 .native-update-actions button { min-height:44px; padding:8px 12px; border:1px solid #ddd6e8; border-radius:10px; background:white; color:#35264f; font:inherit; cursor:pointer; }
 .native-update-actions button:disabled { opacity:.5; cursor:wait; }
 .native-update-actions button:focus-visible { outline:2px solid #8069b7; outline-offset:2px; }
+.native-update-badge { position:relative; }
+.native-update-badge::after { content:''; position:absolute; top:2px; right:2px; width:6px; height:6px; border-radius:50%; background:#0a84ff; }
+/* Dark appearance for the window bar, workspace and update dialog. */
+:root[data-theme='dark'] .native-surface { color:#f2f2f7; }
+:root[data-theme='dark'] .native-workspace { background:#111113; }
+:root[data-theme='dark'] .native-chrome { background:rgba(28,28,30,.86); border-bottom-color:rgba(255,255,255,.08); }
+:root[data-theme='dark'] .native-chrome span { color:#98989f; }
+:root[data-theme='dark'] .native-chrome button { color:#c7c7cc; }
+:root[data-theme='dark'] .native-chrome button:hover { background:rgba(255,255,255,.08); }
+:root[data-theme='dark'] .native-error { background:#1c1c1e; }
+:root[data-theme='dark'] .native-update-dialog { background:#242428; color:#f2f2f7; border-color:rgba(255,255,255,.1); box-shadow:0 18px 48px rgba(0,0,0,.6); }
+:root[data-theme='dark'] .native-update-dialog::backdrop { background:rgba(0,0,0,.55); }
+:root[data-theme='dark'] .native-update-actions button { background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.12); color:#f2f2f7; }

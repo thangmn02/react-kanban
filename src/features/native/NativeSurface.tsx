@@ -10,6 +10,24 @@ import './nativeSurface.css';
 import NativeUpdateDialog from './NativeUpdateDialog';
 import { useCompanionSetup } from './use-companion-setup';
 import {nativeCompanionPreviewEnabled} from './runtime';
+import { check } from '@tauri-apps/plugin-updater';
+import { requestNativeMusic } from './nativeMusic';
+import UpdateNotice from '../updates/UpdateNotice';
+import { APP_CHECK_DELAY_MS, APP_CHECK_EVERY_MS, COMPANION_CHECK_EVERY_MS, olderThan, usePeriodicCheck } from '../updates/update-notices';
+
+// The version of an available Kora update ('' when current). The dialog downloads it; this only looks.
+async function availableAppUpdate() {
+  const next = await check({ timeout: 15_000 });
+  const version = next?.version ?? '';
+  await next?.close().catch(() => {});
+  return version;
+}
+// Whether a connected browser runs an older Companion than the one this Kora installs.
+async function companionOutdated() {
+  const response = await requestNativeMusic('companion.status');
+  const companions = response.companions as { version?: string | null; verified?: boolean }[] | undefined;
+  return Boolean(companions?.some(peer => peer.verified && olderThan(peer.version ?? undefined, __KORA_COMPANION_VERSION__)));
+}
 
 async function updateNativeShape(rounded: boolean) {
   const radius = await invoke<number>('native_dock_shape', { rounded });
@@ -57,6 +75,21 @@ export default function NativeSurface({ dock, onToggle, focusProps, children }: 
   const [maximized, setMaximized] = useState(false);
   const [updateOpen, setUpdateOpen] = useState(false);
   const companion = useCompanionSetup();
+  const appUpdate = usePeriodicCheck(true, availableAppUpdate, APP_CHECK_DELAY_MS, APP_CHECK_EVERY_MS);
+  const companionOld = usePeriodicCheck(!nativeCompanionPreviewEnabled() && Boolean(__KORA_COMPANION_VERSION__), companionOutdated, 5_000, COMPANION_CHECK_EVERY_MS);
+  // Updating from the note retires it for this session; the next check shows it again only if a browser is still behind.
+  const [companionHandled, setCompanionHandled] = useState(false);
+  const updateCompanion = () => { setCompanionHandled(true); void companion.run(); };
+  const appBadge = Boolean(appUpdate);
+  const updateLabel = appBadge ? (vi ? 'Có bản cập nhật Kora' : 'Kora update ready') : (vi ? 'Cập nhật Kora' : 'Update Kora');
+  const notices = [
+    ...(appUpdate ? [{ key: `app:${appUpdate}`, message: vi ? 'Đã có bản cập nhật Kora.' : 'A Kora update is ready.',
+      action: vi ? 'Cập nhật' : 'Update', onAction: () => setUpdateOpen(true) }] : []),
+    ...(companionOld && !companionHandled ? [{ key: `companion:${__KORA_COMPANION_VERSION__}`,
+      message: vi ? 'Music Companion trong trình duyệt có bản mới.' : 'Your browser’s Music Companion has an update.',
+      action: vi ? 'Cập nhật' : 'Update', onAction: updateCompanion }] : []),
+  ];
+  const notice = <UpdateNotice items={notices} laterLabel={vi ? 'Để sau' : 'Later'} />;
   const effectQueue = useRef(Promise.resolve());
   useEffect(() => {
     // Serialize surface changes so an older backdrop request cannot overwrite
@@ -115,7 +148,7 @@ export default function NativeSurface({ dock, onToggle, focusProps, children }: 
         if (event.button === 0) action(() => getCurrentWindow().startDragging());
       }} onDoubleClick={toggleMaximize}>Kora</span>
       {onToggle && <button type="button" onClick={switchSurface}>Dock</button>}
-      <button type="button" onClick={() => setUpdateOpen(true)}>{vi ? 'Cập nhật' : 'Update'}</button>
+      <button type="button" className={appBadge ? 'native-update-badge' : undefined} aria-label={updateLabel} title={updateLabel} onClick={() => setUpdateOpen(true)}>{vi ? 'Cập nhật' : 'Update'}</button>
       <button type="button" aria-label={vi ? 'Thu nhỏ' : 'Minimize'} onClick={() => action(() => getCurrentWindow().minimize())}>−</button>
       <button type="button" aria-label={maximizeLabel} title={maximizeLabel} onClick={toggleMaximize}>{maximized ? '❐' : '□'}</button>
       <button type="button" aria-label={vi ? 'Đóng ứng dụng' : 'Close app'} onClick={() => action(() => getCurrentWindow().close())}>×</button>
@@ -129,14 +162,15 @@ export default function NativeSurface({ dock, onToggle, focusProps, children }: 
         musicSetupMessage: companion.message,
         musicSetupFolder: companion.folder,
         nativeControls: <>
-          <button className="dock-icon-button" type="button" aria-label={vi ? 'Cập nhật Kora' : 'Update Kora'} title={vi ? 'Cập nhật Kora' : 'Update Kora'} onClick={() => setUpdateOpen(true)}>↓</button>
+          <button className={`dock-icon-button${appBadge ? ' dock-update-badge' : ''}`} type="button" aria-label={updateLabel} title={updateLabel} onClick={() => setUpdateOpen(true)}>↓</button>
           <button className="dock-icon-button" type="button" aria-label={vi ? 'Thu nhỏ' : 'Minimize'} onClick={() => action(() => getCurrentWindow().minimize())}>−</button>
           <button className="dock-icon-button" type="button" aria-label={maximizeLabel} title={maximizeLabel} onClick={toggleMaximize}>{maximized ? '❐' : '□'}</button>
           <button className="dock-icon-button" type="button" aria-label={vi ? 'Đóng ứng dụng' : 'Close app'} onClick={() => action(() => getCurrentWindow().close())}>×</button>
         </>,
       }} /></div>
       {error && <p role="status" className="native-error">{error}</p>}
-    </> : <div className="native-workspace-content">{children}</div>}
+      {notice}
+    </> : <><div className="native-workspace-content">{children}</div>{notice}</>}
     {updateOpen && <NativeUpdateDialog onClose={() => setUpdateOpen(false)} />}
   </div>;
 }

@@ -16,9 +16,12 @@ const nativeInvoke = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: nativeInvoke, isTauri: () => true }));
 vi.mock('@tauri-apps/api/window', () => ({ getCurrentWindow: () => nativeWindow, currentMonitor: async () => null, Effect: { Blur: 'blur' },
   LogicalSize: class { width: number; height: number; constructor(width: number, height: number) { this.width = width; this.height = height; } } }));
+const updater = vi.hoisted(() => ({ check: vi.fn().mockResolvedValue(null) }));
+vi.mock('@tauri-apps/plugin-updater', () => ({ check: updater.check }));
+vi.mock('@tauri-apps/api/event', () => ({ listen: vi.fn().mockResolvedValue(() => {}) }));
 vi.mock('../music/useBrowserMusic', () => ({ useBrowserMusic: () => ({ sessions: [], connected: true, checking: false,
   beat: { sessionId: '', mode: 'clock', onsets: {} } }) }));
-beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); nativeInvoke.mockResolvedValue(undefined); nativeWindow.isMaximized.mockResolvedValue(false);
+beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); nativeInvoke.mockResolvedValue(undefined); updater.check.mockResolvedValue(null); nativeWindow.isMaximized.mockResolvedValue(false);
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} }); });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 const props: FloatingFocusProps = { activeTask: null, focusTasks: [], cycleTotal: 4, remainingSeconds: 1500,
@@ -148,4 +151,31 @@ it('does not let dock auto-sizing undo maximize, and restores before swapping su
   await waitFor(() => expect(swap).toHaveBeenCalledOnce());
   expect(nativeWindow.unmaximize).toHaveBeenCalledOnce();
   expect(nativeWindow.unmaximize.mock.invocationCallOrder[0]).toBeLessThan(swap.mock.invocationCallOrder[0]);
+});
+
+it('badges the update button and offers one quiet note for a Kora update, then for an older browser Companion', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  try {
+    const close = vi.fn().mockResolvedValue(undefined);
+    updater.check.mockResolvedValue({ version: '0.1.44', close });
+    nativeInvoke.mockImplementation(async (command: string, args?: { action?: string }) => command === 'native_music_request' && args?.action === 'companion.status'
+      ? { ok: true, companions: [{ peerId: 'peer', version: '0.3.30', verified: true }] } : undefined);
+    const view = render(<I18nProvider><NativeSurface dock focusProps={props}>Workspace</NativeSurface></I18nProvider>);
+    const shadow = view.container.querySelector('.native-dock-host')!.shadowRoot!;
+    // Nothing is checked at launch; the Companion check runs after 5 s and the app check after 15 s.
+    expect(updater.check).not.toHaveBeenCalled();
+    await act(async () => { vi.advanceTimersByTime(5_100); });
+    await waitFor(() => expect(view.getByRole('status')).toHaveTextContent('Music Companion has an update'));
+    await act(async () => { vi.advanceTimersByTime(10_000); });
+    await waitFor(() => expect(shadow.querySelector('[aria-label="Kora update ready"]')).toHaveClass('dock-update-badge'));
+    expect(close).toHaveBeenCalled();
+    expect(view.getByRole('status')).toHaveTextContent('A Kora update is ready.');
+    // Later hides this version's note; the Companion note is next, and the badge stays.
+    fireEvent.click(view.getByRole('button', { name: 'Later' }));
+    expect(view.getByRole('status')).toHaveTextContent('Music Companion has an update');
+    fireEvent.click(view.getByRole('button', { name: 'Update' }));
+    await waitFor(() => expect(nativeInvoke).toHaveBeenCalledWith('native_music_setup'));
+    expect(view.queryByRole('status')).toBeNull();
+    expect(shadow.querySelector('.dock-update-badge')).not.toBeNull();
+  } finally { vi.useRealTimers(); }
 });
