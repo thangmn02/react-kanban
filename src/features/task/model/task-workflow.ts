@@ -12,12 +12,17 @@ export interface WorkflowResult {
 }
 const normalize = (title: string) => title.toLowerCase().replace(/[^a-z0-9]/g, '');
 export const workflowCompletionState=(kind:WorkflowRequest['kind'],doneListId:string|null,destination:string|undefined,current:boolean)=>kind==='complete'?true:kind==='reopen'?false:doneListId?destination===doneListId:current;
+// Titles that name a Done column, after normalize(); "Xong"/"Hoàn thành" lose their diacritics the same way in SQL.
+export const doneListTitles = ['done', 'completed', 'complete', 'finished', 'xong', 'honthnh', 'hoanthanh'];
+/** Like Trello: exactly one list named Done, at any position, receives completed tasks. Keep in step with transition_task_workflow. */
 export function resolveTaskWorkflow(lists: Pick<ListRow, 'id' | 'title' | 'position'>[]) {
   const ordered = [...lists].sort((a, b) => a.position - b.position || a.id.localeCompare(b.id));
-  const shape = ordered.map(list => normalize(list.title)).join('/');
-  const standard = shape === 'todo/doing/done' || shape === 'backlog/inprogress/nearlydone/done';
+  const done = ordered.filter(list => doneListTitles.includes(normalize(list.title)));
+  const doneList = done.length === 1 ? done[0] : null;
+  const active = doneList ? ordered.find(list => list.id !== doneList.id) : undefined;
+  const standard = Boolean(doneList && active);
   return { mode: standard ? 'standard' as const : 'completion-only' as const,
-    doneListId: standard ? ordered.at(-1)!.id : null, activeListId: standard ? ordered[0].id : null };
+    doneListId: standard ? doneList!.id : null, activeListId: standard ? active!.id : null };
 }
 export function planTaskWorkflow(task: TaskRow, lists: ListRow[], tasks: TaskRow[], activities: TaskActivityRow[], request: WorkflowRequest, now: string) {
   if (task.board_id !== request.boardId || task.workspace_id !== request.workspaceId || task.deleted_at || task.archived_at) throw new Error('Task is unavailable in this workspace.');

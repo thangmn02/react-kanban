@@ -32,6 +32,7 @@ const vi = {
   'shell.pinned': 'Ghi chú đã ghim',
   'shell.recent': 'Ghi chú gần đây',
   'shell.shared': 'Ghi chú được chia sẻ',
+  'board.noDoneList': 'Đặt tên một danh sách là “Done” hoặc “Xong” để việc đã hoàn thành tự chuyển vào đó.',
   'shell.trash': 'Thùng rác',
   'notes.scope': 'Phạm vi ghi chú',
   'notes.scope.workspace': 'Không gian',

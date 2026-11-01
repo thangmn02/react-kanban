@@ -32,6 +32,7 @@ const en = {
   'shell.pinned': 'Pinned notes',
   'shell.recent': 'Recent notes',
   'shell.shared': 'Shared notes',
+  'board.noDoneList': 'Name one list “Done” and completed tasks will move there automatically.',
   'shell.trash': 'Trash',
   'notes.scope': 'Notes scope',
   'notes.scope.workspace': 'Workspace',

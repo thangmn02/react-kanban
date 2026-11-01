@@ -1,8 +1,8 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 vi.mock('../lib/supabase',()=>({default:null,requireSupabaseClient:vi.fn()}));
-import { localCreateBoardFromTemplate, localCreateTasks, localFetchBoardSnapshot, localFetchBoardActivities, resetLocalBoardStore } from '../infrastructure/local/localBoardStore';
+import { localCreateBoardFromTemplate, localCreateList, localCreateTasks, localFetchBoardSnapshot, localFetchBoardActivities, resetLocalBoardStore } from '../infrastructure/local/localBoardStore';
 import { transitionTaskWorkflow } from './task-workflow.service';
-import { auditTaskConsistency } from '../features/task/model/task-workflow';
+import { auditTaskConsistency, resolveTaskWorkflow } from '../features/task/model/task-workflow';
 
 const workspaceId='local-mock-workspace';
 beforeEach(()=>{localStorage.clear();resetLocalBoardStore();});
@@ -51,4 +51,20 @@ it('fails without permanent success or lost unrelated data when the storage comm
 it('reports historical anomalies and proposed corrections without editing them',()=>{
  const x=setup();const snap=x.snapshot();const tasks=snap.taskRows.map(t=>({...t,is_done:true,completed_at:null}));const before=JSON.stringify(tasks);
  const audit=auditTaskConsistency(snap.listRows,tasks);expect(audit.counts).toMatchObject({'completed-in-active-list':1,'completion-timestamp-mismatch':1});expect(JSON.stringify(tasks)).toBe(before);
+});
+it('finds one Done list anywhere on a custom board, like Trello, and reopens to where the task was',async()=>{
+ const x=setup('presentation');const done=localCreateList({board_id:x.board.id,workspace_id:workspaceId,title:'DONE',position:-1000});
+ const result=await x.run('complete');expect(result.mapping).toBe('standard');expect(result.task).toMatchObject({is_done:true,list_id:done.id});
+ const reopened=await x.run('reopen');expect(reopened.task).toMatchObject({is_done:false,list_id:x.lists[0].id});
+ const moved=await x.run('move',{destinationListId:done.id,destinationIndex:0});expect(moved.task.is_done).toBe(true);
+});
+it('only maps a single, clearly named Done list',()=>{
+ const lists=(...titles:string[])=>titles.map((title,position)=>({id:`l${position}`,title,position}));
+ expect(resolveTaskWorkflow(lists('Done','To-do','Doing'))).toEqual({mode:'standard',doneListId:'l0',activeListId:'l1'});
+ expect(resolveTaskWorkflow(lists('Backlog','In Progress','Nearly done','Done')).doneListId).toBe('l3');
+ expect(resolveTaskWorkflow(lists('Việc','Đã xong')).doneListId).toBe('l1');
+ expect(resolveTaskWorkflow(lists('Làm','Hoàn thành')).doneListId).toBe('l1');
+ expect(resolveTaskWorkflow(lists('Done','Completed','To-do')).mode).toBe('completion-only');
+ expect(resolveTaskWorkflow(lists('Done')).mode).toBe('completion-only');
+ expect(resolveTaskWorkflow(lists('Research','Delivered')).mode).toBe('completion-only');
 });

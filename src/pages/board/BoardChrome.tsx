@@ -5,8 +5,10 @@ import BoardToolbar from '../../components/board/BoardToolbar';
 import ErrorState from '../../components/atoms/ErrorState';
 import type { AppLayoutRouteContext } from '../../app/AppLayoutRouteContext';
 import { resolveTaskWorkflow } from '../../features/task/model/task-workflow';
+import { useI18n } from '../../i18n';
 
 export default function BoardChrome({ context, children }: { context: AppLayoutRouteContext; children: ReactNode }) {
+  const { t } = useI18n();
   const workflow = resolveTaskWorkflow(context.board.kanban.boardData.columns.map((id,position)=>({id,title:context.board.kanban.boardData.list[id].title,position})));
   return (
     <div className="min-h-screen bg-canvas">
@@ -30,7 +32,7 @@ export default function BoardChrome({ context, children }: { context: AppLayoutR
         </div>
       )}
       <BoardToolbar {...context.board.toolbar} />
-      {workflow.mode === 'completion-only' && <p role="note" className="px-4 py-2 text-xs text-slate-600 sm:px-6">Completion-only workflow: this custom board has no unambiguous Done mapping. Completing a task keeps its current column.</p>}
+      {workflow.mode === 'completion-only' && <p role="note" className="px-4 py-2 text-xs text-slate-600 sm:px-6">{t('board.noDoneList')}</p>}
       <div aria-busy={context.isBoardLoading} inert={context.isBoardLoading || Boolean(context.boardErrorMessage)}>{children}</div>
     </div>
   );
