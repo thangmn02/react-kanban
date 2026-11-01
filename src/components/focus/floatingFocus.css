@@ -249,6 +249,7 @@
 .floating-focus[data-style='tabs'] .music-access { background:rgba(255,255,255,.09); border-color:rgba(255,255,255,.18); }
 .floating-focus[data-style='tabs'] .music-feedback { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:4px 8px; min-width:0; flex-shrink:0; }
 .floating-focus[data-style='tabs'] .music-feedback > .text-button { color:rgba(255,255,255,.9); }
+.floating-focus[data-style='tabs'] .dock-track-pane .music-sync-status .text-button { color:rgba(255,255,255,.95); font-weight:600; text-decoration:underline; text-underline-offset:2px; }
 @container dock (max-width:600px) {
   .floating-focus[data-style='tabs'] .dock-toolbar .dock-icon-button { width:30px; height:30px; }
   .floating-focus[data-style='tabs'] .dock-track-pane .music-heading { grid-template-columns:32px minmax(0,1fr) 18px; gap:8px; }
