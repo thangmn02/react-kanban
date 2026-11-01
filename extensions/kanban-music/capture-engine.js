@@ -210,7 +210,8 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
           });
           drumHits.length = 0;
           state.percussionRecovery = reason;
-          state.percussionRetryAt = now() + Math.min(30000, 1000 * 2 ** Math.min(state.percussionFailures++, 5));
+          // A stall on a busy device is usually brief; never leave the drum rows dark for long.
+          state.percussionRetryAt = now() + Math.min(4000, 500 * 2 ** Math.min(state.percussionFailures++, 3));
           telemetry.record('EVENT_DROPPED', undefined, { captureId, reason });
         };
         const createRuntime=state.hybridMode==='L0'?createPercussion:createHybrid;

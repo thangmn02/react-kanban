@@ -90,12 +90,14 @@ it('backs off failed initialization and cancels retry when the capture ends', as
   const f = fixture(); f.deps.createPercussion = vi.fn(async () => null);
   const engine = createCaptureEngine(f.deps);
   await engine.start('stream', 'missing-runtime'); await Promise.resolve();
-  await vi.advanceTimersByTimeAsync(900); expect(f.deps.createPercussion).toHaveBeenCalledOnce();
+  await vi.advanceTimersByTimeAsync(400); expect(f.deps.createPercussion).toHaveBeenCalledOnce();
   await vi.advanceTimersByTimeAsync(200); expect(f.deps.createPercussion).toHaveBeenCalledTimes(2);
-  await vi.advanceTimersByTimeAsync(1800); expect(f.deps.createPercussion).toHaveBeenCalledTimes(2);
-  await vi.advanceTimersByTimeAsync(200); expect(f.deps.createPercussion).toHaveBeenCalledTimes(3);
+  await vi.advanceTimersByTimeAsync(700); expect(f.deps.createPercussion).toHaveBeenCalledTimes(2);
+  await vi.advanceTimersByTimeAsync(300); expect(f.deps.createPercussion).toHaveBeenCalledTimes(3);
+  // Retries come quickly, so a stall never leaves the drum rows dark for long.
+  await vi.advanceTimersByTimeAsync(2000); expect(f.deps.createPercussion).toHaveBeenCalledTimes(4);
   engine.stop(); await vi.advanceTimersByTimeAsync(30000);
-  expect(f.deps.createPercussion).toHaveBeenCalledTimes(3); expect(vi.getTimerCount()).toBe(0);
+  expect(f.deps.createPercussion).toHaveBeenCalledTimes(4); expect(vi.getTimerCount()).toBe(0);
 });
 it('traces unchanged Bass delivery while acoustic proposals cannot claim drum identities', async () => {
   beatTelemetry.enable();

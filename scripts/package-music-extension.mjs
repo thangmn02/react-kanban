@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile, rm, lstat } from 'node:fs/promises';
 import {prepareNativeCompanionDelay,assertNativeDelayGuide} from './native-companion-delay-package.mjs';
 import {prepareEnhancedBeatSync} from './enhanced-beat-sync-package.mjs';
+import {prepareHybridHats} from './hybrid-hat-package.mjs';
 import {prepareSourceAudioDelay,prepareHatProminence} from './source-audio-delay-package.mjs';
 import {prepareLiveLead,liveLeadFiles,contourLeadFiles} from './live-lead-package.mjs';
 import { fileURLToPath } from 'node:url';
@@ -238,6 +239,7 @@ if(hybridCandidate){
     assets:files.map(({name,bytes})=>({name,bytes:bytes.length,sha256:digest(bytes)})),
   },null,2))});
 }
+if(enhancedBeatSync)sourceDelayProof.hybridHats=await prepareHybridHats(files,root);
 if(nativeDelayCandidate)files.push({name:'NATIVE-DELAY-PROVENANCE.json',bytes:Buffer.from(JSON.stringify(prepareNativeCompanionDelay(files),null,2))});
 if(hatProminenceCandidate){sourceDelayProof.hatProminence=prepareHatProminence(files);sourceDelayProof.files.push({name:'percussion-classifier.js'});}
 if(liveLeadCandidate){sourceDelayProof.liveLead=prepareLiveLead(files,liveLeadVariant);for(const entry of sourceDelayProof.liveLead.files)if(!sourceDelayProof.files.some(file=>file.name===entry.name))sourceDelayProof.files.push({name:entry.name});}
