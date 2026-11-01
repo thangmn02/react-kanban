@@ -142,7 +142,7 @@ export function useSourceAudioDelay(selected:BrowserMusicSession|undefined,refre
 
   const status=sourceDelayStatus({preferred:preference.enabled,routed,pending,error,supported,session:selected});
   const hint=status==='preparing'&&routed&&selected&&!captureId?'Click the Kora Music Companion icon on the music tab once so it can take over the sound.'
-    :status==='unavailable'?'Not available for this source, or while its video is visible. Music plays normally.':undefined;
+    :status==='unavailable'?'Not available for this source right now. Music plays normally.':undefined;
   return {available,routed,controller:available?{owner,enabled:route.enabled,preferred:preference.enabled,supported,busy:Boolean(pending),error,hint,
     delayMs:SOURCE_AUDIO_DELAY_MS,status,setPreferred:preference.setEnabled}:undefined};
 }

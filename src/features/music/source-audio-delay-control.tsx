@@ -27,8 +27,9 @@ export function EnhancedBeatSyncSetting(){
     {confirming&&!preference.enabled?<div role="group" aria-label="Turn on Enhanced Beat Sync">
       <p className="muted">Supported music will play about 0.17 s later, so drum flashes land on the beat.
         Kora pauses a playing song for a moment to switch it on. You can turn it off at any time.</p>
+      <p className="muted">On YouTube with the video showing, the sound will be about 0.17 s behind the picture.</p>
       <button type="button" onClick={()=>{preference.setEnabled(true);setConfirming(false);}}>Turn on</button>{' '}
       <button type="button" onClick={()=>setConfirming(false)}>Cancel</button>
-    </div>:<p className="muted">{preference.enabled?'On for supported music sources.':'Off. Music plays without delay.'}</p>}
+    </div>:<p className="muted">{preference.enabled?'On for supported music sources. Video sound is about 0.17 s behind the picture.':'Off. Music plays without delay.'}</p>}
   </fieldset>;
 }

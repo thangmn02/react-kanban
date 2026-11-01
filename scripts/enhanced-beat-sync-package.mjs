@@ -9,6 +9,7 @@ export const enhancedBeatSyncVersion='0.3.31';
  *  Companion re-applies the approved delay right at that boundary, using the two steps its audio engine accepts:
  *  hold the new output paused with the delay set, then resume into the delayed output. One attempt per capture;
  *  a refusal falls back to normal output (never a capture restart, which looped) and Kora re-applies it later.
+ *  Visible video keeps the delay (Kora tells the owner the sound runs behind the picture).
  *  Turning it off, ending the subscription or losing eligibility still restores normal output. */
 export function prepareEnhancedBeatSync(files){
   const get=name=>{const matches=files.filter(file=>file.name===name);assert.equal(matches.length,1,name);return matches[0];};
@@ -66,6 +67,9 @@ export function prepareEnhancedBeatSync(files){
       +"          standingDelay:recentStanding?.key===standingKeyOf(owner,session)&&Date.now()-recentStanding.at<10000?recentStanding.standing:undefined };\n"
       +"        recentStanding=undefined;\n        state = current;\n");
   });
+  // The owner accepts that a visible video's sound runs behind its picture; Kora says so when the setting is turned on.
+  edit('beat-mode.js',replace=>replace("const compensationEligible=Boolean(liveSource&&(source.kind==='audio-only'&&source.noVideo===true||source.hidden===true)&&",
+    'const compensationEligible=Boolean(liveSource&&'));
   const manifest=get('manifest.json'),metadata=JSON.parse(manifest.bytes);
   Object.assign(metadata,{version:enhancedBeatSyncVersion,name:'Kora Music Companion'});delete metadata.version_name;
   manifest.bytes=Buffer.from(JSON.stringify(metadata,null,2)+'\n');

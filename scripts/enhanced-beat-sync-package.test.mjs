@@ -74,12 +74,20 @@ test('turning Enhanced Beat Sync off clears the standing approval',async()=>{
   await seekOnly(f);await tick(200);assert.equal(f.sync.status(f.session).capability.bufferMs,0);
  }finally{await f.sync.stop();}
 });
-test('a standing approval is not applied while the source is ineligible',async()=>{
+test('a visible video keeps the delay',async()=>{
  const f=fixture();try{
   await f.start();await f.approveWhilePaused();
   f.session.mediaFacts={kind:'video',singleSource:true,noVideo:false,noFrames:true};f.view.active=true;await tick(550);f.clock({});await tick();f.clock({});await tick();
-  assert.equal(f.sync.status(f.session).capability.bufferMs,0,'A visible video revokes the delay.');
-  await seekOnly(f);await tick(200);assert.equal(f.sync.status(f.session).capability.bufferMs,0,'It stays off while the video is visible.');
+  assert.equal(f.sync.status(f.session).capability.bufferMs,170);
+  await seekOnly(f);assert.equal(f.sync.status(f.session).capability.bufferMs,170,'Restored after a seek with the video showing.');
+ }finally{await f.sync.stop();}
+});
+test('a standing approval is not applied while the source is ineligible',async()=>{
+ const f=fixture();try{
+  await f.start();await f.approveWhilePaused();
+  f.clock({playbackRate:1.5});await tick();f.clock({playbackRate:1.5});await tick();
+  assert.equal(f.sync.status(f.session).capability.bufferMs,0,'A changed playback speed revokes the delay.');
+  f.session.playbackRate=1.5;await seekOnly(f);await tick(200);assert.equal(f.sync.status(f.session).capability.bufferMs,0,'It stays off while ineligible.');
  }finally{await f.sync.stop();}
 });
 test('a track change that swaps the media source in the same tab keeps the approval',async()=>{
