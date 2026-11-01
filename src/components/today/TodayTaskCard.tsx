@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { TodayTaskSummary } from '../../services/today.service';
 import { getPriorityBadgeClass } from '../../utils/taskMetadata';
 import DueDateBadge from '../atoms/DueDateBadge';
@@ -12,6 +13,8 @@ interface TodayTaskCardProps {
   onToggleTodayFocus: (task: TodayTaskSummary) => void;
   onCompleteTask?: (task: TodayTaskSummary) => void;
   isCompleting?: boolean;
+  /** Extra context shown inside the card, e.g. why a task is suggested. */
+  reasons?: ReactNode;
 }
 
 export default function TodayTaskCard({
@@ -22,6 +25,7 @@ export default function TodayTaskCard({
   onToggleTodayFocus,
   onCompleteTask,
   isCompleting = false,
+  reasons,
 }: TodayTaskCardProps) {
   const priorityClassName = getPriorityBadgeClass(task.priority || undefined);
   const { t } = useI18n();
@@ -85,6 +89,7 @@ export default function TodayTaskCard({
             <DueDateBadge dueDate={task.dueDate || undefined} />
           </>
         )}
+        {reasons}
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">

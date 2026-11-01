@@ -103,7 +103,7 @@ export default function AppHeader({
         </div>
 
         <div className="flex items-center gap-2">
-          {user&&NOTES_PREVIEW_ENABLED&&<><button type="button" className="min-h-10 rounded-lg px-2 text-sm text-slate-600 hover:bg-slate-100" onClick={()=>openQuickNotes({create:true})} title="Quick Notes (Ctrl+Alt+N)">Quick note</button><button type="button" className="min-h-10 rounded-lg px-2 text-sm text-slate-600 hover:bg-slate-100" onClick={openSavedContext}>Saved</button></>}
+          {user&&NOTES_PREVIEW_ENABLED&&<><button type="button" className="min-h-10 rounded-lg px-2 text-sm text-slate-600 hover:bg-slate-100" onClick={()=>openQuickNotes({create:true})} title="Quick note (Ctrl+Alt+N)">{t('notes.quick')}</button><button type="button" className="min-h-10 rounded-lg px-2 text-sm text-slate-600 hover:bg-slate-100" onClick={openSavedContext}>Saved</button></>}
           {!isNativeWidget() && <a
             href="/downloads/Kora-setup.exe"
             download="Kora-setup.exe"

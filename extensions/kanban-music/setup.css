@@ -1,4 +1,15 @@
 body { margin: 40px auto; padding: 24px; max-width: 600px; font: 15px/1.65 system-ui, sans-serif; color: #202124; background: #f7f7f8; }
 main { background: white; border: 1px solid #e4e4e9; border-radius: 22px; padding: 24px; }
-h1 { font-size: 24px; }
+header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+h1 { font-size: 24px; margin: 0; }
+h2 { font-size: 17px; margin: 24px 0 4px; }
+header button, details button { font: inherit; font-size: 13px; padding: 6px 12px; border: 1px solid #d5d5dc; border-radius: 999px; background: white; cursor: pointer; }
+.version { margin: 4px 0 16px; color: #1e7b4b; font-weight: 600; }
+.reason { margin: 0 0 16px; padding: 12px 14px; border-radius: 12px; background: #fff4e5; border: 1px solid #f5c98b; color: #6b3d00; }
+.steps { padding-left: 22px; }
+.steps li { margin: 6px 0; }
+.muted { color: #5f6368; font-size: 13px; }
+details { margin-top: 20px; border-top: 1px solid #e4e4e9; padding-top: 12px; }
+summary { cursor: pointer; font-weight: 600; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 input { display: block; width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #ccc; border-radius: 8px; font: 14px monospace; }

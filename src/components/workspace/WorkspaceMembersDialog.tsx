@@ -139,10 +139,7 @@ export default function WorkspaceMembersDialog({
             <header className="border-b border-slate-200/80 bg-white px-6 py-5">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-blue-600">
-                    Small team
-                  </p>
-                  <h2 id="workspace-members-title" className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+                  <h2 id="workspace-members-title" className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">
                     Workspace members
                   </h2>
                   <p className="mt-1 text-sm text-slate-500">
@@ -184,12 +181,12 @@ export default function WorkspaceMembersDialog({
                       className="cursor-pointer rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none transition focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
                       aria-label="New member role"
                     >
-                      <option value="member">Member</option>
-                      <option value="admin">Admin</option>
-                      <option value="viewer">Viewer</option>
+                      <option value="member">Member · edits tasks</option>
+                      <option value="admin">Admin · manages members</option>
+                      <option value="viewer">Viewer · read only</option>
                     </select>
                   </div>
-                  <p className="mt-2 text-xs leading-5 text-slate-600">Admins manage members. Members edit workspace tasks. Viewers read. Notes have separate sharing permissions.</p>
+                  <p className="mt-2 text-xs leading-5 text-slate-600">Notes are shared separately.</p>
                   <button
                     type="submit"
                     disabled={isSubmitting}

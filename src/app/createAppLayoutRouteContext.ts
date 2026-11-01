@@ -11,6 +11,7 @@ import type { OnboardingSetupValues } from '../types/onboarding.type';
 import type { TodayTaskSummary } from '../services/today.service';
 import type { ITaskItem } from '../types/task.type';
 import { readReturnTo } from './auth-routing';
+import { openQuickNotes } from '../features/notes/quick-notes-events';
 
 interface Params {
   header: ReactNode;
@@ -131,7 +132,8 @@ export function useAppLayoutRouteContextValue(params: Params): AppLayoutRouteCon
       hasTeamMembers: params.workspaceMembers.length > 1,
     },
     today: {
-      onCreateNote: () => routing.navigate('/notes?new=1'),
+      // Same Quick Notes popup as the header button; device-only Notes ignores ?new=1.
+      onCreateNote: () => openQuickNotes({ create: true }),
       currentUser: params.user!,
       activeWorkspace: params.activeWorkspace,
       focusTasks: focus.focusTasks,

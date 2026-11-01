@@ -69,6 +69,7 @@ it('prefers the clicked music tab, opens a selected music tab, and does not clai
   await f.action.invoke({ id: 10, url: 'https://other.example' });
   expect(f.api.runtime.openOptionsPage).toHaveBeenCalledOnce();
   expect(f.api.tabs.create).not.toHaveBeenCalled();
+  expect(f.stored.setupReason).toBe('not-music-tab');
 });
 it('publishes a fresh selection token for each explicit click, not a persistent permission flag', async () => {
   const f = fixture();

@@ -4,7 +4,7 @@ import { uiFade, uiSpring } from '../../shared/motion';
 import type { FocusTask, PomodoroTimerState, PomodoroTimerSettings, PomodoroMode } from '../../types/focus.type';
 import { formatPomodoroTime } from '../../utils/pomodoroTime';
 import { useI18n } from '../../i18n';
-import { MusicFeedback, MusicGrid, MusicSetup, MusicTrack, MusicNowPlaying } from '../../features/music/MusicPlayer';
+import { BeatRowLegend, CopyFolderButton, MusicFeedback, MusicGrid, MusicSetup, MusicTrack, MusicNowPlaying } from '../../features/music/MusicPlayer';
 import { useBrowserMusic } from '../../features/music/useBrowserMusic';
 import { EnhancedBeatSyncSetting } from '../../features/music/source-audio-delay-control';
 import { useDockPreferences, beatPalettes } from './useDockPreferences';
@@ -38,6 +38,7 @@ export interface FloatingFocusProps {
   onMusicSetup?: () => void;
   musicSetupPending?: boolean;
   musicSetupMessage?: string;
+  musicSetupFolder?: string;
   nativeControls?: ReactNode;
   returnLabel?: string;
 }
@@ -95,6 +96,8 @@ export default function FloatingFocus(props: FloatingFocusProps) {
   const tasks = activeTask && !focusTasks.some((task) => task.id === activeTask.id) ? [activeTask, ...focusTasks] : focusTasks;
   const modeLabel = timerState.mode === 'focus' ? t('focus.mode.focus') : timerState.mode === 'shortBreak' ? t('focus.mode.shortBreak') : t('focus.mode.longBreak');
   const hasMusic = music.sessions.length > 0;
+  // Say what is happening while the Companion check runs, and what to do once it is connected but idle.
+  const emptyMusic = music.checking ? 'music.checking' : music.connected ? 'music.playToStart' : 'music.nothingPlaying';
   const cycle = Math.min((timerState.completedCycleFocus || 0) + 1, cycleTotal);
   const progress = Math.max(0, Math.min(1, remainingSeconds / Math.max(1, timerState.plannedSeconds || remainingSeconds || 1500)));
   const layoutTransition = reducedMotion ? { duration: 0 } : uiSpring;
@@ -107,7 +110,7 @@ export default function FloatingFocus(props: FloatingFocusProps) {
       <div className="dock-toolbar" ref={toolbarRef} data-draggable={Boolean(props.onDragStart)} onPointerDown={(event) => {
         if (event.button === 0 && !(event.target as HTMLElement).closest('button, a, input, select, textarea, [role="dialog"]')) props.onDragStart?.();
       }}>
-        <span className="dock-style-name">{t('dock.style.tabs')}</span>
+        <span className="dock-style-name">{t('dock.title')}</span>
         <button ref={settingsButtonRef} type="button" className="dock-icon-button" aria-label={t('dock.settings')} title={t('dock.settings')}
           aria-expanded={settingsOpen} aria-controls={settingsId} aria-haspopup="dialog" onClick={() => setSettingsOpen((current) => !current)}><DockIcon kind="settings" /></button>
         <button type="button" className="dock-icon-button" aria-label={props.returnLabel || t(props.isWidget ? 'dock.return' : 'dock.widget')}
@@ -134,6 +137,7 @@ export default function FloatingFocus(props: FloatingFocusProps) {
               </label>)}
               {timerState.startedAt !== null && <p className="muted">{t('focus.timer.settingsApplyNext')}</p>}
             </fieldset>}
+            <EnhancedBeatSyncSetting />
             {/* The Kinetic grid owns its per-instrument colours, so the legacy colour-mode choice is no longer offered. */}
             <label>{t('dock.palette')}<select value={preferences.palette} onChange={(event) => preferences.setPalette(event.target.value as typeof preferences.palette)}>
               {beatPalettes.map((value) => <option key={value} value={value}>{t(`dock.palette.${value}`)}</option>)}</select></label>
@@ -145,10 +149,10 @@ export default function FloatingFocus(props: FloatingFocusProps) {
                 <option value="system">{t('dock.motion.system')}</option><option value="reduced">{t('dock.motion.reduced')}</option>
               </select></label>
             </>
-            <EnhancedBeatSyncSetting />
             {props.onMusicSetup && <button type="button" disabled={props.musicSetupPending} onClick={props.onMusicSetup}>
               {t(props.musicSetupPending ? 'music.companionUpdating' : 'music.installCompanion')}</button>}
             {props.musicSetupMessage && <p role="status" className="muted" style={{ overflowWrap: 'anywhere' }}>{props.musicSetupMessage}</p>}
+            {props.musicSetupFolder && <CopyFolderButton folder={props.musicSetupFolder} />}
           </motion.div>}
         </AnimatePresence>
       </div>
@@ -223,15 +227,16 @@ export default function FloatingFocus(props: FloatingFocusProps) {
           data-card="beat" aria-label={t('dock.beat')} aria-hidden={hidden('beat')} inert={hidden('beat')}
           role="tabpanel" aria-labelledby={`${groupId}-beat-tab`} tabIndex={0}
           animate={{ opacity: hidden('beat') ? 0 : 1 }} transition={{ ...layoutTransition, layout: layoutTransition }}>
-          {!hasMusic && <p className="dock-empty muted">{t('music.nothingPlaying')}</p>}
+          {!hasMusic && <p className="dock-empty muted">{t(emptyMusic)}</p>}
           <MusicGrid music={music} colorMode={preferences.colorMode} palette={preferences.palette} motionProfile={preferences.motionProfile} motionReduction={preferences.motionReduction}
             visualActive={selectedTab==='beat'&&visible&&!props.isMinimized}/>
+          <BeatRowLegend />
         </motion.section>
         <motion.section id={`${groupId}-music`} layout layoutId="music-row" className={`dock-panel dock-track-pane${preferences.palette === 'ultraviolet' ? ' ultraviolet' : ''}`}
           data-card="music" aria-label={t('focus.island.music')} aria-hidden={hidden('music')} inert={hidden('music')}
           role="tabpanel" aria-labelledby={`${groupId}-music-tab`} tabIndex={0}
           animate={{ opacity: hidden('music') ? 0 : 1 }} transition={{ ...layoutTransition, layout: layoutTransition }}>
-          {hasMusic ? <><MusicTrack music={music} /><MusicFeedback music={music} /></> : <p className="dock-empty muted">{t('music.nothingPlaying')}</p>}
+          {hasMusic ? <><MusicTrack music={music} /><MusicFeedback music={music} /></> : <p className="dock-empty muted">{t(emptyMusic)}</p>}
         </motion.section>
         </div>
       </motion.div>

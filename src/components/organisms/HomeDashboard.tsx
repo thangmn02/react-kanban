@@ -251,7 +251,7 @@ function HomeBriefing({ currentUser, activeWorkspace, onOpenTask, onOpenBoard,
         {showBriefing && <aside className="min-w-0 space-y-10 border-t border-slate-200 pt-8 lg:border-0 lg:pt-0">
           <section aria-labelledby="briefing-focus">
             <h2 id="briefing-focus" className={sectionLabel}>{t('today.plan')}</h2>
-            <p className="mt-2 text-[13px] text-slate-600">{t('home.focusSelectedCount', { count: focusControls ? focusControls.session.focusTasks.length : focusTaskCount || plannedTasks.length, max: 3 })}</p>
+            {plannedTasks.length > 0 && <p className="mt-2 text-[13px] text-slate-600">{t('home.focusSelectedCount', { count: focusControls ? focusControls.session.focusTasks.length : focusTaskCount || plannedTasks.length, max: 3 })}</p>}
             <ol className="mt-3 space-y-3">
               {plannedTasks.map((task, index) => <li key={task.id} className="rounded-xl border border-slate-200 bg-white p-4">
                 <span className="text-xs font-bold text-blue-600">{index + 1}</span>
@@ -266,7 +266,6 @@ function HomeBriefing({ currentUser, activeWorkspace, onOpenTask, onOpenBoard,
             </ol>
             {plannedTasks.length === 0 && <p className="mt-4 text-sm text-slate-500">{t('home.focusEmptyTitle')}</p>}
             {onOpenToday && <button type="button" className={`${quietButton} mt-2 -ml-3`} onClick={onOpenToday}>{t('home.openToday')} <span aria-hidden="true" className="ml-2">→</span></button>}
-            <p className="mt-3 text-[13px] text-slate-500">{t('today.stats.sessions', { count: focusSessionsToday, plural: focusSessionsToday === 1 ? '' : 's' })}</p>
           </section>
           <section aria-labelledby="briefing-boards">
             <h2 id="briefing-boards" className={sectionLabel}>{t('briefing.boards')}</h2>

@@ -37,7 +37,7 @@ export default function WorkspaceMemberRow({
             {member.name}
             {isCurrentUser && <span className="ml-1 text-xs font-medium text-slate-400">(you)</span>}
           </p>
-          <p className="truncate text-xs text-slate-500">{member.email || 'No email profile'}</p>
+          {member.email && <p className="truncate text-xs text-slate-500">{member.email}</p>}
         </div>
       </div>
 

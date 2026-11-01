@@ -26,7 +26,7 @@ it('keeps the public Home layout without fetching private data and gates local p
   expect(screen.getByText('Recent boards')).toBeInTheDocument();
   expect(fetchHomeDashboardData).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: 'Order today’s tasks' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Pin a thread' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Pin a message' }));
   expect(onRequireSignIn).toHaveBeenCalledTimes(2);
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   expect(props.onPlanFocusTasks).not.toHaveBeenCalled();

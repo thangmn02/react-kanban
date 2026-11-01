@@ -490,7 +490,7 @@ function AppLayout() {
     <FocusSessionProvider value={focusSession}>
       {showNavigation && <AppNavigation activeView={activeView} onNavigate={setActiveViewWithPath} />}
       <div className={showNavigation ? 'min-h-screen bg-white lg:ml-14 lg:flex' : undefined}>
-        {showNavigation && <ContextSidebar key={`${user?.id}:${activeWorkspaceId}`} activeView={activeView} workspaceId={activeWorkspaceId} workspaceName={activeWorkspace?.name} boards={boardController.boardSummaries} activeBoardId={activeBoardId} boardData={boardData} onBoard={boardController.handleOpenBoardFromHome} onHighPriority={filterHighPriority} onDueToday={filterDueToday} onClearFilters={clearBoardFilters} />}
+        {showNavigation && <ContextSidebar key={`${user?.id}:${activeWorkspaceId}`} activeView={activeView} workspaceId={activeWorkspaceId} workspaceName={activeWorkspace?.name} boards={boardController.boardSummaries} activeBoardId={activeBoardId} boardData={boardData} onBoard={boardController.handleOpenBoardFromHome} onHighPriority={filterHighPriority} onDueToday={filterDueToday} onClearFilters={clearBoardFilters} notesSharing={Boolean(user && !user.isMock)} />}
         <div className="min-w-0 flex-1 bg-white">
         <ViewContextBoundary key={`${user?.id ?? 'public'}:${activeWorkspaceId ?? 'none'}`} ready={!boardController.isBoardLoading}>
           <Suspense fallback={<div role="status" className="min-h-48 bg-canvas px-6 py-10 text-sm text-slate-500">{t('ux.loadingView')}</div>}>

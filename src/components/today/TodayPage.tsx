@@ -179,7 +179,7 @@ export default function TodayPage({
           title={t('today.title')}
           className="mb-4"
           actions={(
-            <div className="flex flex-wrap gap-2">{NOTES_PREVIEW_ENABLED && onCreateNote && <button type="button" onClick={onCreateNote} className="min-h-11 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">New note</button>}<button
+            <div className="flex flex-wrap gap-2">{NOTES_PREVIEW_ENABLED && onCreateNote && <button type="button" onClick={onCreateNote} className="min-h-11 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">{t('notes.quick')}</button>}<button
               type="button"
               onClick={onQuickCreateTask}
               className="cursor-pointer rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-blue-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-100"
@@ -250,7 +250,7 @@ export default function TodayPage({
                 </div>
 
                 <div className="mt-4 grid gap-3">
-                  {focusTasks.length === 0 ? (focusSuggestions.length > 0 ? <p className="text-sm text-slate-500">{t('today.noFocusTitle')}</p> : <EmptyState
+                  {focusTasks.length === 0 ? (focusSuggestions.length > 0 ? <p className="text-sm text-slate-500">{t('today.noFocusPick')}</p> : <EmptyState
                       compact
                       title={t('today.noFocusTitle')}
                       description={t('today.noFocusDescription')}
@@ -324,24 +324,16 @@ export default function TodayPage({
                   <div className="grid gap-3">
                     <AnimatePresence initial={false}>{focusSuggestions.map(({ task, reasons }) => (
                       <motion.div key={task.id} layout={prefersReducedMotion ? false : 'position'} exit={{ opacity: 0 }} transition={prefersReducedMotion ? { duration: 0 } : uiSpring}>
-                        <TodayTaskCard task={task} isFocusTask={false} onOpenTask={onOpenTask} onStartFocus={onStartFocus} onToggleTodayFocus={onToggleTodayFocus} onCompleteTask={handleComplete} isCompleting={completion.pending.has(task.id)} />
-                        <div className="mt-2 flex flex-wrap gap-1.5">{reasons.map(reason => <span key={reason} className={focusReasonBadgeClass(reason)}>{focusReasonLabels[reason]}</span>)}</div>
+                        <TodayTaskCard task={task} isFocusTask={false} onOpenTask={onOpenTask} onStartFocus={onStartFocus} onToggleTodayFocus={onToggleTodayFocus} onCompleteTask={handleComplete} isCompleting={completion.pending.has(task.id)}
+                          reasons={reasons.map(reason => <span key={reason} className={focusReasonBadgeClass(reason)}>{focusReasonLabels[reason]}</span>)} />
                       </motion.div>
                     ))}</AnimatePresence>
                   </div>
                 </SectionCard></div>
               )}
 
-              {!hasUrgentTasks && (
-                <motion.div
-                  className="rounded-2xl border border-sky-100 bg-sky-50/70 p-4 text-slate-700"
-                  initial={prefersReducedMotion ? false : { opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ type: 'spring', stiffness: 160, damping: 20 }}
-                >
-                  <h2 className="text-sm font-semibold text-slate-950">{t('today.noUrgentTitle')}</h2>
-                </motion.div>
-              )}
+              {/* A quiet line, not another card: nothing needs attention. */}
+              {!hasUrgentTasks && <p className="px-1 text-sm text-slate-500">{t('today.noUrgentTitle')}</p>}
             </div>
 
             {(hasUrgentTasks || hasSecondaryTasks) && <div id="today-due-tasks" className="space-y-4">
@@ -394,7 +386,7 @@ export default function TodayPage({
               {hasSecondaryTasks && (
                 <details className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-card">
                   <summary className="cursor-pointer text-sm font-bold uppercase tracking-[0.2em] text-slate-600">
-                    {t('today.moreTasks')}
+                    {t('today.moreTasks')} ({todayData.assignedTasks.length + todayData.recentlyActiveTasks.length})
                   </summary>
                   <div className="mt-3 grid gap-4">
                     {todayData.assignedTasks.length > 0 && (

@@ -127,6 +127,7 @@ export default function NativeSurface({ dock, onToggle, focusProps, children }: 
         onMusicSetup: nativeCompanionPreviewEnabled()?undefined:() => void companion.run(),
         musicSetupPending: companion.updating,
         musicSetupMessage: companion.message,
+        musicSetupFolder: companion.folder,
         nativeControls: <>
           <button className="dock-icon-button" type="button" aria-label={vi ? 'Cập nhật Kora' : 'Update Kora'} title={vi ? 'Cập nhật Kora' : 'Update Kora'} onClick={() => setUpdateOpen(true)}>↓</button>
           <button className="dock-icon-button" type="button" aria-label={vi ? 'Thu nhỏ' : 'Minimize'} onClick={() => action(() => getCurrentWindow().minimize())}>−</button>

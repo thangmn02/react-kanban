@@ -1,8 +1,8 @@
 import { useI18n } from '../../i18n';
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { lazy, memo, Suspense, useEffect, useRef, useState, type CSSProperties } from 'react';
 import {useMotionReduction} from './use-motion-reduction';
 import type {MotionProfile,MotionReduction} from './semantic-motion';
-import {motionPreviewAllowed} from './semantic-motion';
+import {instrumentMotion, motionPreviewAllowed} from './semantic-motion';
 import {liveLeadAvailable} from './live-lead';
 import { getMusicInstallUrl } from './mediaBridge';
 import ExperimentalBeatControl from './experimental-beat-control';
@@ -164,6 +164,28 @@ export function MusicGrid({ music, colorMode = 'random', palette = 'bloom', orie
   </>;
 }
 
+const legendRows = ['kick', 'clap', 'hat', 'bass'] as const;
+type Translate = ReturnType<typeof useI18n>['t'];
+
+/** Live analysis names only the rows that have fired for this song, from the existing per-capture onset counters. */
+function beatPathLabel(t: Translate, beat: BrowserMusicController['beat']) {
+  if (beat.eventPath !== 'local') return t(`music.beatPath.${beat.eventPath!}`);
+  const heard = legendRows.filter((band) => (beat.onsets[band] || 0) > 0);
+  if (!heard.length) return t('music.beatPath.local');
+  if (heard.length === legendRows.length) return t('music.rows.all');
+  const rows = heard.map((band) => t(`music.row.${band}`)).join(', ');
+  return t(heard.length === 1 ? 'music.rows.only' : 'music.rows.some', { rows });
+}
+
+/** Static key for the four Beat grid rows; rendered beside the grid so the grid itself is unchanged. */
+export const BeatRowLegend = memo(function BeatRowLegend() {
+  const { t } = useI18n();
+  return <p className="beat-row-legend" aria-label={t('music.rows.legend')}>
+    {legendRows.map((band) => <span key={band} style={{ '--c': instrumentMotion[band].color } as CSSProperties}>
+      <b aria-hidden="true">{({ kick: '●', clap: '⌁', hat: '⌃', bass: '∿' })[band]}</b>{t(`music.row.${band}`)}</span>)}
+  </p>;
+});
+
 export function MusicFeedback({ music }: { music: BrowserMusicController }) {
   const { t } = useI18n();
   const { selected, playing, busy, openMusicTab, error, beat } = music;
@@ -171,7 +193,7 @@ export function MusicFeedback({ music }: { music: BrowserMusicController }) {
   const outdatedCapturePolicy = beat.mode === 'clock' && (beat.reason === 'drm-protected' || selected?.syncState?.reason === 'drm-protected');
   const silentPlayback = playing && beat.mode === 'clock' && beat.reason === 'silent';
   return <div className="music-feedback">
-    {playing && beat.eventPath && <p className="music-status muted" role="status">{t(`music.beatPath.${beat.eventPath}`)}</p>}
+    {playing && beat.eventPath && <p className="music-status muted" role="status">{beatPathLabel(t, beat)}</p>}
     {needsAccess && <div className="music-access" role="status">
       <p className="music-access-title">{t('music.beatAccessTitle')}</p>
       <p className="muted">{t('music.beatAccessHelp')}</p>
@@ -213,5 +235,15 @@ export function MusicSetup({ music }: { music: BrowserMusicController }) {
       <button type="button" className="text-button" onClick={music.refresh}>{t('music.checkAgain')}</button>
     </div>
     {companion.message && <p className="muted" role="status" style={{ overflowWrap: 'anywhere' }}>{companion.message}</p>}
+    {companion.folder && <CopyFolderButton folder={companion.folder} />}
   </div></>;
+}
+
+/** Copies the Companion folder so it can be pasted into the browser's Load unpacked dialog. */
+export function CopyFolderButton({ folder }: { folder: string }) {
+  const { t } = useI18n();
+  const [copied, setCopied] = useState(false);
+  return <button type="button" className="text-button music-copy-folder" onClick={() => {
+    void navigator.clipboard?.writeText(folder).then(() => setCopied(true), () => setCopied(false));
+  }}>{t(copied ? 'music.copiedFolder' : 'music.copyFolder')}</button>;
 }

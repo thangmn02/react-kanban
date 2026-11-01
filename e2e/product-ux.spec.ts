@@ -175,7 +175,7 @@ test('returning Home restores its scroll position after visiting Today', async (
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(250);
   const previous = await page.evaluate(() => window.scrollY);
   await nav(page).getByRole('button', { name: 'Today', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'My Day', exact: true })).toBeVisible();
+  await expect(page.locator('#today-content').getByRole('heading', { name: 'Today', exact: true })).toBeVisible();
   await nav(page).getByRole('button', { name: 'Home', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(previous - 15);
 });
@@ -183,7 +183,7 @@ test('returning Home restores its scroll position after visiting Today', async (
 test('an unavailable task link returns to its original view with feedback', async ({ page }) => {
   await page.goto('/today?task=missing-task&taskBoard=local-mock-board');
   await expect(page).toHaveURL('/today');
-  await expect(page.getByRole('heading', { name: 'My Day', exact: true })).toBeVisible();
+  await expect(page.locator('#today-content').getByRole('heading', { name: 'Today', exact: true })).toBeVisible();
   await expect(page.getByRole('dialog', { name: 'Edit task' })).toBeHidden();
   await expect(page.getByRole('status').filter({ hasText: /no longer available/i })).toBeVisible();
 });

@@ -39,6 +39,8 @@ export function createCompanionAction(api, beats, widgetConnected = () => false)
         let sameOrigin = false;
         try { sameOrigin = new URL(tab.url).origin === new URL(leadAudioTestScope?.sourceUrl).origin; } catch { /* Invalid URL. */ }
         if (!Number.isInteger(tab?.id) || source?.provider !== 'kora-development' || !sameOrigin) {
+          // Tell the setup page why it opened, so it can explain instead of looking like a success screen.
+          await api.storage.session.set({ setupReason: 'not-music-tab' }).catch(() => {});
           await api.runtime.openOptionsPage(); return;
         }
       }

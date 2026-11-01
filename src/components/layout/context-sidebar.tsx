@@ -9,9 +9,29 @@ interface Props {
   activeView: string; workspaceId: string | null; workspaceName?: string;
   boards: BoardRow[]; activeBoardId: string | null; boardData: BoardData;
   onBoard: (id: string) => void; onHighPriority: () => void; onDueToday: () => void; onClearFilters: () => void;
+  /** Connected accounts can share notes; the device-only preview cannot, so its Shared view is not offered. */
+  notesSharing?: boolean;
 }
 
-export default function ContextSidebar({ activeView, workspaceId, boards, activeBoardId, boardData, onBoard, onHighPriority, onDueToday, onClearFilters }: Props) {
+/** The one Notes navigation: scope first (Workspace / Personal), then the view inside it. */
+function NotesLinks({ item, close, sharing, search }: { item: string; close: () => void; sharing: boolean; search: string }) {
+  const { t } = useI18n();
+  const query = new URLSearchParams(search), personal = query.get('scope') === 'personal', active = query.get('filter') || 'all';
+  const scope = personal ? '&scope=personal' : '';
+  const selected = 'bg-white font-semibold text-slate-900 shadow-sm';
+  const filters = (['all', 'pinned', 'recent', ...(sharing && !personal ? ['shared'] as const : []), 'trash'] as const);
+  return <>
+    <div role="group" aria-label={t('notes.scope')} className="mb-3 grid grid-cols-2 gap-1 rounded-lg bg-black/5 p-1">
+      {([false, true] as const).map(value => <Link key={String(value)} to={value ? '/notes?scope=personal' : '/notes'} onClick={close}
+        aria-current={personal === value ? 'page' : undefined}
+        className={`min-h-9 rounded-md px-2 py-2 text-center text-xs text-slate-600 ${personal === value ? selected : ''}`}>{t(value ? 'notes.scope.personal' : 'notes.scope.workspace')}</Link>)}
+    </div>
+    {filters.map(filter => <Link key={filter} to={`/notes?filter=${filter}${scope}`} onClick={close} aria-current={active === filter ? 'page' : undefined}
+      className={`${item} ${active === filter ? selected : ''}`}>{t(`shell.${filter}`)}</Link>)}
+  </>;
+}
+
+export default function ContextSidebar({ activeView, workspaceId, boards, activeBoardId, boardData, onBoard, onHighPriority, onDueToday, onClearFilters, notesSharing = false }: Props) {
   const { t } = useI18n();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false), [mobileOpen, setMobileOpen] = useState(false);
@@ -31,7 +51,7 @@ export default function ContextSidebar({ activeView, workspaceId, boards, active
         {boardData.columns.map(id => <p key={id} className="flex justify-between px-3 py-2 text-xs text-slate-600"><span>{boardData.list[id].title}</span><span>{boardData.list[id].tasks.length}</span></p>)}
         <p className="mb-2 mt-5 text-xs font-semibold text-slate-500">{t('shell.filters')}</p>
         <button type="button" className={item} onClick={onHighPriority}>{t('shell.priority')}</button><button type="button" className={item} onClick={onDueToday}>{t('shell.dueToday')}</button><button type="button" className={item} onClick={onClearFilters}>{t('shell.clearFilters')}</button>
-      </> : activeView === 'notes' ? <>{(['all', 'pinned', 'recent', 'shared'] as const).map(filter => <Link key={filter} to={`/notes?filter=${filter}${new URLSearchParams(location.search).get('scope') === 'personal' ? '&scope=personal' : ''}`} onClick={close} aria-current={(new URLSearchParams(location.search).get('filter') || 'all') === filter ? 'page' : undefined} className={item}>{t(`shell.${filter}`)}</Link>)}</>
+      </> : activeView === 'notes' ? <NotesLinks item={item} close={close} sharing={notesSharing} search={location.search} />
       : activeView === 'members' ? <><Link className={item} to={`/workspaces/${workspaceId}/members`} onClick={close}>{t('shell.membersInvites')}</Link><Link className={item} to="/tasks" onClick={close}>{t('shell.sharedBoards')}</Link></>
       : <><Link className={item} to="/today#today-plan-heading" onClick={close}>{t('shell.priorityPlanning')}</Link><Link className={item} to="/today#today-due-tasks" onClick={close}>{t('shell.dueToday')}</Link>{NOTES_PREVIEW_ENABLED && <Link className={item} to="/notes?filter=pinned" onClick={close}>{t('shell.pinned')}</Link>}</>}
       {board && workspaceId && <Link className={`${item} mt-6 border-t border-slate-200 pt-4`} to={`/workspaces/${workspaceId}/members`} onClick={close}>{t('shell.membersInvites')}</Link>}
