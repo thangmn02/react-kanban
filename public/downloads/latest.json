@@ -1,10 +1,10 @@
 {
-  "version": "0.1.38",
-  "pub_date": "2026-11-01T05:30:33.230Z",
+  "version": "0.1.39",
+  "pub_date": "2026-11-01T08:15:09.287Z",
   "platforms": {
     "windows-x86_64": {
-      "url": "https://kanthangboard.netlify.app/downloads/Kora-setup.exe?version=0.1.38",
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSYTExK2tpc3RSVU5NRUZhV1lOdkxVRmtIeVVZcloycEZIblB6dE44N1YxUkFpcXM3UlZ1R2JNUHZJVW5vSmtJQXZ4Q0tUSDZQWFVKMFAvVnduSmpxeDBUWUdkRnc2MHdZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkzNTExMDIyCWZpbGU6S29yYV8wLjEuMzhfeDY0LXNldHVwLmV4ZQl2ZXJzaW9uOjAuMS4zOApkYkNTWG4rUnlBZkJzWGxUVCsvZUpTZWtlWCs0OUJ2b3FmNGRQemxsdWU3VSsyeFhMUHN5WEtHVVFSc01UQThaS0hWU3ZidERmUit0QnNDektqT09BUT09Cg=="
+      "url": "https://kanthangboard.netlify.app/downloads/Kora-setup.exe?version=0.1.39",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSYTExK2tpc3RSVUczclRGYVRsdCtnd3lkamtGeTlleE9wQVBsV01vRUhJcHozeTVxVTZjclFSOVJWSy9jbTJtdFVHN2oxY1JxOUZFRTRqdnI0RFNkNlNhWE91KzlaTHdFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkzNTIwODk1CWZpbGU6S29yYV8wLjEuMzlfeDY0LXNldHVwLmV4ZQl2ZXJzaW9uOjAuMS4zOQpUcTJtOVRmTFlqdDF1Qzh6Y0R0UXd2NmpqbHd4MGEzSUJsYm1MS2d0K21OQnFySzFyVmRDaEZhd3oyTmtaMVNQOFVqMjZNUWRBT2ZXT3hXNEZtNDhBUT09Cg=="
     }
   }
 }
