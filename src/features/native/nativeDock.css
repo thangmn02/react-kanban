@@ -28,3 +28,8 @@
 .music-setup { flex-shrink:0; padding:8px 12px; }
 .dock-style-name { user-select: none; }
 .dock-panel.ultraviolet { background: linear-gradient(165deg,rgba(42,40,58,.58),rgba(21,18,37,.42)); }
+/* Dark appearance over the light compositor frost: a smoked face dense enough to read as dark glass. */
+.floating-focus[data-appearance='dark'] { --dock-inner-glow: inset 0 1px 1px rgba(255,255,255,.12), inset 0 0 20px rgba(255,255,255,.03); }
+.floating-focus[data-appearance='dark'].glass { background:linear-gradient(165deg,rgba(40,40,46,.86),rgba(22,22,26,.82) 48%,rgba(32,32,38,.86)); border-color:rgba(255,255,255,.12); }
+.floating-focus[data-style='tabs'][data-appearance='dark'] { --dock-glass-face:linear-gradient(165deg,rgba(40,40,46,.86),rgba(22,22,26,.82) 48%,rgba(32,32,38,.86)); border-color:rgba(255,255,255,.12); }
+.floating-focus[data-appearance='dark'] .dock-settings { background:rgba(36,36,40,.97); }

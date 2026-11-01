@@ -93,7 +93,7 @@
 .music-pattern.vertical > .beat-channel { display: flex; flex-direction: column; align-items: center; gap: 7px; min-width: 0; }
 .music-pattern.vertical .beat-square { width: 100%; }
 .music-pattern svg { width: 18px; height: 18px; }
-.beat-square { position: relative; aspect-ratio: 1.5; border: 1px solid #e4e4e9; background: #eef0f3; border-radius: 7px; transform: scale(1); }
+.beat-square { position: relative; aspect-ratio: 1.5; border: 1px solid var(--beat-line,#e4e4e9); background: var(--beat-idle,#eef0f3); border-radius: 7px; transform: scale(1); }
 .music-pattern.live .beat-square.active { background: var(--ci); border-color: transparent; }
 .music-pattern .beat-square.onset { animation: square-onset 150ms ease-out var(--pulse-delay) both; }
 .music-pattern.flow .beat-square { animation: hue-cycle 9s linear var(--hue-delay) infinite; }
@@ -111,13 +111,13 @@
   100% { background: var(--ci); border-color: transparent; transform: scale(1); box-shadow: none; }
 }
 @keyframes hue-cycle { to { filter: hue-rotate(360deg); } }
-.music-pattern.moment .beat-square, .music-pattern.moment .beat-square.active { background: #eef0f3; border-color: #e4e4e9; animation: none; box-shadow: none; transform: scale(1); }
+.music-pattern.moment .beat-square, .music-pattern.moment .beat-square.active { background: var(--beat-idle,#eef0f3); border-color: var(--beat-line,#e4e4e9); animation: none; box-shadow: none; transform: scale(1); }
 .music-pattern.moment .beat-square.moment-lit { animation: moment-flash var(--moment-duration) ease-out var(--moment-delay) both; }
 .music-pattern.moment.flow .beat-square.moment-lit { animation: moment-flash var(--moment-duration) ease-out var(--moment-delay) both, hue-cycle 9s linear var(--hue-delay) infinite; }
 @keyframes moment-flash {
-  0% { background: #eef0f3; transform: scale(1); }
+  0% { background: var(--beat-idle,#eef0f3); transform: scale(1); }
   3%, 90% { background: var(--ci); border-color: transparent; transform: scale(1); box-shadow: 0 0 8px color-mix(in srgb, var(--c) 25%, transparent); }
-  100% { background: #eef0f3; transform: scale(1); box-shadow: none; }
+  100% { background: var(--beat-idle,#eef0f3); transform: scale(1); box-shadow: none; }
 }
 .channel-icon { color: var(--c); opacity: .35; animation: none; transform: none; }
 .music-pattern .beat-square { transition: background-color .4s ease, box-shadow .4s ease; }
@@ -355,3 +355,49 @@
 @media(prefers-reduced-motion:reduce){.hybrid-short-attack .semantic-only .beat-square.onset{animation:none}}
 @media(prefers-reduced-motion:reduce){.hybrid-grid-frame .semantic-only .beat-square.onset{animation:none!important;background:var(--c,#7db4ee);border-color:transparent;box-shadow:none;transform:none}}
 .music-copy-folder { justify-self:start; }
+
+
+/* Dark appearance: Apple-style graphite glass. Keyed on the dock itself so the native shadow-root and
+   Picture-in-Picture docks follow the same setting as the page. The player card keeps its own deep face. */
+.floating-focus[data-appearance='dark'] { color-scheme:dark; color:#f5f5f7; --hairline:rgba(255,255,255,.08);
+  --beat-idle:rgba(255,255,255,.055); --beat-line:rgba(255,255,255,.07); }
+.floating-focus[data-appearance='dark'].glass, .floating-focus[data-appearance='dark'] .glass { background:rgba(28,28,32,.78); border-color:rgba(255,255,255,.1);
+  box-shadow:0 18px 48px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.08); }
+.floating-focus[data-style='tabs'][data-appearance='dark'] {
+  --dock-ink:#f5f5f7; --dock-dim:#a1a1a8; --dock-line:rgba(255,255,255,.08);
+  --dock-glass-face:linear-gradient(165deg,rgba(44,44,50,.84),rgba(26,26,30,.8) 55%,rgba(34,34,40,.84));
+  --dock-player-face:radial-gradient(120% 90% at 15% 0%,rgba(74,112,244,.42),transparent 65%),radial-gradient(100% 110% at 100% 100%,rgba(133,84,209,.34),transparent 65%),linear-gradient(155deg,rgba(24,30,56,.92),rgba(12,14,28,.94));
+  border-color:rgba(255,255,255,.1); box-shadow:0 18px 48px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.09),inset 0 0 24px rgba(255,255,255,.03); }
+.floating-focus[data-appearance='dark'] :where(button) { background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.1); color:#f5f5f7; }
+.floating-focus[data-appearance='dark'] button:hover:not(:disabled) { filter:brightness(1.18); }
+.floating-focus[data-appearance='dark'] :is(.dock-icon-button,.text-button,.music-skip,.music-mute,.music-strip-play,.dock-work-check,.dock-work-task,.dock-time-button) { background:transparent; border-color:transparent; }
+.floating-focus[data-appearance='dark'] .dock-style-name { color:#8e8e95; }
+.floating-focus[data-appearance='dark'] :is(.muted,.eyebrow,.cycle,.dock-cycle,.music-debug) { color:var(--dock-dim,#a1a1a8); }
+.floating-focus[data-style='tabs'][data-appearance='dark'] .dock-start { background:#f5f5f7; color:#111113; border-color:transparent; }
+.floating-focus[data-style='tabs'][data-appearance='dark'] :is(.dock-reset,.dock-next) { background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.1); color:var(--dock-ink); }
+.floating-focus[data-appearance='dark'] .dock-task-select { color:var(--dock-ink,#f5f5f7); }
+.floating-focus[data-appearance='dark'] option { background:#2c2c2e; color:#f5f5f7; }
+.floating-focus[data-appearance='dark'] .dock-ring-track { stroke:rgba(255,255,255,.1); }
+.floating-focus[data-appearance='dark'] .dock-ring-progress { stroke:#b9a9ff; filter:drop-shadow(0 0 6px rgba(185,169,255,.45)); }
+.floating-focus[data-style='tabs'][data-appearance='dark'] .dock-tabbar { background:rgba(255,255,255,.07); }
+.floating-focus[data-appearance='dark'] .dock-tab-pill { background:rgba(255,255,255,.16); box-shadow:0 2px 8px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.12); }
+.floating-focus[data-style='tabs'][data-appearance='dark'] :is(.dock-work-pane,.dock-beat-pane) { background:rgba(255,255,255,.04); border-color:rgba(255,255,255,.07); box-shadow:inset 0 1px 0 rgba(255,255,255,.04); }
+.floating-focus[data-appearance='dark'] .music-now-playing-strip { background:rgba(255,255,255,.05); border-color:rgba(255,255,255,.08); }
+.floating-focus[data-appearance='dark'] .dock-plan-link { background:rgba(255,255,255,.05); border-color:rgba(255,255,255,.08); }
+.floating-focus[data-appearance='dark'] .dock-work-check::before { border-color:#6e6e75; }
+.floating-focus[data-appearance='dark'] .dock-work-current { color:#4ade80; }
+.floating-focus[data-appearance='dark'] .music-access { background:rgba(255,255,255,.05); border-color:rgba(255,255,255,.08); }
+.floating-focus[data-appearance='dark'] .music-sessions { background:rgba(255,255,255,.06); border-color:rgba(255,255,255,.1); color:#f5f5f7; }
+.floating-focus[data-style='tabs'][data-appearance='dark'] .music-sessions option { background:#2c2c2e; color:#f5f5f7; }
+.floating-focus[data-appearance='dark'] .tab-content-area { scrollbar-color:rgba(255,255,255,.2) transparent; }
+/* Settings popover. */
+.floating-focus[data-appearance='dark'] .dock-settings, .floating-focus[data-style='tabs'][data-appearance='dark'] .dock-settings { background:rgba(36,36,40,.97); box-shadow:0 14px 40px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.08); }
+.floating-focus[data-appearance='dark'] .dock-settings label { color:#a1a1a8; }
+.floating-focus[data-appearance='dark'] :is(.dock-timer-settings legend,.dock-sync-setting legend,.dock-settings .dock-sync-setting label) { color:#e5e5ea; }
+.floating-focus[data-appearance='dark'] :is(.dock-settings select,.dock-timer-settings input) { background:rgba(255,255,255,.06); color:#f5f5f7; border-color:rgba(255,255,255,.1); }
+.floating-focus[data-appearance='dark'] .dock-mode-switch button[aria-pressed='true'] { background:rgba(185,169,255,.24); }
+/* Beat grid: idle pads recede into the glass so each instrument's color carries the light. */
+.floating-focus[data-appearance='dark'] .music-pattern .beat-square { --ci:color-mix(in srgb,var(--c) 26%,#1d1d22); }
+.floating-focus[data-appearance='dark'] :is(.kinetic-heartbeat,.decorative-tempo-pulse) { border-color:rgba(185,169,255,.5); }
+.floating-focus[data-appearance='dark'] .shape-beat-flash { background:color-mix(in srgb,var(--c) 78%,white); box-shadow:0 0 24px color-mix(in srgb,var(--c) 80%,transparent),inset 0 0 8px #ffffff70; }
+.floating-focus[data-appearance='dark'] :is(.semantic-beat-flash,.melody-beat-flash) { box-shadow:0 0 18px color-mix(in srgb,var(--c) 70%,transparent); }

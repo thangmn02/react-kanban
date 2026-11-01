@@ -1,15 +1,12 @@
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { Theme } from '@astryxdesign/core/theme';
 import { neutralTheme } from '@astryxdesign/theme-neutral/built';
+import { useAppearance } from '../features/appearance/appearance';
 
 interface AstryxThemeProviderProps {
   children: ReactNode;
-  /**
-   * Color mode passed to the Astryx <Theme> provider. Defaults to "light" to
-   * match the app's existing light canvas (#f8f9fa). Use "system" to follow the
-   * OS preference once dark-mode support is desired.
-   */
-  mode?: 'light' | 'dark' | 'system';
+  /** Forces a color mode. Without it, the user's Appearance setting decides (System by default). */
+  mode?: 'light' | 'dark';
 }
 
 /**
@@ -26,10 +23,18 @@ interface AstryxThemeProviderProps {
  */
 export default function AstryxThemeProvider({
   children,
-  mode = 'light',
+  mode,
 }: AstryxThemeProviderProps) {
+  const appearance = useAppearance();
+  // System is resolved here, so <html data-theme> always names the mode in use; kora-appearance.css keys off it.
+  const resolved = mode ?? appearance.resolved;
+  useEffect(() => {
+    const root = document.documentElement;
+    if (appearance.accent === 'blue') root.removeAttribute('data-accent');
+    else root.setAttribute('data-accent', appearance.accent);
+  }, [appearance.accent]);
   return (
-    <Theme theme={neutralTheme} mode={mode}>
+    <Theme theme={neutralTheme} mode={resolved}>
       {children}
     </Theme>
   );

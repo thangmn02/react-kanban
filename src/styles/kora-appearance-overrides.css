@@ -1,0 +1,74 @@
+/*
+ * Hand-written appearance rules the generated palette (kora-appearance.css) cannot express.
+ * Dark follows Apple's dark mode: graphite surfaces, ink buttons inverted to light, scrims kept dark.
+ */
+
+/* Accent swatches show their own hue, never the remapped blue ramp. */
+.kora-swatch { position: relative; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 999px; cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / .12); transition: transform var(--app-motion-fast) ease; }
+.kora-swatch input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+.kora-swatch:has(input:checked) { box-shadow: 0 0 0 2px var(--app-surface), 0 0 0 4px currentColor; }
+.kora-swatch:has(input:focus-visible) { outline: 2px solid currentColor; outline-offset: 4px; }
+.kora-swatch:hover { transform: scale(1.06); }
+.kora-swatch[data-accent='blue'] { background: oklch(54.6% .245 262.881); color: oklch(54.6% .245 262.881); }
+.kora-swatch[data-accent='indigo'] { background: oklch(51.1% .262 276.966); color: oklch(51.1% .262 276.966); }
+.kora-swatch[data-accent='violet'] { background: oklch(54.1% .281 293.009); color: oklch(54.1% .281 293.009); }
+.kora-swatch[data-accent='pink'] { background: oklch(59.2% .249 .584); color: oklch(59.2% .249 .584); }
+.kora-swatch[data-accent='orange'] { background: oklch(64.6% .222 41.116); color: oklch(64.6% .222 41.116); }
+.kora-swatch[data-accent='green'] { background: oklch(62.7% .194 149.214); color: oklch(62.7% .194 149.214); }
+@media (prefers-reduced-motion: reduce) { .kora-swatch { transition: none; } }
+
+:root[data-theme='dark'] {
+  --app-bg: #111113;
+  --app-surface: #1c1c1e;
+  --app-card: #1c1c1e;
+  --app-popover: #242428;
+  --app-text: #f2f2f7;
+  --app-text-muted: #98989f;
+  --app-border: #303035;
+  --app-muted: #242428;
+  --app-shadow-card: 0 1px 0 rgb(255 255 255 / .04) inset, 0 8px 24px rgb(0 0 0 / .45);
+  --app-shadow-overlay: 0 1px 0 rgb(255 255 255 / .06) inset, 0 18px 48px rgb(0 0 0 / .6);
+}
+:root[data-theme='dark'] body { background: #111113; color: #f2f2f7; }
+
+/* Ink buttons and badges (light mode: near-black fill, white label) become light fills with a dark label. */
+:root[data-theme='dark'] :is(.bg-slate-950, .bg-slate-900, .bg-stone-950).text-white,
+:root[data-theme='dark'] :is(.bg-slate-950, .bg-slate-900, .bg-stone-950) .text-white { color: #111113; }
+
+/* Scrims and dark glass stay dark, a little deeper so they read over graphite. */
+:root[data-theme='dark'] .bg-gray-900 { background-color: #000; }
+:root[data-theme='dark'] .bg-slate-950\/20 { background-color: rgb(0 0 0 / .4); }
+:root[data-theme='dark'] .bg-slate-950\/28 { background-color: rgb(0 0 0 / .48); }
+:root[data-theme='dark'] .bg-slate-950\/30 { background-color: rgb(0 0 0 / .5); }
+:root[data-theme='dark'] .bg-slate-950\/35 { background-color: rgb(0 0 0 / .55); }
+:root[data-theme='dark'] .bg-slate-950\/40, :root[data-theme='dark'] .bg-stone-950\/40 { background-color: rgb(0 0 0 / .6); }
+:root[data-theme='dark'] .bg-slate-950\/45 { background-color: rgb(0 0 0 / .62); }
+:root[data-theme='dark'] .bg-slate-900\/60 { background-color: rgb(28 28 30 / .8); }
+:root[data-theme='dark'] .bg-slate-900\/90 { background-color: rgb(44 44 46 / .94); }
+:root[data-theme='dark'] .bg-slate-900\/95 { background-color: rgb(44 44 46 / .97); }
+
+/* Hard-coded light canvases. */
+:root[data-theme='dark'] :is(.bg-\[\#F8F9FA\], .bg-\[\#F8FAFC\], .bg-\[\#fafaf8\]) { background-color: #111113; }
+:root[data-theme='dark'] .bg-\[\#F1F2F4\] { background-color: #19191c; }
+/* The navigation rail stays a distinct dark column, slightly lifted from the canvas. */
+:root[data-theme='dark'] .bg-\[\#20252D\] { background-color: #18181b; box-shadow: inset -1px 0 0 rgb(255 255 255 / .06); }
+:root[data-theme='dark'] .bg-\[\#20252D\] .text-slate-400 { color: #98989f; }
+
+/* Form fields: browser-default white fields and placeholders. */
+:root[data-theme='dark'] :is(input, textarea, select):not([type='checkbox'], [type='radio'], [type='range'], [type='color']) { color: inherit; }
+:root[data-theme='dark'] ::placeholder { color: #6e6e74; }
+:root[data-theme='dark'] option { background: #242428; color: #f2f2f7; }
+
+/* White text and faint white overlays sit on dark or colored surfaces in both modes, so they stay real white.
+   Solid and dense white (cards, glass at 40% and up) follows the remap to graphite. */
+:root[data-theme='dark'] .text-white, :root[data-theme='dark'] .hover\:text-white:hover { color: #fff; }
+:root[data-theme='dark'] .bg-white\/5 { background-color: rgb(255 255 255 / .05); }
+:root[data-theme='dark'] .bg-white\/10, :root[data-theme='dark'] .hover\:bg-white\/10:hover { background-color: rgb(255 255 255 / .1); }
+:root[data-theme='dark'] .bg-white\/15 { background-color: rgb(255 255 255 / .15); }
+:root[data-theme='dark'] .hover\:bg-white\/20:hover { background-color: rgb(255 255 255 / .2); }
+:root[data-theme='dark'] .border-white\/10 { border-color: rgb(255 255 255 / .1); }
+:root[data-theme='dark'] .border-white\/15 { border-color: rgb(255 255 255 / .15); }
+:root[data-theme='dark'] .ring-white\/15 { --tw-ring-color: rgb(255 255 255 / .15); }
+/* A bare `border` draws in currentColor; on graphite that reads as a bright outline, so soften it to a hairline. */
+:root[data-theme='dark'] [class~='border']:not([class*='border-']) { border-color: rgb(255 255 255 / .16); }

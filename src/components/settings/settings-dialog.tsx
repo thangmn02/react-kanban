@@ -7,6 +7,7 @@ import type { AppUser } from '../../types/auth.type';
 import { uiFade } from '../../shared/motion';
 import { renderAvatarCrop,type AvatarCrop } from '../../utils/profile-image';
 import AvatarEditor from './avatar-editor';
+import AppearanceSettings from './appearance-settings';
 
 export default function SettingsDialog({user,onClose,onOpenFocus}:{user:AppUser;onClose:()=>void;onOpenFocus:()=>void}){
  const auth=useAuth(),{t,language,setLanguage}=useI18n(),reduced=useReducedMotion();
@@ -35,7 +36,8 @@ export default function SettingsDialog({user,onClose,onOpenFocus}:{user:AppUser;
     <p role="status" className="mt-3 text-sm text-emerald-700">{message}</p>{user.profileCleanupPending&&<p role="status" className="mt-2 text-xs text-amber-700">{t('settings.cleanupPending')}</p>}{error&&<p role="alert" className="mt-3 text-sm text-rose-700">{error}</p>}
     <section className="mt-6 space-y-4 border-t border-slate-100 pt-5"><h3 className="text-sm font-semibold text-slate-800">{t('settings.preferences')}</h3>
      <label className="block text-sm text-slate-700">{t('app.language.label')}<select aria-label={t('app.language.label')} value={language} onChange={event=>setLanguage(event.target.value as Language)} className="mt-2 block w-full rounded-lg border border-slate-200 px-3 py-2"><option value="en">English</option><option value="vi">Tiếng Việt</option></select></label>
-     <p className="text-xs text-slate-500">{t('settings.instant')}</p><p className="text-sm text-slate-700">{t('settings.light')}</p>
+     <p className="text-xs text-slate-500">{t('settings.instant')}</p>
+     <AppearanceSettings/>
      <button type="button" disabled={saving||dirty} onClick={()=>{onClose();onOpenFocus();}} className="min-h-10 rounded-lg border border-slate-200 px-3 text-sm text-slate-700">{t('settings.focusPreferences')}</button>
     </section>
    </form>

@@ -16,6 +16,10 @@
 /* App-level Astryx → app token bridge (graceful fallbacks; active now). */
 @import "./styles/astryx-bridge.css";
 
+/* Appearance: generated dark palette and accent ramps, then the hand-written exceptions. */
+@import "./styles/kora-appearance.css";
+@import "./styles/kora-appearance-overrides.css";
+
 /*
  * Design foundation tokens (Phase 0).
  * Tailwind v4 theme extension. These are ADDITIVE semantic aliases on top of the

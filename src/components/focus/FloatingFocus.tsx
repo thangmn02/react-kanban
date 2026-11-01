@@ -8,6 +8,7 @@ import { CopyFolderButton, MusicFeedback, MusicGrid, MusicSetup, MusicTrack, Mus
 import { useBrowserMusic } from '../../features/music/useBrowserMusic';
 import { EnhancedBeatSyncSetting } from '../../features/music/source-audio-delay-control';
 import { useDockPreferences, beatPalettes } from './useDockPreferences';
+import { useAppearance, type Appearance } from '../../features/appearance/appearance';
 
 export interface FloatingFocusProps {
   initialTab?: 'focus' | 'beat' | 'music';
@@ -70,6 +71,7 @@ export default function FloatingFocus(props: FloatingFocusProps) {
   }, [props.isWidget]);
   const music = useBrowserMusic(selectedTab === 'beat' && visible && !props.isMinimized);
   const preferences = useDockPreferences();
+  const appearance = useAppearance();
   const reducedMotion = useReducedMotion();
   const groupId = useId();
   const settingsId = useId();
@@ -106,7 +108,7 @@ export default function FloatingFocus(props: FloatingFocusProps) {
   const hidden = (card: Card) => card !== 'focus' && card !== activeTab;
 
   return <LayoutGroup id={groupId}>
-    <main ref={dockRef} className="floating-focus glass" aria-label="Floating Focus" data-style="tabs">
+    <main ref={dockRef} className="floating-focus glass" aria-label="Floating Focus" data-style="tabs" data-appearance={appearance.resolved}>
       <div className="dock-toolbar" ref={toolbarRef} data-draggable={Boolean(props.onDragStart)} onPointerDown={(event) => {
         if (event.button === 0 && !(event.target as HTMLElement).closest('button, a, input, select, textarea, [role="dialog"]')) props.onDragStart?.();
       }}>
@@ -138,6 +140,8 @@ export default function FloatingFocus(props: FloatingFocusProps) {
               {timerState.startedAt !== null && <p className="muted">{t('focus.timer.settingsApplyNext')}</p>}
             </fieldset>}
             <EnhancedBeatSyncSetting />
+            <label>{t('appearance.label')}<select value={appearance.appearance} onChange={(event) => appearance.setAppearance(event.target.value as Appearance)}>
+              {(['system', 'light', 'dark'] as const).map((value) => <option key={value} value={value}>{t(`appearance.${value}`)}</option>)}</select></label>
             {/* The Kinetic grid owns its per-instrument colours, so the legacy colour-mode choice is no longer offered. */}
             <label>{t('dock.palette')}<select value={preferences.palette} onChange={(event) => preferences.setPalette(event.target.value as typeof preferences.palette)}>
               {beatPalettes.map((value) => <option key={value} value={value}>{t(`dock.palette.${value}`)}</option>)}</select></label>
