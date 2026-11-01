@@ -1,10 +1,14 @@
 // These functions are self-contained because Chrome runs them in a media tab.
-export function readMedia() {
+// With ensureObserved, a tab whose observer or control listener is missing returns null so the caller installs them.
+export function readMedia(ensureObserved = false) {
+  if (ensureObserved && !globalThis.__kanbanMusicMedia?.controlListener) return null;
   const metadata = navigator.mediaSession?.metadata;
   const navigation = (selectors) => [...document.querySelectorAll(selectors)].find(button =>
     !button.disabled && button.getAttribute('aria-disabled') !== 'true' && button.getClientRects().length);
-  const previous = navigation('.ytp-prev-button, ytmusic-player-bar .previous-button, [data-testid="control-button-skip-back"], .skipControl__previous, .player-previous');
-  const next = navigation('.ytp-next-button, ytmusic-player-bar .next-button, [data-testid="control-button-skip-forward"], .skipControl__next, .player-next');
+  // getClientRects forces a layout, so a tab without a reportable player never pays for it.
+  let buttons;
+  const skip = () => buttons ??= [navigation('.ytp-prev-button, ytmusic-player-bar .previous-button, [data-testid="control-button-skip-back"], .skipControl__previous, .player-previous'),
+    navigation('.ytp-next-button, ytmusic-player-bar .next-button, [data-testid="control-button-skip-forward"], .skipControl__next, .player-next')];
   const entries = globalThis.__kanbanMusicMedia?.entries() || Array.from(document.querySelectorAll('audio,video'), (media, index) => ({ media, index }));
   // A browsing page is not necessarily the currently playing asset. Only
   // publish identity from the player, or an unambiguous YouTube video page.
@@ -31,7 +35,7 @@ export function readMedia() {
       playbackRate: media.playbackRate, sampledAt: Date.now(), muted: media.muted || media.volume === 0,
       duration: Number.isFinite(media.duration) && media.duration > 0 ? media.duration : undefined,
       volume: media.volume, canSeek: Number.isFinite(media.duration) && media.duration > 0 && media.seekable.length > 0,
-      canPrevious: Boolean(previous), canNext: Boolean(next),
+      canPrevious: Boolean(skip()[0]), canNext: Boolean(skip()[1]),
       assetUrl: assetUrl?.slice(0, 2048), protectedMedia: Boolean(media.mediaKeys), observed: Boolean(globalThis.__kanbanMusicMedia),
       mediaFacts: globalThis.__kanbanMusicMedia?.sourceFacts?.(media) || { kind:'unknown' } }];
   });

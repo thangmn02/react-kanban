@@ -463,3 +463,29 @@ it('returns to clock on silent capture and never publishes capture without audio
   expect(f.api.tabs.sendMessage).not.toHaveBeenCalledWith(24, expect.objectContaining({ kind: 'sync.state', mode: 'capture' }), expect.anything());
   await f.sync.stop();
 });
+
+it('keeps a toolbar click that lands while Kora is still switching to that tab', async () => {
+  const f = fixture();
+  await f.sync.start(f.session, f.owner, 'old');
+  // The click on the new tab arrives before Kora has made it the source.
+  f.sync.invoke(13);
+  const next = { ...f.session, id: 'other', tabId: 13, documentId: 'other-doc' };
+  await f.sync.start(next, f.owner, 'new');
+  await vi.waitFor(() => expect(f.api.tabCapture.getMediaStreamId).toHaveBeenCalledWith({ targetTabId: 13 }));
+  await f.sync.stop();
+});
+
+it('retries soon, not after 30 s, when a clicked tab briefly refuses capture', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  try {
+    const f = fixture();
+    f.api.tabCapture.getMediaStreamId.mockRejectedValueOnce(new Error('Extension has not been invoked for the current page.'));
+    f.sync.invoke(12);
+    await f.sync.start(f.session, f.owner, 'subscription');
+    await vi.waitFor(() => expect(f.sync.status(f.session)).toMatchObject({ reason: 'capture-permission' }));
+    vi.setSystemTime(Date.now() + 3500);
+    await f.sync.start(f.session, f.owner, 'subscription');
+    await vi.waitFor(() => expect(f.api.tabCapture.getMediaStreamId).toHaveBeenCalledTimes(2));
+    await f.sync.stop();
+  } finally { vi.useRealTimers(); }
+});

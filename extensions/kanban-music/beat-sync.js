@@ -32,6 +32,9 @@ export function createBeatSync(api, nativePublish) {
   let creating;
   let queue = Promise.resolve();
   let sourceRevision=0;
+  // Tabs whose toolbar click granted capture. Chrome keeps the grant until the tab navigates, so a click that lands
+  // while Kora is still switching to that tab is not lost: its capture starts as soon as the tab becomes the source.
+  const invokedTabs=new Set();
   let diagnosticSession,diagnosticTimer;
   const stopDiagnosticInstrumentation=current=>{
     if(!diagnosticSession?.instrumentationActive)return;
@@ -207,7 +210,7 @@ export function createBeatSync(api, nativePublish) {
               : /receiving end|connection|port.*closed/i.test(message) ? 'TransportError' : 'UnavailableError' };
           }
           const reason = captureFailure(stage, error);
-          current.retryAt = Date.now() + (reason === 'capture-permission' ? 30000 : 3000);
+          current.retryAt = Date.now() + (reason === 'capture-permission' && !invokedTabs.has(current.session.tabId) ? 30000 : 3000);
           current.fallbackReason = reason;
           cancelCapture(current);
         }
@@ -314,7 +317,7 @@ export function createBeatSync(api, nativePublish) {
         publishState(current);
         try {
           if (!await startClock(current)) throw new Error('Clock unavailable');
-          void capture(current);
+          void capture(current,invokedTabs.has(session.tabId));
         } catch { if (state === current) await stopCurrent(false,'clock-disconnected'); }
       });
     },
@@ -546,6 +549,7 @@ export function createBeatSync(api, nativePublish) {
     invoke(tabId) {
       // This click can grant browser permission. It is not our own permission
       // flag: automatic attempts always ask Chrome, including after reloads.
+      invokedTabs.add(tabId);
       const current=state;
       if(current?.session.tabId===tabId) {
         // A click may arrive while the initial uninvoked request is failing.
@@ -555,11 +559,13 @@ export function createBeatSync(api, nativePublish) {
       }
     },
     tabClosed(tabId) {
+      invokedTabs.delete(tabId);
       if (state && (state.session.tabId === tabId || state.owner.tabId === tabId)) void stopIfCurrent(state);
     },
     tabLoading(tabId) {
       // Source navigation invalidates its audio immediately. App SPA URL updates
-      // keep the same document; pagehide, receiver failure and leases release it.
+      // keep the same document; pagehide, receiver failure and leases release it. Navigation also ends the grant.
+      invokedTabs.delete(tabId);
       if(state?.session.tabId===tabId)void stopIfCurrent(state,'track-changed');
     },
     tabMuted(tabId, muted) {

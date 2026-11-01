@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 
 const inputs={
-  'beat-sync.js':'683ad6c35f2cb3d518c378564ffd7530ac43cd8881d0d3b2528934cc29a886e5',
+  'beat-sync.js':'cb88ca269ba41e8cf4161eadab78b635163212b85a407ce4bb824d13ae080e63',
   'beat-mode.js':'acef25de51e6193ea2fed41eedfb59650bf9b08ee5c4ea781f997fa6ae05bff7',
   'widget-bridge.js':'774b2b879f05e1acdacbef10fd4a623cf2cb949e0546894cd06bbd47364ac2d2',
 };

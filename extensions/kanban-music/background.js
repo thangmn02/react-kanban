@@ -34,10 +34,13 @@ async function scan() {
     const tabs = await chrome.tabs.query({ url: developmentOrigin ? [...mediaSites, developmentOrigin] : mediaSites });
     const results = await Promise.all(tabs.map(async (tab) => {
       try {
-        // Idempotent; also installs observation in tabs left open during reload.
-        await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'MAIN', files: ['spotify-player.js', 'media-observer.js'] });
-        await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'MAIN', func: controlMedia, args: [0, '', 'install'] });
-        const frames = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'MAIN', func: readMedia });
+        // One injection per tab per scan. Install observation only where it is missing (tabs left open during a reload).
+        let frames = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'MAIN', func: readMedia, args: [true] });
+        if (frames.some((frame) => frame.result === null)) {
+          await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'MAIN', files: ['spotify-player.js', 'media-observer.js'] });
+          await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'MAIN', func: controlMedia, args: [0, '', 'install'] });
+          frames = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'MAIN', func: readMedia });
+        }
         return frames.flatMap((frame) => (frame.result || []).map((media) => ({
           ...media, asset: mediaAssetFromUrl(media.assetUrl, leadAudioTestScope), tabId: tab.id, tabMuted: Boolean(tab.mutedInfo?.muted), documentId: frame.documentId,
           id: `${tab.id}:${frame.documentId}:${media.index}`,

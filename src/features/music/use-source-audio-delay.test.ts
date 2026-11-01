@@ -6,7 +6,7 @@ const native=vi.hoisted(()=>({prepare:vi.fn(),stop:vi.fn(),configure:vi.fn(),med
 vi.mock('../native/runtime',()=>({nativeSourceAudioDelayEnabled:()=>true}));
 vi.mock('../native/nativeMusic',()=>({prepareNativeSourceAudioDelay:native.prepare,stopNativeSourceAudioDelay:native.stop,sourceKey:(id:string)=>id.split(':').slice(0,3).join(':')}));
 vi.mock('./mediaBridge',()=>({configureExperimentalSynchronization:native.configure,sendMusicRequest:native.media}));
-const {sourceDelayStatus,sourceDelaySupported,useSourceAudioDelay,writeEnhancedBeatSyncPreference,readEnhancedBeatSyncPreference,ENHANCED_BEAT_SYNC_KEY}=await import('./use-source-audio-delay');
+const {sourceDelayStatus,sourceDelaySupported,useSourceAudioDelay,writeEnhancedBeatSyncPreference,readEnhancedBeatSyncPreference,ENHANCED_BEAT_SYNC_KEY,SOURCE_DELAY_STUCK_MS}=await import('./use-source-audio-delay');
 
 afterEach(cleanup);
 beforeEach(()=>{
@@ -83,4 +83,22 @@ it('supports YouTube, SoundCloud and Apple Music previews but never Spotify or p
   expect(sourceDelaySupported(session({source:'music.apple.com'}))).toBe(true);
   expect(sourceDelaySupported(session({source:'open.spotify.com'}))).toBe(false);
   expect(sourceDelaySupported(session({asset:{provider:'spotify',id:'x'}} as Partial<BrowserMusicSession>))).toBe(false);
+});
+it('restarts the song once on its own when Preparing outlasts a running capture',async()=>{
+  vi.useFakeTimers({shouldAdvanceTime:true});
+  try{
+    const stuck=session({syncState:owned(0,'capture',{outputOwned:false})});
+    const refresh=vi.fn();
+    const {result,rerender}=renderHook(({value})=>useSourceAudioDelay(value,refresh),{initialProps:{value:stuck}});
+    turnOn();await waitFor(()=>expect(result.current.routed).toBe(true));
+    expect(result.current.controller!.status).toBe('preparing');
+    await act(async()=>{vi.advanceTimersByTime(SOURCE_DELAY_STUCK_MS-500);});
+    expect(native.media).not.toHaveBeenCalled();
+    await act(async()=>{vi.advanceTimersByTime(1000);});
+    await waitFor(()=>expect(native.media.mock.calls.map(call=>call[0])).toEqual(['media.pause','media.play']));
+    await waitFor(()=>expect(refresh).toHaveBeenCalled());
+    // Once per capture: the same stuck capture is not restarted again.
+    rerender({value:{...stuck}});await act(async()=>{vi.advanceTimersByTime(SOURCE_DELAY_STUCK_MS*2);});
+    expect(native.media).toHaveBeenCalledTimes(2);
+  }finally{vi.useRealTimers();}
 });

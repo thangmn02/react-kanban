@@ -5,6 +5,8 @@ import {prepareNativeSourceAudioDelay,sourceKey,stopNativeSourceAudioDelay} from
 
 // Owner-accepted preset from the private prototype; physical A/V timing is uncalibrated.
 export const SOURCE_AUDIO_DELAY_MS=170;
+// How long Preparing may last on a running capture before Kora restarts the song once on its own.
+export const SOURCE_DELAY_STUCK_MS=8000;
 const DELAY_HOSTS=['youtube.com','www.youtube.com','m.youtube.com','music.youtube.com','soundcloud.com','www.soundcloud.com','m.soundcloud.com',
   // Signed-out previews are plain audio; signed-in DRM tracks are refused by the Companion's protected-media check.
   'music.apple.com',
@@ -141,6 +143,22 @@ export function useSourceAudioDelay(selected:BrowserMusicSession|undefined,refre
   });
 
   const status=sourceDelayStatus({preferred:preference.enabled,routed,pending,error,supported,session:selected});
+  // Still Preparing on a running capture well after the switch (the delay never took): do once, per capture, what
+  // pausing and playing by hand does. A fresh play makes the Companion re-check the capture and the delay re-apply.
+  const stuck=status==='preparing'&&routed&&!pending&&Boolean(captureId)&&Boolean(selected&&!selected.paused);
+  const stuckKey=stuck?JSON.stringify([owner,captureId]):'';
+  const nudged=useRef('');const stuckNow=useRef('');stuckNow.current=stuckKey;
+  useEffect(()=>{
+    if(!stuckKey||nudged.current===stuckKey||!selected)return;
+    const sessionId=selected.id;
+    const wait=setTimeout(()=>{
+      if(stuckNow.current!==stuckKey)return;
+      nudged.current=stuckKey;applied.current='';
+      void sendMusicRequest('media.pause',sessionId).then(()=>sendMusicRequest('media.play',sessionId)).catch(()=>{}).finally(refresh);
+    },SOURCE_DELAY_STUCK_MS);
+    return()=>clearTimeout(wait);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Keyed on the stuck capture; the session object changes every poll.
+  },[stuckKey]);
   const hint=status==='preparing'&&routed&&selected&&!captureId?'Click the Kora Music Companion icon on the music tab once so it can take over the sound.'
     :status==='unavailable'?'Not available for this source right now. Music plays normally.':undefined;
   return {available,routed,controller:available?{owner,enabled:route.enabled,preferred:preference.enabled,supported,busy:Boolean(pending),error,hint,

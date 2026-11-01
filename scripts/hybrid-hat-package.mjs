@@ -4,7 +4,7 @@ import {readFile} from 'node:fs/promises';
 import {join} from 'node:path';
 
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
-export const hybridHatsVersion='0.3.35';
+export const hybridHatsVersion='0.3.36';
 const cnnSha256='785c9b7a8640d78066598bc9da4bba54a2c67464a4b3ae125e322770e9d704db';
 const adtofSha256='c571062d76c322d54c2808c95339ea2dadd2f6ab99f9d83163d0f5311cd0f80a';
 
