@@ -54,3 +54,21 @@ it('halves batching delay without shifting feature timestamps or changing the tr
   expect(after.flatMap(b => [...b.data]).slice(0, 90)).toEqual(before.flatMap(b => [...b.data]));
   expect(before[0].availableAudioTime - after[0].availableAudioTime).toBeCloseTo(.05, 10);
 });
+it('restores a quiet player volume toward full level and leaves a loud input unchanged', () => {
+  const run = (amplitude, levelCompensation) => {
+    const features = new PercussionFeatures({ ...config, levelCompensation }), out = [];
+    for (let at = 0; at < 44100; at += 128) {
+      const samples = Float32Array.from({ length: Math.min(128, 44100 - at) }, (_, i) => amplitude * Math.sin((at + i) * .17));
+      features.push([samples], at / 44100, block => out.push(...block.data));
+    }
+    return out.at(-1);
+  };
+  // A song peaking at .8 is already full level: compensation is a no-op.
+  expect(run(.8, true)).toBe(run(.8, false));
+  // The same song at 20% volume: uncompensated scores fall far below full level; compensated ones come back to .5 peak.
+  const full = run(.5, false), quiet = run(.1, false), restored = run(.1, true);
+  expect(quiet).toBeLessThan(full * .5);
+  expect(restored).toBeCloseTo(full, 5);
+  // Near-silence is boosted at most 8x.
+  expect(run(.001, true)).toBeCloseTo(run(.008, false), 5);
+});

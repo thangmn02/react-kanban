@@ -354,7 +354,4 @@
 @keyframes hybrid-short-attack{0%{background:var(--ci,#eef0f3);box-shadow:0 0 8px var(--c,#7db4ee)}100%{background:var(--c,#7db4ee);box-shadow:none}}
 @media(prefers-reduced-motion:reduce){.hybrid-short-attack .semantic-only .beat-square.onset{animation:none}}
 @media(prefers-reduced-motion:reduce){.hybrid-grid-frame .semantic-only .beat-square.onset{animation:none!important;background:var(--c,#7db4ee);border-color:transparent;box-shadow:none;transform:none}}
-.beat-row-legend { display:flex; flex-wrap:wrap; justify-content:center; gap:4px 12px; margin:6px 0 0; font-size:11px; color:#716b7d; }
-.beat-row-legend span { display:inline-flex; align-items:center; gap:4px; }
-.beat-row-legend b { color:var(--c); font-weight:400; }
 .music-copy-folder { justify-self:start; }

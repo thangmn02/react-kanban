@@ -200,7 +200,6 @@ const en = {
   'music.row.clap': 'Snare',
   'music.row.hat': 'Hat',
   'music.row.bass': 'Bass',
-  'music.rows.legend': 'Beat grid rows',
   'music.sync.title': 'Enhanced Beat Sync',
   'music.sync.toggle': 'Line the Beat Grid up with the beat',
   'music.sync.confirm': "Music plays about 0.17 s later so drum flashes land on the beat. A playing song pauses for a moment to switch.",

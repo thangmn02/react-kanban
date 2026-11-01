@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, expect, it } from 'vitest';
 import { I18nProvider } from '../../i18n';
-import { BeatRowLegend, MusicFeedback } from './MusicPlayer';
+import { MusicFeedback } from './MusicPlayer';
 import type { BrowserMusicController } from './useBrowserMusic';
 
 afterEach(cleanup);
@@ -22,9 +22,4 @@ it('names only the rows that have fired instead of claiming the whole grid is li
   expect(feedback({ eventPath: 'local', onsets: {} })).toHaveTextContent(/^Live beats$/);
   cleanup();
   expect(feedback({ eventPath: 'cache', onsets: { bass: 2 } })).toHaveTextContent('Beats · saved analysis');
-});
-
-it('labels the four Beat grid rows', () => {
-  render(<I18nProvider><BeatRowLegend /></I18nProvider>);
-  expect(screen.getByLabelText('Beat grid rows')).toHaveTextContent(/Kick.*Snare.*Hat.*Bass/);
 });

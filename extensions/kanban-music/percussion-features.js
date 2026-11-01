@@ -36,6 +36,12 @@ export class PercussionFeatures {
     this.times = [];
     this.used = 0;
     this.computeMs = 0;
+    // Tab capture hears the song after the player volume; at 20% the learned Snare scores fall under threshold.
+    // Opt-in: boost a quiet input back toward full-volume level. Boost only, so a loud input is unchanged.
+    // Instant attack, ~10 s release half-life, at most 8x (18 dB).
+    this.levelCompensation = config.levelCompensation === true;
+    this.level = 0; this.framePeak = 0; this.gain = 1;
+    this.release = Math.pow(.5, config.hopSize / config.sampleRate / 10);
   }
 
   spectrum() {
@@ -65,7 +71,7 @@ export class PercussionFeatures {
       const filter = this.config.filterbank[bin];
       let value = 0;
       for (let k = 0; k < filter.weights.length; k++) value += this.magnitude[filter.first + k] * filter.weights[k];
-      this.data[this.used * this.config.bins + bin] = Math.log10(1 + value);
+      this.data[this.used * this.config.bins + bin] = Math.log10(1 + value * this.gain);
     }
   }
   push(channels, startTime, emit) {
@@ -75,7 +81,12 @@ export class PercussionFeatures {
       for (const channel of channels) value += channel[i] / channels.length;
       this.samples[this.write] = value;
       this.write = (this.write + 1) % this.samples.length;
+      if (this.levelCompensation && Math.abs(value) > this.framePeak) this.framePeak = Math.abs(value);
       if (++this.received !== this.next) continue;
+      if (this.levelCompensation) {
+        this.level = Math.max(this.level * this.release, this.framePeak); this.framePeak = 0;
+        this.gain = this.level > 0 ? Math.min(8, Math.max(1, .5 / this.level)) : 1;
+      }
       const began = this.config.telemetry ? Date.now() : 0;
       this.spectrum();
       if (this.config.telemetry) this.computeMs += Date.now() - began;

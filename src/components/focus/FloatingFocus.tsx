@@ -4,7 +4,7 @@ import { uiFade, uiSpring } from '../../shared/motion';
 import type { FocusTask, PomodoroTimerState, PomodoroTimerSettings, PomodoroMode } from '../../types/focus.type';
 import { formatPomodoroTime } from '../../utils/pomodoroTime';
 import { useI18n } from '../../i18n';
-import { BeatRowLegend, CopyFolderButton, MusicFeedback, MusicGrid, MusicSetup, MusicTrack, MusicNowPlaying } from '../../features/music/MusicPlayer';
+import { CopyFolderButton, MusicFeedback, MusicGrid, MusicSetup, MusicTrack, MusicNowPlaying } from '../../features/music/MusicPlayer';
 import { useBrowserMusic } from '../../features/music/useBrowserMusic';
 import { EnhancedBeatSyncSetting } from '../../features/music/source-audio-delay-control';
 import { useDockPreferences, beatPalettes } from './useDockPreferences';
@@ -230,7 +230,6 @@ export default function FloatingFocus(props: FloatingFocusProps) {
           {!hasMusic && <p className="dock-empty muted">{t(emptyMusic)}</p>}
           <MusicGrid music={music} colorMode={preferences.colorMode} palette={preferences.palette} motionProfile={preferences.motionProfile} motionReduction={preferences.motionReduction}
             visualActive={selectedTab==='beat'&&visible&&!props.isMinimized}/>
-          <BeatRowLegend />
         </motion.section>
         <motion.section id={`${groupId}-music`} layout layoutId="music-row" className={`dock-panel dock-track-pane${preferences.palette === 'ultraviolet' ? ' ultraviolet' : ''}`}
           data-card="music" aria-label={t('focus.island.music')} aria-hidden={hidden('music')} inert={hidden('music')}

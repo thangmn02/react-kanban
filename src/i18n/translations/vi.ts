@@ -200,7 +200,6 @@ const vi = {
   'music.row.clap': 'Snare',
   'music.row.hat': 'Hat',
   'music.row.bass': 'Bass',
-  'music.rows.legend': 'Các hàng của lưới nhịp',
   'music.sync.title': 'Đồng bộ nhịp nâng cao',
   'music.sync.toggle': 'Khớp lưới nhịp với nhịp nhạc',
   'music.sync.confirm': "Nhạc phát chậm khoảng 0,17 giây để đèn trống nháy đúng nhịp. Bài đang phát sẽ dừng một chút để chuyển.",

@@ -44,6 +44,8 @@ export async function createPercussionRuntime({ context, source, onEvent, signal
     const config = await response.json();
     config.semanticPrecisionGuards=precisionConfiguration(semanticPrecisionGuards);
     config.hatLabelMapping=validateHatLabelMode(hatLabelMapping);
+    // Live audio arrives after the player volume; the frontend restores a quiet input's level (percussion-features.js).
+    config.levelCompensation=true;
     if (['onset-guided','local-prominence','early-finalization'].includes(classifier)) config.classifier = classifier;
     if (!live || context.sampleRate !== config.sampleRate || config.version !== 1 || config.bins !== 84) return null;
     // Raw activations are private, explicitly requested diagnostics only.

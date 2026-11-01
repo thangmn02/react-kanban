@@ -1,8 +1,8 @@
 import { useI18n } from '../../i18n';
-import { lazy, memo, Suspense, useEffect, useRef, useState, type CSSProperties } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import {useMotionReduction} from './use-motion-reduction';
 import type {MotionProfile,MotionReduction} from './semantic-motion';
-import {instrumentMotion, motionPreviewAllowed} from './semantic-motion';
+import {motionPreviewAllowed} from './semantic-motion';
 import {liveLeadAvailable} from './live-lead';
 import { getMusicInstallUrl } from './mediaBridge';
 import ExperimentalBeatControl from './experimental-beat-control';
@@ -176,15 +176,6 @@ function beatPathLabel(t: Translate, beat: BrowserMusicController['beat']) {
   const rows = heard.map((band) => t(`music.row.${band}`)).join(', ');
   return t(heard.length === 1 ? 'music.rows.only' : 'music.rows.some', { rows });
 }
-
-/** Static key for the four Beat grid rows; rendered beside the grid so the grid itself is unchanged. */
-export const BeatRowLegend = memo(function BeatRowLegend() {
-  const { t } = useI18n();
-  return <p className="beat-row-legend" aria-label={t('music.rows.legend')}>
-    {legendRows.map((band) => <span key={band} style={{ '--c': instrumentMotion[band].color } as CSSProperties}>
-      <b aria-hidden="true">{({ kick: '●', clap: '⌁', hat: '⌃', bass: '∿' })[band]}</b>{t(`music.row.${band}`)}</span>)}
-  </p>;
-});
 
 export function MusicFeedback({ music }: { music: BrowserMusicController }) {
   const { t } = useI18n();
