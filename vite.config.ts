@@ -7,11 +7,12 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { copyFile, rm } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import nativeConfig from './src-tauri/tauri.conf.json' with { type: 'json' }
+import releaseVersion from './release-version.json' with { type: 'json' }
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
-  define: { __KORA_VERSION__: JSON.stringify(nativeConfig.version) },
+  // Shown to people; the internal Kora/Companion numbers keep rising so updates still install.
+  define: { __KORA_VERSION__: JSON.stringify(releaseVersion.display) },
   plugins: [
     localHybridDevelopmentPlugin(process.env.VITE_PRIVATE_LOCAL_HYBRID==='true'),
     react(),

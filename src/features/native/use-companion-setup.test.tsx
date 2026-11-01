@@ -17,7 +17,7 @@ it('prevents duplicate clicks and distinguishes confirmed reload from manual ins
   await act(() => view.result.current.run()); expect(invoke).toHaveBeenCalledTimes(1);
   await act(async () => { finish(result); await pending; });
   expect(view.result.current.message).toContain('click Reload'); expect(view.result.current.message).toContain(result.folder);
-  expect(view.result.current.message).toContain('0.3.23');
+  expect(view.result.current.message).toContain(__KORA_VERSION__);
   invoke.mockResolvedValueOnce({ ...result, status: 'ready', browsersReady: 1 });
   await act(() => view.result.current.run()); expect(view.result.current.message).toContain('ready in your connected browsers');
   invoke.mockResolvedValueOnce({ ...result, status: 'install-required' });

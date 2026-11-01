@@ -2,10 +2,10 @@ import * as ort from './vendor/percussion/ort.wasm.min.mjs';
 import {CnnBrowserFrontend} from '../../scripts/cnn-browser-frontend.mjs';
 import {SoxrStream} from '../../scripts/research-cnn-live/soxr-wasm-adapter.mjs';
 import {SourceSegmentGuard} from '../../scripts/research-cnn-live/source-segment-guard.mjs';
-import {CnnHatEdges,cnnModelSha256,sameHybridOwner} from './hybrid-live-contract.js';
+import {CnnDrumEdges,cnnModelSha256,sameHybridOwner} from './hybrid-live-contract.js';
 const epoch=()=>performance.timeOrigin+performance.now();
 let config,session,module,coefficients,guard,frontend,resampler,origin=0,token=0,running=false,failed=false;
-let pending=[],edges=new CnnHatEdges(),recordingId,sequence=0;
+let pending=[],edges=new CnnDrumEdges(),recordingId,sequence=0;
 let probe;
 function send(data){self.postMessage({...data,ownership:config.ownership,detectorModel:'CNN-B',diagnosticRecordingId:recordingId});}
 function resetSegment(sample){
@@ -35,15 +35,15 @@ async function drain(){
         output=await session.run({input});const cnnInferenceEnd=epoch();
         if(row.token!==token||failed)continue;
         const logits=Array.from(output.logits.data),audioTime=row.origin+row.frame*256/22050;
-        const event=edges.push(logits,row.frame,audioTime),detectorDecisionReady=epoch();
+        const events=edges.push(logits,row.frame,audioTime),detectorDecisionReady=epoch();
         const timing={sourceAudioTime:audioTime,analysisFrameIndex:row.frame,modelOutputFrameIndex:row.frame,segmentId:row.token,
           cnnInputStartSample:Math.round(row.origin*config.sampleRate),cnnInputEndSample:Math.round(row.requiredInputAudioTime*config.sampleRate),
           frontendReadyTime:row.frontendReadyTime,cnnInferenceStart,cnnInferenceEnd,
           detectorDecisionReady,decisionAt:detectorDecisionReady,workerPostTime:epoch(),
           requiredInputAudioTime:row.requiredInputAudioTime,queueDepth:pending.length,frontendFrames:frontend.frames,
           normalizationReference:frontend.runningPower,normalization:'observed-only running maximum; old dB frames never revised'};
-        if(event)event.timing=timing;
-        send({kind:'result',events:event?[event]:[],processedAudioTime:row.requiredInputAudioTime,
+        for(const event of events)event.timing=timing;
+        send({kind:'result',events,processedAudioTime:row.requiredInputAudioTime,
           durationMs:cnnInferenceEnd-cnnInferenceStart,queueDepth:pending.length,timing,
           ...(recordingId?{diagnostics:[{audioTime,scores:logits,scoreKind:'logits',frame:row.frame,segmentOrigin:row.origin,...timing}]}:{})});
       }finally{input.dispose();output&&Object.values(output).forEach(t=>t.dispose());}

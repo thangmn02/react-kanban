@@ -2,8 +2,11 @@ import {beforeEach,afterEach,expect,it,vi} from 'vitest';
 const state=vi.hoisted(()=>({options:null,stop:vi.fn(),initialFailure:false}));
 vi.mock('./percussion-runtime.js',()=>({createPercussionRuntime:vi.fn(async options=>{state.options=options;return {stop:state.stop,recordDiagnostics:()=>true};})}));
 import {createHybridPercussionRuntime} from './hybrid-percussion-runtime.js';
+import {createPercussionRuntime} from './percussion-runtime.js';
+import {CnnDrumEdges} from './hybrid-live-contract.js';
 let workers,nodes;
 beforeEach(()=>{
+  try{localStorage.clear();}catch{/* No storage in this environment. */}
   vi.useFakeTimers();workers=[];nodes=[];state.initialFailure=false;state.stop.mockClear();
   vi.stubGlobal('Worker',class{
     constructor(){workers.push(this);this.terminate=vi.fn();}
@@ -50,4 +53,50 @@ it('does not bounce normal input observations through the worker; snapshots requ
   node.port.onmessage({data:observation});expect(worker.postMessage).toHaveBeenLastCalledWith(observation);
   runtime.recordDiagnostics('recording',false);const after=worker.postMessage.mock.calls.length;
   node.port.onmessage({data:observation});expect(worker.postMessage).toHaveBeenCalledTimes(after);runtime.stop();
+});
+const cnn=(f,band)=>workers[0].emit({kind:'result',ownership:f.ownership,events:[{band,detectorModel:'CNN-B'}]});
+it('switches a device too slow for ADTOF to light drums: CNN Kick/Snare/Hat, ADTOF stopped',async()=>{
+  const f=fixture('H-LIVE');f.options.onLightDrums=vi.fn();const runtime=await createHybridPercussionRuntime(f.options);
+  cnn(f,'kick');expect(f.options.onEvent).not.toHaveBeenCalled();
+  for(let i=0;i<11;i++)state.options.onEvent({band:'kick',audioTime:1.5});
+  expect(f.options.onEvent).toHaveBeenCalledTimes(11);expect(state.stop).not.toHaveBeenCalled();
+  state.options.onEvent({band:'kick',audioTime:1.5});
+  expect(f.options.onLightDrums).toHaveBeenCalledWith('adtof-late');expect(state.stop).toHaveBeenCalledOnce();
+  state.options.onEvent({band:'clap',audioTime:1.99});expect(f.options.onEvent).toHaveBeenCalledTimes(11);
+  cnn(f,'kick');cnn(f,'clap');cnn(f,'hat');
+  expect(f.options.onEvent.mock.calls.slice(11).map(([e])=>[e.band,e.detectorModel])).toEqual([['kick','CNN-B'],['clap','CNN-B'],['hat','CNN-B']]);
+  expect(f.options.onFailure).not.toHaveBeenCalled();runtime.stop();
+});
+it('keeps ADTOF when it keeps up with the music',async()=>{
+  const f=fixture('H-LIVE');const runtime=await createHybridPercussionRuntime(f.options);
+  for(let i=0;i<30;i++)state.options.onEvent({band:'kick',audioTime:1.8});
+  expect(state.stop).not.toHaveBeenCalled();cnn(f,'kick');expect(f.options.onEvent).toHaveBeenCalledTimes(30);runtime.stop();
+});
+it('an ADTOF failure moves that song to light drums; only a second one in a row marks the device',async()=>{
+  let storage;try{storage=localStorage;}catch{/* Node without storage. */}
+  if(!storage){vi.stubGlobal('localStorage',(()=>{const m=new Map();return {getItem:k=>m.get(k)??null,setItem:(k,v)=>m.set(k,v),clear:()=>m.clear()};})());}
+  let f=fixture('H-LIVE');let runtime=await createHybridPercussionRuntime(f.options);
+  state.options.onFailure('worker-stalled');
+  expect(f.options.onFailure).not.toHaveBeenCalled();cnn(f,'clap');expect(f.options.onEvent).toHaveBeenCalledOnce();runtime.stop();
+  expect(localStorage.getItem('kora-light-drums')).toBe(null);
+  workers=[];f=fixture('H-LIVE');runtime=await createHybridPercussionRuntime(f.options);state.options.onFailure('worker-stalled');runtime.stop();
+  expect(localStorage.getItem('kora-light-drums')).not.toBe(null);
+});
+it('a remembered light device does not load ADTOF at all',async()=>{
+  let storage;try{storage=localStorage;}catch{/* Node without storage. */}
+  if(!storage){vi.stubGlobal('localStorage',(()=>{const m=new Map();return {getItem:k=>m.get(k)??null,setItem:(k,v)=>m.set(k,v),clear:()=>m.clear()};})());}
+  const first=fixture('H-LIVE');let runtime=await createHybridPercussionRuntime(first.options);
+  for(let i=0;i<12;i++)state.options.onEvent({band:'kick',audioTime:1});runtime.stop();
+  const calls=createPercussionRuntime.mock.calls.length;workers=[];
+  const f=fixture('H-LIVE');runtime=await createHybridPercussionRuntime(f.options);
+  expect(runtime).not.toBe(null);expect(createPercussionRuntime.mock.calls.length).toBe(calls);
+  cnn(f,'kick');expect(f.options.onEvent).toHaveBeenCalledOnce();runtime.stop();
+});
+it('the CNN reports Kick, Snare and Hat rising edges with the published threshold',()=>{
+  const edges=new CnnDrumEdges();
+  expect(edges.push([1,1,1],0,0)).toEqual([]);
+  expect(edges.push([1,-1,1],1,.01)).toEqual([]);
+  expect(edges.push([1,1,-1],2,.02).map(e=>e.band)).toEqual(['clap']);
+  expect(edges.push([-1,1,2],3,.03).map(e=>e.band)).toEqual(['hat']);
+  expect(edges.push([2,-1,2],4,.04).map(e=>[e.band,e.originalClassName])).toEqual([['kick','kick']]);
 });

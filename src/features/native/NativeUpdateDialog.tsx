@@ -11,7 +11,6 @@ export default function NativeUpdateDialog({ onClose }: { onClose: () => void })
   const alive = useRef(true);
   const busy = useRef(false);
   const [phase, setPhase] = useState<'checking' | 'current' | 'available' | 'installing' | 'error'>('checking');
-  const [version, setVersion] = useState('');
   const [progress, setProgress] = useState<number | undefined>();
 
   const checkNow = async () => {
@@ -22,7 +21,6 @@ export default function NativeUpdateDialog({ onClose }: { onClose: () => void })
       const next = await check({ timeout: 15_000 });
       if (!alive.current) { await next?.close(); return; }
       update.current = next;
-      setVersion(next?.version ?? '');
       setPhase(next ? 'available' : 'current');
     } catch {
       if (alive.current) setPhase('error');
@@ -71,7 +69,7 @@ export default function NativeUpdateDialog({ onClose }: { onClose: () => void })
     <p role="status" aria-live="polite">
       {phase === 'checking' && (vi ? 'Đang kiểm tra…' : 'Checking for updates…')}
       {phase === 'current' && (vi ? 'Bạn đang dùng phiên bản mới nhất.' : 'Kora is up to date.')}
-      {phase === 'available' && `${vi ? 'Có phiên bản' : 'Version available:'} ${version}`}
+      {phase === 'available' && (vi ? 'Có phiên bản Kora mới.' : 'A new version of Kora is available.')}
       {phase === 'installing' && (vi ? 'Đang tải và cài đặt…' : 'Downloading and installing…')}
       {phase === 'error' && (vi ? 'Không thể cập nhật. Kiểm tra kết nối và thử lại.' : 'Update failed. Check your connection and try again.')}
     </p>

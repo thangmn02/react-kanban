@@ -24,7 +24,7 @@ it('checks once when opened and never installs the current version', async () =>
 it('requires confirmation and frees unused update resources on close', async () => {
   updater.check.mockResolvedValue(available());
   const view = open();
-  expect(await screen.findByText('Version available: 0.1.6')).toBeVisible();
+  expect(await screen.findByText('A new version of Kora is available.')).toBeVisible();
   expect(screen.getByText('Save your work first. Kora will restart.')).toBeVisible();
   expect(updater.install).not.toHaveBeenCalled();
   view.unmount(); expect(updater.close).toHaveBeenCalledOnce();

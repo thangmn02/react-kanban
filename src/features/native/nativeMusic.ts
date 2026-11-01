@@ -111,7 +111,7 @@ export async function prepareNativeSourceAudioDelay(sessionId:string){
   if(!nativeSourceAudioDelayEnabled())throw Error('Optional source audio delay is unavailable.');
   const response=await requestNativeMusic('companion.status');
   const companions=response.companions as {peerId:string;version:string;verified:boolean}[]|undefined;
-  if(!companions?.some(peer=>peer.peerId===sessionId.split(':')[0]&&peer.verified&&companionSupportsSourceDelay(peer.version)))throw Error('Enhanced Beat Sync needs Music Companion 0.3.31 or newer. Use Install or update Companion, then reload it in your browser.');
+  if(!companions?.some(peer=>peer.peerId===sessionId.split(':')[0]&&peer.verified&&companionSupportsSourceDelay(peer.version)))throw Error('Enhanced Beat Sync needs the latest Music Companion. Use Install or update Companion, then reload it in your browser.');
   if([...sourceIntents].some(([key,intent])=>key!==sourceKey(sessionId)&&intent.enabled))throw Error('Stop the previous source audio route before preparing another.');
   sourceIntents.set(sourceKey(sessionId),{epoch:++sourceIntentEpoch,enabled:true});
 }

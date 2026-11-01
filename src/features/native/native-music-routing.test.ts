@@ -49,7 +49,7 @@ it('requires the build gate and a verified delay-capable Companion on the select
   vi.stubEnv('VITE_ENABLE_SOURCE_AUDIO_DELAY','true');
   for(const peer of [{peerId:'candidate',version:'0.3.28',verified:true},{peerId:'candidate',version:'0.3.30',verified:true},{peerId:'foreign',version:'0.3.31',verified:true},{peerId:'candidate',version:'0.3.31',verified:false}]){
     vi.mocked(invoke).mockResolvedValue({ok:true,companions:[peer]});
-    await expect(prepareNativeSourceAudioDelay('candidate:song')).rejects.toThrow('0.3.31 or newer');
+    await expect(prepareNativeSourceAudioDelay('candidate:song')).rejects.toThrow('the latest Music Companion');
   }
   for(const version of ['0.3.29','0.3.31','0.4.0']){
     vi.mocked(invoke).mockResolvedValue({ok:true,companions:[{peerId:'candidate',version,verified:true}]});

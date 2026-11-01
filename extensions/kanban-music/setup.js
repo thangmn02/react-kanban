@@ -1,6 +1,6 @@
 const button = document.getElementById('check-detection');
 const output = document.getElementById('detection-result');
-document.getElementById('companion-version').textContent = chrome.runtime.getManifest().version;
+document.getElementById('companion-version').textContent = chrome.runtime.getManifest().version_name || chrome.runtime.getManifest().version;
 button.addEventListener('click', async () => {
   button.disabled = true;
   output.textContent = 'Checking supported music tabs…';

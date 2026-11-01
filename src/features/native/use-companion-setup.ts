@@ -22,6 +22,6 @@ export function useCompanionSetup() {
     } finally { pending.current = false; setUpdating(false); }
   };
   const message = updating ? t('music.companionUpdating') : error ? `${t('music.companionUpdateFailed')} ${error}`
-    : result ? `${t(`music.companion.${result.status}`, { version: result.version })}${result.status !== 'ready' ? ` ${result.folder}` : ''}` : '';
+    : result ? `${t(`music.companion.${result.status}`, { version: __KORA_VERSION__ })}${result.status !== 'ready' ? ` ${result.folder}` : ''}` : '';
   return { run, updating, message };
 }

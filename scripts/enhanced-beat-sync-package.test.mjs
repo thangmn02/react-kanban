@@ -43,7 +43,7 @@ function fixture(owner={native:'owner',nativeAudio:false},{refuseResume=false}={
 }
 
 test('the public Companion is versioned for release and keeps web owners on the normal path',async()=>{
- assert.equal(manifest.version,enhancedBeatSyncVersion);assert.equal(manifest.name,'Kora Music Companion');assert.equal(manifest.version_name,undefined);
+ assert.equal(manifest.version,enhancedBeatSyncVersion);assert.equal(manifest.name,'Kora Music Companion');assert.equal(manifest.version_name,JSON.parse(await readFile('release-version.json','utf8')).display);
  const f=fixture({tabId:42,documentId:'web'});try{await f.start();assert.equal(f.sync.status(f.session).capability,undefined);assert.equal(await f.sync.configure(f.session,f.owner,f.config()),false);}finally{await f.sync.stop();}
 });
 const restarted=async(f,first)=>{const until=Date.now()+1500;while(Date.now()<until&&!(f.sync.status(f.session).mode==='capture'&&f.sync.status(f.session).captureId!==first))await tick(10);await tick(100);};

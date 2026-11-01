@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
+import {readFileSync} from 'node:fs';
 
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 export const enhancedBeatSyncVersion='0.3.31';
@@ -79,7 +80,9 @@ export function prepareEnhancedBeatSync(files){
   edit('beat-mode.js',replace=>replace("const compensationEligible=Boolean(liveSource&&(source.kind==='audio-only'&&source.noVideo===true||source.hidden===true)&&",
     'const compensationEligible=Boolean(liveSource&&'));
   const manifest=get('manifest.json'),metadata=JSON.parse(manifest.bytes);
-  Object.assign(metadata,{version:enhancedBeatSyncVersion,name:'Kora Music Companion'});delete metadata.version_name;
+  // Chrome shows version_name; version keeps rising so installed Companions still update.
+  const display=JSON.parse(readFileSync(new URL('../release-version.json',import.meta.url),'utf8')).display;
+  Object.assign(metadata,{version:enhancedBeatSyncVersion,version_name:display,name:'Kora Music Companion'});
   manifest.bytes=Buffer.from(JSON.stringify(metadata,null,2)+'\n');
   return {enhancedBeatSync:true,approval:'kora-subscription, boundary restore once per capture',files:proof};
 }

@@ -131,7 +131,7 @@ it('updates Companion from dock settings and shows progress and the confirmed ve
   fireEvent.click(setup!);
   expect(nativeInvoke.mock.calls.filter(([command]) => command === 'native_music_setup')).toHaveLength(1);
   await act(async () => { finish({ version: '0.3.23', status: 'ready', folder: 'C:\\Companion\\extension', browsersReady: 1, folderOpened: false }); });
-  await waitFor(() => expect(shadow.querySelector('[role="status"]')).toHaveTextContent('Companion 0.3.23 is ready'));
+  await waitFor(() => expect(shadow.querySelector('[role="status"]')).toHaveTextContent(`Companion ${__KORA_VERSION__} is ready`));
   expect(setup).not.toBeDisabled();
 });
 it('does not let dock auto-sizing undo maximize, and restores before swapping surfaces', async () => {
