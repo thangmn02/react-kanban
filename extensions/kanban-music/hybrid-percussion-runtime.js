@@ -1,17 +1,22 @@
 import {createPercussionRuntime} from './percussion-runtime.js';
 import {acceptsHybridEvent,sameHybridOwner} from './hybrid-live-contract.js';
 
+// One warm CNN worker survives between captures when the caller opts in (see percussion-runtime.js).
+let parkedWorker;
+
 export async function createHybridPercussionRuntime(options){
   const {context,source,signal,ownership,hybridMode,onEvent,onFailure=()=>{}}=options;
   const controller=new AbortController();
-  let live=true,adtof,node,worker,timer,watchdog,inFlight=0,lastProgress=performance.now(),recording;
+  let live=true,adtof,node,worker,timer,watchdog,inFlight=0,lastProgress=performance.now(),recording,workerReady=false,workerFailed=false;
   let resolveReady=()=>{};
   const stop=()=>{
     if(!live)return;live=false;clearTimeout(timer);clearInterval(watchdog);resolveReady(false);
-    signal?.removeEventListener('abort',stop);controller.abort();adtof?.stop();worker?.terminate();
+    signal?.removeEventListener('abort',stop);controller.abort();adtof?.stop();
+    if(options.reuseWorker&&workerReady&&!workerFailed&&!parkedWorker){worker.onmessage=null;worker.onerror=null;worker.postMessage({kind:'park'});parkedWorker=worker;}
+    else worker?.terminate();
     if(node){node.port.onmessage=null;node.port.close?.();try{source.disconnect(node);}catch{/* Already detached. */}node.disconnect();}
   };
-  const fail=reason=>{if(!live)return;stop();onFailure('hybrid-cnn-'+reason);};
+  const fail=reason=>{if(!live)return;workerFailed=true;stop();onFailure('hybrid-cnn-'+reason);};
   signal?.addEventListener('abort',stop,{once:true});if(signal?.aborted){stop();return null;}
   const observe=data=>{
     const received={...data,mainThreadReceivedAt:performance.timeOrigin+performance.now(),receivedAudioTime:context.currentTime};
@@ -19,12 +24,13 @@ export async function createHybridPercussionRuntime(options){
   };
   try{
     timer=setTimeout(()=>fail('startup-timeout'),10000);
-    worker=new Worker(new URL('./hybrid-cnn-worker.js',import.meta.url),{type:'module'});
+    worker=options.reuseWorker&&parkedWorker||new Worker(new URL('./hybrid-cnn-worker.js',import.meta.url),{type:'module'});
+    if(worker===parkedWorker)parkedWorker=undefined;
     const ready=new Promise(resolve=>{resolveReady=resolve;});
     worker.onerror=()=>fail('worker-error');
     worker.onmessage=({data})=>{
       if(!live||!sameHybridOwner(ownership,data.ownership))return;
-      if(data.kind==='ready')resolveReady(true);
+      if(data.kind==='ready'){workerReady=true;resolveReady(true);}
       if(data.kind==='failed'){observe(data);fail(data.reason||'failed');return;}
       if(data.kind==='pcm-ack'){inFlight=Math.max(0,inFlight-1);lastProgress=performance.now();return;}
       observe(data);

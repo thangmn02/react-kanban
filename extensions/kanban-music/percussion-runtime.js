@@ -2,10 +2,12 @@ import { beatTelemetry } from './beat-telemetry.js';
 import {precisionConfiguration} from './semantic-precision-guards.js';
 import {validateHatLabelMode} from './percussion-label-contract.js';
 const telemetry = beatTelemetry.at('percussion-classifier');
+// One warm worker survives between captures when the caller opts in; loading the model again on every song change is costly.
+let parkedWorker;
 
-export async function createPercussionRuntime({ context, source, onEvent, signal, ownership, onDiagnostic, onCaptureDiagnostic, semanticPrecisionGuards={mode:'off'},hatLabelMapping='off', classifier, onFailure = () => {}, onProgress = () => {} }) {
+export async function createPercussionRuntime({ context, source, onEvent, signal, ownership, onDiagnostic, onCaptureDiagnostic, semanticPrecisionGuards={mode:'off'},hatLabelMapping='off', classifier, reuseWorker = false, onFailure = () => {}, onProgress = () => {} }) {
   if (signal?.aborted || !context.audioWorklet || typeof AudioWorkletNode === 'undefined') return null;
-  let live = true, worker, node, watchdog, timeout, pendingSince;
+  let live = true, worker, node, watchdog, timeout, pendingSince, workerReady = false, workerFailed = false;
   let submittedTime = -Infinity;
   let resolveReady = () => {}, resolveCancelled;
   const cancelled = new Promise(resolve => { resolveCancelled = resolve; });
@@ -15,7 +17,9 @@ export async function createPercussionRuntime({ context, source, onEvent, signal
     live = false;
     clearTimeout(timeout); clearInterval(watchdog);
     loadingAbort.abort(); resolveReady(false); resolveCancelled(null);
-    worker?.terminate();
+    if (reuseWorker && workerReady && !workerFailed && !parkedWorker) {
+      worker.onmessage = null; worker.onerror = null; worker.postMessage({ kind: 'park' }); parkedWorker = worker;
+    } else worker?.terminate();
     if (node) node.port.onmessage = null;
     node?.port.close?.();
     node?.disconnect();
@@ -24,6 +28,7 @@ export async function createPercussionRuntime({ context, source, onEvent, signal
   };
   const fail = (reason = 'worker-failed') => {
     if (!live) return;
+    workerFailed = true;
     stop();
     telemetry.record('EVENT_DROPPED', undefined, { reason });
     onFailure(reason);
@@ -48,7 +53,8 @@ export async function createPercussionRuntime({ context, source, onEvent, signal
     if(ownership)config.ownership={...ownership};
     const owns = data => !ownership || ['captureId','sourceId','sourceGeneration','synchronizationEpoch']
       .every(key=>data.ownership?.[key]===ownership[key]);
-    worker = new Worker(new URL('./percussion-worker.js', import.meta.url), { type: 'module' });
+    worker = reuseWorker && parkedWorker || new Worker(new URL('./percussion-worker.js', import.meta.url), { type: 'module' });
+    if (worker === parkedWorker) parkedWorker = undefined;
     const ready = new Promise(resolve => { resolveReady = resolve; });
     worker.onerror = () => fail();
     worker.onmessage = ({ data }) => {
@@ -57,7 +63,7 @@ export async function createPercussionRuntime({ context, source, onEvent, signal
         try{onCaptureDiagnostic({...data,mainThreadReceivedAt:Date.now(),receivedAudioTime:context.currentTime});}
         catch{/* Recording cannot interrupt event delivery. */}
       }
-      if (data.kind === 'ready') resolveReady(true);
+      if (data.kind === 'ready') { workerReady = true; resolveReady(true); }
       if (data.kind === 'failed') fail();
       if (data.kind === 'backlog') telemetry.record('EVENT_DROPPED', undefined, { reason: 'worker-backlog' });
       if (data.kind === 'result') {

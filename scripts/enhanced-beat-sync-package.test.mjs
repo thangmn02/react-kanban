@@ -20,7 +20,7 @@ after(async()=>{if(root){assert.ok(root.startsWith(resolve('scratch')+sep));awai
 
 const tick=(ms=20)=>new Promise(done=>setTimeout(done,ms));
 function fixture(owner={native:'owner',nativeAudio:false},{refuseResume=false}={}){
- const view={active:false,window:'normal'},messages=[],watches=[];let sync;
+ const view={active:false,window:'normal'},messages=[],watches=[],closed=[];let sync;
  const session={id:'source',src:'https://music.youtube.com/watch?v=abcdefghijk',source:'music.youtube.com',tabId:12,documentId:'document',index:0,playing:true,paused:false,
   playbackRate:1,currentTime:10,sampledAt:Date.now(),generation:1,mediaFacts:{kind:'audio-only',singleSource:true,noVideo:true,noFrames:true}};
  const api={runtime:{getURL:name=>'chrome-extension://companion/'+name,getContexts:async()=>[{}],sendMessage:async message=>{
@@ -28,10 +28,10 @@ function fixture(owner={native:'owner',nativeAudio:false},{refuseResume=false}={
    if(refuseResume&&message.kind==='synchronization'&&message.settings?.resume===true)return {ok:false};
    return {ok:true,calibration:{samples:64,p95Ms:240,p99Ms:250}};}},
   tabs:{sendMessage:async(_tab,message)=>{watches.push(message);return {ok:true};},get:async()=>({active:view.active,windowId:1})},windows:{get:async()=>({state:view.window})},
-  offscreen:{closeDocument:async()=>{}},tabCapture:{getMediaStreamId:async()=>'stream',getCapturedTabs:async()=>[{tabId:12,status:'active'}]},
+  offscreen:{closeDocument:async()=>{closed.push(Date.now());}},tabCapture:{getMediaStreamId:async()=>'stream',getCapturedTabs:async()=>[{tabId:12,status:'active'}]},
   scripting:{executeScript:async()=>[]},alarms:{create(){},clear(){},onAlarm:{addListener(){}}}};
  sync=createBeatSync(api,()=>{});
- return {sync,session,owner,messages,view,watch:()=>watches.filter(m=>m.kind==='watch').at(-1),
+ return {sync,session,owner,messages,view,closed,watch:()=>watches.filter(m=>m.kind==='watch').at(-1),
   clock(patch){sync.clock({token:watches.filter(m=>m.kind==='watch').at(-1).token,valid:true,clock:{...session,...patch,sampledAt:Date.now()}},{tab:{id:12},documentId:'document'});},
   async start(){await sync.start(session,owner,'subscription');const until=Date.now()+1000;while(sync.status(session).mode!=='capture'&&Date.now()<until)await tick(5);
    assert.equal(sync.status(session).mode,'capture');this.clock({});await tick();},
@@ -98,5 +98,12 @@ test('a track change that swaps the media source in the same tab keeps the appro
   const until=Date.now()+1500;while(Date.now()<until&&!(f.sync.status(next).mode==='capture'&&f.sync.status(next).capability?.bufferMs>0)){
    f.sync.clock({token:f.watch().token,valid:true,clock:{...next,sampledAt:Date.now()}},{tab:{id:12},documentId:'document'});await tick(20);}
   assert.equal(f.sync.status(next).capability.bufferMs,170,'The successor state re-applied the approved delay.');
+ }finally{await f.sync.stop();}
+});
+test('a song change in the same tab keeps the audio page and its loaded models for the next song',async()=>{
+ const f=fixture();try{
+  await f.start();
+  f.sync.clock({token:f.watch().token,valid:false,clock:{...f.session,sampledAt:Date.now()}},{tab:{id:12},documentId:'document'});await tick(100);
+  assert.equal(f.closed.length,0,'The offscreen document stays open across the song change.');
  }finally{await f.sync.stop();}
 });

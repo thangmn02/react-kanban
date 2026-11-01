@@ -4,7 +4,7 @@ import {prepareNativeCompanionDelay} from './native-companion-delay-package.mjs'
 
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 const inputs={
-  'capture-engine.js':'ab657722435a68acc181a495fb65d30830911906eae8db55627fde115461eac8',
+  'capture-engine.js':'ce531f81f163bcb4b1b5847884df5836f97a13bdde8c5b6e8df6b228016e57cd',
   'offscreen.js':'69c88dea1cd4becacb154ff0bba9d665ca7275aa25b74df5595f41754b8d0616',
   'beat-candidate.js':'98909f840afe54abf9602c102cc773f74aba3562449cb2a16bf7abaee2e7a260',
 };

@@ -215,7 +215,8 @@ export function createCaptureEngine({ getUserMedia, createAudioContext, onBeat, 
           telemetry.record('EVENT_DROPPED', undefined, { captureId, reason });
         };
         const createRuntime=state.hybridMode==='L0'?createPercussion:createHybrid;
-        void createRuntime({ context: state.context, source: state.source, signal: owner.abort.signal,hybridMode:state.hybridMode,
+        // Warm workers are reused across captures, so a song change does not reload the models.
+        void createRuntime({ context: state.context, source: state.source, signal: owner.abort.signal,hybridMode:state.hybridMode,reuseWorker:true,
           ...(state.candidate?{onCaptureDiagnostic(result){
             if(active!==state||state.percussionOwner!==owner||!recording?.active||result.diagnosticRecordingId!==recording.meta.recordingId)return;
             if(result.detectorModel==='CNN-B'){

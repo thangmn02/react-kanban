@@ -59,13 +59,21 @@ export function prepareEnhancedBeatSync(files){
     // Every ending (replacement, Kora unsubscribing, or the page emptying its media at a track change) remembers the
     // approval briefly; the next state for the same owner, tab and document resumes it.
     replace("  async function stopCurrent(keepOffscreen = false,reason='stopped') {\n    const previous = state;\n",
-      "  let recentStanding;\n  const standingKeyOf=(owner,session)=>`${owner.native||owner.tabId}:${session.tabId}:${session.documentId}`;\n"
+      "  let recentStanding,idleClose;\n  const standingKeyOf=(owner,session)=>`${owner.native||owner.tabId}:${session.tabId}:${session.documentId}`;\n"
       +"  async function stopCurrent(keepOffscreen = false,reason='stopped') {\n    const previous = state;\n"
       +"    if(previous?.standingDelay)recentStanding={key:standingKeyOf(previous.owner,previous.session),standing:previous.standingDelay,at:Date.now()};\n");
     replace("          tabMuted: session.tabMuted, clock: session };\n        state = current;\n",
       "          tabMuted: session.tabMuted, clock: session,\n"
       +"          standingDelay:recentStanding?.key===standingKeyOf(owner,session)&&Date.now()-recentStanding.at<10000?recentStanding.standing:undefined };\n"
       +"        recentStanding=undefined;\n        state = current;\n");
+    // A song change in the same tab keeps the empty document and its warm detector workers for the next song, so the
+    // models are not reloaded; an idle document closes after 30 s.
+    replace('    if (keepOffscreen&&released) return true;\n',
+      "    clearTimeout(idleClose);\n    if (keepOffscreen&&released) {\n"
+      +"      idleClose=setTimeout(()=>{void serialize(async()=>{if(!state)await timeout(api.offscreen.closeDocument(),1000).catch(()=>{});});},30000);\n"
+      +"      return true;\n    }\n");
+    replace('    return serialize(async () => { if (state === current) await stopCurrent(false,reason); });\n',
+      "    return serialize(async () => { if (state === current) await stopCurrent(reason==='track-changed',reason); });\n");
   });
   // The owner accepts that a visible video's sound runs behind its picture; Kora says so when the setting is turned on.
   edit('beat-mode.js',replace=>replace("const compensationEligible=Boolean(liveSource&&(source.kind==='audio-only'&&source.noVideo===true||source.hidden===true)&&",

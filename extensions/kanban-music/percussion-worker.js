@@ -9,7 +9,7 @@ let session, config, ort, running = false, stopped = false, queue = [], frames =
 let classifier = new PercussionClassifier();
 let evidenceRing;
 let labelShadow;
-let diagnosticRecordingId,baseDiagnostics;
+let diagnosticRecordingId,baseDiagnostics,loadedModel;
 async function drain() {
   if (running || !session || stopped) return;
   running = true;
@@ -115,8 +115,12 @@ async function drain() {
   finally { running = false; }
 }
 self.onmessage = async ({ data }) => {
+  if (data.kind === 'park') { stopped = true; queue = []; return; }
   if (data.kind === 'init') {
     try {
+      // A parked worker is reused for the next capture: finish the old batch, then start clean with the same model.
+      stopped = true; while (running) await new Promise(resolve => setTimeout(resolve, 5));
+      queue = []; frames = []; count = 0; lastTime = undefined; diagnosticRecordingId = undefined;
       config = data.config;
       baseDiagnostics=config.diagnostics===true;
       config.semanticPrecisionGuards=precisionConfiguration(config.semanticPrecisionGuards);
@@ -129,16 +133,20 @@ self.onmessage = async ({ data }) => {
       classifier.labelMapping=config.hatLabelMapping==='M1'?'M1':'M0';
       labelShadow=config.hatLabelMapping==='shadow'?new classifier.constructor(config.thresholds,{
         onsetGuided:['onset-guided','local-prominence'].includes(config.classifier),localProminence:config.classifier==='local-prominence',diagnostics:true,labelMapping:'M1'}):undefined;
-      // Keep ORT's loader intact and emit its exact assets in production builds.
-      const runtimeUrl = new URL('./vendor/percussion/ort.wasm.min.mjs', import.meta.url).href;
-      ort = await import(/* @vite-ignore */ runtimeUrl);
-      ort.env.wasm.numThreads = 1; ort.env.wasm.proxy = false;
-      ort.env.wasm.wasmPaths = {
-        mjs: new URL('./vendor/percussion/ort-wasm-simd-threaded.mjs', import.meta.url).href,
-        wasm: new URL('./vendor/percussion/ort-wasm-simd-threaded.wasm', import.meta.url).href,
-      };
-      const modelBytes=await loadFrozenPercussionModel(data.model,config);
-      session = await ort.InferenceSession.create(modelBytes, { executionProviders: ['wasm'] });
+      if (!session || loadedModel !== data.model + ':' + config.sha256) {
+        // Keep ORT's loader intact and emit its exact assets in production builds.
+        const runtimeUrl = new URL('./vendor/percussion/ort.wasm.min.mjs', import.meta.url).href;
+        ort = await import(/* @vite-ignore */ runtimeUrl);
+        ort.env.wasm.numThreads = 1; ort.env.wasm.proxy = false;
+        ort.env.wasm.wasmPaths = {
+          mjs: new URL('./vendor/percussion/ort-wasm-simd-threaded.mjs', import.meta.url).href,
+          wasm: new URL('./vendor/percussion/ort-wasm-simd-threaded.wasm', import.meta.url).href,
+        };
+        const modelBytes=await loadFrozenPercussionModel(data.model,config);
+        session = await ort.InferenceSession.create(modelBytes, { executionProviders: ['wasm'] });
+        loadedModel = data.model + ':' + config.sha256;
+      }
+      stopped = false;
       self.postMessage({ kind: 'ready',ownership:config.ownership }); void drain();
     } catch { self.postMessage({ kind: 'failed',ownership:config?.ownership }); stopped = true; }
   }

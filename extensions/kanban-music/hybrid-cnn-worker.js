@@ -52,8 +52,14 @@ async function drain(){
 }
 self.onmessage=async({data})=>{
   try{
+    if(data.kind==='park'){token++;pending=[];resampler?.close();resampler=undefined;frontend=undefined;return;}
     if(data.kind==='init'){
-      if(config)throw Error('Worker already initialized');config=data;
+      // A parked worker is reused for the next capture with the same loaded model; per-source state starts clean.
+      if(config&&(failed||probe||data.parityFrameLimit!==undefined))throw Error('Worker cannot be reused');
+      token++;pending=[];while(running)await new Promise(resolve=>setTimeout(resolve,5));
+      resampler?.close();resampler=undefined;frontend=undefined;edges.reset();sequence=0;recordingId=undefined;origin=0;
+      const reused=Boolean(config&&session&&module&&coefficients&&config.sampleRate===data.sampleRate);config=data;
+      if(reused){guard=new SourceSegmentGuard(config.ownership.sourceId,config.ownership.sourceGeneration);send({kind:'ready',modelSha256:cnnModelSha256});return;}
       if(config.parityFrameLimit!==undefined){
         if(!Number.isSafeInteger(config.parityFrameLimit)||config.parityFrameLimit<1||config.parityFrameLimit>256)throw Error('Invalid finite parity probe limit');
         probe={resampled:[],power:[],mel:[],db:[],features:[],tensor:[]};
