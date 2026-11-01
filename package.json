@@ -7,7 +7,7 @@
     "tauri": "tauri",
     "desktop:package": "node scripts/package-desktop-installer.mjs",
     "dev:native": "vite --host 127.0.0.1 --port 1420 --strictPort",
-    "music:package": "node scripts/package-music-extension.mjs",
+    "music:package": "node scripts/package-music-extension.mjs --enhanced-beat-sync",
     "predev": "npm run music:package",
     "prebuild": "npm run music:package",
     "dev": "vite",
