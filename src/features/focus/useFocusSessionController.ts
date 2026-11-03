@@ -21,6 +21,7 @@ import type {
 } from '../../types/focus.type';
 import type { StorageScope } from '../../shared/storage/storageAdapter';
 import { useNextSteps } from './next-steps';
+import { recordFirstFocusStart } from './time-to-resume';
 import { useFocusTasks } from '../../hooks/useFocusTasks';
 import { useFocusTaskHandlers } from '../../hooks/useFocusTaskHandlers';
 import { usePomodoroTimer } from '../../hooks/usePomodoroTimer';
@@ -198,9 +199,10 @@ export function useFocusSessionController({
     focusTasksApi.setActiveFocusTaskId(nextTaskId);
     setIsFocusDockCollapsed(false);
     if (nextStep) saveNextStep(nextTaskId, nextStep);
+    recordFirstFocusStart(Boolean(nextSteps[nextTaskId]?.pausedAt));
     pomodoro.startTimer(nextTaskId);
     return true;
-  }, [focusTasksApi, pomodoro, resolveRunnableTaskId, saveNextStep]);
+  }, [focusTasksApi, nextSteps, pomodoro, resolveRunnableTaskId, saveNextStep]);
 
   const handleStartFocusTimer = useCallback((taskId?: string, nextStep = '') => {
     const nextTaskId = resolveRunnableTaskId(taskId);

@@ -11,6 +11,8 @@ import { Skeleton } from '../atoms/skeleton';
 import { useBriefingPins } from '../../hooks/useBriefingPins';
 import { fetchBriefingPinTaskBoard } from '../../services/briefing.service';
 import { notify } from './toast/notify';
+import ContinueCard from '../home/ContinueCard';
+import { pickResumeTask } from '../home/resume-task';
 import HomeFocusView, { type HomeFocusControls } from '../home/HomeFocusView';
 import BriefingPinForm from '../home/BriefingPinForm';
 import type { BriefingPin } from '../../types/briefing.type';
@@ -160,6 +162,8 @@ function HomeBriefing({ currentUser, activeWorkspace, onOpenTask, onOpenBoard,
   const exitFocusView = () => {
     setFocusViewId(null);
   };
+  // Continue: the task paused most recently, with its Next step, beats a fresh suggestion.
+  const resumeTask = focusControls && onStartFocusTask ? pickResumeTask(plannedTasks, focusControls.session.nextSteps) : undefined;
   const startTask = (task: HomeTaskSummary) => {
     setFocusViewId(task.id);
     onStartFocusTask?.(task);
@@ -183,7 +187,10 @@ function HomeBriefing({ currentUser, activeWorkspace, onOpenTask, onOpenBoard,
           {error && <div className="mt-8"><ErrorState title={t('today.errorTitle')} description={t('today.errorDescription')} details={error} onRetry={() => { setError(null); setAttempt((value) => value + 1); }} /></div>}
 
           {showBriefing && <>
-            {(plannedTasks[0] || tasks[0]) && (() => {
+            {resumeTask ? <ContinueCard task={resumeTask} nextSteps={focusControls!.session.nextSteps} currentUser={currentUser} taskRevision={taskRevision}
+              onContinue={() => startTask(resumeTask)} onOpenTask={() => onOpenTask(resumeTask.id, resumeTask.boardId)}
+              primaryButton={primaryButton} quietButton={quietButton} sectionLabel={sectionLabel} />
+            : (plannedTasks[0] || tasks[0]) && (() => {
               const task = plannedTasks[0] || tasks[0];
               return <section aria-label={t('ux.nextAction')} className="mt-6 rounded-xl border border-slate-200 bg-white p-5">
                 <p className={sectionLabel}>{t(plannedTasks.length ? 'ux.yourPlan' : 'ux.fromTasks')}</p>
