@@ -124,7 +124,7 @@ test('same-note interleaving rejects edits that depend on a conflicted predecess
     await expect(page.getByRole('textbox', { name: 'Note title' })).toHaveValue('Dependent edit');
     await page.reload();
     await expect(page.getByRole('textbox', { name: 'Note title' })).toHaveValue('External winner');
-    const retained=page.locator('details').filter({hasText:'Retained device drafts'});await retained.locator('summary').click();
+    const retained=page.locator('details').filter({hasText:'Unsaved device drafts'});await retained.locator('summary').click();
     await expect(retained).toContainText('Dependent edit');
     const download=page.waitForEvent('download');await retained.getByRole('button',{name:'Export draft',exact:true}).click();
     const stream=await(await download).createReadStream();if(!stream)throw Error('Retained draft download is unavailable.');

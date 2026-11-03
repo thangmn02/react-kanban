@@ -357,7 +357,9 @@ function AppLayout() {
     onSave: async (title: string) => {
       const listId = boardData.columns[0];
       if (!activeBoardId || !listId) { handleQuickAddTask(); return false; }
-      return boardController.onSubmitCard({ title, description: '', dueDate: format(new Date(), 'yyyy-MM-dd'), labels: [], attachments: [], checklistItems: [] }, { listId });
+      // Yours and due today, so it shows up on Today right away.
+      const assignees = user ? [{ name: user.name, avatar: user.avatarUrl ?? '', userId: user.id }] : [];
+      return boardController.onSubmitCard({ title, description: '', dueDate: format(new Date(), 'yyyy-MM-dd'), assignees, labels: [], attachments: [], checklistItems: [] }, { listId });
     },
     onMore: (title: string) => { setIsQuickTaskOpen(false); setFullFormTitle(title); handleQuickAddTask(); },
     onFullFormClosed: () => setFullFormTitle(''),

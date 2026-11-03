@@ -108,7 +108,6 @@ test('fast repeated avatar-position clicks leave no stranded modal or inert back
 test('profile and Settings preserve the mounted running Focus Dock and its progressing timer', async ({ page }) => {
   await page.goto('/workspaces/local-mock-workspace/boards/local-mock-board');
   await page.getByRole('button', { name: 'Start focus session: Redesign tables card', exact: true }).click();
-  await page.getByRole('button', { name: 'Start without intention', exact: true }).click();
   const dock = page.getByRole('complementary', { name: 'Focus Dock', exact: true });
   await expect(dock.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
   const originalDock = await dock.elementHandle();

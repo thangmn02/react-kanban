@@ -27,7 +27,7 @@ test('canonical workflow agrees across Board, Task Detail, Focus, Today and drag
  await editor.getByLabel('Due date',{exact:true}).fill(await page.evaluate(()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}));
  const rich=editor.locator('[contenteditable="true"]');await rich.fill('First paragraph');await rich.press('Enter');await rich.pressSequentially('Second paragraph');
  await editor.getByRole('button',{name:'Save changes',exact:true}).click();await expect(editor).toBeHidden();
- await page.getByRole('button',{name:'Start focus session: Workflow proof',exact:true}).click();await page.getByRole('button',{name:'Start without intention',exact:true}).click();
+ await page.getByRole('button',{name:'Start focus session: Workflow proof',exact:true}).click();
  const canonicalUrl=page.url();await page.getByRole('navigation',{name:'Main navigation'}).filter({visible:true}).getByRole('button',{name:'Focus',exact:true}).click();const dock=page.getByRole('main',{name:'Floating Focus'});await dock.getByRole('button',{name:'Complete & next',exact:true}).click();
  await expect.poll(async()=> (await storedTask(page,'Workflow proof')).task.is_done).toBe(true);expect((await storedTask(page,'Workflow proof')).task.list_id).toBe(done.id);
  await page.goto(canonicalUrl);await page.getByRole('button',{name:'Open task: Workflow proof',exact:true}).click();await editor.getByRole('button',{name:'Mark not done',exact:true}).click();await expect(editor).toBeHidden();

@@ -57,8 +57,6 @@ test('focus and Pomodoro state survives reload', async ({ page }) => {
 
   await openBoard(page);
   await page.getByRole('button', { name: 'Start focus session: Redesign tables card', exact: true }).click();
-  await expect(page.getByRole('dialog', { name: 'Start with intention' })).toBeVisible();
-  await page.getByRole('button', { name: 'Start without intention' }).click();
   const dock = page.getByRole('complementary', { name: 'Focus Dock' });
   await expect(dock.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
   await dock.getByRole('button', { name: 'Pause', exact: true }).click();

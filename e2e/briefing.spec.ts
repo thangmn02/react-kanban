@@ -6,8 +6,6 @@ test('briefing launches guarded focus and real task details', async ({ page }) =
   await page.getByRole('button', { name: /^Add to focus:/ }).first().click();
   await expect(page.getByRole('button', { name: 'Expand Focus Dock' })).toBeVisible();
   await page.getByRole('button', { name: 'Start focus', exact: true }).click();
-  await expect(page.getByRole('dialog', { name: 'Start with intention' })).toBeVisible();
-  await page.getByRole('button', { name: 'Start without intention' }).click();
   await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'View details', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Edit task' })).toBeVisible();
@@ -34,10 +32,10 @@ test('exiting paused Home focus restores the dock and stays exited in a new run'
   await page.goto('/home');
   await page.getByRole('button', { name: /^Add to focus:/ }).first().click();
   await page.getByRole('button', { name: 'Start focus', exact: true }).click();
-  await page.getByRole('button', { name: 'Start without intention' }).click();
   await page.getByRole('button', { name: 'Pause', exact: true }).click();
   const remaining = await page.getByRole('timer').textContent();
   await page.getByRole('button', { name: 'Exit focus', exact: true }).click();
+  await page.getByRole('button', { name: 'Exit', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Needs attention' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Expand Focus Dock' })).toBeVisible();
   await expect(page.locator('.island-time')).toHaveText(remaining!);

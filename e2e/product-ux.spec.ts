@@ -61,8 +61,6 @@ test('Calendar month, Table sort and filters survive view switches with keyboard
 test('Home first action and Today start use the existing intention and running controller', async ({ page }) => {
   await page.goto('/home');
   await page.getByRole('region', { name: 'Start here' }).getByRole('button', { name: /^Start focus:/ }).click();
-  await expect(page.getByRole('dialog', { name: 'Start with intention' })).toBeVisible();
-  await page.getByRole('button', { name: 'Start without intention' }).click();
   await nav(page).getByRole('button', { name: 'Today', exact: true }).click();
   const pause = page.getByRole('button', { name: 'Pause', exact: true });
   await expect(pause).toBeVisible();
