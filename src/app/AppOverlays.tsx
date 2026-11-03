@@ -11,7 +11,6 @@ import AppToastContainer from '../components/organisms/toast/AppToastContainer';
 import CommandPalette from '../components/command/CommandPalette';
 import FocusCompletionPrompt from '../components/focus/FocusCompletionPrompt';
 import FocusDock from '../components/focus/FocusDock';
-import FocusLaunchpadDialog from '../components/focus/FocusLaunchpadDialog';
 import FocusLimitToast from '../components/focus/FocusLimitToast';
 import ShutdownRitualDialog from '../features/today/components/ShutdownRitualDialog';
 import TodayQuickPlanDialog from '../features/today/components/TodayQuickPlanDialog';
@@ -24,7 +23,6 @@ import type { useAppFocusIntegration } from '../features/focus/useAppFocusIntegr
 import type { usePlanningController } from '../features/today/hooks/usePlanningController';
 import type { useCommandPaletteActions } from '../hooks/useCommandPaletteActions';
 import { useI18n } from '../i18n';
-import { getPomodoroModeSeconds } from '../utils/pomodoroTime';
 import { ARCANA_ENABLED, NOTES_PREVIEW_ENABLED } from '../constants/features';
 import { isNativeWidget } from '../features/native/runtime';
 
@@ -66,23 +64,12 @@ export default function AppOverlays(props: Props) {
       {focusIntegration.floatingFocusPortal}
       <CommandPalette {...props.commandPalette} />
       {ARCANA_ENABLED && <Suspense fallback={null}><ArcanaRewardToast {...props.arcanaReward} /></Suspense>}
-      <FocusLaunchpadDialog
-        key={`${focus.focusLaunchTask?.id ?? 'closed'}:${focus.focusLaunchIntention}`}
-        initialIntention={focus.focusLaunchIntention}
-        isOpen={Boolean(focus.focusLaunchTask)}
-        task={focus.focusLaunchTask}
-        mode={focus.timerState.mode}
-        suggestedSeconds={focus.focusLaunchTask?.id === focus.timerState.activeTaskId
-          ? focus.remainingSeconds
-          : getPomodoroModeSeconds(focus.timerState.mode, focus.timerSettings)}
-        onClose={focus.closeFocusLaunchpad}
-        onStart={focus.confirmFocusLaunch}
-      />
       <FocusCompletionPrompt
         task={focus.focusCompletion?.task || null}
         session={focus.focusCompletion?.session || null}
-        intention={focus.focusCompletion?.intention || ''}
-        onMarkDone={focusIntegration.handleMarkDoneFromCompletion}
+        nextStep={focus.focusCompletion?.intention || ''}
+        onSaveNextStep={(text) => { if (focus.focusCompletion) focus.saveNextStep(focus.focusCompletion.task.id, text, { paused: true }); }}
+        onMarkDone={() => { if (focus.focusCompletion) focus.clearNextStep(focus.focusCompletion.task.id); void focusIntegration.handleMarkDoneFromCompletion(); }}
         onKeepWorking={focus.keepWorkingFromCompletion}
         onClose={focus.closeFocusCompletion}
       />
@@ -170,6 +157,8 @@ export default function AppOverlays(props: Props) {
         isOpen={planning.isShutdownRitualOpen}
         focusTasks={focus.focusTasks}
         dailyFocusStats={focus.dailyFocusStats}
+        nextSteps={focus.nextSteps}
+        onSaveNextStep={(taskId, text) => focus.saveNextStep(taskId, text, { paused: true })}
         onClose={() => planning.setIsShutdownRitualOpen(false)}
         onComplete={planning.handleCompleteShutdownRitual}
       />

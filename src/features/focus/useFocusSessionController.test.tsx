@@ -18,7 +18,6 @@ it('starts, counts down, pauses and resumes without a task or launch modal', () 
   expect(result.current.timerState.isRunning).toBe(true);
   expect(result.current.timerState.activeTaskId).toBeNull();
   expect(result.current.focusTasks).toHaveLength(0);
-  expect(result.current.focusLaunchTask).toBeNull();
   const sessionId = result.current.timerState.sessionId;
   act(() => vi.advanceTimersByTime(5000));
   expect(result.current.remainingSeconds).toBe(1495);
@@ -40,33 +39,31 @@ it.each(['shortBreak', 'longBreak'] as const)('starts %s without requiring a foc
   expect(result.current.timerState.mode).toBe(mode);
   expect(result.current.timerState.activeTaskId).toBeNull();
 });
-it('prefills a reviewed AI step without starting the timer before confirmation', () => {
+it('starts a reviewed AI step in focus mode at once and saves it as the task Next step', () => {
   const { result } = renderHook(() => useFocusSessionController({ user: null, workspaceId: 'workspace', boardData: { columns: [], task: {}, list: {} }, activeBoardId: null, activeBoardSummary: null }), { wrapper: I18nProvider });
   act(() => result.current.setMode('shortBreak'));
   act(() => result.current.handleStartFocusTaskFromHome(summary('mission'), 'Open the research notes'));
   expect(result.current.timerState.mode).toBe('focus');
-  expect(result.current.focusLaunchIntention).toBe('Open the research notes');
-  expect(result.current.timerState.isRunning).toBe(false);
-  act(() => result.current.confirmFocusLaunch('Read the notes and mark three findings'));
-  expect(result.current.activeFocusIntention).toEqual({ taskId: 'mission', text: 'Read the notes and mark three findings' });
   expect(result.current.timerState.isRunning).toBe(true);
+  expect(result.current.timerState.activeTaskId).toBe('mission');
+  expect(result.current.nextSteps.mission?.text).toBe('Open the research notes');
 });
-it('requires an intention for a different task and enforces the Home pin limit', () => {
+it('starts each task in one click, keeps every task its own Next step, and enforces the Home pin limit', () => {
   const { result } = renderHook(() => useFocusSessionController({ user: null, workspaceId: 'workspace', boardData: { columns: [], task: {}, list: {} }, activeBoardId: null, activeBoardSummary: null }), { wrapper: I18nProvider });
   act(() => result.current.handleStartFocusTaskFromHome(summary('a')));
-  expect(result.current.focusLaunchTask?.id).toBe('a');
-  expect(result.current.timerState.isRunning).toBe(false);
-  act(() => result.current.confirmFocusLaunch('Write introduction'));
   expect(result.current.timerState.isRunning).toBe(true);
+  expect(result.current.timerState.activeTaskId).toBe('a');
+  act(() => result.current.saveNextStep('a', 'Write introduction'));
   act(() => result.current.pauseTimer());
+  const session = result.current.timerState.sessionId;
   act(() => result.current.handleStartFocusTaskFromHome(summary('a')));
-  expect(result.current.focusLaunchTask).toBeNull();
-  expect(result.current.activeFocusIntention?.text).toBe('Write introduction');
+  expect(result.current.timerState.sessionId).toBe(session);
   act(() => result.current.handleStartFocusTaskFromHome(summary('b')));
-  expect(result.current.timerState.isRunning).toBe(false);
-  expect(result.current.focusLaunchTask?.id).toBe('b');
-  act(() => result.current.confirmFocusLaunch('Review draft'));
-  expect(result.current.activeFocusIntention).toEqual({ taskId: 'b', text: 'Review draft' });
+  expect(result.current.timerState.activeTaskId).toBe('b');
+  expect(result.current.timerState.isRunning).toBe(true);
+  act(() => result.current.saveNextStep('b', 'Review draft'));
+  expect(result.current.nextSteps.a?.text).toBe('Write introduction');
+  expect(result.current.nextSteps.b?.text).toBe('Review draft');
   act(() => result.current.handleToggleFocusTaskFromHome(summary('c')));
   act(() => result.current.handleStartFocusTaskFromHome(summary('d')));
   expect(result.current.focusTasks).toHaveLength(3);

@@ -6,7 +6,7 @@ import { formatPomodoroTime } from '../../utils/pomodoroTime';
 import DueDateBadge from '../atoms/DueDateBadge';
 
 export interface HomeFocusControls {
-  session: Pick<FocusSessionValue, 'timerState' | 'remainingSeconds' | 'focusTasks' | 'dailyFocusStats' | 'activeFocusIntention' | 'setFocusIntention' | 'handleStartFocusTimer' | 'pauseTimer' | 'resetTimer' | 'setMode' | 'setIsFocusDockCollapsed'>;
+  session: Pick<FocusSessionValue, 'timerState' | 'remainingSeconds' | 'focusTasks' | 'dailyFocusStats' | 'nextSteps' | 'saveNextStep' | 'clearNextStep' | 'handleStartFocusTimer' | 'pauseTimer' | 'resetTimer' | 'setMode' | 'setIsFocusDockCollapsed'>;
   onMarkDone: (task: FocusTask) => Promise<boolean>;
   onOpenTask?: (taskId: string, boardId: string) => void;
 }
@@ -23,21 +23,31 @@ export default function HomeFocusView({ task, session, onMarkDone, onOpenTask, o
   useEffect(() => { heading.current?.focus(); }, [task.id]);
   const { setIsFocusDockCollapsed } = session;
   useEffect(() => { setIsFocusDockCollapsed(true); }, [setIsFocusDockCollapsed, session.timerState.isRunning]);
-  const intention = session.activeFocusIntention?.taskId === task.id ? session.activeFocusIntention.text : '';
+  const intention = session.nextSteps[task.id]?.text ?? '';
+  // Exit asks once where to start next time; the answer is this task's Next step.
+  const [exiting, setExiting] = useState(false);
+  const [exitDraft, setExitDraft] = useState('');
   const [editingIntention, setEditingIntention] = useState(false);
   const [draftIntention, setDraftIntention] = useState('');
   useEffect(() => {
     cancelIntentionCommitRef.current = false;
     setEditingIntention(false);
     setDraftIntention('');
+    setExiting(false);
   }, [task.id]);
+  const exit = (save: boolean) => {
+    if (save) session.saveNextStep(task.id, exitDraft, { paused: true });
+    else session.saveNextStep(task.id, intention, { paused: true });
+    setExiting(false);
+    onExit();
+  };
   const commitIntention = () => {
     if (cancelIntentionCommitRef.current) {
       cancelIntentionCommitRef.current = false;
       return;
     }
     const trimmedDraft = draftIntention.trim();
-    session.setFocusIntention(task.id, trimmedDraft);
+    session.saveNextStep(task.id, trimmedDraft);
     setDraftIntention(trimmedDraft);
     setEditingIntention(false);
   };
@@ -45,6 +55,7 @@ export default function HomeFocusView({ task, session, onMarkDone, onOpenTask, o
     setSaving(true);
     try {
       if (await onMarkDone(task)) {
+        session.clearNextStep(task.id);
         session.pauseTimer();
         onExit();
       }
@@ -107,8 +118,21 @@ export default function HomeFocusView({ task, session, onMarkDone, onOpenTask, o
           </button>
         )}
         <button type="button" disabled={saving || task.isDone} className={primaryAction} onClick={() => void complete()}>{t('common.markDone')}</button>
-        <button type="button" disabled={saving} className={button} onClick={onExit}>{t('briefing.exitFocus')}</button>
+        <button type="button" disabled={saving} className={button} aria-expanded={exiting} onClick={() => { setExitDraft(intention); setExiting(true); }}>{t('briefing.exitFocus')}</button>
       </div>
+      {exiting && (
+        <form className="mt-4 rounded-xl border border-slate-200 bg-white p-4" onSubmit={(event) => { event.preventDefault(); exit(true); }}>
+          <label htmlFor="focus-exit-next" className="text-sm font-medium text-slate-700">{t('focus.nextStart.question')}</label>
+          <input id="focus-exit-next" type="text" autoFocus maxLength={500} value={exitDraft} onChange={(event) => setExitDraft(event.target.value)}
+            onKeyDown={(event) => { if (event.key === 'Escape') setExiting(false); }}
+            placeholder={t('focus.nextStart.placeholder')}
+            className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[15px] text-slate-800 placeholder:text-slate-400 focus:border-blue-400 focus:outline-none" />
+          <div className="mt-3 flex flex-wrap justify-end gap-2">
+            <button type="button" className={button} onClick={() => exit(false)}>{t('focus.nextStart.skip')}</button>
+            <button type="submit" className={primaryAction}>{t('focus.nextStart.saveExit')}</button>
+          </div>
+        </form>
+      )}
     </main>
   );
 }

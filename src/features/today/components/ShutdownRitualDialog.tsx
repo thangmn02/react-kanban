@@ -2,11 +2,15 @@ import { useEffect, useId } from 'react';
 
 import { useI18n } from '../../../i18n';
 import type { DailyFocusStats, FocusTask } from '../../../types/focus.type';
+import type { NextSteps } from '../../focus/next-steps';
 
 interface ShutdownRitualDialogProps {
   isOpen: boolean;
   focusTasks: FocusTask[];
   dailyFocusStats: DailyFocusStats;
+  /** Each unfinished task's Next step, edited here so tomorrow starts in the right place. */
+  nextSteps: NextSteps;
+  onSaveNextStep: (taskId: string, text: string) => void;
   onClose: () => void;
   onComplete: () => void;
 }
@@ -15,6 +19,8 @@ export default function ShutdownRitualDialog({
   isOpen,
   focusTasks,
   dailyFocusStats,
+  nextSteps,
+  onSaveNextStep,
   onClose,
   onComplete,
 }: ShutdownRitualDialogProps) {
@@ -79,8 +85,18 @@ export default function ShutdownRitualDialog({
             {unfinishedTasks.length > 0 && (
               <ul className="mt-3 space-y-2">
                 {unfinishedTasks.map((task) => (
-                  <li key={task.id} className="rounded-2xl bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
-                    {task.title}
+                  <li key={task.id} className="rounded-2xl bg-slate-50 px-3 py-2 text-sm">
+                    <label htmlFor={`${titleId}-${task.id}`} className="block font-medium text-slate-700">{task.title}</label>
+                    <input
+                      id={`${titleId}-${task.id}`}
+                      type="text"
+                      maxLength={500}
+                      defaultValue={nextSteps[task.id]?.text ?? ''}
+                      onBlur={(event) => onSaveNextStep(task.id, event.target.value)}
+                      placeholder={t('focus.nextStart.question')}
+                      aria-label={t('shutdown.nextStepFor', { task: task.title })}
+                      className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-400 focus:outline-none"
+                    />
                   </li>
                 ))}
               </ul>

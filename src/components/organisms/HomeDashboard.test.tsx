@@ -76,8 +76,8 @@ it('keeps focus mode dismissed after Home unmounts and mounts again', async () =
       timerState: { mode: 'focus', activeTaskId: task.id, isRunning: false, remainingSeconds: 1200, startedAt: 42, endsAt: null, plannedSeconds: 1500 },
       remainingSeconds: 1200,
       dailyFocusStats: { focusedMinutes: 0, completedSessions: 0, interruptedSessions: 0, topTaskTitle: null },
-      activeFocusIntention: null,
-      setFocusIntention: vi.fn(),
+      nextSteps: {},
+      saveNextStep: vi.fn(), clearNextStep: vi.fn(),
       handleStartFocusTimer: vi.fn(),
       pauseTimer: vi.fn(),
       resetTimer: vi.fn(),
@@ -95,6 +95,8 @@ it('keeps focus mode dismissed after Home unmounts and mounts again', async () =
   fireEvent.click(screen.getByRole('button', { name: 'Start focus' }));
   expect(screen.getByRole('timer')).toHaveTextContent('20:00');
   fireEvent.click(screen.getByRole('button', { name: 'Exit focus' }));
+  // Exit asks once where to start next time; leaving without an answer is fine.
+  fireEvent.click(screen.getByRole('button', { name: 'Exit' }));
   await screen.findByText('Needs attention');
   expect(focusControls.session.pauseTimer).not.toHaveBeenCalled();
   expect(focusControls.session.resetTimer).not.toHaveBeenCalled();

@@ -1,4 +1,4 @@
-import { useEffect, useId } from 'react';
+import { useEffect, useId, useState } from 'react';
 
 import type { FocusTask, PomodoroSessionSnapshot } from '../../types/focus.type';
 import { useI18n } from '../../i18n';
@@ -6,7 +6,9 @@ import { useI18n } from '../../i18n';
 interface FocusCompletionPromptProps {
   task: FocusTask | null;
   session: PomodoroSessionSnapshot | null;
-  intention: string;
+  /** The task's saved Next step; the prompt lets the person update it while the work is fresh. */
+  nextStep: string;
+  onSaveNextStep: (text: string) => void;
   onMarkDone: () => void;
   onKeepWorking: () => void;
   onClose: () => void;
@@ -15,13 +17,19 @@ interface FocusCompletionPromptProps {
 function FocusCompletionPrompt({
   task,
   session,
-  intention,
+  nextStep,
+  onSaveNextStep,
   onMarkDone,
   onKeepWorking,
   onClose,
 }: FocusCompletionPromptProps) {
   const titleId = useId();
+  const nextStepId = useId();
   const { t } = useI18n();
+  const [draft, setDraft] = useState(nextStep);
+  useEffect(() => { setDraft(nextStep); }, [nextStep, task?.id]);
+  // Leaving without finishing keeps the answer to "where do I start next time?".
+  const keep = (then: () => void) => () => { onSaveNextStep(draft); then(); };
 
   useEffect(() => {
     if (!task || !session) {
@@ -30,6 +38,7 @@ function FocusCompletionPrompt({
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        onSaveNextStep(draft);
         onClose();
       }
     };
@@ -37,7 +46,7 @@ function FocusCompletionPrompt({
     document.addEventListener('keydown', handleKeyDown);
 
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, session, task]);
+  }, [draft, onClose, onSaveNextStep, session, task]);
 
   if (!task || !session) {
     return null;
@@ -49,7 +58,7 @@ function FocusCompletionPrompt({
     <div className="fixed inset-0 z-[60] overflow-y-auto">
       <div
         className="fixed inset-0 bg-slate-950/35"
-        onClick={onClose}
+        onClick={keep(onClose)}
         aria-hidden="true"
       />
 
@@ -71,28 +80,28 @@ function FocusCompletionPrompt({
             })}
           </p>
 
-          {intention && (
-            <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">
-                {t('focus.complete.doneWhen')}
-              </p>
-              <p className="mt-1 text-sm leading-6 text-emerald-900">
-                {intention}
-              </p>
-            </div>
-          )}
+          <label htmlFor={nextStepId} className="mt-5 block text-sm font-medium text-slate-700">{t('focus.nextStart.question')}</label>
+          <input
+            id={nextStepId}
+            type="text"
+            value={draft}
+            maxLength={500}
+            onChange={(event) => setDraft(event.target.value)}
+            placeholder={t('focus.nextStart.placeholder')}
+            className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-400 focus:outline-none"
+          />
 
           <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <button
               type="button"
-              onClick={onClose}
+              onClick={keep(onClose)}
               className="cursor-pointer rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-slate-100"
             >
               {t('common.close')}
             </button>
             <button
               type="button"
-              onClick={onKeepWorking}
+              onClick={keep(onKeepWorking)}
               className="cursor-pointer rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-slate-100"
             >
               {t('focus.complete.keepWorking')}
