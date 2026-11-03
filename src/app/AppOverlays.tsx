@@ -1,3 +1,4 @@
+import QuickTaskEntry from '../components/organisms/dialog/QuickTaskEntry';
 import { lazy, Suspense } from 'react';
 import {openQuickNotes} from '../features/notes/quick-notes-events';
 
@@ -13,7 +14,6 @@ import FocusCompletionPrompt from '../components/focus/FocusCompletionPrompt';
 import FocusDock from '../components/focus/FocusDock';
 import FocusLimitToast from '../components/focus/FocusLimitToast';
 import ShutdownRitualDialog from '../features/today/components/ShutdownRitualDialog';
-import TodayQuickPlanDialog from '../features/today/components/TodayQuickPlanDialog';
 import type { AppUser, WorkspaceMember, WorkspaceSummary } from '../types/auth.type';
 import type { useBoardPageController } from '../features/board/hooks/useBoardPageController';
 import type { useBoardDialogState } from '../features/board/hooks/useBoardDialogState';
@@ -51,6 +51,7 @@ interface Props {
     onLater: () => void;
   };
   progressReport: { isOpen: boolean; onClose: () => void };
+  quickTask: { isOpen: boolean; initialTitle: string; onClose: () => void; onSave: (title: string) => Promise<boolean>; onMore: (title: string) => void; onFullFormClosed: () => void };
   isHomeFocusActive?: boolean;
   hideCompactFocusDock?: boolean;
   onOpenNativeDock?: () => void;
@@ -73,11 +74,13 @@ export default function AppOverlays(props: Props) {
         onKeepWorking={focus.keepWorkingFromCompletion}
         onClose={focus.closeFocusCompletion}
       />
+      <QuickTaskEntry isOpen={props.quickTask.isOpen} onClose={props.quickTask.onClose} onSave={props.quickTask.onSave} onMore={props.quickTask.onMore} />
       <TaskDialog
         currentUser={props.user}
+        initialTitle={taskEditor.state.mode === 'edit' ? undefined : props.quickTask.initialTitle}
         openCommentId={new URLSearchParams(window.location.search).get('comment')??undefined}
         isOpen={taskEditor.isOpen}
-        onClose={taskEditor.closeTaskDialog}
+        onClose={() => { props.quickTask.onFullFormClosed(); taskEditor.closeTaskDialog(); }}
         onOpenNotes={NOTES_PREVIEW_ENABLED && props.user && taskEditor.state.editingTask ? () => openQuickNotes({taskId:taskEditor.state.editingTask!.id,boardId:board.activeBoardId??undefined}) : undefined}
         taskData={taskEditor.state.mode === 'edit' ? taskEditor.state.editingTask : null}
         onSubmitTask={taskEditor.state.mode === 'edit' ? board.onSubmitEditTask : board.onSubmitCard}
@@ -101,23 +104,6 @@ export default function AppOverlays(props: Props) {
           ? list.tasks.includes(taskEditor.state.editingTask.id)
           : list.id === taskEditor.state.activeListId)?.title}
       />
-      {boardDialogs.quickPlanDialog.isOpen && props.user && (
-        <TodayQuickPlanDialog
-          isOpen
-          onClose={boardDialogs.closeQuickPlanDialog}
-          currentUser={props.user}
-          activeWorkspace={props.workspace}
-          focusTasks={focus.focusTasks}
-          carryoverSummary={planning.carryoverSummary}
-          onCarryYesterday={planning.handleCarryYesterday}
-          onDismissCarryover={() => planning.setCarryoverSummary(null)}
-          onToggleTodayFocus={focus.handleToggleFocusTaskFromToday}
-          onOpenTask={planning.handleOpenTaskFromPlan}
-          onStartFocus={planning.handleStartFocusFromPlan}
-          onGoToBoard={planning.handleGoToBoardFromPlan}
-          onFinishRitual={planning.handleFinishDailyRitual}
-        />
-      )}
       {board.deleteItem && (
         <DeleteDialog onSubmit={board.handleDeleteConfirm} onClose={() => board.setDeleteItem(null)}>
           Are you sure you want to delete this {board.deleteItem.type}?

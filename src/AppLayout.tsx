@@ -1,5 +1,6 @@
 import {runNotesTransition} from './features/notes/native-notes-lifecycle';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { format } from 'date-fns';
 import ViewContextBoundary from './app/ViewContextBoundary';
 import { useTaskWorkflowSync } from './hooks/use-task-workflow-sync';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -114,8 +115,6 @@ function AppLayout() {
   const {
     openGroupDialog,
     closeGroupDialog,
-    openQuickPlanDialog,
-    closeQuickPlanDialog,
     openCreateBoardDialog,
     closeCreateBoardDialog,
     openActivityDialog,
@@ -324,14 +323,7 @@ function AppLayout() {
 
   const planning = usePlanningController({
     focus: focusSession,
-    activeBoardId,
-    firstListId: boardData.columns[0],
-    openQuickPlanDialog,
-    closeQuickPlanDialog,
-    onOpenTask: handleOpenTaskFromToday,
-    onGoToBoard: () => setActiveViewWithPath('board'),
-    canOpenPictureInPicture: isPictureInPictureSupported,
-    onOpenPictureInPicture: handleOpenFloatingFocusTimer,
+    onOpenToday: () => setActiveViewWithPath('today'),
     t,
   });
   const { handleOpenQuickPlan } = planning;
@@ -355,10 +347,25 @@ function AppLayout() {
     isPictureInPictureSupported,
   });
 
+  // N opens one line; Enter saves a task due today, Shift+Enter opens the full form with that title.
+  const [isQuickTaskOpen, setIsQuickTaskOpen] = useState(false);
+  const [fullFormTitle, setFullFormTitle] = useState('');
+  const quickTask = {
+    isOpen: isQuickTaskOpen,
+    initialTitle: fullFormTitle,
+    onClose: () => setIsQuickTaskOpen(false),
+    onSave: async (title: string) => {
+      const listId = boardData.columns[0];
+      if (!activeBoardId || !listId) { handleQuickAddTask(); return false; }
+      return boardController.onSubmitCard({ title, description: '', dueDate: format(new Date(), 'yyyy-MM-dd'), labels: [], attachments: [], checklistItems: [] }, { listId });
+    },
+    onMore: (title: string) => { setIsQuickTaskOpen(false); setFullFormTitle(title); handleQuickAddTask(); },
+    onFullFormClosed: () => setFullFormTitle(''),
+  };
   useGlobalKeyboardShortcuts({
     enabled: Boolean(user) && activeView !== 'auth' && activeView !== 'onboarding',
     onOpenCommandPalette: () => setIsCommandPaletteOpen(true),
-    onQuickAddTask: handleQuickAddTask,
+    onQuickAddTask: () => setIsQuickTaskOpen(true),
     onFocusSearch: focusBoardSearch,
   });
 
@@ -390,6 +397,7 @@ function AppLayout() {
 
   const sharedDialogs = (
     <AppOverlays
+      quickTask={quickTask}
       user={user}
       workspace={activeWorkspace}
       workspaceMembers={workspaceMembers}
@@ -474,6 +482,7 @@ function AppLayout() {
     routing,
     handleOpenQuickPlan,
     handleOpenTaskFromToday,
+    carryover: { summary: planning.carryoverSummary, onCarry: planning.handleCarryYesterday, onDismiss: () => planning.setCarryoverSummary(null) },
     isSavingBoard,
     onMarkFocusDone: focusIntegration.handleMarkFocusTaskDone,
     onOpenProgressReport: () => setIsProgressReportOpen(true),

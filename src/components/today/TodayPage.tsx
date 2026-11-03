@@ -1,3 +1,4 @@
+import type { DailyCarryoverSummary } from '../../features/today/dailyRitual';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useSummaryCompletion } from '../../hooks/use-summary-completion';
@@ -32,6 +33,8 @@ interface TodayPageProps {
   onCreateNote?: () => void;
   onCompleteTask?: (task: TodayTaskSummary) => Promise<boolean>;
   taskRevision?: BoardData['task'];
+  /** Yesterday's unfinished tasks, offered once at the top of Today. */
+  carryover?: { summary: DailyCarryoverSummary | null; onCarry: (taskIds: string[]) => void; onDismiss: () => void };
 }
 
 function getEmptyTodayData(): TodayPageData {
@@ -56,6 +59,7 @@ export default function TodayPage({
   onCreateNote,
   onCompleteTask,
   taskRevision,
+  carryover,
 }: TodayPageProps) {
   const [loadedData, setTodayData] = useState<TodayPageData>(getEmptyTodayData);
   const completion = useSummaryCompletion(onCompleteTask);
@@ -188,6 +192,13 @@ export default function TodayPage({
             </button></div>
           )}
         />
+        {carryover?.summary && carryover.summary.unfinishedTasks.length > 0 && (
+          <div role="status" className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-slate-700">
+            <p className="mr-auto">{t('dailyRitual.carryQuestion', { summary: t('dailyRitual.carrySummary', { finished: carryover.summary.finishedCount, total: carryover.summary.totalCount }) })}</p>
+            <button type="button" className="min-h-9 rounded-xl px-3 font-semibold text-slate-600 hover:bg-white" onClick={carryover.onDismiss}>{t('dailyRitual.dismissCarryover')}</button>
+            <button type="button" className="min-h-9 rounded-xl bg-blue-600 px-3 font-semibold text-white hover:bg-blue-700" onClick={() => carryover.onCarry(carryover.summary!.unfinishedTasks.map(task => task.id))}>{t('dailyRitual.carryAction')}</button>
+          </div>
+        )}
 
         <p role="status" aria-live="polite" className="mb-3 text-sm text-slate-700">{completion.message}</p>
 

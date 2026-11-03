@@ -1,3 +1,4 @@
+import type { DailyCarryoverSummary } from '../features/today/dailyRitual';
 import type { ReactNode } from 'react';
 
 import type { AppLayoutRouteContext } from './AppLayoutRouteContext';
@@ -45,6 +46,7 @@ interface Params {
   routing: ReturnType<typeof useAppRoutingController>;
   handleOpenQuickPlan: () => void;
   handleOpenTaskFromToday: (task: TodayTaskSummary) => void;
+  carryover: { summary: DailyCarryoverSummary | null; onCarry: (taskIds: string[]) => void; onDismiss: () => void };
   isSavingBoard: boolean;
   onOpenProgressReport: () => void;
 }
@@ -119,7 +121,6 @@ export function useAppLayoutRouteContextValue(params: Params): AppLayoutRouteCon
       onToggleFocusTask: focus.handleToggleFocusTaskFromHome,
       onStartFocusTask: focus.handleStartFocusTaskFromHome,
       onCompleteTask: (task) => params.onMarkFocusDone({ ...task, priority: task.priority ?? undefined, dueDate: task.dueDate ?? undefined }),
-      onPlanFocusTasks: focus.handlePlanFocusTasksFromHome,
       isFocusTask: focus.isFocusTask,
       currentUser: params.user,
       activeWorkspace: params.user ? params.activeWorkspace : null,
@@ -145,6 +146,7 @@ export function useAppLayoutRouteContextValue(params: Params): AppLayoutRouteCon
       onCompleteTask: (task) => params.onMarkFocusDone({ ...task, priority: task.priority ?? undefined, dueDate: task.dueDate ?? undefined }),
       taskRevision: board.boardData.task,
       onQuickCreateTask: board.handleQuickAddTask,
+      carryover: params.carryover,
     },
     board: {
       hasActiveBoard: Boolean(board.activeBoardId),

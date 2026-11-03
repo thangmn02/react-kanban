@@ -14,7 +14,7 @@ vi.mock('../../lib/supabase', () => ({ default: null, authMode: 'mock', isLocalD
 const user: AppUser = { id: 'user', name: 'Alex', email: null, avatarUrl: '', isMock: true };
 const workspace = (id: string): WorkspaceSummary => ({ id, name: id, role: 'owner', ownerId: user.id });
 const data = (title: string): HomeDashboardData => ({ myTasks: [{ id: title, title, boardId: 'board', boardTitle: 'Project', dueDate: null, priority: null }], recentBoards: [], holidays: [] });
-const props = { currentUser: user, activeWorkspace: workspace('a'), onOpenTask: vi.fn(), onOpenBoard: vi.fn(), onToggleFocusTask: vi.fn(), onStartFocusTask: vi.fn(), onPlanFocusTasks: vi.fn(), isFocusTask: () => false, onOpenQuickPlan: vi.fn() };
+const props = { currentUser: user, activeWorkspace: workspace('a'), onOpenTask: vi.fn(), onOpenBoard: vi.fn(), onToggleFocusTask: vi.fn(), onStartFocusTask: vi.fn(), isFocusTask: () => false, onOpenQuickPlan: vi.fn() };
 beforeEach(() => { vi.clearAllMocks(); localStorage.clear(); sessionStorage.clear(); });
 afterEach(cleanup);
 
@@ -25,11 +25,11 @@ it('keeps the public Home layout without fetching private data and gates local p
   expect(screen.getByText('Needs attention')).toBeInTheDocument();
   expect(screen.getByText('Recent boards')).toBeInTheDocument();
   expect(fetchHomeDashboardData).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole('button', { name: 'Order today’s tasks' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Plan today' }));
   fireEvent.click(screen.getByRole('button', { name: 'Pin a message' }));
   expect(onRequireSignIn).toHaveBeenCalledTimes(2);
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-  expect(props.onPlanFocusTasks).not.toHaveBeenCalled();
+  expect(props.onOpenQuickPlan).not.toHaveBeenCalled();
 });
 
 it('discards a previous workspace retry and immediately clears old tasks', async () => {
@@ -55,17 +55,10 @@ it('delegates details, focus and planning to the real workflow callbacks', async
   expect(props.onOpenTask).toHaveBeenCalledWith('Suggested task', 'board');
   fireEvent.click(screen.getByRole('button', { name: 'Start focus' }));
   expect(props.onStartFocusTask).toHaveBeenCalledWith(expect.objectContaining(data('Suggested task').myTasks[0]));
-  fireEvent.click(screen.getByRole('button', { name: 'Add multiple tasks' }));
+  // One planning flow: Plan today opens the Today page.
+  expect(screen.getAllByRole('button', { name: 'Plan today' })).toHaveLength(1);
+  fireEvent.click(screen.getByRole('button', { name: 'Plan today' }));
   expect(props.onOpenQuickPlan).toHaveBeenCalledOnce();
-});
-
-it('adds the ranked plan to Today from Home', async () => {
-  vi.mocked(fetchHomeDashboardData).mockResolvedValueOnce(data('Planned task'));
-  render(<I18nProvider><HomeDashboard {...props} /></I18nProvider>);
-  await screen.findByRole('heading', { name: 'Planned task' });
-  fireEvent.click(screen.getByRole('button', { name: 'Order today’s tasks' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Add top 3 to Today' }));
-  expect(props.onPlanFocusTasks).toHaveBeenCalledWith([expect.objectContaining({ id: 'Planned task' })]);
 });
 
 it('keeps focus mode dismissed after Home unmounts and mounts again', async () => {

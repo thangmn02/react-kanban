@@ -59,7 +59,8 @@ export interface UseTaskOperationsParams {
 }
 
 export interface UseTaskOperationsResult {
-  onSubmitCard: (formData: TaskDialogFormData) => Promise<void>;
+  /** Creates a task in the open dialog's list, or in `target.listId` for quick entry. Resolves true once saved. */
+  onSubmitCard: (formData: TaskDialogFormData, target?: { listId: string }) => Promise<boolean>;
   onSubmitQuickPlan: (formData: QuickPlanFormData) => Promise<void>;
   onSubmitEditTask: (formData: TaskDialogFormData) => Promise<void>;
   handleDeleteConfirm: () => Promise<void>;
@@ -82,7 +83,7 @@ export function useTaskOperations({
   deleteItem,
   setDeleteItem,
   editingTask,
-  activeListId,
+  activeListId: dialogListId,
   closeTaskDialog,
   refreshBoardData,
   onTaskCompleted,
@@ -225,11 +226,12 @@ export function useTaskOperations({
     }
   };
 
-  const onSubmitCard = async (formData: TaskDialogFormData) => {
+  const onSubmitCard = async (formData: TaskDialogFormData, target?: { listId: string }) => {
     const requestScope = scope;
+    const activeListId = target?.listId ?? dialogListId;
     if (!activeListId || !activeBoardId || !boardData.list[activeListId]) {
       notify.error(t('toast.chooseValidTargetList'));
-      return;
+      return false;
     }
 
     setIsSavingBoard(true);
@@ -267,17 +269,19 @@ export function useTaskOperations({
         actorId: userId,
       });
 
-      if(latestScope.current!==requestScope)return;
+      if(latestScope.current!==requestScope)return false;
       await refreshBoardData();
-      if(latestScope.current!==requestScope)return;
-      closeTaskDialog();
+      if(latestScope.current!==requestScope)return false;
+      if (!target) closeTaskDialog();
       notify.success(t('toast.cardAdded'));
+      return true;
     } catch (error) {
-      if(latestScope.current!==requestScope)return;
+      if(latestScope.current!==requestScope)return false;
       const message = taskErrorMessage(error, t('toast.unableAddTask'));
       console.error('[tasks] Create failed:', message,
         error && typeof error === 'object' && 'code' in error ? String(error.code) : '');
       notify.error(message);
+      return false;
     } finally {
       if(latestScope.current===requestScope)setIsSavingBoard(false);
     }

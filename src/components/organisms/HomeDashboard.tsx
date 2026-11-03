@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 import { fetchHomeDashboardData, type HomeDashboardData, type HomeTaskSummary } from '../../services/home.service';
 import type { AppUser, WorkspaceSummary } from '../../types/auth.type';
@@ -14,7 +14,6 @@ import { notify } from './toast/notify';
 import HomeFocusView, { type HomeFocusControls } from '../home/HomeFocusView';
 import BriefingPinForm from '../home/BriefingPinForm';
 import type { BriefingPin } from '../../types/briefing.type';
-import PlanMyDayDialog from '../../features/today/components/PlanMyDayDialog';
 import { useHomeFocusView } from '../../hooks/useHomeFocusView';
 import { useSummaryCompletion } from '../../hooks/use-summary-completion';
 import { TASK_WORKFLOW_CHANGED } from '../../services/task-workflow.service';
@@ -25,7 +24,6 @@ interface HomeDashboardProps {
   onOpenBoard: (boardId: string) => void;
   onToggleFocusTask: (task: HomeTaskSummary) => void;
   onStartFocusTask?: (task: HomeTaskSummary, nextStep?: string) => void;
-  onPlanFocusTasks?: (tasks: HomeTaskSummary[]) => void;
   isFocusTask: (taskId: string) => boolean;
   currentUser: AppUser | null;
   onRequireSignIn?: () => boolean;
@@ -98,7 +96,7 @@ export default function HomeDashboard(props: HomeDashboardProps) {
 
 function HomeBriefing({ currentUser, activeWorkspace, onOpenTask, onOpenBoard,
   onToggleFocusTask, onStartFocusTask, isFocusTask, onCreateBoard, onCreateTask,
-  onPlanFocusTasks, onOpenQuickPlan, onOpenToday, focusTaskCount = 0, focusSessionsToday = 0, refreshKey, taskRevision, focusControls, onRequireSignIn, onCompleteTask,
+  onOpenQuickPlan, onOpenToday, focusTaskCount = 0, focusSessionsToday = 0, refreshKey, taskRevision, focusControls, onRequireSignIn, onCompleteTask,
 }: HomeDashboardProps) {
   const { t, language } = useI18n();
   const completion = useSummaryCompletion(onCompleteTask);
@@ -116,8 +114,6 @@ function HomeBriefing({ currentUser, activeWorkspace, onOpenTask, onOpenBoard,
   },[workspaceId]);
   const { focusViewId, setFocusViewId } = useHomeFocusView(currentUser?.id, workspaceId);
   const [isPinFormOpen, setIsPinFormOpen] = useState(false);
-  const [isPlanMyDayOpen, setIsPlanMyDayOpen] = useState(false);
-  const closePlanMyDay = useCallback(() => setIsPlanMyDayOpen(false), []);
   const { pins, isLoading: arePinsLoading, error: pinsError, createPin, removePin } = useBriefingPins(workspaceId);
 
   useEffect(() => {
@@ -240,8 +236,7 @@ function HomeBriefing({ currentUser, activeWorkspace, onOpenTask, onOpenBoard,
             <section aria-labelledby="briefing-plan" className="mt-8 border-t border-slate-200 pt-8">
               <h2 id="briefing-plan" className={sectionLabel}>{t('briefing.makeRoom')}</h2>
               <div className="mt-4 flex flex-wrap gap-2">
-                {onStartFocusTask && onPlanFocusTasks && <button type="button" className={`${primaryButton} px-5 py-2.5`} onClick={() => { if (onRequireSignIn?.() !== false) setIsPlanMyDayOpen(true); }}>{t('planDay.action')}</button>}
-                {onOpenQuickPlan && <button type="button" className={`${primaryButton} px-5 py-2.5`} onClick={onOpenQuickPlan}>{t('home.quickPlan')}</button>}
+                {onOpenQuickPlan && <button type="button" className={`${primaryButton} px-5 py-2.5`} onClick={() => { if (onRequireSignIn?.() !== false) onOpenQuickPlan(); }}>{t('planDay.action')}</button>}
                 {onCreateTask && <button type="button" className={quietButton} onClick={onCreateTask}>{t('home.createSingleTask')}</button>}
               </div>
             </section>
@@ -278,7 +273,6 @@ function HomeBriefing({ currentUser, activeWorkspace, onOpenTask, onOpenBoard,
         </aside>}
       </main>
       {workspaceId && currentUser && <BriefingPinForm isOpen={isPinFormOpen} workspaceId={workspaceId} currentUser={currentUser} tasks={tasks} onClose={() => setIsPinFormOpen(false)} onSubmit={async (input) => { await createPin(input); notify.success(t('briefing.pin.created')); }} />}
-      {isPlanMyDayOpen && onStartFocusTask && onPlanFocusTasks && <PlanMyDayDialog tasks={tasks} workspaceId={workspaceId} onCreateTask={onCreateTask} onClose={closePlanMyDay} onStart={(task, nextStep) => { setFocusViewId(task.id); onStartFocusTask(task, nextStep); }} onAddTopThree={onPlanFocusTasks} />}
     </div>
   );
 }

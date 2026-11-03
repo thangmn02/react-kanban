@@ -48,6 +48,8 @@ interface TaskDialogProps {
   onClose: () => void;
   onSubmitTask: (data: TaskDialogFormData) => void;
   taskData?: ITaskItem | null;
+  /** A new task's title typed in quick entry before opening the full form. */
+  initialTitle?: string;
   isFocusTask?: boolean;
   onToggleFocusTask?: () => void;
   onStartFocus?: () => void;
@@ -114,6 +116,7 @@ function TaskDialog({
   onClose,
   onSubmitTask,
   taskData,
+  initialTitle = '',
   isFocusTask = false,
   onToggleFocusTask,
   onStartFocus,
@@ -164,7 +167,7 @@ function TaskDialog({
   } = useForm<TaskDialogValues>({
     resolver: yupResolver(taskSchema) as Resolver<TaskDialogValues>,
     defaultValues: {
-      title: taskData?.title || '',
+      title: taskData?.title || initialTitle,
       description: taskData?.description || '',
       priority: taskData?.priority || 'Low',
       startDate: taskData?.startDate || '',
@@ -273,7 +276,7 @@ function TaskDialog({
     }
 
     const nextValues = {
-      title: taskData?.title || '',
+      title: taskData?.title || initialTitle,
       description: taskData?.description || '',
       priority: taskData?.priority || 'Low',
       startDate: taskData?.startDate || '',
@@ -290,7 +293,7 @@ function TaskDialog({
     if (editor) {
       editor.commands.setContent(nextValues.description, { emitUpdate: false });
     }
-  }, [editor, isOpen, reset, setValue, taskData]);
+  }, [editor, initialTitle, isOpen, reset, setValue, taskData]);
 
   const handleFormSubmit = (formData: TaskDialogValues) => {
     const parsedTask = isEditMode ? null : parseSmartTaskInput(formData.title);
