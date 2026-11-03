@@ -104,9 +104,6 @@ export default function TodayQuickPlanDialog({
     <ContentDialog
       title={
         <header className="mb-5 flex flex-col gap-1">
-          <p className="text-[11px] font-black uppercase tracking-[0.22em] text-sky-600">
-            {t('dailyRitual.eyebrow')}
-          </p>
           <h3 className="mt-1 text-2xl font-semibold tracking-[-0.04em] text-slate-950">
             {t('dailyRitual.title')}
           </h3>

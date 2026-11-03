@@ -60,9 +60,6 @@ function FocusCompletionPrompt({
           aria-labelledby={titleId}
           className="relative w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl"
         >
-          <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-emerald-700">
-            {t('focus.complete.eyebrow')}
-          </p>
           <h2 id={titleId} className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
             {t('focus.complete.title')}
           </h2>

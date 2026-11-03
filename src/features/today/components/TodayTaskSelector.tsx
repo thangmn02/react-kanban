@@ -169,9 +169,6 @@ export default function TodayTaskSelector({
       {/* Smart suggestions */}
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card sm:p-6">
         <header>
-          <p className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-400">
-            {t('dailyRitual.suggestionsEyebrow')}
-          </p>
           <h3 className="mt-2 text-lg font-semibold tracking-[-0.03em] text-slate-950">
             {t('dailyRitual.suggestionsTitle')}
           </h3>

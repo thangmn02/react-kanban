@@ -319,7 +319,6 @@ export default function TodayPage({
                     <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-slate-600">
                       {t('today.focusTitle')}
                     </h2>
-                    <p className="mt-1 text-sm text-slate-500">{t('today.focusDescription')}</p>
                   </div>
                   <div className="grid gap-3">
                     <AnimatePresence initial={false}>{focusSuggestions.map(({ task, reasons }) => (
@@ -343,15 +342,11 @@ export default function TodayPage({
                     <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-slate-600">
                       {t('today.needsAttention')}
                     </h2>
-                    <p className="mt-1 text-sm text-slate-500">
-                      {t('today.needsAttentionDescription')}
-                    </p>
                   </div>
                   <div className="grid gap-5">
                     {todayData.overdueTasks.length > 0 && (
                       <TodayTaskSection
                         title={t('common.overdue')}
-                        description={t('today.overdueDescription')}
                         tasks={todayData.overdueTasks}
                         emptyMessage={t('today.noOverdue')}
                         isFocusTask={isFocusTask}
@@ -367,7 +362,6 @@ export default function TodayPage({
                     {todayData.dueTodayTasks.length > 0 && (
                       <TodayTaskSection
                         title={t('today.dueTodayTitle')}
-                        description={t('today.dueTodayDescription')}
                         tasks={todayData.dueTodayTasks}
                         emptyMessage={t('today.emptyUrgent')}
                         isFocusTask={isFocusTask}
@@ -392,7 +386,6 @@ export default function TodayPage({
                     {todayData.assignedTasks.length > 0 && (
                       <TodayTaskSection
                         title={t('today.assignedTitle')}
-                        description={t('today.assignedDescription')}
                         tasks={todayData.assignedTasks}
                         emptyMessage={t('today.noAssigned')}
                         isFocusTask={isFocusTask}
@@ -408,7 +401,6 @@ export default function TodayPage({
                     {todayData.recentlyActiveTasks.length > 0 && (
                       <TodayTaskSection
                         title={t('today.recentTitle')}
-                        description={t('today.recentDescription')}
                         tasks={todayData.recentlyActiveTasks}
                         emptyMessage={t('today.noRecent')}
                         isFocusTask={isFocusTask}

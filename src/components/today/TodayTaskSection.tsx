@@ -7,7 +7,7 @@ import { uiSpring } from '../../shared/motion';
 
 interface TodayTaskSectionProps {
   title: string;
-  description: string;
+  description?: string;
   tasks: TodayTaskSummary[];
   emptyMessage: string;
   isFocusTask: (taskId: string) => boolean;
@@ -38,7 +38,7 @@ export default function TodayTaskSection({
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
           <h2 className="text-sm font-bold uppercase tracking-[0.18em] text-slate-600">{title}</h2>
-          <p className="mt-1 text-sm text-slate-500">{description}</p>
+          {description && <p className="mt-1 text-sm text-slate-500">{description}</p>}
         </div>
         <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
           {tasks.length}

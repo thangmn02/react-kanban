@@ -48,9 +48,6 @@ export default function ShutdownRitualDialog({
           aria-labelledby={titleId}
           className="relative w-full max-w-xl rounded-[2rem] border border-slate-200 bg-white p-6 shadow-2xl"
         >
-          <p className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-400">
-            {t('shutdown.eyebrow')}
-          </p>
           <h2 id={titleId} className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-slate-950">
             {t('shutdown.title')}
           </h2>

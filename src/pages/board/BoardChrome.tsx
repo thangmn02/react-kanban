@@ -16,14 +16,14 @@ export default function BoardChrome({ context, children }: { context: AppLayoutR
       <BoardHeader {...context.board.header} />
       {(context.isBoardLoading || context.isSavingBoard) && (
         <div role="status" className="border-b border-gray-200 bg-white px-4 py-2 text-sm text-gray-600">
-          {context.isBoardLoading ? 'Loading tasks…' : 'Saving changes…'}
+          {t(context.isBoardLoading ? 'load.board' : 'load.saving')}
         </div>
       )}
       {context.boardErrorMessage && (
         <div className="px-4 py-3">
           <ErrorState
-            title="Couldn't load this board"
-            description="We couldn't load the board data. Check your connection and try again."
+            title={t('load.boardError')}
+            description={t('load.connectionHint')}
             details={context.boardErrorMessage}
             onRetry={context.onRetryBoard}
             isRetrying={context.isRetryingBoard}
