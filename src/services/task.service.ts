@@ -14,6 +14,7 @@ import type { Json, TaskInsert, TaskRow, TaskUpdate } from '../types/supabase.ty
 import type { TaskRepeatInterval } from '../types/task.type';
 import { addDays, addMonths, format, parseISO } from 'date-fns';
 import { isMissingDatabaseField } from '../utils/dataError';
+import { translateNow } from '../i18n/context';
 
 export class RecurrenceSchemaError extends Error {
   constructor() { super('Repeating tasks require a database update. This change was not saved.'); }
@@ -197,7 +198,7 @@ export async function createTask(taskData: TaskInsert): Promise<TaskRow> {
   }
 
   if (!data) {
-    throw new Error('Task was not created.');
+    throw new Error(translateNow('task.taskWasNotCreated'));
   }
 
   return data;
@@ -279,7 +280,7 @@ export async function updateTask(taskId: string, taskData: TaskUpdate): Promise<
   }
 
   if (!data) {
-    throw new Error('Task was not updated.');
+    throw new Error(translateNow('task.taskWasNotUpdated'));
   }
 
   return data;

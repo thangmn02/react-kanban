@@ -6,10 +6,11 @@ import {
 } from '../infrastructure/local/localBoardStore';
 import type { ITaskActivity } from '../types/task.type';
 import type { Json, TaskActivityInsert, TaskActivityRow } from '../types/supabase.type';
+import { translateNow } from '../i18n/context';
 
 
 const DEFAULT_ACTOR = {
-  name: 'You',
+  get name() { return translateNow('notes.you'); },
   avatar: '/logo.png',
 };
 
@@ -118,7 +119,7 @@ export async function createActivity(
   }
 
   if (!data) {
-    throw new Error('Activity was not created.');
+    throw new Error(translateNow('app.activityWasNotCreated'));
   }
 
   return mapActivityRowToActivity(data, taskTitle);

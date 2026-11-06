@@ -2,6 +2,7 @@ import supabase, { requireSupabaseClient } from '../lib/supabase';
 import { localTransitionTaskWorkflow } from '../infrastructure/local/localBoardStore';
 import type { WorkflowRequest, WorkflowResult } from '../features/task/model/task-workflow';
 import type { Json } from '../types/supabase.type';
+import { translateNow } from '../i18n/context';
 
 export const TASK_WORKFLOW_CHANGED = 'kora:task-workflow-changed';
 export async function transitionTaskWorkflow(input: Omit<WorkflowRequest,'operationId'> & {operationId?:string}): Promise<WorkflowResult> {
@@ -14,7 +15,7 @@ export async function transitionTaskWorkflow(input: Omit<WorkflowRequest,'operat
         request:request as unknown as Json,
       });
       if(error) throw new Error(`Task transition was not confirmed. Reload to reconcile. ${error.message}`);
-      if(!data) throw new Error('Task transition was not confirmed. Reload to reconcile.');
+      if(!data) throw new Error(translateNow('task.taskTransitionWasNotConfirmedReload'));
       result=data as unknown as WorkflowResult;
     }
     if(typeof window!=='undefined') window.dispatchEvent(new CustomEvent(TASK_WORKFLOW_CHANGED,{detail:{boardId:request.boardId,workspaceId:request.workspaceId,task:result.task}}));

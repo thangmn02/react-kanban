@@ -1,8 +1,11 @@
-import {act,cleanup,fireEvent,render,screen,waitFor} from '@testing-library/react';
+import { act, cleanup, fireEvent, render as renderBare, screen, waitFor } from '@testing-library/react';
+import type { ReactElement } from 'react';
+import { I18nProvider } from '../../i18n';
 import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 import NativeNoteWindow from './native-note-window';
 import {newNote} from './notes-store';
 import type {NativeNoteSnapshot} from './native-note-bridge';
+const render = (ui: ReactElement) => renderBare(ui, { wrapper: I18nProvider });
 
 const mocks=vi.hoisted(()=>({request:vi.fn(),events:new Map<string,(event:{payload:unknown})=>void>()}));
 vi.mock('@tauri-apps/api/event',()=>({listen:()=>{throw Error('Frame events must target their owning window.');}}));

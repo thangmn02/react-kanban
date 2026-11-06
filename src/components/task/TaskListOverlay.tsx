@@ -3,6 +3,7 @@ import { memo } from 'react';
 import type { IListItem, ITaskItem } from '../../types/task.type';
 import Typography from '../atoms/Typography';
 import TaskCard from './TaskCard';
+import { useI18n } from '../../i18n';
 
 interface TaskListOverlayProps {
   listItem: IListItem;
@@ -10,6 +11,7 @@ interface TaskListOverlayProps {
 }
 
 function TaskListOverlay({ listItem, tasks }: TaskListOverlayProps) {
+  const { t } = useI18n();
   return (
     <div className="w-80 cursor-grabbing rounded-xl bg-white/95 p-1 shadow-2xl ring-1 ring-blue-100 backdrop-blur-sm">
       <div className="mb-4 flex items-center justify-between px-3 pt-3">
@@ -39,7 +41,7 @@ function TaskListOverlay({ listItem, tasks }: TaskListOverlayProps) {
 
         {tasks.length === 0 && (
           <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 py-8 text-center text-sm text-gray-400">
-            Empty list
+            {t('task.emptyList')}
           </div>
         )}
       </div>

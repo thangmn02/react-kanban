@@ -7,6 +7,7 @@ import type { OnboardingSetupValues } from '../../types/onboarding.type';
 import BoardTemplatePicker from '../board/BoardTemplatePicker';
 import Typography from '../atoms/Typography';
 import OnboardingProgressList from './OnboardingProgressList';
+import { useI18n } from '../../i18n';
 
 interface OnboardingPageProps {
   userName: string;
@@ -19,6 +20,7 @@ export default function OnboardingPage({
   onCompleteSetup,
   onSignOut,
 }: OnboardingPageProps) {
+  const { t } = useI18n();
   const [workspaceName, setWorkspaceName] = useState('My Workspace');
   const [boardTitle, setBoardTitle] = useState('Personal Tasks');
   const [boardDescription, setBoardDescription] = useState('');
@@ -49,58 +51,57 @@ export default function OnboardingPage({
         <section className="rounded-3xl border border-slate-200/80 bg-white p-8 shadow-card">
           <Typography
             component="p"
-            content="Workspace setup"
+            content={t('onboarding.workspaceSetup')}
             className="text-[11px] font-semibold uppercase tracking-[0.28em] text-blue-600"
           />
           <Typography
             component="h1"
-            content="Set up your first board"
+            content={t('onboarding.setUpYourFirstBoard')}
             className="mt-4 text-4xl font-semibold tracking-[-0.04em] text-slate-950"
           />
           <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-500">
-            Hi {userName}. Create a workspace and choose a starter board template.
-            This avoids an empty dashboard and keeps production data scoped by workspace membership.
+            {t('onboarding.intro', { name: userName })}
           </p>
 
           <form className="mt-8 space-y-7" onSubmit={handleSubmit}>
             <div className="grid gap-4 md:grid-cols-2">
               <label className="block">
-                <span className="text-sm font-medium text-slate-700">Workspace name</span>
+                <span className="text-sm font-medium text-slate-700">{t('onboarding.workspaceName')}</span>
                 <input
                   value={workspaceName}
                   onChange={(event) => setWorkspaceName(event.target.value)}
                   className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-100"
-                  placeholder="Small Team Sprint"
+                  placeholder={t('onboarding.smallTeamSprint')}
                   required
                 />
               </label>
 
               <label className="block">
-                <span className="text-sm font-medium text-slate-700">First board title</span>
+                <span className="text-sm font-medium text-slate-700">{t('onboarding.firstBoardTitle')}</span>
                 <input
                   value={boardTitle}
                   onChange={(event) => setBoardTitle(event.target.value)}
                   className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-100"
-                  placeholder="Personal Tasks"
+                  placeholder={t('onboarding.personalTasks')}
                   required
                 />
               </label>
             </div>
 
             <label className="block">
-              <span className="text-sm font-medium text-slate-700">Board description</span>
+              <span className="text-sm font-medium text-slate-700">{t('onboarding.boardDescription')}</span>
               <textarea
                 value={boardDescription}
                 onChange={(event) => setBoardDescription(event.target.value)}
                 className="mt-2 min-h-24 w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-100"
-                placeholder="Short context for this board"
+                placeholder={t('onboarding.shortContextForThisBoard')}
               />
             </label>
 
             <div>
               <Typography
                 component="p"
-                content="Choose a starter template"
+                content={t('onboarding.chooseAStarterTemplate')}
                 className="mb-3 text-sm font-semibold text-slate-700"
               />
               <BoardTemplatePicker
@@ -116,14 +117,14 @@ export default function OnboardingPage({
                 disabled={isSubmitting}
                 className="cursor-pointer rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-blue-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-100 disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-60"
               >
-                {isSubmitting ? 'Creating workspace...' : 'Create workspace and board'}
+                {isSubmitting ? t('onboarding.creatingWorkspace') : t('onboarding.createWorkspaceAndBoard')}
               </button>
               <button
                 type="button"
                 onClick={() => void onSignOut()}
                 className="cursor-pointer rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"
               >
-                Sign out
+                {t('app.signOut')}
               </button>
             </div>
           </form>

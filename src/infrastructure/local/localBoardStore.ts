@@ -21,7 +21,6 @@ import { data as seedBoardData } from '../../data';
 import { findBoardTemplateById } from '../../data/boardTemplates';
 import {
   DEFAULT_BOARD_TITLE,
-  SAMPLE_BOARD_TITLE,
   DEFAULT_TASK_CATEGORIES,
   DEFAULT_TASK_PRIORITY,
   ERROR_MESSAGES,
@@ -52,6 +51,7 @@ import {
 } from '../../shared/storage/storageAdapter';
 import { planTaskWorkflow, type WorkflowRequest, type WorkflowResult } from '../../features/task/model/task-workflow';
 import { addDays, addMonths, format, parseISO } from 'date-fns';
+import { translateNow } from '../../i18n/context';
 
 export interface LocalBoardState {
   boards: BoardRow[];
@@ -112,8 +112,8 @@ function sampleState(boardId: string): LocalBoardState {
   const boardRow: BoardRow = {
     id: boardId,
     workspace_id: LOCAL_MOCK_WORKSPACE_ID,
-    title: SAMPLE_BOARD_TITLE,
-    description: 'Sample tasks to explore Kora',
+    title: translateNow('board.sampleTitle'),
+    description: translateNow('board.sampleDescription'),
     created_by: null,
     created_at: now,
     updated_at: null,
@@ -204,7 +204,7 @@ let cachedState: LocalBoardState | null = null;
 function getState(): LocalBoardState {
   const raw = localStorage.getItem(buildStorageKey(MOCK_SCOPE, BOARD_STORE_FEATURE));
   let stored: LocalBoardState | null;
-  try { stored = raw === null ? null : JSON.parse(raw); } catch { throw new Error('Local data could not be read. Restore the local backup before continuing.'); }
+  try { stored = raw === null ? null : JSON.parse(raw); } catch { throw new Error(translateNow('board.localDataCouldNotBeRead')); }
   if (stored && Array.isArray(stored.boards) && Array.isArray(stored.lists) && Array.isArray(stored.tasks)) {
     cachedState = { ...stored, activities: Array.isArray(stored.activities) ? stored.activities : [], briefingPins: Array.isArray(stored.briefingPins) ? stored.briefingPins : [] };
   } else if (stored === null) {
@@ -217,7 +217,7 @@ function getState(): LocalBoardState {
 /** One recoverable storage commit owns state, membership, activity and recurrence. */
 export function localTransitionTaskWorkflow(request: WorkflowRequest): WorkflowResult {
   const current = getState();
-  if(!current.boards.some(board=>board.id===request.boardId&&board.workspace_id===request.workspaceId&&!board.archived_at))throw new Error('Board is unavailable in this workspace.');
+  if(!current.boards.some(board=>board.id===request.boardId&&board.workspace_id===request.workspaceId&&!board.archived_at))throw new Error(translateNow('board.boardIsUnavailableInThisWorkspace'));
   const task = current.tasks.find(t => t.id === request.taskId);
   if (!task) throw new Error('Task was not found.');
   const lists = current.lists.filter(l=>l.board_id===request.boardId && l.workspace_id===request.workspaceId && !l.archived_at);
@@ -246,7 +246,7 @@ export function localTransitionTaskWorkflow(request: WorkflowRequest): WorkflowR
     next.tasks.push(occurrence);
   }
   next.activities.push({id:request.operationId,task_id:task.id,task_title:task.title,board_id:task.board_id,workspace_id:task.workspace_id,
-    actor_id:null,actor:{name:'You',avatar:''},action:task.is_done!==updated.is_done?'status_change':'move',created_at:now,
+    actor_id:null,actor:{name:translateNow('notes.you'),avatar:''},action:task.is_done!==updated.is_done?'status_change':'move',created_at:now,
     details:{description:request.kind==='move'?'Moved task through workflow':updated.is_done?'Marked task as completed':'Reopened task',workflowTransition:true,
       fromListId:task.list_id,fromIndex:plan.sourceIndex,fromPosition:task.position,toListId:updated.list_id,toPosition:updated.position,
       fromCompleted:task.is_done,toCompleted:updated.is_done,...(occurrence?{recurrenceId:occurrence.id}:{})}});
@@ -266,7 +266,7 @@ function saveState(): void {
     localStorage.setItem(key,JSON.stringify(cachedState));
   } catch {
     cachedState = previous ? JSON.parse(previous) : null;
-    throw new Error('Local changes could not be saved. Existing data was preserved. Free storage space and try again.');
+    throw new Error(translateNow('board.localChangesCouldNotBeSaved'));
   }
 }
 

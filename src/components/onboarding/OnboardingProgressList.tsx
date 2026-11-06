@@ -1,4 +1,5 @@
 import Typography from '../atoms/Typography';
+import { useI18n } from '../../i18n';
 
 const onboardingSteps = [
   'Create an isolated workspace under your account.',
@@ -7,11 +8,12 @@ const onboardingSteps = [
 ];
 
 export default function OnboardingProgressList() {
+  const { t } = useI18n();
   return (
     <aside className="rounded-3xl border border-blue-100 bg-blue-50/80 p-8 shadow-[0_24px_70px_rgba(37,99,235,0.08)]">
       <Typography
         component="p"
-        content="What happens next"
+        content={t('onboarding.whatHappensNext')}
         className="text-sm font-semibold text-blue-700"
       />
       <div className="mt-5 space-y-4 text-sm leading-6 text-blue-950/70">

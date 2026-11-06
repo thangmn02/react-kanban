@@ -78,7 +78,7 @@ test('route navigation participates in browser history', async ({ page }) => {
   const errors = collectPageErrors(page);
 
   await page.goto('/home');
-  await page.getByRole('button', { name: 'Open board: Sample board' }).click();
+  await page.getByRole('button', { name: 'Open board: Sample: Product launch' }).click();
   await expect(page).toHaveURL(boardPath);
   await page.getByRole('button', { name: 'Board options' }).click();
   await page.getByRole('button', { name: 'Table', exact: true }).click();

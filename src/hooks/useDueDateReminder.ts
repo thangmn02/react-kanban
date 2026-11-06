@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { translateNow } from '../i18n/context';
 import { isPast, isToday, parseISO, startOfDay } from 'date-fns';
 import { notify } from '../components/organisms/toast/notify';
 
@@ -36,7 +37,7 @@ export function useDueDateReminder(boardData: BoardData, enabled = true) {
 
     window.localStorage.setItem(reminderStorageKey, todayKey);
     notify.info(
-      `${todayTasks.length} due today · ${overdueTasks.length} overdue`
+      translateNow('app.dueSummary', { today: todayTasks.length, overdue: overdueTasks.length })
     );
   }, [boardData.task, enabled]);
 }

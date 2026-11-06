@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import Button from '../../atoms/Button';
 import ContentDialog from '../../molecules/dialog/ContentDialog';
 import InputField from '../../molecules/InputField';
+import { useI18n } from '../../../i18n';
 
 interface AddGroupDialogValues {
   title: string;
@@ -20,6 +21,7 @@ const listSchema = yup.object({
 }).required();
 
 function AddGroupDialog({ onClose, onSubmitGroup }: AddGroupDialogProps) {
+  const { t } = useI18n();
   const { 
     register: registerList, 
     handleSubmit: handleSubmitList, 
@@ -37,7 +39,7 @@ function AddGroupDialog({ onClose, onSubmitGroup }: AddGroupDialogProps) {
   return (
     <ContentDialog
       title={(
-        <h3 className="text-xl font-semibold text-gray-900 mb-6">Add new group</h3>
+        <h3 className="text-xl font-semibold text-gray-900 mb-6">{t('app.addNewGroup')}</h3>
       )}
       onSubmit={() => {}}
       onClose={onClose}
@@ -47,7 +49,7 @@ function AddGroupDialog({ onClose, onSubmitGroup }: AddGroupDialogProps) {
     >
       <form onSubmit={handleSubmitList(onSubmit)}>
         <InputField 
-          label="Name"
+          label={t('app.name2')}
           messageError={errorsList.title?.message || ''}
           {...registerList('title')}
         />

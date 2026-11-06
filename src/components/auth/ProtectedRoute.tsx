@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { useEffect } from 'react';
 
 import { useAuth } from '../../hooks/useAuth';
+import { useI18n } from '../../i18n';
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -9,6 +10,7 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ children, onRequireAuth }: ProtectedRouteProps) {
+  const { t } = useI18n();
   const { authMode, isAuthLoading, user } = useAuth();
 
   useEffect(() => {
@@ -20,7 +22,7 @@ export default function ProtectedRoute({ children, onRequireAuth }: ProtectedRou
   if (isAuthLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-canvas text-sm font-medium text-slate-500">
-        Checking session...
+        {t('auth.checkingSession')}
       </div>
     );
   }

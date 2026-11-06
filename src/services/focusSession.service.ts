@@ -9,6 +9,7 @@ import type {
   FocusSessionStatus,
   PomodoroMode,
 } from '../types/focus.type';
+import { translateNow } from '../i18n/context';
 
 interface FocusSessionRow {
   id: string;
@@ -156,7 +157,7 @@ export async function logFocusSession(input: FocusSessionLogInput): Promise<Focu
   }
 
   if (!data) {
-    throw new Error('Focus session was not logged.');
+    throw new Error(translateNow('app.focusSessionWasNotLogged'));
   }
 
   return mapFocusSessionRow(data);

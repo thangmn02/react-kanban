@@ -41,7 +41,7 @@ it('offers Add a task when empty inside Kora and no dead return link', () => {
   const onAddTask = vi.fn();
   renderDock({ ...props, activeTask: null, focusTasks: [], onAddTask });
   expect(screen.queryByRole('button', { name: 'Back to Kora' })).toBeNull();
-  fireEvent.click(screen.getByRole('button', { name: 'Add a task' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Add task' }));
   expect(onAddTask).toHaveBeenCalledOnce();
 });
 

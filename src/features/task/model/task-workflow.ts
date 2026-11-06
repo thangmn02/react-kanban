@@ -1,4 +1,5 @@
 import type { ListRow, TaskActivityRow, TaskRow } from '../../../types/supabase.type';
+import { translateNow } from '../../../i18n/context';
 
 export interface WorkflowRequest {
   taskId: string; boardId: string; workspaceId: string | null;
@@ -25,9 +26,9 @@ export function resolveTaskWorkflow(lists: Pick<ListRow, 'id' | 'title' | 'posit
     doneListId: standard ? doneList!.id : null, activeListId: standard ? active!.id : null };
 }
 export function planTaskWorkflow(task: TaskRow, lists: ListRow[], tasks: TaskRow[], activities: TaskActivityRow[], request: WorkflowRequest, now: string) {
-  if (task.board_id !== request.boardId || task.workspace_id !== request.workspaceId || task.deleted_at || task.archived_at) throw new Error('Task is unavailable in this workspace.');
-  if (request.expectedListId && task.list_id !== request.expectedListId) throw new Error('Task moved elsewhere. Reload and try again.');
-  if (request.expectedUpdatedAt && task.updated_at !== request.expectedUpdatedAt) throw new Error('Task changed elsewhere. Reload and try again.');
+  if (task.board_id !== request.boardId || task.workspace_id !== request.workspaceId || task.deleted_at || task.archived_at) throw new Error(translateNow('task.taskIsUnavailableInThisWorkspace'));
+  if (request.expectedListId && task.list_id !== request.expectedListId) throw new Error(translateNow('task.taskMovedElsewhereReloadAndTry'));
+  if (request.expectedUpdatedAt && task.updated_at !== request.expectedUpdatedAt) throw new Error(translateNow('task.taskChangedElsewhereReloadAndTry'));
   const policy = resolveTaskWorkflow(lists);
   const history = [...activities].reverse().find(activity => {
     const d = activity.details as Record<string, unknown>;
@@ -42,7 +43,7 @@ export function planTaskWorkflow(task: TaskRow, lists: ListRow[], tasks: TaskRow
       ? history.fromListId : policy.activeListId!;
     index = listId === history?.fromListId && typeof history.fromIndex === 'number' ? history.fromIndex : undefined;
   }
-  if (!lists.some(list => list.id === listId)) throw new Error('Destination list is unavailable in this board.');
+  if (!lists.some(list => list.id === listId)) throw new Error(translateNow('task.destinationListIsUnavailableInThis'));
   const ordered = (id: string) => tasks.filter(t => t.list_id === id && !t.deleted_at && !t.archived_at).sort((a,b) => a.position-b.position || a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id));
   const sourceIndex = ordered(task.list_id).findIndex(t => t.id === task.id);
   const destination = ordered(listId).filter(t => t.id !== task.id);

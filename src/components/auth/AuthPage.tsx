@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 
 import { useAuth } from '../../hooks/useAuth';
+import { useI18n } from '../../i18n';
 
 type AuthFormMode = 'sign-in' | 'sign-up';
 
@@ -17,6 +18,7 @@ function getSubmitButtonLabel(mode: AuthFormMode, isSubmitting: boolean) {
 }
 
 export default function AuthPage({ onAuthenticated }: AuthPageProps) {
+  const { t } = useI18n();
   const {
     authMode,
     user,
@@ -101,16 +103,16 @@ export default function AuthPage({ onAuthenticated }: AuthPageProps) {
               Kora
             </h1>
             <p className="mt-4 max-w-sm text-base leading-7 text-slate-300">
-              Intelligent Focus Space
+              {t('auth.intelligentFocusSpace')}
             </p>
           </div>
 
           <div className="space-y-3 text-sm text-slate-300">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              Organize your tasks and make room to focus.
+              {t('auth.organizeYourTasksAndMakeRoom')}
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              Tasks, music, and focus in one space.
+              {t('auth.tasksMusicAndFocusInOne')}
             </div>
           </div>
         </aside>
@@ -120,12 +122,12 @@ export default function AuthPage({ onAuthenticated }: AuthPageProps) {
             Kora
           </p>
           <h2 className="mt-3 text-3xl font-semibold tracking-[-0.03em] text-slate-950">
-            {formMode === 'sign-in' ? 'Welcome back' : 'Create your account'}
+            {formMode === 'sign-in' ? t('auth.welcomeBack') : t('auth.createYourAccount')}
           </h2>
           <p className="mt-2 text-sm leading-6 text-slate-500">
             {formMode === 'sign-in'
-              ? 'Sign in to continue.'
-              : 'Create an account to get started.'}
+              ? t('auth.signInToContinue')
+              : t('auth.createAnAccountToGetStarted')}
           </p>
 
           <div className="mt-6 grid grid-cols-2 rounded-2xl bg-slate-100 p-1">
@@ -138,7 +140,7 @@ export default function AuthPage({ onAuthenticated }: AuthPageProps) {
                   : 'text-slate-500 hover:text-slate-700'
               }`}
             >
-              Sign in
+              {t('auth.signIn')}
             </button>
             <button
               type="button"
@@ -149,27 +151,27 @@ export default function AuthPage({ onAuthenticated }: AuthPageProps) {
                   : 'text-slate-500 hover:text-slate-700'
               }`}
             >
-              Create account
+              {t('auth.createAccount')}
             </button>
           </div>
 
           <form className="mt-7 space-y-4" onSubmit={handleSubmit}>
             {formMode === 'sign-up' && (
               <label className="block" htmlFor="auth-full-name">
-                <span className="text-sm font-medium text-slate-700">Full name</span>
+                <span className="text-sm font-medium text-slate-700">{t('auth.fullName')}</span>
                 <input
                   id="auth-full-name"
                   value={fullName}
                   onChange={(event) => setFullName(event.target.value)}
                   className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-100"
-                  placeholder="Your name"
+                  placeholder={t('contact.name')}
                   autoComplete="name"
                 />
               </label>
             )}
 
             <label className="block" htmlFor="auth-email">
-              <span className="text-sm font-medium text-slate-700">Email</span>
+              <span className="text-sm font-medium text-slate-700">{t('settings.email')}</span>
               <input
                 id="auth-email"
                 type="email"
@@ -183,14 +185,14 @@ export default function AuthPage({ onAuthenticated }: AuthPageProps) {
             </label>
 
             <label className="block" htmlFor="auth-password">
-              <span className="text-sm font-medium text-slate-700">Password</span>
+              <span className="text-sm font-medium text-slate-700">{t('auth.password')}</span>
               <input
                 id="auth-password"
                 type="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-100"
-                placeholder="Minimum 6 characters"
+                placeholder={t('auth.minimum6Characters')}
                 autoComplete={formMode === 'sign-in' ? 'current-password' : 'new-password'}
                 required
               />
@@ -219,13 +221,13 @@ export default function AuthPage({ onAuthenticated }: AuthPageProps) {
 
           <p className="mt-5 text-center text-xs leading-5 text-slate-500">
             {formMode === 'sign-in'
-              ? 'New here? Create an account to set up your first workspace.'
-              : 'Already have an account? Switch back to sign in.'}
+              ? t('auth.newHereCreateAnAccountTo')
+              : t('auth.alreadyHaveAnAccountSwitchBack')}
           </p>
-          <nav aria-label="About Kora and policies" className="mt-4 flex justify-center gap-4 text-xs text-slate-500">
-            <a href="https://koraspace.online/about/" className="underline underline-offset-4">About Kora</a>
-            <a href="https://koraspace.online/privacy/" className="underline underline-offset-4">Privacy</a>
-            <a href="https://koraspace.online/terms/" className="underline underline-offset-4">Terms</a>
+          <nav aria-label={t('auth.aboutKoraAndPolicies')} className="mt-4 flex justify-center gap-4 text-xs text-slate-500">
+            <a href="https://koraspace.online/about/" className="underline underline-offset-4">{t('app.about')}</a>
+            <a href="https://koraspace.online/privacy/" className="underline underline-offset-4">{t('auth.privacy')}</a>
+            <a href="https://koraspace.online/terms/" className="underline underline-offset-4">{t('auth.terms')}</a>
           </nav>
         </div>
       </section>

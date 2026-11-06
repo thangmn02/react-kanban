@@ -188,7 +188,7 @@ function TaskItem({
                       handleEditTask(task);
                     }
                   }}
-                  aria-label={`Open task: ${task.title}`}
+                  aria-label={`${t('task.openTask')}: ${task.title}`}
                   className={`block w-full cursor-pointer rounded text-left line-clamp-2 break-words text-[15px] font-semibold leading-snug tracking-[-0.01em] focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 ${
                     task.isDone ? 'text-slate-500 line-through decoration-slate-300' : 'text-slate-900'
                   }`}

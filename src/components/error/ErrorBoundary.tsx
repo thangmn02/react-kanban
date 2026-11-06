@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { translateNow } from '../../i18n/context';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -90,7 +91,7 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
       >
         <div className="max-w-xl rounded-3xl border border-slate-200/80 bg-white p-8 text-center shadow-[0_24px_70px_rgba(15,23,42,0.08)]">
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-rose-600">
-            {isChunkLoadError ? 'Update' : 'Error'}
+            {isChunkLoadError ? translateNow('app.update') : translateNow('music.sync.status.error')}
           </p>
           <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{title}</h1>
           <p className="mt-3 text-sm leading-6 text-slate-500">{description}</p>
@@ -108,14 +109,14 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
               onClick={this.handleReload}
               className="inline-flex cursor-pointer items-center justify-center rounded-lg bg-blue-600 px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-200"
             >
-              {isChunkLoadError ? 'Reload the app' : 'Reload app'}
+              {isChunkLoadError ? translateNow('app.reloadTheApp') : translateNow('app.reloadApp')}
             </button>
             <button
               type="button"
               onClick={this.handleGoDashboard}
               className="inline-flex cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-slate-100 px-5 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-200 hover:text-slate-900 focus:outline-none focus-visible:ring-4 focus-visible:ring-slate-200"
             >
-              Go to Dashboard
+              {translateNow('app.goToDashboard')}
             </button>
           </div>
         </div>

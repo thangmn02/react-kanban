@@ -45,7 +45,7 @@ test('notes autosave rich text/checklist, pin, move, resize, Peek, link, convers
   const resize = note.getByRole('button', { name: 'Resize note' }); await resize.focus(); await resize.press('ArrowDown');
   await expect.poll(async () => (await rows(page))[0]?.height).toBe(380);
   expect((await rows(page))[0]).toMatchObject({ pinned: true, x: 10, checklist: [{ text: 'Review integration', isDone: true }] });
-  await note.getByRole('button', { name: 'Peek', exact: true }).click();
+  await note.getByRole('button', { name: 'See through', exact: true }).click();
   const restore = page.getByRole('button', { name: 'Restore note: Integration note' }); await expect(restore).toBeVisible();
   expect(await note.evaluate(el => { const r = el.getBoundingClientRect(); return el.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)); })).toBe(false);
   await restore.click(); await expect(note).not.toHaveAttribute('inert');

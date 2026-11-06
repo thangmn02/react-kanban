@@ -6,6 +6,7 @@ import type { FocusTask } from '../types/focus.type';
 import type { BoardViewMode } from './useViewRouting';
 import {NOTES_PREVIEW_ENABLED} from '../constants/features';
 import {openQuickNotes,openSavedContext} from '../features/notes/quick-notes-events';
+import { translateNow } from '../i18n/context';
 
 export interface UseCommandPaletteActionsParams {
   setActiveViewWithPath: (view: BoardViewMode | 'table' | 'focus') => void;
@@ -59,7 +60,7 @@ export function useCommandPaletteActions({
   isPictureInPictureSupported,
 }: UseCommandPaletteActionsParams): CommandPaletteAction[] {
   return useMemo<CommandPaletteAction[]>(() => [
-    ...(NOTES_PREVIEW_ENABLED?[{id:'quick-note',title:'New Quick Note',description:'Capture without leaving your current task.',shortcut:'Ctrl+Alt+N',keywords:['note','capture','quick'],run:()=>openQuickNotes({create:true})},{id:'saved-context',title:'Open Saved Context',description:'Resume original tasks, comments and notes.',keywords:['saved','pinned','resume','context'],run:openSavedContext}]:[]),
+    ...(NOTES_PREVIEW_ENABLED?[{id:'quick-note',title:translateNow('command.newQuickNote'),description:translateNow('command.captureWithoutLeavingYourCurrentTask'),shortcut:'Ctrl+Alt+N',keywords:['note','capture','quick'],run:()=>openQuickNotes({create:true})},{id:'saved-context',title:translateNow('command.openSavedContext'),description:translateNow('command.resumeOriginalTasksCommentsAndNotes'),keywords:['saved','pinned','resume','context'],run:openSavedContext}]:[]),
     withRun(COMMAND_PALETTE_ACTION_CONFIG.GO_HOME, () => setActiveViewWithPath('home')),
     withRun(COMMAND_PALETTE_ACTION_CONFIG.GO_TODAY, () => setActiveViewWithPath('today')),
     withRun(COMMAND_PALETTE_ACTION_CONFIG.GO_BOARD, () => setActiveViewWithPath('board')),

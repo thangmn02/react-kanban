@@ -20,8 +20,9 @@
     "typecheck": "tsc -b",
     "test:ci": "vitest run --coverage",
     "bundle-size": "node scripts/check-bundle-size.mjs",
+    "copy:check": "node scripts/check-hardcoded-copy.mjs",
     "e2e": "playwright test",
-    "quality": "npm run lint && npm run typecheck && npm run test:ci && npm run build && npm run bundle-size"
+    "quality": "npm run lint && npm run copy:check && npm run typecheck && npm run test:ci && npm run build && npm run bundle-size"
   },
   "dependencies": {
     "@astryxdesign/core": "0.1.9",

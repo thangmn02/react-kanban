@@ -191,7 +191,7 @@ function TaskDialog({
     extensions: [
       StarterKit,
       Placeholder.configure({
-        placeholder: 'Add notes…',
+        placeholder: t('task.addNotes'),
       }),
     ],
     content: taskData?.description || '',
@@ -405,7 +405,7 @@ function TaskDialog({
           </div>
 
           <div className="flex max-w-full flex-wrap items-center gap-2">
-            {isEditMode && onOpenNotes && <button type="button" onClick={onOpenNotes} className="min-h-11 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700">Task notes</button>}
+            {isEditMode && onOpenNotes && <button type="button" onClick={onOpenNotes} className="min-h-11 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700">{t('task.taskNotes')}</button>}
             {isEditMode && onToggleCompletion && <button type="button" disabled={hasUnsavedChanges || isCompleting}
               onClick={async () => {
                 if (completionPending.current) return;
@@ -426,7 +426,7 @@ function TaskDialog({
                 }`}
                 aria-pressed={isFocusTask}
               >
-                {isFocusTask ? 'In Focus Dock' : 'Add Focus'}
+                {isFocusTask ? t('task.inFocusDock') : t('task.addFocus2')}
               </button>
             )}
 
@@ -434,7 +434,7 @@ function TaskDialog({
               type="button"
               onClick={onClose}
               className="cursor-pointer rounded-full p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
-              aria-label="Close task drawer"
+              aria-label={t('task.closeTaskDrawer')}
             >
               <svg className="h-5 w-5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -464,7 +464,7 @@ function TaskDialog({
 
                   <div>
                     <label className="mb-2 block text-sm font-semibold text-gray-700">
-                      Description
+                      {t('task.description')}
                     </label>
                     <div className="flex items-center gap-2 rounded-t-xl border border-gray-300 border-b-0 bg-gray-50 px-3 py-2">
                       <button
@@ -473,7 +473,7 @@ function TaskDialog({
                         className={`cursor-pointer rounded-md px-2 py-1 text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 ${
                           editor?.isActive('bold') ? 'bg-gray-200 text-gray-900' : 'text-gray-500 hover:bg-gray-200 hover:text-gray-700'
                         }`}
-                        aria-label="Bold"
+                        aria-label={t('task.bold')}
                         aria-pressed={editor?.isActive('bold') ?? false}
                       >
                         <span className="font-bold">B</span>
@@ -484,7 +484,7 @@ function TaskDialog({
                         className={`cursor-pointer rounded-md px-2 py-1 text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 ${
                           editor?.isActive('italic') ? 'bg-gray-200 text-gray-900' : 'text-gray-500 hover:bg-gray-200 hover:text-gray-700'
                         }`}
-                        aria-label="Italic"
+                        aria-label={t('task.italic')}
                         aria-pressed={editor?.isActive('italic') ?? false}
                       >
                         <span className="italic">I</span>
@@ -495,7 +495,7 @@ function TaskDialog({
                         className={`cursor-pointer rounded-md px-2 py-1 text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 ${
                           editor?.isActive('bulletList') ? 'bg-gray-200 text-gray-900' : 'text-gray-500 hover:bg-gray-200 hover:text-gray-700'
                         }`}
-                        aria-label="Bullet list"
+                        aria-label={t('task.bulletList')}
                         aria-pressed={editor?.isActive('bulletList') ?? false}
                       >
                         •
@@ -529,7 +529,7 @@ function TaskDialog({
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-gray-500">
-                        Checklist
+                        {t('task.checklist2')}
                       </h4>
                     </div>
                     {checklistProgress.total > 0 && <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
@@ -590,7 +590,7 @@ function TaskDialog({
                               setChecklistItems((currentChecklistItems) => currentChecklistItems.filter((checklistItem) => checklistItem.id !== item.id));
                             }}
                             className="cursor-pointer rounded-md p-1 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
-                            aria-label={`Remove checklist item: ${item.text || 'untitled'}`}
+                            aria-label={`${t('task.removeChecklistItem')}: ${item.text || t('task.untitled')}`}
                           >
                             <svg className="h-4 w-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                               <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -611,8 +611,8 @@ function TaskDialog({
                             handleAddChecklistItem();
                           }
                         }}
-                        placeholder="Checklist item"
-                        aria-label="Checklist item"
+                        placeholder={t('task.checklistItem')}
+                        aria-label={t('task.checklistItem')}
                         className="flex-1 rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                       <Button text="Add item" variant="outline" onClick={handleAddChecklistItem} />
@@ -625,7 +625,7 @@ function TaskDialog({
                 <section className="space-y-5 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
                   <div>
                     <label className="mb-2 block text-sm font-semibold text-gray-700">
-                      Assignees
+                      {t('task.assignees')}
                     </label>
                     <div className="flex flex-wrap items-center gap-3">
                       {currentAssignees.length > 0 ? (
@@ -653,7 +653,7 @@ function TaskDialog({
                           <svg className="mr-2 h-4 w-4 text-gray-500" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                           </svg>
-                          Assign members
+                          {t('task.assignMembers')}
                         </button>
 
                         {showAssigneeSelect && (
@@ -661,7 +661,7 @@ function TaskDialog({
                             <div className="fixed inset-0 z-10" onClick={() => setShowAssigneeSelect(false)} />
                             <div className="absolute left-0 z-20 mt-2 w-60 rounded-xl border border-gray-200 bg-white p-2 shadow-2xl">
                               <div className="mb-2 border-b border-gray-100 px-2 pb-2 text-xs font-bold uppercase tracking-wider text-gray-500">
-                                Select members
+                                {t('task.selectMembers')}
                               </div>
                               <div className="max-h-56 space-y-1 overflow-y-auto">
                                 {assigneeOptions.map((member) => {
@@ -703,7 +703,7 @@ function TaskDialog({
 
                   <div>
                     <label className="mb-2 block text-sm font-semibold text-gray-700">
-                      Priority
+                      {t('common.priority')}
                     </label>
                     <div className="flex flex-wrap gap-2">
                       {TASK_PRIORITIES.map((priority) => (
@@ -725,7 +725,7 @@ function TaskDialog({
 
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div>
-                      <label className="mb-2 block text-sm font-semibold text-gray-700">Start date</label>
+                      <label className="mb-2 block text-sm font-semibold text-gray-700">{t('task.startDate')}</label>
                       <input
                         type="date"
                         {...register('startDate')}
@@ -733,7 +733,7 @@ function TaskDialog({
                       />
                     </div>
                     <div>
-                      <label htmlFor="task-due-date" className="mb-2 block text-sm font-semibold text-gray-700">Due date</label>
+                      <label htmlFor="task-due-date" className="mb-2 block text-sm font-semibold text-gray-700">{t('common.dueDate')}</label>
                       <input
                         id="task-due-date"
                         type="date"
@@ -756,7 +756,7 @@ function TaskDialog({
                 <section className="space-y-5 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
                   <div>
                     <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-gray-500">
-                      Labels
+                      {t('task.labels')}
                     </h4>
                   </div>
 
@@ -771,7 +771,7 @@ function TaskDialog({
                           type="button"
                           onClick={() => setLabels((currentLabels) => currentLabels.filter((currentLabel) => currentLabel.id !== label.id))}
                           className="cursor-pointer rounded-full text-current/70 transition-colors hover:text-current focus:outline-none focus-visible:ring-2 focus-visible:ring-current"
-                          aria-label={`Remove label: ${label.name}`}
+                          aria-label={`${t('task.removeLabel')}: ${label.name}`}
                         >
                           ×
                         </button>
@@ -790,8 +790,8 @@ function TaskDialog({
                           handleAddLabel();
                         }
                       }}
-                      placeholder="Label name"
-                      aria-label="Label name"
+                      placeholder={t('task.labelName')}
+                      aria-label={t('task.labelName')}
                       className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
 
@@ -804,7 +804,7 @@ function TaskDialog({
                           className={`cursor-pointer rounded-full px-3 py-1 text-xs font-semibold capitalize transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/30 ${getTaskLabelClass(color)} ${
                             formDrafts.label.color === color ? 'scale-105 ring-2 ring-gray-900/10' : ''
                           }`}
-                          aria-label={`Label color: ${color}`}
+                          aria-label={`${t('task.labelColor')}: ${color}`}
                           aria-pressed={formDrafts.label.color === color}
                         >
                           {color}
@@ -819,7 +819,7 @@ function TaskDialog({
                 <section className="space-y-5 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
                   <div>
                     <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-gray-500">
-                      Attachments
+                      {t('task.attachments2')}
                     </h4>
                   </div>
 
@@ -849,7 +849,7 @@ function TaskDialog({
                               setAttachments((currentAttachments) => currentAttachments.filter((currentAttachment) => currentAttachment.id !== attachment.id));
                             }}
                             className="cursor-pointer rounded-md p-1 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
-                            aria-label={`Remove attachment: ${attachment.name}`}
+                            aria-label={`${t('task.removeAttachment')}: ${attachment.name}`}
                           >
                             <svg className="h-4 w-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                               <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -865,7 +865,7 @@ function TaskDialog({
                       type="text"
                       value={formDrafts.attachment.name}
                       onChange={(event) => setFormDrafts((prev) => ({ ...prev, attachment: { ...prev.attachment, name: event.target.value } }))}
-                      placeholder="Attachment name"
+                      placeholder={t('task.attachmentName')}
                       className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     <input
@@ -889,7 +889,7 @@ function TaskDialog({
                   <section className="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm" aria-busy={isLoadingFocusSessions}>
                     <div className="flex items-center justify-between">
                       <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-gray-500">
-                        Focus history
+                        {t('task.focusHistory')}
                       </h4>
                       <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
                         {focusSessions.length} sessions
@@ -936,7 +936,7 @@ function TaskDialog({
                       </div>
                     ) : (
                       <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-5 text-sm italic text-gray-400">
-                        No focus sessions logged for this task yet.
+                        {t('task.noFocusSessionsLoggedForThis')}
                       </div>
                     )}
                   </section>
@@ -946,7 +946,7 @@ function TaskDialog({
                   <section className="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm" aria-busy={isLoadingActivities}>
                     <div className="flex items-center justify-between">
                       <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-gray-500">
-                        Activity log
+                        {t('task.activityLog')}
                       </h4>
                       <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
                         {activities.length} events
@@ -996,7 +996,7 @@ function TaskDialog({
                       </div>
                     ) : (
                       <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-5 text-sm italic text-gray-400">
-                        No activity logged for this task yet.
+                        {t('task.noActivityLoggedForThisTask')}
                       </div>
                     )}
                   </section>

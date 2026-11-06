@@ -55,7 +55,7 @@ export default function ContactForm() {
           <span>{t('contact.message')}</span><textarea id="contact-message" name="message" required minLength={10} maxLength={5000} rows={6} value={message} onChange={event => setMessage(event.target.value)} className={`${inputClass} resize-y`} placeholder={t('contact.messagePlaceholder')} aria-describedby="contact-privacy" />
         </label>
         <div className="absolute -left-[10000px] top-auto h-px w-px overflow-hidden" aria-hidden="true">
-          <label htmlFor="contact-website">Website</label><input id="contact-website" name="website" tabIndex={-1} autoComplete="off" value={website} onChange={event => setWebsite(event.target.value)} />
+          <label htmlFor="contact-website">{t('app.website')}</label><input id="contact-website" name="website" tabIndex={-1} autoComplete="off" value={website} onChange={event => setWebsite(event.target.value)} />
         </div>
       </fieldset>
       <p id="contact-privacy" className="text-xs leading-5 text-slate-500">{t('contact.privacy')}</p>

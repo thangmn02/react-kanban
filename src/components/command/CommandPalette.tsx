@@ -5,6 +5,7 @@ import { uiSpring } from '../../shared/motion';
 
 import type { CommandPaletteAction } from '../../types/command.type';
 import Typography from '../atoms/Typography';
+import { useI18n } from '../../i18n';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -27,6 +28,7 @@ function doesActionMatchQuery(action: CommandPaletteAction, query: string) {
 }
 
 export default function CommandPalette({ isOpen, actions, onClose }: CommandPaletteProps) {
+  const { t } = useI18n();
   const dialogRef = useRef<HTMLElement | null>(null);
   const listId = useId();
   const [query, setQuery] = useState('');
@@ -62,7 +64,7 @@ export default function CommandPalette({ isOpen, actions, onClose }: CommandPale
           onClick={closePalette}
         >
           <motion.section
-            ref={dialogRef} role="dialog" aria-modal="true" aria-label="Command palette" tabIndex={-1}
+            ref={dialogRef} role="dialog" aria-modal="true" aria-label={t('command.commandPalette')} tabIndex={-1}
             className="w-full max-w-2xl overflow-hidden rounded-[2rem] border border-white/70 bg-white/94 shadow-[0_30px_100px_rgba(15,23,42,0.24)] backdrop-blur-xl"
             initial={shouldReduceMotion ? false : { y: 20, scale: 0.98, opacity: 0 }}
             animate={{ y: 0, scale: 1, opacity: 1 }}
@@ -73,11 +75,11 @@ export default function CommandPalette({ isOpen, actions, onClose }: CommandPale
             <div className="border-b border-slate-100 px-5 py-4">
               <Typography
                 component="p"
-                content="Command palette"
+                content={t('command.commandPalette')}
                 className="text-[11px] font-semibold uppercase tracking-[0.24em] text-blue-600"
               />
               <input
-                role="combobox" aria-label="Search commands" aria-autocomplete="list" aria-expanded="true"
+                role="combobox" aria-label={t('command.searchCommands')} aria-autocomplete="list" aria-expanded="true"
                 aria-controls={listId} aria-activedescendant={filteredActions.length ? `${listId}-${Math.min(selectedIndex, filteredActions.length - 1)}` : undefined}
                 value={query}
                 onChange={(event) => { setQuery(event.target.value); setSelectedIndex(0); }}
@@ -95,15 +97,15 @@ export default function CommandPalette({ isOpen, actions, onClose }: CommandPale
                     event.preventDefault(); runAction(filteredActions[selectedIndex]);
                   }
                 }}
-                placeholder="Search actions, pages, and quick tasks..."
+                placeholder={t('command.searchActionsPagesAndQuickTasks')}
                 className="mt-3 w-full bg-transparent text-xl font-semibold text-slate-950 outline-none placeholder:text-slate-300"
               />
             </div>
 
-            <div id={listId} role="listbox" aria-label="Commands" className="max-h-[min(440px,60dvh)] overflow-y-auto p-2">
+            <div id={listId} role="listbox" aria-label={t('command.commands')} className="max-h-[min(440px,60dvh)] overflow-y-auto p-2">
               {filteredActions.length === 0 ? (
                 <div className="px-4 py-10 text-center text-sm text-slate-400">
-                  No matching commands.
+                  {t('command.noMatchingCommands')}
                 </div>
               ) : (
                 filteredActions.map((action, index) => (

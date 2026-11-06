@@ -1,6 +1,9 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render as renderBare, screen, waitFor } from '@testing-library/react';
+import type { ReactElement } from 'react';
+import { I18nProvider } from '../../i18n';
 import { afterEach, expect, it, vi } from 'vitest';
 import CommandPalette from './CommandPalette';
+const render = (ui: ReactElement) => renderBare(ui, { wrapper: I18nProvider });
 
 afterEach(cleanup);
 it('runs the selected keyboard command and resets selection when filtering', async () => {

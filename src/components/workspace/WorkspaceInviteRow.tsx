@@ -1,5 +1,6 @@
 import type { WorkspaceInvite } from '../../types/auth.type';
 import { useEffect, useState } from 'react';
+import { useI18n } from '../../i18n';
 
 interface WorkspaceInviteRowProps {
   invite: WorkspaceInvite;
@@ -24,6 +25,7 @@ export default function WorkspaceInviteRow({
   onCopyLink,
   onCancelInvite,
 }: WorkspaceInviteRowProps) {
+  const { t } = useI18n();
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const [now, setNow] = useState(Date.now);
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 30000); return () => clearInterval(timer); }, []);
@@ -50,7 +52,7 @@ export default function WorkspaceInviteRow({
             onClick={() => onCopyLink(inviteLink)}
             className="cursor-pointer rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-sky-100"
           >
-            Copy link
+            {t('invite.copyLink')}
           </button>
           <button
             type="button"
@@ -58,7 +60,7 @@ export default function WorkspaceInviteRow({
             onClick={async () => { if (busy) return; setBusy(true); setError(''); try { await onCancelInvite(invite.id); } catch (reason) { setError(reason instanceof Error ? reason.message : 'The invitation could not be cancelled.'); } finally { setBusy(false); } }}
             className="cursor-pointer rounded-xl border border-rose-100 bg-white px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-50 focus:outline-none focus:ring-4 focus:ring-rose-100"
           >
-            Cancel invite
+            {t('invite.cancelInvite')}
           </button>
         </div>
       )}

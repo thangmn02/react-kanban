@@ -110,7 +110,7 @@ export default function AppHeader({
         </div>
 
         <div className="flex items-center gap-2">
-          {user&&NOTES_PREVIEW_ENABLED&&<><button type="button" className="hidden min-h-10 rounded-lg px-2 text-sm text-slate-600 hover:bg-slate-100 sm:block" onClick={()=>openQuickNotes({create:true})} title="Quick note (Ctrl+Alt+N)">{t('notes.quick')}</button><button type="button" className="hidden min-h-10 rounded-lg px-2 text-sm text-slate-600 hover:bg-slate-100 sm:block" onClick={openSavedContext}>{t('app.saved')}</button></>}
+          {user&&NOTES_PREVIEW_ENABLED&&<><button type="button" className="hidden min-h-10 rounded-lg px-2 text-sm text-slate-600 hover:bg-slate-100 sm:block" onClick={()=>openQuickNotes({create:true})} title={t('app.quickNoteCtrlAltN')}>{t('notes.quick')}</button><button type="button" className="hidden min-h-10 rounded-lg px-2 text-sm text-slate-600 hover:bg-slate-100 sm:block" onClick={openSavedContext}>{t('app.saved')}</button></>}
           {!isNativeWidget() && <a
             href="/downloads/Kora-setup.exe"
             download="Kora-setup.exe"
@@ -144,7 +144,7 @@ export default function AppHeader({
             onSignOut={onSignOut}
             onOpenArcanaBooth={onOpenArcanaBooth}
             arcanaAvailableDraws={arcanaAvailableDraws}
-          /> : <button type="button" onClick={onSignIn} className="whitespace-nowrap rounded-xl px-3 py-2 text-sm font-semibold text-blue-600 hover:bg-blue-50">Sign in</button>}
+          /> : <button type="button" onClick={onSignIn} className="whitespace-nowrap rounded-xl px-3 py-2 text-sm font-semibold text-blue-600 hover:bg-blue-50">{t('auth.signIn')}</button>}
         </div>
       </div>
       {onNavigate && <AppNavigation mobile activeView={activeView} onNavigate={onNavigate} />}

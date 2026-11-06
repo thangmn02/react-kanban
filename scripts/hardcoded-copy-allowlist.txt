@@ -1,0 +1,220 @@
+src/AppLayout.tsx	Please sign in again.
+src/AppLayout.tsx	min-h-screen bg-white lg:ml-14 lg:flex
+src/components/auth/AuthPage.tsx	Kora
+src/components/auth/AuthPage.tsx	you@example.com
+src/components/board/BoardEmptyState.tsx	Workspace
+src/components/focus/FloatingFocus.tsx	`${t('common.markDone')}: ${task.title}`
+src/components/home/ContinueCard.tsx	`${t('resume.continue')}: ${task.title}`
+src/components/layout/AppNavigation.tsx	fixed inset-y-0 left-0 z-40 hidden w-14 flex-col items-center gap-2 bg-[#20252D] py-5 lg:flex
+src/components/layout/AppNavigation.tsx	flex items-stretch gap-1 overflow-x-auto border-t border-slate-100 px-2 py-1.5 lg:hidden
+src/components/organisms/HomeDashboard.tsx	Kora
+src/components/organisms/HomeDashboard.tsx	`${isFocusTask(task.id) ? t('home.removeFromFocus') : t('home.addToFocus')}: ${task.title}`
+src/components/organisms/HomeDashboard.tsx	`${t('briefing.details')}: ${task.title}`
+src/components/organisms/HomeDashboard.tsx	`${t('common.markDone')}: ${task.title}`
+src/components/organisms/HomeDashboard.tsx	`${t('home.openBoard')}: ${board.title}`
+src/components/organisms/HomeDashboard.tsx	`${t('home.startFocus')}: ${task.title}`
+src/components/organisms/QuickSearch.tsx	`${t('command.deleteSavedFilter')}: ${filter.name}`
+src/components/organisms/dialog/CreateBoardDialog.tsx	templateId
+src/components/organisms/dialog/ProgressReportDialog.tsx	Clipboard API unavailable
+src/components/organisms/dialog/TaskDialog.tsx	`${t('task.labelColor')}: ${color}`
+src/components/organisms/dialog/TaskDialog.tsx	`${t('task.removeAttachment')}: ${attachment.name}`
+src/components/organisms/dialog/TaskDialog.tsx	`${t('task.removeChecklistItem')}: ${item.text || t('task.untitled')}`
+src/components/organisms/dialog/TaskDialog.tsx	`${t('task.removeLabel')}: ${label.name}`
+src/components/organisms/dialog/TaskDialog.tsx	dueDate
+src/components/organisms/dialog/TaskDialog.tsx	repeatInterval
+src/components/settings/settings-dialog.tsx	English
+src/components/settings/settings-dialog.tsx	Profile editing is unavailable.
+src/components/settings/settings-dialog.tsx	Tiếng Việt
+src/components/task/TaskItem.tsx	`${t('task.changePriority')}: ${task.title}`
+src/components/task/TaskItem.tsx	`${t('task.delete')}: ${task.title}`
+src/components/task/TaskItem.tsx	`${t('task.edit')}: ${task.title}`
+src/components/task/TaskItem.tsx	`${t('task.openTask')}: ${task.title}`
+src/components/task/TaskItem.tsx	`${t('task.startFocus')}: ${task.title}`
+src/components/task/TaskItem.tsx	`${t('ux.moveTask')}: ${task.title}`
+src/components/task/TaskItem.tsx	`${t(task.isDone ? 'common.markNotDone' : 'common.markDone')}: ${task.title}`
+src/components/task/TaskList.tsx	`${t('task.listOptions')}: ${listItem.title}`
+src/components/today/TodayPage.tsx	`${t('today.removeFromToday')}: ${task.title}`
+src/components/today/TodayTaskCard.tsx	`${isFocusTask ? t('today.removeFromToday') : t('today.planToday')}: ${task.title}`
+src/components/today/TodayTaskCard.tsx	`${t('common.markDone')}: ${task.title}`
+src/components/today/TodayTaskCard.tsx	`${t('task.startFocus')}: ${task.title}`
+src/components/workspace/WorkspaceInviteRow.tsx	invite ·
+src/components/workspace/WorkspaceMembersDialog.tsx	teammate@example.com
+src/data.ts	Bugfix
+src/data.ts	Complete the implementation of dynamic form elements.
+src/data.ts	Create Javascript elements
+src/data.ts	Design
+src/data.ts	Figma spec
+src/data.ts	Fix responsive issues
+src/data.ts	Frontend
+src/data.ts	Guest
+src/data.ts	Implementation notes
+src/data.ts	In _variables.scss on line 672 you define $table_variants. Each instance of "color-level" needs to be changed to "shift-color".
+src/data.ts	List 1
+src/data.ts	List 2
+src/data.ts	List 3
+src/data.ts	Redesign tables card
+src/data.ts	Resolve mobile view problems on the dashboard page.
+src/data.ts	Roberta Casas
+src/data.ts	UI
+src/data/assignees.ts	Guest
+src/data/assignees.ts	Jese Leos
+src/data/assignees.ts	Leslie Livingston
+src/data/assignees.ts	Michael Gough
+src/data/assignees.ts	Roberta Casas
+src/data/currentUser.ts	Guest
+src/data/vietnamHolidays.ts	Giỗ Tổ Hùng Vương
+src/data/vietnamHolidays.ts	Ngày Giải phóng miền Nam
+src/data/vietnamHolidays.ts	Quốc khánh Việt Nam
+src/data/vietnamHolidays.ts	Quốc tế Lao động
+src/data/vietnamHolidays.ts	Tết Dương lịch
+src/data/vietnamHolidays.ts	Tết Nguyên Đán
+src/features/arcana/ArcanaHistoryDialog.tsx	Arcana Booth
+src/features/arcana/components/ArcanaCard.tsx	`${name} - ${rarity} - ${finish} - ${orientation}`
+src/features/arcana/components/ArcanaRitualShell.tsx	arcana-room-light is-still
+src/features/arcana/components/CardRevealStep.tsx	Ba vị trí mở lần lượt. Khi cả ba lá đã hiện ra, lời giải mới được mở.
+src/features/arcana/components/CardRevealStep.tsx	Read the image first, the words after
+src/features/arcana/components/CardRevealStep.tsx	The three positions open one by one. Once all cards are visible, the interpretation unlocks.
+src/features/arcana/components/CardRevealStep.tsx	Đọc hình trước, đọc lời sau
+src/features/arcana/components/EntryStep.tsx	Bước vào Góc Arcana
+src/features/arcana/components/EntryStep.tsx	Choose a question, open a pack, and let three cards reveal themselves in their own rhythm.
+src/features/arcana/components/EntryStep.tsx	Chọn một câu hỏi, mở một gói bài và để ba lá hiện ra theo nhịp riêng của chúng.
+src/features/arcana/components/EntryStep.tsx	Step into Arcana Booth
+src/features/arcana/components/PackOpeningStep.tsx	Chưa có lời giải ở bước này. Chỉ có tiếng gói bài mở ra và ba lá chuẩn bị hiện mặt.
+src/features/arcana/components/PackOpeningStep.tsx	Chạm để mở phong ấn
+src/features/arcana/components/PackOpeningStep.tsx	Tap to break the seal
+src/features/arcana/components/PackOpeningStep.tsx	There is no interpretation in this step yet, only the sound of the pack opening and three cards preparing to appear.
+src/features/arcana/components/PackSelectStep.tsx	Choose the vessel for the three cards
+src/features/arcana/components/PackSelectStep.tsx	Chọn vật chứa cho ba lá
+src/features/arcana/components/PackSelectStep.tsx	Each pack changes the opening mood, rarity, and finish. The reading still comes from your question and the three cards drawn.
+src/features/arcana/components/PackSelectStep.tsx	Mỗi gói chỉ đổi cảm giác mở, độ hiếm và hiệu ứng ánh. Lời giải vẫn đến từ câu hỏi và ba lá rút được.
+src/features/arcana/components/QuestionStep.tsx	Choose the question that keeps the draw in rhythm
+src/features/arcana/components/QuestionStep.tsx	Chọn câu hỏi giữ nhịp cho lượt rút
+src/features/arcana/components/QuestionStep.tsx	Câu hỏi này sẽ được giữ lại trong bản ghi và dẫn toàn bộ lời giải.
+src/features/arcana/components/QuestionStep.tsx	This question is saved with the reading and guides the full interpretation.
+src/features/arcana/components/QuestionStep.tsx	`II - ${arcanaTopicLabels[locale][topic]}`
+src/features/arcana/components/TopicStep.tsx	Each topic opens a different lens for the same three cards.
+src/features/arcana/components/TopicStep.tsx	Mỗi chủ đề mở một lăng kính riêng cho cùng ba lá bài.
+src/features/arcana/components/TopicStep.tsx	Place your hand on the right symbol
+src/features/arcana/components/TopicStep.tsx	Đặt tay lên biểu tượng phù hợp
+src/features/contact/contact-form.tsx	Kora v
+src/features/focus/focusSessionContext.ts	useFocusSession must be used within FocusSessionProvider
+src/features/music/MusicPlayer.tsx	Beat debug
+src/features/music/MusicPlayer.tsx	Beat sync debug
+src/features/music/MusicPlayer.tsx	Capture error:
+src/features/music/MusicPlayer.tsx	Capture:
+src/features/music/MusicPlayer.tsx	Companion capture status
+src/features/music/MusicPlayer.tsx	Export row trace
+src/features/music/MusicPlayer.tsx	Four-row baseline · Melody off · semantic events only
+src/features/music/MusicPlayer.tsx	Four-row event counters
+src/features/music/MusicPlayer.tsx	Instrument preview status
+src/features/music/MusicPlayer.tsx	Kick:
+src/features/music/MusicPlayer.tsx	Lead pipeline status
+src/features/music/MusicPlayer.tsx	Lead:
+src/features/music/MusicPlayer.tsx	Legacy
+src/features/music/MusicPlayer.tsx	Live event counters
+src/features/music/MusicPlayer.tsx	Loading private Melody comparison…
+src/features/music/MusicPlayer.tsx	Open saved Lead listening demo
+src/features/music/MusicPlayer.tsx	Private test Companion 0.3.28 is unavailable. Open the dedicated test browser; preserve your existing installed extensions.
+src/features/music/MusicPlayer.tsx	Record 30 seconds
+src/features/music/MusicPlayer.tsx	Return to live Beat Grid
+src/features/music/MusicPlayer.tsx	new pipeline disabled · live local capture does not generate Lead events
+src/features/music/MusicPlayer.tsx	· Bass:
+src/features/music/MusicPlayer.tsx	· Hat:
+src/features/music/MusicPlayer.tsx	· Lead:
+src/features/music/MusicPlayer.tsx	· Path:
+src/features/music/MusicPlayer.tsx	· Playback:
+src/features/music/MusicPlayer.tsx	· Snare / Clap:
+src/features/music/MusicPlayer.tsx	· Snare:
+src/features/music/event-track.ts	Invalid response bound
+src/features/music/event-track.ts	Missing EventTrack body
+src/features/music/event-track.ts	Oversized EventTrack
+src/features/music/playback-audio-segment.ts	Invalid audio segment bounds
+src/features/music/semantic-motion-pattern.tsx	`Instrument activity: ${visible.map(b=>instrumentMotion[b].name).join(', ')}. Cells are not rhythmic subdivisions.`
+src/features/music/semantic-motion.ts	Bass
+src/features/music/semantic-motion.ts	Hi-Hat
+src/features/music/semantic-motion.ts	Kick
+src/features/music/semantic-motion.ts	Melody / Lead
+src/features/music/semantic-motion.ts	Snare / Clap
+src/features/music/source-audio-delay-control.tsx	`${t('music.sync.turnOn')}: ${t('music.sync.title')}`
+src/features/music/use-local-hybrid-music.ts	'Checking exact local recording and frozen analysis…'
+src/features/music/use-local-hybrid-music.ts	'Exact recording is still being prepared.'
+src/features/music/use-local-hybrid-music.ts	'Exact stored recording selected; no inference requested.'
+src/features/music/use-local-hybrid-music.ts	'Local audio could not be loaded. Verify the private runtime and exact recording.'
+src/features/music/use-local-hybrid-music.ts	'Local audio duration does not match its saved analysis.'
+src/features/music/use-local-hybrid-music.ts	'Local file exceeds 256 MiB limit.'
+src/features/music/use-local-hybrid-music.ts	'Preparing selected audio on this computer only. First-run frozen A/B analysis can take several minutes.'
+src/features/native/NativeSurface.tsx	Close app
+src/features/native/NativeSurface.tsx	Cập nhật
+src/features/native/NativeSurface.tsx	Dock
+src/features/native/NativeSurface.tsx	Kora
+src/features/native/NativeSurface.tsx	Later
+src/features/native/NativeSurface.tsx	Minimize
+src/features/native/NativeSurface.tsx	Thu nhỏ
+src/features/native/NativeSurface.tsx	Update
+src/features/native/NativeSurface.tsx	Đóng ứng dụng
+src/features/native/NativeSurface.tsx	Để sau
+src/features/native/NativeUpdateDialog.tsx	Close
+src/features/native/NativeUpdateDialog.tsx	Cập nhật Kora
+src/features/native/NativeUpdateDialog.tsx	Cập nhật và khởi động lại
+src/features/native/NativeUpdateDialog.tsx	Lưu công việc trước khi cập nhật. Kora sẽ khởi động lại.
+src/features/native/NativeUpdateDialog.tsx	Retry
+src/features/native/NativeUpdateDialog.tsx	Save your work first. Kora will restart.
+src/features/native/NativeUpdateDialog.tsx	Thử lại
+src/features/native/NativeUpdateDialog.tsx	Tiến độ cập nhật
+src/features/native/NativeUpdateDialog.tsx	Update Kora
+src/features/native/NativeUpdateDialog.tsx	Update and restart
+src/features/native/NativeUpdateDialog.tsx	Update progress
+src/features/notes/mini-editor.tsx	https://…
+src/features/notes/native-note-window.tsx	`${t('notes.restoreExternal')}: ${note.title||t('notes.quick.untitled')}`
+src/features/notes/native-note-window.tsx	line-through opacity-60
+src/features/notes/note-image-node.ts	noteImage
+src/features/notes/sticky-note.tsx	`${t('notes.moveNote')}: ${label}`
+src/features/notes/sticky-note.tsx	`${t('notes.noteLabel')}: ${label}`
+src/features/notes/sticky-note.tsx	line-through opacity-60
+src/features/today/components/PlanTodayTaskCard.tsx	`${t('dailyRitual.remove')}: ${task.title}`
+src/features/today/components/PlanTodayTaskCard.tsx	`${t('today.startFocus')}: ${task.title}`
+src/hooks/useAuth.ts	useAuth must be used inside AuthProvider.
+src/hooks/useFocusTaskHandlers.ts	Assignee
+src/hooks/useTaskOperations.ts	Task move has no task identity.
+src/hooks/useTaskOperations.ts	Task move has no valid destination.
+src/infrastructure/local/localBoardStore.ts	Local data has an unsupported format. Existing data was preserved.
+src/infrastructure/local/localBoardStore.ts	Task was not found.
+src/lib/supabase.ts	Supabase client is not configured.
+src/lib/supabase.ts	VITE_AUTH_MODE=supabase requires valid VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY values.
+src/providers/AuthProvider.tsx	Supabase auth is not configured.
+src/services/board.service.ts	Board was not created.
+src/services/board.service.ts	Seeded Kora board
+src/services/invite.service.ts	Invite acceptance returned an invalid response.
+src/services/invite.service.ts	Invite action returned an invalid response.
+src/services/invite.service.ts	Invite links require Supabase auth mode.
+src/services/invite.service.ts	Member email is required.
+src/services/workspace.service.ts	Member email is required.
+src/services/workspace.service.ts	Workspace name is required.
+src/utils/coverBackground.ts	Amber
+src/utils/coverBackground.ts	Aurora
+src/utils/coverBackground.ts	Bloom
+src/utils/coverBackground.ts	Blue
+src/utils/coverBackground.ts	Dark
+src/utils/coverBackground.ts	Deep Sea
+src/utils/coverBackground.ts	Emerald
+src/utils/coverBackground.ts	Forest
+src/utils/coverBackground.ts	Fuchsia
+src/utils/coverBackground.ts	Horizon
+src/utils/coverBackground.ts	Indigo
+src/utils/coverBackground.ts	Lime
+src/utils/coverBackground.ts	Meadow
+src/utils/coverBackground.ts	Midnight
+src/utils/coverBackground.ts	Nebula
+src/utils/coverBackground.ts	Orange
+src/utils/coverBackground.ts	Rose
+src/utils/coverBackground.ts	Sky
+src/utils/coverBackground.ts	Slate
+src/utils/coverBackground.ts	Sunset
+src/utils/coverBackground.ts	Teal
+src/utils/coverBackground.ts	Twilight
+src/utils/coverBackground.ts	Violet
+src/utils/profile-image.ts	Choose PNG, JPEG or WebP up to 5 MB.
+src/utils/profile-image.ts	Choose a still image.
+src/utils/profile-image.ts	Image editing is unavailable in this browser.
+src/utils/profile-image.ts	Image processing failed.
+src/utils/profile-image.ts	This image cannot be processed safely. Choose a smaller valid image.

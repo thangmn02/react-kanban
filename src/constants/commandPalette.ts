@@ -1,3 +1,4 @@
+import { translateNow } from '../i18n/context';
 // Static, serializable parts of each command palette action (NO `run` closures here —
 // those stay in the hook because they capture component state/handlers).
 export interface CommandPaletteActionConfig {
@@ -9,25 +10,25 @@ export interface CommandPaletteActionConfig {
 }
 
 export const COMMAND_PALETTE_ACTION_CONFIG = {
-  GO_HOME: { id: 'go-home', title: 'Go to Home', description: 'Open the personal dashboard.', shortcut: 'H', keywords: ['dashboard', 'my tasks', 'home'] },
-  GO_TODAY: { id: 'go-today', title: 'Go to Today', description: 'Open the daily focus planning page.', shortcut: 'T', keywords: ['today', 'my day', 'daily plan', 'focus plan'] },
-  GO_BOARD: { id: 'go-board', title: 'Go to Board', description: 'Open the active Kora board.', shortcut: 'B', keywords: ['kanban', 'board', 'columns'] },
-  GO_CALENDAR: { id: 'go-calendar', title: 'Go to Calendar', description: 'Open the calendar view for due dates.', shortcut: 'C', keywords: ['calendar', 'due dates', 'schedule'] },
-  GO_TABLE: { id: 'go-table', title: 'Go to Table', description: 'Compare and open tasks in the active board.', keywords: ['table', 'tasks', 'rows'] },
-  GO_FOCUS: { id: 'go-focus', title: 'Go to Focus', description: 'Open Tasks, Music and Beat Grid in the shared Dock.', keywords: ['focus', 'music', 'beat', 'dock'] },
-  QUICK_ADD_TASK: { id: 'quick-add-task', title: 'Quick add task', description: 'Create a task in the first list of the active board.', shortcut: 'N', keywords: ['new task', 'create task', 'card'] },
-  PLAN_TODAYS_FOCUS: { id: 'plan-todays-focus', title: "Plan today's focus", description: 'Open Today to choose up to 3 focus tasks.', keywords: ['today', 'my day', 'focus', 'plan'] },
-  NEW_LIST: { id: 'new-list', title: 'Create list', description: 'Add a new column to the active board.', keywords: ['new list', 'column', 'group'] },
-  NEW_BOARD: { id: 'new-board', title: 'Create board', description: 'Start another board from a template.', keywords: ['new board', 'template', 'project'] },
-  FOCUS_BOARD_SEARCH: { id: 'focus-board-search', title: 'Focus board search', description: 'Jump to task search and filters.', shortcut: '/', keywords: ['search', 'filter', 'find', 'tasks'] },
-  CLEAR_BOARD_FILTERS: { id: 'clear-board-filters', title: 'Clear board filters', description: 'Reset search, priority, assignee, and due date filters.', keywords: ['clear filters', 'reset search', 'show all tasks'] },
-  FILTER_HIGH_PRIORITY: { id: 'filter-high-priority', title: 'Show high priority tasks', description: 'Filter the board to high priority tasks.', keywords: ['filter', 'priority', 'high', 'urgent'] },
-  FILTER_DUE_TODAY: { id: 'filter-due-today', title: 'Show tasks due today', description: 'Filter the board to tasks due today.', keywords: ['filter', 'due today', 'deadline', 'today'] },
-  OPEN_BOARD_ACTIVITY: { id: 'open-board-activity', title: 'Open board activity', description: 'Review the audit trail for the active board.', keywords: ['activity', 'audit', 'history', 'log'] },
-  START_FOCUS_TIMER: { id: 'start-focus-timer', title: 'Start focus session', description: 'Start Pomodoro for the active focus task.', keywords: ['focus', 'pomodoro', 'timer', 'start', 'session'] },
-  VIEW_TODAY_FOCUS_STATS: { id: 'view-today-focus-stats', title: 'View today focus stats', description: 'Open Today to review sessions and focused minutes.', keywords: ['focus', 'stats', 'today', 'minutes', 'sessions'] },
-  OPEN_FOCUS_HISTORY: { id: 'open-focus-history', title: 'Open focus history', description: 'Open the active focus task to review recent focus sessions.', keywords: ['focus', 'history', 'task detail', 'sessions'] },
-  PAUSE_FOCUS_TIMER: { id: 'pause-focus-timer', title: 'Pause focus timer', description: 'Pause the current focus session.', keywords: ['focus', 'pomodoro', 'timer', 'pause'] },
-  RESET_FOCUS_TIMER: { id: 'reset-focus-timer', title: 'Reset focus timer', description: 'Reset the current Pomodoro mode.', keywords: ['focus', 'pomodoro', 'timer', 'reset'] },
-  POP_OUT_FOCUS_TIMER: { id: 'pop-out-focus-timer', title: 'Pop out focus timer', description: 'Open a small floating timer window.', keywords: ['focus', 'pomodoro', 'timer', 'floating', 'picture in picture'] },
+  GO_HOME: { id: 'go-home', get title() { return translateNow('command.goToHome'); }, get description() { return translateNow('command.openThePersonalDashboard'); }, shortcut: 'H', keywords: ['dashboard', 'my tasks', 'home'] },
+  GO_TODAY: { id: 'go-today', get title() { return translateNow('command.goToToday'); }, get description() { return translateNow('command.openTheDailyFocusPlanningPage'); }, shortcut: 'T', keywords: ['today', 'my day', 'daily plan', 'focus plan'] },
+  GO_BOARD: { id: 'go-board', get title() { return translateNow('command.goToBoard'); }, get description() { return translateNow('command.openTheActiveKoraBoard'); }, shortcut: 'B', keywords: ['kanban', 'board', 'columns'] },
+  GO_CALENDAR: { id: 'go-calendar', get title() { return translateNow('command.goToCalendar'); }, get description() { return translateNow('command.openTheCalendarViewForDue'); }, shortcut: 'C', keywords: ['calendar', 'due dates', 'schedule'] },
+  GO_TABLE: { id: 'go-table', get title() { return translateNow('command.goToTable'); }, get description() { return translateNow('command.compareAndOpenTasksInThe'); }, keywords: ['table', 'tasks', 'rows'] },
+  GO_FOCUS: { id: 'go-focus', get title() { return translateNow('command.goToFocus'); }, get description() { return translateNow('command.openTasksMusicAndBeatGrid'); }, keywords: ['focus', 'music', 'beat', 'dock'] },
+  QUICK_ADD_TASK: { id: 'quick-add-task', get title() { return translateNow('command.quickAddTask'); }, get description() { return translateNow('command.createATaskInTheFirst'); }, shortcut: 'N', keywords: ['new task', 'create task', 'card'] },
+  PLAN_TODAYS_FOCUS: { id: 'plan-todays-focus', get title() { return translateNow('command.planTodaySFocus'); }, get description() { return translateNow('command.openTodayToChooseUpTo'); }, keywords: ['today', 'my day', 'focus', 'plan'] },
+  NEW_LIST: { id: 'new-list', get title() { return translateNow('command.createList'); }, get description() { return translateNow('command.addANewColumnToThe'); }, keywords: ['new list', 'column', 'group'] },
+  NEW_BOARD: { id: 'new-board', get title() { return translateNow('home.createBoard'); }, get description() { return translateNow('command.startAnotherBoardFromATemplate'); }, keywords: ['new board', 'template', 'project'] },
+  FOCUS_BOARD_SEARCH: { id: 'focus-board-search', get title() { return translateNow('command.focusBoardSearch'); }, get description() { return translateNow('command.jumpToTaskSearchAndFilters'); }, shortcut: '/', keywords: ['search', 'filter', 'find', 'tasks'] },
+  CLEAR_BOARD_FILTERS: { id: 'clear-board-filters', get title() { return translateNow('command.clearBoardFilters'); }, get description() { return translateNow('command.resetSearchPriorityAssigneeAndDue'); }, keywords: ['clear filters', 'reset search', 'show all tasks'] },
+  FILTER_HIGH_PRIORITY: { id: 'filter-high-priority', get title() { return translateNow('command.showHighPriorityTasks'); }, get description() { return translateNow('command.filterTheBoardToHighPriority'); }, keywords: ['filter', 'priority', 'high', 'urgent'] },
+  FILTER_DUE_TODAY: { id: 'filter-due-today', get title() { return translateNow('command.showTasksDueToday'); }, get description() { return translateNow('command.filterTheBoardToTasksDue'); }, keywords: ['filter', 'due today', 'deadline', 'today'] },
+  OPEN_BOARD_ACTIVITY: { id: 'open-board-activity', get title() { return translateNow('command.openBoardActivity'); }, get description() { return translateNow('command.reviewTheAuditTrailForThe'); }, keywords: ['activity', 'audit', 'history', 'log'] },
+  START_FOCUS_TIMER: { id: 'start-focus-timer', get title() { return translateNow('task.startFocus'); }, get description() { return translateNow('command.startPomodoroForTheActiveFocus'); }, keywords: ['focus', 'pomodoro', 'timer', 'start', 'session'] },
+  VIEW_TODAY_FOCUS_STATS: { id: 'view-today-focus-stats', get title() { return translateNow('command.viewTodayFocusStats'); }, get description() { return translateNow('command.openTodayToReviewSessionsAnd'); }, keywords: ['focus', 'stats', 'today', 'minutes', 'sessions'] },
+  OPEN_FOCUS_HISTORY: { id: 'open-focus-history', get title() { return translateNow('command.openFocusHistory'); }, get description() { return translateNow('command.openTheActiveFocusTaskTo'); }, keywords: ['focus', 'history', 'task detail', 'sessions'] },
+  PAUSE_FOCUS_TIMER: { id: 'pause-focus-timer', get title() { return translateNow('command.pauseFocusTimer'); }, get description() { return translateNow('command.pauseTheCurrentFocusSession'); }, keywords: ['focus', 'pomodoro', 'timer', 'pause'] },
+  RESET_FOCUS_TIMER: { id: 'reset-focus-timer', get title() { return translateNow('command.resetFocusTimer'); }, get description() { return translateNow('command.resetTheCurrentPomodoroMode'); }, keywords: ['focus', 'pomodoro', 'timer', 'reset'] },
+  POP_OUT_FOCUS_TIMER: { id: 'pop-out-focus-timer', get title() { return translateNow('command.popOutFocusTimer'); }, get description() { return translateNow('command.openASmallFloatingTimerWindow'); }, keywords: ['focus', 'pomodoro', 'timer', 'floating', 'picture in picture'] },
 } as const satisfies Record<string, CommandPaletteActionConfig>;

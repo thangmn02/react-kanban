@@ -1,6 +1,7 @@
 import supabase from '../lib/supabase';
 import { buildStorageKey } from '../shared/storage/storageAdapter';
 import type { AppUser } from '../types/auth.type';
+import { translateNow } from '../i18n/context';
 
 export const DEFAULT_IDENTITY_IMAGE='/logo.png';
 export const PROFILE_CHANGED='kora:profile-changed';
@@ -29,31 +30,31 @@ export async function loadUserProfile(user:AppUser):Promise<AppUser>{
   if(error)throw error;
   return data ? {...user,name:data.full_name||user.name,avatarUrl:await resolveProfileImage(data.avatar_url),legacyName:user.legacyName||user.name,profileUpdatedAt:data.updated_at} : {...user,avatarUrl:safeImage(user.avatarUrl)};
 }
-function dataUrl(blob:Blob):Promise<string>{return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=()=>reject(new Error('The image could not be read.'));reader.readAsDataURL(blob);});}
+function dataUrl(blob:Blob):Promise<string>{return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=()=>reject(new Error(translateNow('app.theImageCouldNotBeRead')));reader.readAsDataURL(blob);});}
 export async function saveUserProfile(user:AppUser,changes:ProfileChanges,isCurrent:()=>boolean=()=>true):Promise<AppUser>{
-  if(pendingSaves.has(user.id))throw new Error('A profile save is already in progress. Wait for it to finish.');
+  if(pendingSaves.has(user.id))throw new Error(translateNow('auth.aProfileSaveIsAlreadyIn'));
   pendingSaves.add(user.id);
   try{return await persistUserProfile(user,changes,isCurrent);}finally{pendingSaves.delete(user.id);}
 }
 async function persistUserProfile(user:AppUser,changes:ProfileChanges,isCurrent:()=>boolean):Promise<AppUser>{
-  const name=changes.name.trim();if(!name||name.length>80)throw new Error('Use a display name between 1 and 80 characters.');
-  if(changes.avatar && (!['image/jpeg','image/png','image/webp'].includes(changes.avatar.type)||changes.avatar.size>524288))throw new Error('Use a processed PNG, JPEG or WebP image smaller than 512 KB.');
+  const name=changes.name.trim();if(!name||name.length>80)throw new Error(translateNow('app.useADisplayNameBetween1'));
+  if(changes.avatar && (!['image/jpeg','image/png','image/webp'].includes(changes.avatar.type)||changes.avatar.size>524288))throw new Error(translateNow('app.useAProcessedPNGJPEGOr'));
   if(user.isMock){
     const key=localKey(user.id),previous=localStorage.getItem(key),stored=previous?JSON.parse(previous):null;
-    if(changes.expectedUpdatedAt!==undefined&&changes.expectedUpdatedAt!==(stored?.updatedAt??null))throw new Error('Profile changed in another session. Reopen Settings before saving.');
+    if(changes.expectedUpdatedAt!==undefined&&changes.expectedUpdatedAt!==(stored?.updatedAt??null))throw new Error(translateNow('app.profileChangedInAnotherSessionReopen'));
     const avatarUrl=changes.avatar===undefined?safeImage(stored?.avatarUrl||user.avatarUrl):changes.avatar===null?DEFAULT_IDENTITY_IMAGE:await dataUrl(changes.avatar);
-    if(!isCurrent())throw new Error('The account changed. Save was cancelled.');
-    if(localStorage.getItem(key)!==previous)throw new Error('Profile changed in another session. Reopen Settings before saving.');
+    if(!isCurrent())throw new Error(translateNow('app.theAccountChangedSaveWasCancelled'));
+    if(localStorage.getItem(key)!==previous)throw new Error(translateNow('app.profileChangedInAnotherSessionReopen'));
     const updatedAt=new Date().toISOString();
     const next={...user,name,avatarUrl,legacyName:user.legacyName||user.name,profileUpdatedAt:updatedAt};
     if(previous)localStorage.setItem(`${key}:backup`,previous);
     localStorage.setItem(key,JSON.stringify({name,avatarUrl,updatedAt}));window.dispatchEvent(new CustomEvent(PROFILE_CHANGED,{detail:{userId:user.id}}));return next;
   }
-  if(!supabase)throw new Error('Account storage is unavailable. Your profile was not changed.');
+  if(!supabase)throw new Error(translateNow('app.accountStorageIsUnavailableYourProfile'));
   const client=supabase;
-  const {data:auth,error:authError}=await client.auth.getUser();if(authError||auth.user?.id!==user.id)throw new Error('Sign in again before saving this profile.');
-  const {data:before,error:readError}=await client.from('profiles').select('*').eq('id',user.id).single();if(readError||!before)throw new Error('The account profile could not be loaded. Try again after reconnecting.');
-  if(changes.expectedUpdatedAt!==undefined&&changes.expectedUpdatedAt!==before.updated_at)throw new Error('Profile changed in another session. Reopen Settings before saving.');
+  const {data:auth,error:authError}=await client.auth.getUser();if(authError||auth.user?.id!==user.id)throw new Error(translateNow('app.signInAgainBeforeSavingThis'));
+  const {data:before,error:readError}=await client.from('profiles').select('*').eq('id',user.id).single();if(readError||!before)throw new Error(translateNow('app.theAccountProfileCouldNotBe'));
+  if(changes.expectedUpdatedAt!==undefined&&changes.expectedUpdatedAt!==before.updated_at)throw new Error(translateNow('app.profileChangedInAnotherSessionReopen'));
   let uploaded:string|null=null;
   let avatar=changes.avatar===null?null:before.avatar_url;
   if(changes.avatar){
@@ -62,7 +63,7 @@ async function persistUserProfile(user:AppUser,changes:ProfileChanges,isCurrent:
     avatar=`${PROFILE_IMAGE_BUCKET}/${uploaded}`;
   }
   try{
-    if(!isCurrent())throw new Error('A newer profile choice replaced this save.');
+    if(!isCurrent())throw new Error(translateNow('app.aNewerProfileChoiceReplacedThis'));
     let query=client.from('profiles').update({full_name:name,avatar_url:avatar,updated_at:new Date().toISOString()}).eq('id',user.id);
     query=before.updated_at?query.eq('updated_at',before.updated_at):query.is('updated_at',null);
     const {data,error}=await query.select().maybeSingle();
@@ -74,7 +75,7 @@ async function persistUserProfile(user:AppUser,changes:ProfileChanges,isCurrent:
       if(current?.full_name!==name||current?.avatar_url!==avatar)throw new Error(error?.message||'Profile changed in another session. Reload before saving.');
       savedVersion=current.updated_at;
     }
-    if(!isCurrent())throw new Error('The account changed while saving. Reopen Settings to refresh.');
+    if(!isCurrent())throw new Error(translateNow('app.theAccountChangedWhileSavingReopen'));
     // Only retire managed objects owned by this account after the new pointer
     // is confirmed. Persist failed removals for the next successful save.
     const cleanupKey=`${localKey(user.id)}:image-cleanup`;

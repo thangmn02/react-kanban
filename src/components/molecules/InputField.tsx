@@ -1,4 +1,5 @@
 import { useId, type InputHTMLAttributes } from 'react';
+import { useI18n } from '../../i18n';
 
 interface InputFieldProps extends InputHTMLAttributes<HTMLInputElement> {
   label: string;
@@ -6,6 +7,7 @@ interface InputFieldProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 function InputField({ label, messageError, ...props }: InputFieldProps) {
+  const { t } = useI18n();
   const generatedId=useId();
   const id=props.id||generatedId;
   return (
@@ -15,7 +17,7 @@ function InputField({ label, messageError, ...props }: InputFieldProps) {
       </label>
       <input
         type="text"
-        placeholder="Please input ..."
+        placeholder={t('app.pleaseInput')}
         className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
         {...props}
         id={id}
