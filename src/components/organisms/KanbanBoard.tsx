@@ -356,8 +356,8 @@ function KanbanBoard({
         {showNoResults && (
           <div className="mb-4">
             <EmptyState
-              title="No matching tasks"
-              description="No tasks match your current search or filters. Try adjusting them."
+              title={t('board.noMatchingTasks')}
+              description={t('board.noTasksMatchYourCurrentSearch')}
               compact
             />
           </div>

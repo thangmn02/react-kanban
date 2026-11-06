@@ -8,10 +8,11 @@ import { CURRENT_USER } from '../data/currentUser';
 import supabase, { authMode } from '../lib/supabase';
 import { clearUserData } from '../shared/storage/storageAdapter';
 import type { AppUser } from '../types/auth.type';
+import { translateNow } from '../i18n/context';
 
 const mockUser: AppUser = {
   id: 'mock-user',
-  email: 'bonnie@example.com',
+  email: 'guest@example.com',
   name: CURRENT_USER.name,
   avatarUrl: DEFAULT_IDENTITY_IMAGE,
   legacyName: CURRENT_USER.name,
@@ -194,15 +195,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [user?.id]);
 
   const updateProfile = useCallback(async (changes: ProfileChanges) => {
-    if (savingProfile.current) throw new Error('A profile save is already in progress. Wait for it to finish.');
+    if (savingProfile.current) throw new Error(translateNow('auth.aProfileSaveIsAlreadyIn'));
     const current = identityRef.current;
-    if (!current) throw new Error('Sign in before editing your profile.');
+    if (!current) throw new Error(translateNow('auth.signInBeforeEditingYourProfile'));
     savingProfile.current = true;
     const revision = ++profileEdit.current;
     hydration.current += 1;
     try {
       const next = await saveUserProfile(current, changes, () => identityRef.current?.id === current.id && profileEdit.current === revision);
-      if (identityRef.current?.id !== current.id || profileEdit.current !== revision) throw new Error('The account changed while saving.');
+      if (identityRef.current?.id !== current.id || profileEdit.current !== revision) throw new Error(translateNow('auth.theAccountChangedWhileSaving'));
       hydration.current += 1;
       identityRef.current = next;
       setUser(next);

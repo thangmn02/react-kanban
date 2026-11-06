@@ -37,7 +37,7 @@ it.each(['Attachment name', 'https://...'])('preserves an uncommitted %s draft w
 it.each(['en', 'vi'])('keeps the %s task form concise while preserving labels and actions', (language) => {
   localStorage.setItem('app.language', language);
   render(<I18nProvider><TaskDialog isOpen onClose={vi.fn()} onSubmitTask={vi.fn()} workspaceId="workspace" /></I18nProvider>);
-  expect(screen.getByRole('dialog', { name: language === 'en' ? 'Create task' : 'Tạo công việc' })).toBeVisible();
+  expect(screen.getByRole('dialog', { name: language === 'en' ? 'Create task' : 'Tạo việc' })).toBeVisible();
   expect(screen.getByRole('textbox', { name: language === 'en' ? 'Title' : 'Tiêu đề' })).toBeVisible();
   expect(screen.getByRole('button', { name: language === 'en' ? 'Suggest steps with AI' : 'Gợi ý các bước bằng AI' })).toBeDisabled();
   const removed = /Add a richer task|Keep the board visible|Board-first editing|Break work into smaller steps|GEMINI|Turn a task or a bigger mission|Biến công việc|Uses Gemini|Dùng Gemini|Enter a title to get started|Nhập tiêu đề để bắt đầu|New task will be created|Keep priority for urgency|Lightweight link attachments|No checklist items yet|No labels added yet|No attachments yet/i;

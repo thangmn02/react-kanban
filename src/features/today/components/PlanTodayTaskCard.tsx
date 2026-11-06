@@ -54,7 +54,7 @@ export default function PlanTodayTaskCard({
           <div className="min-w-0">
             <h3
               className={`truncate text-sm font-semibold tracking-[-0.01em] ${
-                isDone ? 'text-slate-400 line-through' : 'text-slate-950'
+                isDone ? 'text-slate-500 line-through' : 'text-slate-950'
               }`}
             >
               {task.title}

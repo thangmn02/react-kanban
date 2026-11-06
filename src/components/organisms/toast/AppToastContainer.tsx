@@ -7,6 +7,7 @@ import {
 import 'react-toastify/dist/ReactToastify.css';
 
 import './app-toast.css';
+import { useI18n } from '../../../i18n';
 
 const iconByType: Record<TypeOptions | 'default', string> = {
   success: '\u2713',
@@ -41,6 +42,7 @@ function AppToastCloseButton({ closeToast, ariaLabel = 'Dismiss notification' }:
 }
 
 export default function AppToastContainer() {
+  const { t } = useI18n();
   return (
     <ToastContainer
       position="top-right"
@@ -60,7 +62,7 @@ export default function AppToastContainer() {
       // Callback class names replace Toastify's defaults, including the CSS timer.
       progressClassName={(context) => `${context?.defaultClassName || ''} app-toast__progress app-toast__progress--${context?.type || 'default'}`}
       className="app-toast-viewport"
-      aria-label="Notifications"
+      aria-label={t('app.notifications')}
     />
   );
 }

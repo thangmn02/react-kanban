@@ -1,4 +1,5 @@
 import { lazy, Suspense } from 'react'
+import { I18nProvider } from './i18n/I18nProvider';
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import ErrorBoundary from './components/error/ErrorBoundary.tsx'
@@ -34,7 +35,7 @@ const isLab = typeof window !== 'undefined' && shouldMountDesignLab(window.locat
 createRoot(document.getElementById('root')!).render(
   // <StrictMode>
     <ErrorBoundary>
-      {isNoteWindow ? <Suspense fallback={null}><NativeNoteWindow /></Suspense> : isLab && DesignLab ? (
+      {isNoteWindow ? <I18nProvider><Suspense fallback={null}><NativeNoteWindow /></Suspense></I18nProvider> : isLab && DesignLab ? (
         <Suspense fallback={null}>
           <DesignLab />
         </Suspense>

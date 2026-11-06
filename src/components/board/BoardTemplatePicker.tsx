@@ -1,5 +1,6 @@
 import { BOARD_TEMPLATES } from '../../data/boardTemplates';
 import Typography from '../atoms/Typography';
+import { useI18n } from '../../i18n';
 
 interface BoardTemplatePickerProps {
   selectedTemplateId: string;
@@ -12,6 +13,7 @@ export default function BoardTemplatePicker({
   onTemplateChange,
   name = 'templateId',
 }: BoardTemplatePickerProps) {
+  const { t } = useI18n();
   return (
     <div className="grid gap-3 md:grid-cols-3">
       {BOARD_TEMPLATES.map((template) => {
@@ -49,7 +51,7 @@ export default function BoardTemplatePicker({
               </div>
               {isSelected && (
                 <span className="rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
-                  Active
+                  {t('board.active')}
                 </span>
               )}
             </div>

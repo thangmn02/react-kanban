@@ -51,6 +51,7 @@ import {
 } from '../../shared/storage/storageAdapter';
 import { planTaskWorkflow, type WorkflowRequest, type WorkflowResult } from '../../features/task/model/task-workflow';
 import { addDays, addMonths, format, parseISO } from 'date-fns';
+import { translateNow } from '../../i18n/context';
 
 export interface LocalBoardState {
   boards: BoardRow[];
@@ -76,6 +77,9 @@ const BOARD_STORE_FEATURE = 'board_store';
 const MOCK_SCOPE: StorageScope = { userId: 'mock-user', workspaceId: 'local-mock-workspace' };
 export const LOCAL_MOCK_WORKSPACE_ID = 'local-mock-workspace';
 const LOCAL_MOCK_BOARD_ID = 'local-mock-board';
+export const LOCAL_SAMPLE_BOARD_ID = 'local-sample-board';
+/** Development and tests opt in; a new local workspace otherwise starts empty. */
+const seedsSample = () => import.meta.env.VITE_LOCAL_SAMPLE === 'true';
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -91,13 +95,25 @@ function serializeAssignees(assignees: TaskAssignee[] | undefined): Json {
 }
 
 
-function seedState(): LocalBoardState {
+function emptyState(): LocalBoardState {
+  const now = nowIso();
+  const board: BoardRow = { id: LOCAL_MOCK_BOARD_ID, workspace_id: LOCAL_MOCK_WORKSPACE_ID, title: DEFAULT_BOARD_TITLE, description: null, created_by: null, created_at: now, updated_at: null, archived_at: null };
+  const lists: ListRow[] = ['To do', 'In progress', 'Done'].map((title, index) => ({
+    id: `local-list-${index + 1}`, workspace_id: LOCAL_MOCK_WORKSPACE_ID, board_id: LOCAL_MOCK_BOARD_ID, title,
+    position: index * LIST_POSITION_STEP, created_at: now, updated_at: null, archived_at: null,
+  }));
+  return { boards: [board], lists, tasks: [], checklistItems: [], labels: [], labelLinks: [], activities: [], briefingPins: [] };
+}
+
+const seedState = () => seedsSample() ? sampleState(LOCAL_MOCK_BOARD_ID) : emptyState();
+
+function sampleState(boardId: string): LocalBoardState {
   const now = nowIso();
   const boardRow: BoardRow = {
-    id: LOCAL_MOCK_BOARD_ID,
+    id: boardId,
     workspace_id: LOCAL_MOCK_WORKSPACE_ID,
-    title: DEFAULT_BOARD_TITLE,
-    description: 'Local demo board',
+    title: translateNow('board.sampleTitle'),
+    description: translateNow('board.sampleDescription'),
     created_by: null,
     created_at: now,
     updated_at: null,
@@ -117,7 +133,7 @@ function seedState(): LocalBoardState {
     lists.push({
       id: listItem.id,
       workspace_id: LOCAL_MOCK_WORKSPACE_ID,
-      board_id: LOCAL_MOCK_BOARD_ID,
+      board_id: boardId,
       title: listItem.title,
       position: listIndex * LIST_POSITION_STEP,
       created_at: now,
@@ -131,7 +147,7 @@ function seedState(): LocalBoardState {
 
       tasks.push({
         id: task.id,
-        board_id: LOCAL_MOCK_BOARD_ID,
+        board_id: boardId,
         list_id: listItem.id,
         workspace_id: LOCAL_MOCK_WORKSPACE_ID,
         title: task.title,
@@ -166,7 +182,7 @@ function seedState(): LocalBoardState {
       task.labels.forEach((label) => {
         if (!labels.some((l) => l.id === label.id)) {
           labels.push({
-            id: label.id, board_id: LOCAL_MOCK_BOARD_ID,
+            id: label.id, board_id: boardId,
             workspace_id: LOCAL_MOCK_WORKSPACE_ID,
             name: label.name, color: label.color,
             created_at: now, updated_at: null,
@@ -188,7 +204,7 @@ let cachedState: LocalBoardState | null = null;
 function getState(): LocalBoardState {
   const raw = localStorage.getItem(buildStorageKey(MOCK_SCOPE, BOARD_STORE_FEATURE));
   let stored: LocalBoardState | null;
-  try { stored = raw === null ? null : JSON.parse(raw); } catch { throw new Error('Local data could not be read. Restore the local backup before continuing.'); }
+  try { stored = raw === null ? null : JSON.parse(raw); } catch { throw new Error(translateNow('board.localDataCouldNotBeRead')); }
   if (stored && Array.isArray(stored.boards) && Array.isArray(stored.lists) && Array.isArray(stored.tasks)) {
     cachedState = { ...stored, activities: Array.isArray(stored.activities) ? stored.activities : [], briefingPins: Array.isArray(stored.briefingPins) ? stored.briefingPins : [] };
   } else if (stored === null) {
@@ -201,7 +217,7 @@ function getState(): LocalBoardState {
 /** One recoverable storage commit owns state, membership, activity and recurrence. */
 export function localTransitionTaskWorkflow(request: WorkflowRequest): WorkflowResult {
   const current = getState();
-  if(!current.boards.some(board=>board.id===request.boardId&&board.workspace_id===request.workspaceId&&!board.archived_at))throw new Error('Board is unavailable in this workspace.');
+  if(!current.boards.some(board=>board.id===request.boardId&&board.workspace_id===request.workspaceId&&!board.archived_at))throw new Error(translateNow('board.boardIsUnavailableInThisWorkspace'));
   const task = current.tasks.find(t => t.id === request.taskId);
   if (!task) throw new Error('Task was not found.');
   const lists = current.lists.filter(l=>l.board_id===request.boardId && l.workspace_id===request.workspaceId && !l.archived_at);
@@ -230,7 +246,7 @@ export function localTransitionTaskWorkflow(request: WorkflowRequest): WorkflowR
     next.tasks.push(occurrence);
   }
   next.activities.push({id:request.operationId,task_id:task.id,task_title:task.title,board_id:task.board_id,workspace_id:task.workspace_id,
-    actor_id:null,actor:{name:'You',avatar:''},action:task.is_done!==updated.is_done?'status_change':'move',created_at:now,
+    actor_id:null,actor:{name:translateNow('notes.you'),avatar:''},action:task.is_done!==updated.is_done?'status_change':'move',created_at:now,
     details:{description:request.kind==='move'?'Moved task through workflow':updated.is_done?'Marked task as completed':'Reopened task',workflowTransition:true,
       fromListId:task.list_id,fromIndex:plan.sourceIndex,fromPosition:task.position,toListId:updated.list_id,toPosition:updated.position,
       fromCompleted:task.is_done,toCompleted:updated.is_done,...(occurrence?{recurrenceId:occurrence.id}:{})}});
@@ -250,12 +266,37 @@ function saveState(): void {
     localStorage.setItem(key,JSON.stringify(cachedState));
   } catch {
     cachedState = previous ? JSON.parse(previous) : null;
-    throw new Error('Local changes could not be saved. Existing data was preserved. Free storage space and try again.');
+    throw new Error(translateNow('board.localChangesCouldNotBeSaved'));
   }
 }
 
 export function resetLocalBoardStore(): void {
   cachedState = seedState();
+  saveState();
+}
+
+/** Adds the labeled sample next to whatever the workspace already holds. Safe to call twice. */
+export function localCreateSampleBoard(): BoardRow {
+  const state = getState();
+  const existing = state.boards.find(board => board.id === LOCAL_SAMPLE_BOARD_ID);
+  if (existing) return existing;
+  const sample = sampleState(LOCAL_SAMPLE_BOARD_ID);
+  for (const key of ['boards', 'lists', 'tasks', 'checklistItems', 'labels', 'labelLinks'] as const) (state[key] as unknown[]).push(...sample[key]);
+  saveState();
+  return sample.boards[0];
+}
+
+/** Removes the on-demand sample and everything in it. Other boards are untouched. */
+export function localRemoveSampleBoard(): void {
+  const state = getState();
+  const tasks = new Set(state.tasks.filter(task => task.board_id === LOCAL_SAMPLE_BOARD_ID).map(task => task.id));
+  state.boards = state.boards.filter(board => board.id !== LOCAL_SAMPLE_BOARD_ID);
+  state.lists = state.lists.filter(list => list.board_id !== LOCAL_SAMPLE_BOARD_ID);
+  state.tasks = state.tasks.filter(task => !tasks.has(task.id));
+  state.checklistItems = state.checklistItems.filter(item => !tasks.has(item.task_id));
+  state.labelLinks = state.labelLinks.filter(link => !tasks.has(link.task_id));
+  state.labels = state.labels.filter(label => label.board_id !== LOCAL_SAMPLE_BOARD_ID);
+  state.activities = state.activities.filter(activity => activity.board_id !== LOCAL_SAMPLE_BOARD_ID);
   saveState();
 }
 

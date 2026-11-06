@@ -31,6 +31,8 @@ export interface FloatingFocusProps {
   onPopOut?: () => void;
   onOpenNotes?: () => void;
   onReturnToTab?: () => void;
+  /** Present inside Kora; an empty task list offers this instead of a return link. */
+  onAddTask?: () => void;
   onDismiss?: () => void;
   isWidget?: boolean;
   canPopOut?: boolean;
@@ -108,7 +110,7 @@ export default function FloatingFocus(props: FloatingFocusProps) {
   const hidden = (card: Card) => card !== 'focus' && card !== activeTab;
 
   return <LayoutGroup id={groupId}>
-    <main ref={dockRef} className="floating-focus glass" aria-label="Floating Focus" data-style="tabs" data-appearance={appearance.resolved}>
+    <section ref={dockRef} className="floating-focus glass" aria-label={t('app.floatingFocus')} data-style="tabs" data-appearance={appearance.resolved}>
       <div className="dock-toolbar" ref={toolbarRef} data-draggable={Boolean(props.onDragStart)} onPointerDown={(event) => {
         if (event.button === 0 && !(event.target as HTMLElement).closest('button, a, input, select, textarea, [role="dialog"]')) props.onDragStart?.();
       }}>
@@ -119,7 +121,7 @@ export default function FloatingFocus(props: FloatingFocusProps) {
           title={props.returnLabel || t(props.isWidget ? 'dock.return' : 'dock.widget')} disabled={props.isWidget ? !props.onReturnToTab : !props.canPopOut || !props.onPopOut}
           onClick={props.isWidget ? props.onReturnToTab : props.onPopOut}><DockIcon kind={props.isWidget ? 'return' : 'widget'} /></button>
         {props.nativeControls}
-        {props.onOpenNotes && <button type="button" className="dock-icon-button" aria-label="Open pinned notes" title={t('shell.notes')} onClick={props.onOpenNotes}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true"><rect x="5" y="3" width="15" height="18" rx="2" /><path d="M9 3v18M12 8h5M12 12h5M12 16h3" /></svg></button>}
+        {props.onOpenNotes && <button type="button" className="dock-icon-button" aria-label={t('app.openPinnedNotes')} title={t('shell.notes')} onClick={props.onOpenNotes}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true"><rect x="5" y="3" width="15" height="18" rx="2" /><path d="M9 3v18M12 8h5M12 12h5M12 16h3" /></svg></button>}
         {!props.isWidget && props.onDismiss && <button type="button" className="dock-icon-button" aria-label={t('dock.dismiss')} onClick={props.onDismiss}><DockIcon kind="close" /></button>}
         <AnimatePresence>
           {settingsOpen && <motion.div id={settingsId} className="dock-settings glass" role="dialog" aria-label={t('dock.settings')}
@@ -224,8 +226,9 @@ export default function FloatingFocus(props: FloatingFocusProps) {
             <button type="button" className="dock-work-task" disabled={!onActiveTaskChange || task.isDone} aria-pressed={task.id === taskId}
               onClick={() => onActiveTaskChange?.(task.id)}><span>{task.title}</span><small>{[task.boardTitle, task.listTitle].filter(Boolean).join(' · ')}</small></button>
             {task.id === taskId && !task.isDone && <span className="dock-work-current">{t('dock.currentTask')}</span>}
-          </li>)}</ul> : <p className="dock-empty muted">{t('home.focusEmptyTitle')}</p>}
-          {props.onReturnToTab && <button type="button" className="dock-plan-link" onClick={props.onReturnToTab}>{props.returnLabel || t('dock.openKora')} <span aria-hidden="true">→</span></button>}
+          </li>)}</ul> : <p className="dock-empty muted">{t('dock.focusEmpty')}</p>}
+          {!tasks.length && props.onAddTask ? <button type="button" className="dock-plan-link" onClick={props.onAddTask}>{t('dock.addTask')} <span aria-hidden="true">→</span></button>
+            : props.isWidget && props.onReturnToTab && <button type="button" className="dock-plan-link" onClick={props.onReturnToTab}>{props.returnLabel || t('dock.openKora')} <span aria-hidden="true">→</span></button>}
         </section>
         <motion.section id={`${groupId}-beat`} layout layoutId="beat-grid" className={`dock-panel dock-beat-pane${preferences.palette === 'ultraviolet' ? ' ultraviolet' : ''}`}
           data-card="beat" aria-label={t('dock.beat')} aria-hidden={hidden('beat')} inert={hidden('beat')}
@@ -245,6 +248,6 @@ export default function FloatingFocus(props: FloatingFocusProps) {
       </motion.div>
       <MusicSetup music={music} />
       {props.widgetError && <p className="widget-error muted" role="status">{props.widgetError}</p>}
-    </main>
+    </section>
   </LayoutGroup>;
 }

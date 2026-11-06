@@ -65,7 +65,7 @@ test('Home first action and Today start use the existing intention and running c
   const pause = page.getByRole('button', { name: 'Pause', exact: true });
   await expect(pause).toBeVisible();
   await nav(page).getByRole('button', { name: 'Focus', exact: true }).click();
-  const dock = page.getByRole('main', { name: 'Floating Focus' });
+  const dock = page.getByRole('region', { name: 'Floating Focus' });
   await expect(dock.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
   const tasks = dock.getByRole('tab', { name: 'Tasks', exact: true });
   await tasks.focus(); await page.keyboard.press('ArrowRight');
@@ -80,7 +80,7 @@ test('Home first action and Today start use the existing intention and running c
   await expect(page.getByRole('dialog', { name: 'Edit task' })).toBeHidden();
   await expect(page).toHaveURL('/focus?tab=beat');
   await page.reload();
-  await expect(page.getByRole('main', { name: 'Floating Focus' }).getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Floating Focus' }).getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
 });
 
 test('narrow layout, reduced motion and palette keyboard stay usable', async ({ page }) => {

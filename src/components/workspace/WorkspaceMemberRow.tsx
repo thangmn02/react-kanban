@@ -1,5 +1,6 @@
 import type { AppUser, WorkspaceMember, WorkspaceRole } from '../../types/auth.type';
 import { useState } from 'react';
+import { useI18n } from '../../i18n';
 
 const editableRoles: WorkspaceRole[] = ['admin', 'member', 'viewer'];
 
@@ -18,6 +19,7 @@ export default function WorkspaceMemberRow({
   onRoleChange,
   onRemoveMember,
 }: WorkspaceMemberRowProps) {
+  const { t } = useI18n();
   const isCurrentUser = member.userId === currentUser.id;
   const isOwner = member.role === 'owner';
   const canEditMember = canManageMembers && !isOwner && !isCurrentUser;
@@ -35,7 +37,7 @@ export default function WorkspaceMemberRow({
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-slate-900">
             {member.name}
-            {isCurrentUser && <span className="ml-1 text-xs font-medium text-slate-400">(you)</span>}
+            {isCurrentUser && <span className="ml-1 text-xs font-medium text-slate-400">{t('workspace.you')}</span>}
           </p>
           {member.email && <p className="truncate text-xs text-slate-500">{member.email}</p>}
         </div>
@@ -48,7 +50,7 @@ export default function WorkspaceMemberRow({
             disabled={busy}
             onChange={(event) => void run(() => onRoleChange(member.id, event.target.value as WorkspaceRole))}
             className="cursor-pointer rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold capitalize text-slate-700 outline-none transition focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
-            aria-label={`Change role for ${member.name}`}
+            aria-label={t('workspace.changeRoleFor', { name: member.name })}
           >
             {editableRoles.map((role) => (
               <option key={role} value={role}>
@@ -69,11 +71,11 @@ export default function WorkspaceMemberRow({
             onClick={() => { if (confirmRemove) void run(() => onRemoveMember(member.id)); else setConfirmRemove(true); }}
             className="cursor-pointer rounded-xl border border-rose-100 bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-600 transition hover:border-rose-200 hover:bg-rose-100 focus:outline-none focus:ring-4 focus:ring-rose-100"
           >
-            {confirmRemove ? 'Confirm removal' : 'Remove'}
+            {confirmRemove ? t('workspace.confirmRemoval') : t('dailyRitual.remove')}
           </button>
         )}
       </div>
-      {confirmRemove && <p className="w-full text-xs text-slate-600">Remove {member.name} from this workspace? Their workspace access and explicit Notes grants will be removed. Any workspace-visible notes they own stay visible; only that owner can manage them after being re-added. <button type="button" disabled={busy} className="ml-2 font-semibold text-blue-700" onClick={() => setConfirmRemove(false)}>Keep member</button></p>}
+      {confirmRemove && <p className="w-full text-xs text-slate-600">{t('workspace.removeMemberConfirm', { name: member.name })} <button type="button" disabled={busy} className="ml-2 font-semibold text-blue-700" onClick={() => setConfirmRemove(false)}>{t('workspace.keepMember')}</button></p>}
       {error && <p role="alert" className="w-full text-xs text-rose-700">{error}</p>}
     </div>
   );

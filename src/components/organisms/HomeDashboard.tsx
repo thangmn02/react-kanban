@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import FirstRunCard from '../home/FirstRunCard';
+import { isLocalDemoMode } from '../../lib/supabase';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 import { fetchHomeDashboardData, type HomeDashboardData, type HomeTaskSummary } from '../../services/home.service';
 import type { AppUser, WorkspaceSummary } from '../../types/auth.type';
@@ -75,7 +77,7 @@ function PinnedThreadCard({
     <article className="rounded-xl border border-blue-100 bg-white p-5 shadow-sm ring-1 ring-blue-50">
       <div className="flex items-start justify-between gap-3">
         <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-600">{pin.sourceLabel} · {formatPinnedAgo(pin.pinnedAt, language)}</p>
-        {canDelete && <button type="button" onClick={() => onDelete(pin.id)} className="cursor-pointer rounded-lg px-2 py-1 text-xs font-semibold text-slate-400 hover:bg-rose-50 hover:text-rose-600">{t('briefing.pin.unpinAction')}</button>}
+        {canDelete && <button type="button" onClick={() => onDelete(pin.id)} className="cursor-pointer rounded-lg px-2 py-1 text-xs font-semibold text-slate-500 hover:bg-rose-50 hover:text-rose-600">{t('briefing.pin.unpinAction')}</button>}
       </div>
       <div className="mt-3">
         {safeLink ? <a href={safeLink} target="_blank" rel="noreferrer" className="block rounded focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600">{content}</a>
@@ -175,7 +177,7 @@ function HomeBriefing({ currentUser, activeWorkspace, onOpenTask, onOpenBoard,
 
   return (
     <div className="bg-canvas">
-      <main className="mx-auto grid max-w-[1140px] items-start gap-10 px-5 py-8 pb-28 sm:px-8 sm:py-11 sm:pb-28 lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-x-16" aria-busy={loading}>
+      <main id="main" className="mx-auto grid max-w-[1140px] items-start gap-10 px-5 py-8 pb-28 sm:px-8 sm:py-11 sm:pb-28 lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-x-16" aria-busy={loading}>
         <div className="min-w-0">
           <header>
             <p className="text-[13px] text-slate-500">{date}<span className="mx-2" aria-hidden="true">·</span>{activeWorkspace?.name || 'Kora'}</p>
@@ -187,6 +189,7 @@ function HomeBriefing({ currentUser, activeWorkspace, onOpenTask, onOpenBoard,
           {error && <div className="mt-8"><ErrorState title={t('today.errorTitle')} description={t('today.errorDescription')} details={error} onRetry={() => { setError(null); setAttempt((value) => value + 1); }} /></div>}
 
           {showBriefing && <>
+            {currentUser && !tasks.length && !plannedTasks.length && <FirstRunCard localPreview={isLocalDemoMode} onAddTask={onCreateTask} primaryButton={primaryButton} quietButton={quietButton} />}
             {resumeTask ? <ContinueCard task={resumeTask} nextSteps={focusControls!.session.nextSteps} currentUser={currentUser} taskRevision={taskRevision}
               onContinue={() => startTask(resumeTask)} onOpenTask={() => onOpenTask(resumeTask.id, resumeTask.boardId)}
               primaryButton={primaryButton} quietButton={quietButton} sectionLabel={sectionLabel} />
@@ -209,7 +212,7 @@ function HomeBriefing({ currentUser, activeWorkspace, onOpenTask, onOpenBoard,
             })()}
             <p role="status" aria-live="polite" className="mt-3 text-sm text-slate-700">{completion.message}</p>
             {(canEditPins || arePinsLoading || pins.length > 0 || pinsError) && <section aria-labelledby="briefing-pins" className="mt-8 border-t border-slate-200 pt-6">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h2 id="briefing-pins" className={sectionLabel}>{t('briefing.pin.sectionTitle')}</h2><span className="text-xs text-slate-400">{t('briefing.pin.teamVisible')}</span></div>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h2 id="briefing-pins" className={sectionLabel}>{t('briefing.pin.sectionTitle')}</h2><span className="text-xs text-slate-500">{t('briefing.pin.teamVisible')}</span></div>
               {canEditPins && <button type="button" onClick={() => { if (onRequireSignIn?.() !== false) setIsPinFormOpen(true); }} className={`${quietButton} mb-3 -ml-3`}>{t('briefing.pin.pinAction')}</button>}
               {arePinsLoading && <Skeleton className="h-44 w-full" />}
               {pinsError && <p className="text-sm text-rose-600">{t('briefing.pin.loadError')}</p>}

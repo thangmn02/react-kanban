@@ -5,6 +5,7 @@ import { isNativeWidget } from './features/native/runtime';
 import AppLayout from './AppLayout';
 import RequireAuth from './app/RequireAuth';
 import { ARCANA_ENABLED } from './constants/features';
+import { translateNow } from './i18n/context';
 
 const AuthRoute = lazy(() => import('./pages/auth/AuthRoute'));
 const ContactRoute = lazy(() => import('./pages/contact/ContactRoute'));
@@ -21,7 +22,7 @@ const WorkspaceMembersRoute = lazy(() => import('./pages/workspace/WorkspaceMemb
 const ArcanaRoute = lazy(() => import('./pages/arcana/ArcanaRoute'));
 const NotFoundRoute = lazy(() => import('./pages/not-found/NotFoundRoute'));
 
-const routeFallback = <div className="flex min-h-screen items-center justify-center bg-canvas text-sm font-medium text-slate-500">Loading workspace...</div>;
+const routeFallback = <div className="flex min-h-screen items-center justify-center bg-canvas text-sm font-medium text-slate-500">{translateNow('app.loadingWorkspace')}</div>;
 
 export default function App() {
   const Router = isNativeWidget() ? HashRouter : BrowserRouter;

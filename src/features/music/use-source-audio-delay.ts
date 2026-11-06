@@ -2,6 +2,7 @@ import {useEffect,useRef,useState} from 'react';
 import {configureExperimentalSynchronization,sendMusicRequest,type BrowserMusicSession} from './mediaBridge';
 import {nativeSourceAudioDelayEnabled} from '../native/runtime';
 import {prepareNativeSourceAudioDelay,sourceKey,stopNativeSourceAudioDelay} from '../native/nativeMusic';
+import { translateNow } from '../../i18n/context';
 
 // Owner-accepted preset from the private prototype; physical A/V timing is uncalibrated.
 export const SOURCE_AUDIO_DELAY_MS=170;
@@ -92,7 +93,7 @@ export function useSourceAudioDelay(selected:BrowserMusicSession|undefined,refre
     try{
       if(sessionId)await stopNativeSourceAudioDelay(sessionId);
       if(token.current===mine)setRoute({owner:'',enabled:false});
-    }catch{if(token.current===mine)setFailure({owner:previous,capture:'',message:'Turning off is not confirmed. Close the music tab to restore normal sound, or try again.',retryAt:Date.now()+5000});}
+    }catch{if(token.current===mine)setFailure({owner:previous,capture:'',message:translateNow('music.sync.error.off'),retryAt:Date.now()+5000});}
     finally{if(token.current===mine)setPending(undefined);}
   }
 
@@ -132,8 +133,8 @@ export function useSourceAudioDelay(selected:BrowserMusicSession|undefined,refre
             compensationMs:SOURCE_AUDIO_DELAY_MS,intentionalDelay:true,authorizedAudio:true,outputHeard:true,preview:true}).then(()=>true,()=>false);
           if(!applied)await new Promise(done=>setTimeout(done,100));
         }
-        if(!applied&&token.current===mine)setFailure({owner,capture,message:'The delay could not start on this song. It will try again on the next one.',retryAt:0});
-      }catch{if(token.current===mine)setFailure({owner,capture,message:'The delay could not start on this song. It will try again on the next one.',retryAt:0});}
+        if(!applied&&token.current===mine)setFailure({owner,capture,message:translateNow('music.sync.error.start'),retryAt:0});
+      }catch{if(token.current===mine)setFailure({owner,capture,message:translateNow('music.sync.error.start'),retryAt:0});}
       finally{
         // Resume a song this paused, even if the pause has not been reported back yet.
         if(wasPlaying)await sendMusicRequest('media.play',sessionId).catch(()=>{});

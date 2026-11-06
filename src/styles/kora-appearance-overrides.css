@@ -72,3 +72,6 @@
 :root[data-theme='dark'] .ring-white\/15 { --tw-ring-color: rgb(255 255 255 / .15); }
 /* A bare `border` draws in currentColor; on graphite that reads as a bright outline, so soften it to a hairline. */
 :root[data-theme='dark'] [class~='border']:not([class*='border-']) { border-color: rgb(255 255 255 / .16); }
+
+/* Blue-600 text falls to 3.6:1 on dark surfaces; text uses the lighter step, fills keep theirs. */
+:root[data-theme='dark'] .text-blue-600 { color: var(--color-blue-400); }

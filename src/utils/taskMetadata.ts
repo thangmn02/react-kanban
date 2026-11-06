@@ -2,6 +2,7 @@ import { differenceInCalendarDays, isToday, parseISO, startOfDay } from 'date-fn
 
 import type { ITaskItem } from '../types/task.type';
 import type { TaskPriority } from '../constants';
+import { translateNow } from '../i18n/context';
 
 export interface DueDateStatusMeta {
   status: 'overdue' | 'today' | 'upcoming' | 'none';
@@ -37,7 +38,7 @@ export function getDueDateStatus(dueDate?: string, isDone?: boolean): DueDateSta
   if (isDone) {
     return {
       status: 'none',
-      label: 'Completed',
+      label: translateNow('common.completed'),
       className: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
       iconName: 'calendar',
     };
@@ -46,7 +47,7 @@ export function getDueDateStatus(dueDate?: string, isDone?: boolean): DueDateSta
   if (!dueDate) {
     return {
       status: 'none',
-      label: 'No due date',
+      label: translateNow('common.noDueDate'),
       className: 'bg-gray-50 text-gray-500 border border-gray-200 border-dashed',
       iconName: 'calendar',
     };
@@ -57,7 +58,7 @@ export function getDueDateStatus(dueDate?: string, isDone?: boolean): DueDateSta
   if (Number.isNaN(parsedDueDate.getTime())) {
     return {
       status: 'none',
-      label: 'Invalid date',
+      label: translateNow('common.invalidDate'),
       className: 'bg-gray-50 text-gray-400 border border-gray-200',
       iconName: 'calendar',
     };
@@ -70,7 +71,7 @@ export function getDueDateStatus(dueDate?: string, isDone?: boolean): DueDateSta
   if (isToday(due)) {
     return {
       status: 'today',
-      label: 'Due today',
+      label: translateNow('shell.dueToday'),
       className: 'bg-amber-100 text-amber-800 border border-amber-300 font-medium',
       iconName: 'clock',
     };
@@ -91,7 +92,7 @@ export function getDueDateStatus(dueDate?: string, isDone?: boolean): DueDateSta
   if (daysDifference === 1) {
     return {
       status: 'upcoming',
-      label: 'Due tomorrow',
+      label: translateNow('common.dueTomorrow'),
       className: 'bg-sky-50 text-sky-800 border border-sky-200 font-medium',
       iconName: 'calendar',
     };

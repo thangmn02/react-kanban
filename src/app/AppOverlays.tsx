@@ -106,7 +106,7 @@ export default function AppOverlays(props: Props) {
       />
       {board.deleteItem && (
         <DeleteDialog onSubmit={board.handleDeleteConfirm} onClose={() => board.setDeleteItem(null)}>
-          Are you sure you want to delete this {board.deleteItem.type}?
+          {t('app.areYouSureYouWantTo')}{' '}{board.deleteItem.type}?
         </DeleteDialog>
       )}
       {boardDialogs.groupDialog.isOpen && <AddGroupDialog onClose={boardDialogs.closeGroupDialog} onSubmitGroup={board.onSubmitList} />}

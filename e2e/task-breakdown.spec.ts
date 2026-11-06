@@ -22,7 +22,7 @@ test('AI planning sends current task context and requires review before saving',
   await expect(dialog.getByLabel('Step 1', { exact: true })).toHaveValue(steps[0]);
   expect(received).toMatchObject({ workspaceId: 'local-mock-workspace', language: 'en', draftContext: {
     title, description: 'Khách đã gửi email. Cần tìm mã đơn hàng trước khi trả lời.', dueDate: '2026-10-10',
-    boardTitle: 'HVAC Editor', columnTitle: 'List 1', labels: ['Giao hàng'], existingSteps: ['Đọc email của khách'],
+    boardTitle: 'Sample: Product launch', columnTitle: 'List 1', labels: ['Giao hàng'], existingSteps: ['Đọc email của khách'],
   } });
   await expect(dialog.locator(`input[value="${steps[0]}"]`)).toHaveCount(0);
   await dialog.getByLabel('Step 1', { exact: true }).fill('Tìm mã đơn hàng trong email mới nhất');

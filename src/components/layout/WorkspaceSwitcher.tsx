@@ -19,12 +19,13 @@ export default function WorkspaceSwitcher({
   }
 
   return (
-    <label className="flex min-w-0 items-center gap-2">
+    <label className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
       <span className="sr-only">{t('app.activeWorkspace')}</span>
       <select
         value={activeWorkspaceId || ''}
         onChange={(event) => onWorkspaceChange(event.target.value || null)}
-        className="max-w-28 rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm font-medium text-slate-700 outline-none transition focus:border-sky-300 focus:ring-4 focus:ring-sky-100 sm:max-w-48"
+        title={workspaces.find((workspace) => workspace.id === activeWorkspaceId)?.name}
+        className="w-full min-w-0 truncate rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm font-medium text-slate-700 outline-none transition focus:border-sky-300 focus:ring-4 focus:ring-sky-100 sm:w-auto sm:max-w-48"
         aria-label={t('app.activeWorkspace')}
       >
         {workspaces.map((workspace) => {

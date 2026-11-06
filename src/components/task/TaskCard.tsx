@@ -13,6 +13,7 @@ import {
   resolveTaskCover,
   type TaskCoverUpdateEventDetail,
 } from '../../utils/coverBackground';
+import { useI18n } from '../../i18n';
 
 interface TaskCardProps {
   task: ITaskItem;
@@ -33,6 +34,7 @@ function TaskCard({
   isOverlay = false,
   className = '',
 }: TaskCardProps) {
+  const { t } = useI18n();
   const priorityBadgeClass = getPriorityBadgeClass(task.priority);
   const [, refreshCover] = useReducer((currentVersion: number) => currentVersion + 1, 0);
   const descriptionPreview = stripTaskHtml(task.description);
@@ -113,7 +115,7 @@ function TaskCard({
             <button
               onClick={() => handleEditTask?.(task)}
               className="ml-2 cursor-pointer text-gray-400 transition-colors hover:text-gray-600"
-              title="Edit task"
+              title={t('task.edit')}
             >
               <svg className="h-[1.25rem] w-[1.25rem]" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24">
                 <path fillRule="evenodd" d="M11.3 6.2H5a2 2 0 0 0-2 2V19a2 2 0 0 0 2 2h11c1.1 0 2-1 2-2.1V11l-4 4.2c-.3.3-.7.6-1.2.7l-2.7.6c-1.7.3-3.3-1.3-3-3.1l.6-2.9c.1-.5.4-1 .7-1.3l3-3.1Z" clipRule="evenodd"></path>
@@ -126,7 +128,7 @@ function TaskCard({
                 setDeleteItem?.({ type: 'card', listId, cardId: task.id });
               }}
               className="ml-2 cursor-pointer text-gray-400 transition-colors hover:text-red-600"
-              title="Delete task"
+              title={t('task.delete')}
             >
               <svg className="h-[1.25rem] w-[1.25rem]" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0 1 16.138 21H7.862a2 2 0 0 1-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3M4 7h16" />
@@ -144,7 +146,7 @@ function TaskCard({
       {task.checklistItems.length > 0 && (
         <div className="mb-3 rounded-lg border border-emerald-100 bg-emerald-50/70 px-3 py-2">
           <div className="mb-1 flex items-center justify-between text-[11px] font-semibold text-emerald-700">
-            <span>Checklist</span>
+            <span>{t('task.checklist2')}</span>
             <span>{checklistProgress.completed}/{checklistProgress.total}</span>
           </div>
           <div className="h-1.5 rounded-full bg-emerald-100">

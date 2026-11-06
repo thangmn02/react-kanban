@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { readGlobalJSON } from '../../shared/storage/storageAdapter';
+import { useI18n } from '../../i18n';
 
 const BACK_ONLINE_VISIBLE_MS = 3000;
 
@@ -16,6 +17,7 @@ const BACK_ONLINE_VISIBLE_MS = 3000;
  * This phase does not change any sync logic — it only reflects connectivity.
  */
 export default function OfflineBanner() {
+  const { t } = useI18n();
   const [isOnline, setIsOnline] = useState<boolean>(() => (
     typeof navigator === 'undefined' ? true : navigator.onLine
   ));
@@ -79,7 +81,7 @@ export default function OfflineBanner() {
           }`}
         >
           {isOnline
-            ? 'Back online.'
+            ? t('app.backOnline')
             : `You are offline. ${cachedTimeLabel ? `Cached board from ${cachedTimeLabel} is available.` : 'Changes may not sync.'}`}
         </div>
       )}

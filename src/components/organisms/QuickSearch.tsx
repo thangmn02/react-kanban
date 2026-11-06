@@ -157,6 +157,7 @@ export default function QuickSearch({
           type="text"
           value={searchQuery}
           onChange={(e) => onSearchQueryChange(e.target.value)}
+          aria-label={t('board.searchTasksLabel')}
           placeholder={t('board.searchTasks')}
           className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 py-2.5 pl-10 pr-4 text-sm text-slate-800 shadow-inner outline-none transition focus:border-sky-200 focus:bg-white focus:ring-4 focus:ring-sky-100"
         />
@@ -208,15 +209,15 @@ export default function QuickSearch({
 
             <div className="grid gap-2 rounded-2xl border border-slate-100 bg-slate-50/70 p-3">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Saved filters</span>
+                <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">{t('command.savedFilters')}</span>
                 {savedFilters.length > 0 && (
                   <select
                     value=""
                     onChange={(event) => applySavedFilter(event.target.value)}
                     className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none transition focus:ring-2 focus:ring-sky-100"
-                    aria-label="Apply saved filter"
+                    aria-label={t('command.applySavedFilter')}
                   >
-                    <option value="">Apply...</option>
+                    <option value="">{t('command.apply')}</option>
                     {savedFilters.map((filter) => (
                       <option key={filter.id} value={filter.id}>{filter.name}</option>
                     ))}
@@ -229,7 +230,7 @@ export default function QuickSearch({
                   type="text"
                   value={savedFilterName}
                   onChange={(event) => setSavedFilterName(event.target.value)}
-                  placeholder="Filter name"
+                  placeholder={t('command.filterName')}
                   className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none transition focus:ring-2 focus:ring-sky-100"
                 />
                 <button
@@ -238,7 +239,7 @@ export default function QuickSearch({
                   disabled={!hasActiveFilters || !savedFilterName.trim()}
                   className="cursor-pointer rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Save
+                  {t('notes.quick.save')}
                 </button>
               </div>
 
@@ -259,7 +260,7 @@ export default function QuickSearch({
                       <button
                         type="button"
                         onClick={() => deleteSavedFilter(filter.id)}
-                        aria-label={`Delete saved filter: ${filter.name}`}
+                        aria-label={`${t('command.deleteSavedFilter')}: ${filter.name}`}
                         className="cursor-pointer text-slate-400 hover:text-rose-600 focus:outline-none focus-visible:text-rose-600"
                       >
                         x
@@ -278,10 +279,10 @@ export default function QuickSearch({
                 className="rounded-2xl border border-slate-200 bg-white/90 px-3 py-2 text-sm normal-case tracking-normal text-slate-700 shadow-sm outline-none transition focus:ring-4 focus:ring-sky-100"
               >
                 <option value="">{t('board.allPriorities')}</option>
-                <option value="High">High</option>
-                <option value="Medium">Medium</option>
-                <option value="Low">Low</option>
-                <option value="Lowest">Lowest</option>
+                <option value="High">{t('command.high')}</option>
+                <option value="Medium">{t('command.medium')}</option>
+                <option value="Low">{t('command.low')}</option>
+                <option value="Lowest">{t('command.lowest')}</option>
               </select>
             </label>
 

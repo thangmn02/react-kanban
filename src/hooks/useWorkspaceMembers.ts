@@ -20,6 +20,7 @@ import type {
   WorkspaceRole,
 } from '../types/auth.type';
 import { mockWorkspaceMembers } from '../utils/workspaceMembers';
+import { translateNow } from '../i18n/context';
 
 interface UseWorkspaceMembersResult {
   members: WorkspaceMember[];
@@ -71,7 +72,7 @@ export function useWorkspaceMembers(workspaceId: string | null): UseWorkspaceMem
 
   const addMember = useCallback(async (email: string, role: WorkspaceInviteRole) => {
     if (!workspaceId) {
-      throw new Error('Select a workspace before adding members.');
+      throw new Error(translateNow('workspace.selectAWorkspaceBeforeAddingMembers'));
     }
 
     const result = await inviteWorkspaceMemberByEmail(workspaceId, email, role);

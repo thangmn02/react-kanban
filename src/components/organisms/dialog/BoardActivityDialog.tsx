@@ -3,6 +3,7 @@ import ContentDialog from '../../molecules/dialog/ContentDialog';
 import type { ITaskActivity } from '../../../types/task.type';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import { fetchBoardActivities } from '../../../services/activity.service';
+import { useI18n } from '../../../i18n';
 
 interface BoardActivityDialogProps {
   isOpen: boolean;
@@ -11,6 +12,7 @@ interface BoardActivityDialogProps {
 }
 
 function BoardActivityDialog({ isOpen, onClose, boardId }: BoardActivityDialogProps) {
+  const { t } = useI18n();
   const [activities, setActivities] = useState<ITaskActivity[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -48,13 +50,13 @@ function BoardActivityDialog({ isOpen, onClose, boardId }: BoardActivityDialogPr
             <svg className="h-6 w-6 text-blue-500" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            Board Activity
+            {t('board.boardActivity')}
           </h3>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close board activity"
-            title="Close"
+            aria-label={t('board.closeBoardActivity')}
+            title={t('notes.quick.close')}
             className="cursor-pointer rounded-xl text-gray-400 transition-colors hover:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
           >
             <svg className="h-6 w-6" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -68,7 +70,7 @@ function BoardActivityDialog({ isOpen, onClose, boardId }: BoardActivityDialogPr
       <div className="min-h-[300px]">
         {isLoading ? (
           <div className="py-8 text-center text-sm text-gray-500 italic">
-            Loading board activities...
+            {t('board.loadingBoardActivities')}
           </div>
         ) : activities.length > 0 ? (
           <div className="flow-root">
@@ -104,11 +106,11 @@ function BoardActivityDialog({ isOpen, onClose, boardId }: BoardActivityDialogPr
                           {activity.task_title && (
                             <div className="mt-1 flex items-center gap-1.5">
                               <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-800 border border-gray-200 shadow-sm">
-                                Task: {activity.task_title}
+                                {t('board.task')}{' '}{activity.task_title}
                               </span>
                               {activity.action === 'deleted' && (
                                 <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-50 text-red-700 border border-red-200">
-                                  Deleted
+                                  {t('board.deleted')}
                                 </span>
                               )}
                             </div>
@@ -126,7 +128,7 @@ function BoardActivityDialog({ isOpen, onClose, boardId }: BoardActivityDialogPr
           </div>
         ) : (
           <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 py-12 text-center text-sm text-gray-400 italic">
-            No activity logged for this board yet.
+            {t('board.noActivityLoggedForThisBoard')}
           </div>
         )}
       </div>

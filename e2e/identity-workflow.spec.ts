@@ -22,13 +22,13 @@ test('canonical workflow agrees across Board, Task Detail, Focus, Today and drag
  await page.reload();expect((await storedTask(page,'Workflow proof')).task.completed_at).toBeNull();
  await page.getByRole('button',{name:'Open task: Workflow proof',exact:true}).click();
  const editor=page.getByRole('dialog',{name:'Edit task'});
- await editor.getByRole('button',{name:'Assign members',exact:true}).click();await editor.getByRole('button',{name:/Bonnie Green/}).click();
+ await editor.getByRole('button',{name:'Assign members',exact:true}).click();await editor.getByRole('button',{name:/Guest/}).click();
  await editor.locator('div.fixed.inset-0.z-10').click({position:{x:5,y:5}});
  await editor.getByLabel('Due date',{exact:true}).fill(await page.evaluate(()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}));
  const rich=editor.locator('[contenteditable="true"]');await rich.fill('First paragraph');await rich.press('Enter');await rich.pressSequentially('Second paragraph');
  await editor.getByRole('button',{name:'Save changes',exact:true}).click();await expect(editor).toBeHidden();
  await page.getByRole('button',{name:'Start focus session: Workflow proof',exact:true}).click();
- const canonicalUrl=page.url();await page.getByRole('navigation',{name:'Main navigation'}).filter({visible:true}).getByRole('button',{name:'Focus',exact:true}).click();const dock=page.getByRole('main',{name:'Floating Focus'});await dock.getByRole('button',{name:'Complete & next',exact:true}).click();
+ const canonicalUrl=page.url();await page.getByRole('navigation',{name:'Main navigation'}).filter({visible:true}).getByRole('button',{name:'Focus',exact:true}).click();const dock=page.getByRole('region',{name:'Floating Focus'});await dock.getByRole('button',{name:'Complete & next',exact:true}).click();
  await expect.poll(async()=> (await storedTask(page,'Workflow proof')).task.is_done).toBe(true);expect((await storedTask(page,'Workflow proof')).task.list_id).toBe(done.id);
  await page.goto(canonicalUrl);await page.getByRole('button',{name:'Open task: Workflow proof',exact:true}).click();await editor.getByRole('button',{name:'Mark not done',exact:true}).click();await expect(editor).toBeHidden();
  await page.goto('/today');await expect(page.getByRole('button',{name:'Mark done: Workflow proof',exact:true}).first()).toBeVisible();
@@ -51,6 +51,6 @@ test('mobile identity keyboard, cancel, invalid file, language, default and redu
  await page.setViewportSize({width:320,height:740});await page.emulateMedia({reducedMotion:'reduce'});await page.goto('/home');await openSettings(page);await page.getByRole('textbox',{name:'Display name',exact:true}).fill('Cancelled name');await page.getByRole('button',{name:'Cancel',exact:true}).click();await openSettings(page);await expect(page.getByRole('textbox',{name:'Display name',exact:true})).not.toHaveValue('Cancelled name');
  await page.getByLabel('Choose an image').setInputFiles({name:'bad.png',mimeType:'image/png',buffer:Buffer.from('not an image')});await expect(page.getByRole('alert')).toContainText('cannot be processed');
  await page.getByRole('button',{name:'Restore Kora image',exact:true}).click();await page.getByRole('button',{name:'Save profile',exact:true}).click();await expect(page.getByRole('status').filter({hasText:'Profile saved.'})).toBeVisible();
- await page.getByLabel('Language',{exact:true}).selectOption('vi');await expect(page.getByRole('dialog',{name:'Cài đặt',exact:true})).toBeVisible();await page.reload();await page.getByRole('button',{name:'Open user menu'}).click();await expect(page.getByLabel('Ngôn ngữ',{exact:true})).toHaveValue('vi');expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.getByLabel('Language',{exact:true}).selectOption('vi');await expect(page.getByRole('dialog',{name:'Cài đặt',exact:true})).toBeVisible();await page.reload();await page.getByRole('button',{name:'Mở menu người dùng'}).click();await expect(page.getByLabel('Ngôn ngữ',{exact:true})).toHaveValue('vi');expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  await page.screenshot({path:'scratch/p0-261026-2311/identity-mobile.png'});await page.keyboard.press('Escape');
 });

@@ -1,4 +1,5 @@
 import { useReducedMotion } from 'framer-motion';
+import { useI18n } from '../../i18n';
 
 interface ErrorStateProps {
   /** Human-readable headline, e.g. "Couldn't load this board". */
@@ -41,6 +42,7 @@ export default function ErrorState({
   compact = false,
   className = '',
 }: ErrorStateProps) {
+  const { t } = useI18n();
   const prefersReducedMotion = useReducedMotion();
   const showDetails = Boolean(details) && import.meta.env.DEV;
 
@@ -78,7 +80,7 @@ export default function ErrorState({
               }`}
             />
           )}
-          {isRetrying ? 'Retrying…' : retryLabel}
+          {isRetrying ? t('app.retrying') : retryLabel}
         </button>
       )}
     </div>

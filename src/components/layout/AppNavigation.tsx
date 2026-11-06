@@ -32,6 +32,8 @@ export default function AppNavigation({ activeView, onNavigate, mobile = false }
     { view: 'members' as const, label: t('shell.workspace') },
     { view: 'contact' as const, label: t('navigation.contact') },
   ];
+  // Phones keep five destinations; Workspace and Contact live in the header's More menu.
+  const visible = mobile ? items.filter(({ view }) => view !== 'members' && view !== 'contact') : items;
   const selected = ['board', 'calendar', 'table'].includes(activeView) ? 'board'
     : ['music', 'beat-grid'].includes(activeView) ? 'focus' : activeView;
 
@@ -40,7 +42,7 @@ export default function AppNavigation({ activeView, onNavigate, mobile = false }
       ? 'flex items-stretch gap-1 overflow-x-auto border-t border-slate-100 px-2 py-1.5 lg:hidden'
       : 'fixed inset-y-0 left-0 z-40 hidden w-14 flex-col items-center gap-2 bg-[#20252D] py-5 lg:flex'}>
       {!mobile && <img src="/logo.png" alt="" className="mb-5 h-9 w-9 rounded-xl" />}
-      {items.map(({ view, label }) => <button
+      {visible.map(({ view, label }) => <button
         key={view}
         type="button"
         onClick={() => onNavigate(view)}

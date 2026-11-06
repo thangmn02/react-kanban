@@ -29,7 +29,8 @@ function FocusPage({ tab }: { tab: DockTab }) {
   useEffect(() => { selectTab(tab); setMinimized(false); }, [selectTab, setMinimized, tab]);
   return <div className="min-h-screen bg-canvas">
     {context.header}
-    <div className="mx-auto max-w-3xl px-5 py-8">
+    <main id="main" className="mx-auto max-w-3xl px-5 py-8">
+      <h1 className="sr-only">{t('focus.mode.focus')}</h1>
       <div className="mb-3 flex justify-end gap-3">
         {isFloating ? <button className={actionClass} type="button" onClick={returnToPage}>{t('dock.return')}</button> : <>
           <button className={actionClass} type="button" onClick={() => setMinimized(!minimized)}>{t(minimized ? 'focus.dock.expand' : 'focus.dock.minimizeLabel')}</button>
@@ -38,7 +39,7 @@ function FocusPage({ tab }: { tab: DockTab }) {
       </div>
       {native ? <div hidden={minimized}><NativeFocusPage /></div>
         : <div ref={attach} hidden={minimized} data-testid="focus-dock-page" />}
-    </div>
+    </main>
   </div>;
 }
 

@@ -1,3 +1,4 @@
+import { MoreMenu } from '@astryxdesign/core/MoreMenu';
 import type { AppUser, AuthMode, WorkspaceSummary } from '../../types/auth.type';
 import CommandTrigger from './CommandTrigger';
 import UserMenu from './UserMenu';
@@ -48,10 +49,16 @@ export default function AppHeader({
   onNavigate,
 }: AppHeaderProps) {
   const { t } = useI18n();
+  // Phone-only overflow: the top bar stays one row and these stay one tap away.
+  const more = [
+    ...(user && NOTES_PREVIEW_ENABLED ? [{ label: t('notes.quick'), onClick: () => openQuickNotes({ create: true }) }, { label: t('app.saved'), onClick: openSavedContext }] : []),
+    ...(user ? [{ label: t('app.createBoard'), onClick: onCreateBoard }, { label: t('shell.workspace'), onClick: () => onNavigate?.('members') }] : [{ label: t('app.about'), onClick: () => window.location.assign('/about/') }]),
+    { label: t('navigation.contact'), onClick: () => onNavigate?.('contact') },
+  ];
 
   return (
     <header className="sticky top-0 z-50 overflow-visible border-b border-slate-200/70 bg-white/88 backdrop-blur-xl">
-      <div className="flex min-h-16 flex-wrap items-center gap-2 px-3 py-2 sm:gap-3 sm:px-6">
+      <div className="flex min-h-14 items-center gap-2 px-3 py-2 sm:min-h-16 sm:flex-wrap sm:gap-3 sm:px-6">
         <button
           type="button"
           onClick={onGoHome}
@@ -73,7 +80,7 @@ export default function AppHeader({
           </span>
         </button>
 
-        {!user && <a href="/about/" className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100">About Kora</a>}
+        {!user && <a href="/about/" className="hidden rounded-xl px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 sm:block">{t('app.about')}</a>}
         <WorkspaceSwitcher
           workspaces={workspaces}
           activeWorkspaceId={activeWorkspaceId}
@@ -98,35 +105,37 @@ export default function AppHeader({
           </span>
         )}
 
-        <div className="flex flex-1 justify-center px-1 sm:px-4">
+        <div className={`flex justify-center sm:flex-1 sm:px-4 ${workspaces.length ? '' : 'ml-auto sm:ml-0'}`}>
           <CommandTrigger onOpen={onOpenCommandPalette} placeholder={t('app.command.placeholder')} />
         </div>
 
         <div className="flex items-center gap-2">
-          {user&&NOTES_PREVIEW_ENABLED&&<><button type="button" className="min-h-10 rounded-lg px-2 text-sm text-slate-600 hover:bg-slate-100" onClick={()=>openQuickNotes({create:true})} title="Quick note (Ctrl+Alt+N)">{t('notes.quick')}</button><button type="button" className="min-h-10 rounded-lg px-2 text-sm text-slate-600 hover:bg-slate-100" onClick={openSavedContext}>Saved</button></>}
+          {user&&NOTES_PREVIEW_ENABLED&&<><button type="button" className="hidden min-h-10 rounded-lg px-2 text-sm text-slate-600 hover:bg-slate-100 sm:block" onClick={()=>openQuickNotes({create:true})} title={t('app.quickNoteCtrlAltN')}>{t('notes.quick')}</button><button type="button" className="hidden min-h-10 rounded-lg px-2 text-sm text-slate-600 hover:bg-slate-100 sm:block" onClick={openSavedContext}>{t('app.saved')}</button></>}
           {!isNativeWidget() && <a
             href="/downloads/Kora-setup.exe"
             download="Kora-setup.exe"
             aria-label={t('app.downloadWindows')}
             title={t('app.downloadWindows')}
-            className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 active:bg-slate-100 focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 sm:w-auto sm:px-3"
+            className="hidden h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-3 text-slate-600 shadow-sm transition hover:bg-slate-50 active:bg-slate-100 focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 sm:flex"
           >
             <svg className="h-4 w-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v12m-4-4 4 4 4-4M4 16v4h16v-4" />
             </svg>
-            <span className="ml-2 hidden text-sm font-semibold sm:inline">{t('app.downloadKora')}</span>
+            <span className="ml-2 text-sm font-semibold">{t('app.downloadKora')}</span>
           </a>}
           <button
             type="button"
             onClick={onCreateBoard}
-            className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 sm:w-auto sm:px-3"
+            className="hidden h-10 cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white px-3 text-slate-600 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 sm:flex"
             aria-label={t('app.createBoard')}
           >
             <svg className="h-4 w-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
             </svg>
-            <span className="ml-2 hidden text-sm font-semibold sm:inline">{t('app.new')}</span>
+            <span className="ml-2 text-sm font-semibold">{t('app.new')}</span>
           </button>
+
+          <span className="sm:hidden"><MoreMenu label={t('app.more')} size="md" items={more} /></span>
 
           {user ? <UserMenu
             user={user}
@@ -135,7 +144,7 @@ export default function AppHeader({
             onSignOut={onSignOut}
             onOpenArcanaBooth={onOpenArcanaBooth}
             arcanaAvailableDraws={arcanaAvailableDraws}
-          /> : <button type="button" onClick={onSignIn} className="rounded-xl px-3 py-2 text-sm font-semibold text-blue-600 hover:bg-blue-50">Sign in</button>}
+          /> : <button type="button" onClick={onSignIn} className="whitespace-nowrap rounded-xl px-3 py-2 text-sm font-semibold text-blue-600 hover:bg-blue-50">{t('auth.signIn')}</button>}
         </div>
       </div>
       {onNavigate && <AppNavigation mobile activeView={activeView} onNavigate={onNavigate} />}

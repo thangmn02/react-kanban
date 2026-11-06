@@ -2,6 +2,7 @@ import { isPast, isToday, parseISO, startOfDay } from 'date-fns';
 
 import type { HomeTaskSummary } from '../../services/home.service';
 import Typography from '../atoms/Typography';
+import { useI18n } from '../../i18n';
 
 interface MyTasksSummaryProps {
   tasks: HomeTaskSummary[];
@@ -23,6 +24,7 @@ function countOverdueTasks(tasks: HomeTaskSummary[]) {
 }
 
 export default function MyTasksSummary({ tasks }: MyTasksSummaryProps) {
+  const { t } = useI18n();
   const dueTodayCount = countTasksDueToday(tasks);
   const overdueCount = countOverdueTasks(tasks);
   const noDateCount = tasks.filter((task) => !task.dueDate).length;
@@ -30,15 +32,15 @@ export default function MyTasksSummary({ tasks }: MyTasksSummaryProps) {
   return (
     <div className="grid gap-3 border-b border-slate-100 px-5 py-4 sm:grid-cols-3">
       <div className="rounded-2xl bg-amber-50 px-4 py-3">
-        <Typography component="p" content="Due today" className="text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-600" />
+        <Typography component="p" content={t('shell.dueToday')} className="text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-600" />
         <Typography component="p" content={String(dueTodayCount)} className="mt-1 text-2xl font-semibold text-amber-900" />
       </div>
       <div className="rounded-2xl bg-rose-50 px-4 py-3">
-        <Typography component="p" content="Overdue" className="text-[11px] font-semibold uppercase tracking-[0.2em] text-rose-600" />
+        <Typography component="p" content={t('common.overdue')} className="text-[11px] font-semibold uppercase tracking-[0.2em] text-rose-600" />
         <Typography component="p" content={String(overdueCount)} className="mt-1 text-2xl font-semibold text-rose-900" />
       </div>
       <div className="rounded-2xl bg-slate-50 px-4 py-3">
-        <Typography component="p" content="No date" className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500" />
+        <Typography component="p" content={t('task.noDate')} className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500" />
         <Typography component="p" content={String(noDateCount)} className="mt-1 text-2xl font-semibold text-slate-900" />
       </div>
     </div>

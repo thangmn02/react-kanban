@@ -105,7 +105,7 @@ function TaskList({
           className={`flex flex-1 select-none items-center space-x-2 rounded-2xl p-2 transition-colors ${
             isOverlay ? 'cursor-grabbing' : 'cursor-grab hover:bg-slate-100/80 active:cursor-grabbing'
           }`}
-          title="Drag to reorder list"
+          title={t('task.dragToReorderList')}
         >
           {/* Custom Grip Icon */}
           <svg className="w-4 h-4 text-gray-400 shrink-0" aria-hidden="true" fill="currentColor" viewBox="0 0 20 20">
@@ -128,7 +128,7 @@ function TaskList({
             <button
               onClick={() => toggleMenu(listItem.id)}
               className="pointer-events-none inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-gray-400 opacity-0 transition hover:bg-slate-100 hover:text-gray-600 hover:opacity-100 focus:pointer-events-auto focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 group-hover/list:pointer-events-auto group-hover/list:opacity-100"
-              aria-label={`List options: ${listItem.title}`}
+              aria-label={`${t('task.listOptions')}: ${listItem.title}`}
               aria-haspopup="menu"
               aria-expanded={openMenuId === listItem.id}
               aria-controls={`list-menu-${listItem.id}`}
@@ -157,7 +157,7 @@ function TaskList({
                     }}
                     className="w-full cursor-pointer text-left px-4 py-2 text-sm text-rose-600 transition-colors hover:bg-rose-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-rose-300 flex items-center"
                   >
-                    Delete group
+                    {t('task.deleteGroup')}
                   </button>
                 </div>
               </>

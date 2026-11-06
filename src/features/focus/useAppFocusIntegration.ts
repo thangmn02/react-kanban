@@ -22,6 +22,7 @@ interface Params {
   navigate: NavigateFunction;
   openEditTaskDialog: (task: ITaskItem) => void;
   onTaskCompleted: () => void;
+  onAddTask: () => void;
   t: ReturnType<typeof useI18n>['t'];
 }
 
@@ -33,6 +34,7 @@ export function useAppFocusIntegration({
   navigate,
   openEditTaskDialog,
   onTaskCompleted,
+  onAddTask,
   t,
 }: Params) {
   const [dockTab, setDockTab] = useState<'focus' | 'music' | 'beat'>('focus');
@@ -155,6 +157,7 @@ export function useAppFocusIntegration({
     activeTab: dockTab, onTabChange: handleDockTabChange,
     isMinimized: isFocusPage && focus.isFocusDockCollapsed,
     onDismiss: () => navigate('/home'),
+    onAddTask,
     activeTask: focus.selectedTimerTask || focus.activeFocusTask,
     focusTasks: focus.focusTasks,
     timerState: focus.timerState,

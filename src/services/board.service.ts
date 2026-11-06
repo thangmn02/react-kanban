@@ -1,4 +1,4 @@
-import { DEFAULT_BOARD_TITLE, DEFAULT_TASK_PRIORITY, ERROR_MESSAGES, LIST_POSITION_STEP } from '../constants';
+import { DEFAULT_TASK_PRIORITY, SAMPLE_BOARD_TITLE, ERROR_MESSAGES, LIST_POSITION_STEP } from '../constants';
 import { data as seedBoardData } from '../data';
 import { findBoardTemplateById } from '../data/boardTemplates';
 import supabase, { requireSupabaseClient } from '../lib/supabase';
@@ -235,7 +235,7 @@ async function seedDefaultBoard(workspaceId?: string | null, createdBy?: string 
   const client = requireSupabaseClient();
   const boardRow = await createBoard({
     workspace_id: workspaceId ?? undefined,
-    title: DEFAULT_BOARD_TITLE,
+    title: SAMPLE_BOARD_TITLE,
     description: 'Seeded Kora board',
     created_by: createdBy ?? undefined,
   });

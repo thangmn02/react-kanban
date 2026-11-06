@@ -34,7 +34,7 @@ export default function SourceAudioDelayControl({music}:{music:BrowserMusicContr
   if(!route)return null;
   const off=!route.preferred&&!route.error&&route.status==='off';
   return <section className="music-sync-status muted" aria-label={t('music.sync.title')}>
-    <p><span>{t('music.sync.title')}</span> · <span role="status" aria-label={`${t('music.sync.title')} status`}>{t(STATUS[route.status])}</span>{' '}
+    <p><span>{t('music.sync.title')}</span> · <span role="status" aria-label={t('music.sync.status', { title: t('music.sync.title') })}>{t(STATUS[route.status])}</span>{' '}
       {off?!confirming&&<button type="button" className="text-button" onClick={()=>setConfirming(true)}>{t('music.sync.turnOn')}</button>
         :route.preferred&&<button type="button" className="text-button" onClick={()=>route.setPreferred(false)}>{t('music.sync.turnOff')}</button>}</p>
     {off&&confirming&&<Confirm t={t} onConfirm={()=>{route.setPreferred(true);setConfirming(false);}} onCancel={()=>setConfirming(false)}/>}

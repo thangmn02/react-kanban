@@ -42,3 +42,8 @@ export function interpolate(template: string, params?: TranslationParams) {
     return value === null || value === undefined ? '' : String(value);
   });
 }
+
+/** For code outside React. Reads the saved language at call time, so never call it at module load. */
+export function translateNow(key: TranslationKey, params?: TranslationParams) {
+  return interpolate(translations[getInitialLanguage()][key], params);
+}

@@ -53,7 +53,7 @@ export default function IdentityCard({ user, authMode, activeWorkspace, onSignOu
     <button id="kora-user-trigger" type="button" onClick={() => {
       if (open) { dismiss(); return; }
       afterExit.current = null; setPresent(true); setOpen(true);
-    }} aria-label="Open user menu" aria-haspopup="dialog" aria-expanded={open} aria-controls={present ? 'kora-identity-profile' : undefined}
+    }} aria-label={t('app.openUserMenu')} aria-haspopup="dialog" aria-expanded={open} aria-controls={present ? 'kora-identity-profile' : undefined}
       className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white p-1 shadow-sm transition-transform duration-150 hover:-translate-y-px active:scale-95 motion-reduce:transform-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
       <img src={avatar} alt="" className="h-full w-full rounded-full object-cover" onError={event => { if (!event.currentTarget.src.endsWith('/logo.png')) event.currentTarget.src = DEFAULT_IDENTITY_IMAGE; }} />
     </button>
@@ -66,7 +66,7 @@ export default function IdentityCard({ user, authMode, activeWorkspace, onSignOu
         exit={reduced ? { opacity: 0 } : { opacity: 0, y: 8, scale: 0.98 }} transition={{ duration, ease: uiEase }}
         className="flex max-h-[calc(100dvh-24px)] w-full max-w-[880px] flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_28px_100px_rgba(15,23,42,0.25)] sm:max-h-[calc(100dvh-64px)]">
         <header className="flex shrink-0 items-center justify-between gap-4 border-b border-slate-100 px-5 py-3 sm:px-8">
-          <div className="flex items-center gap-3"><span aria-hidden="true" className="grid grid-cols-3 gap-0.5">{Array.from({ length: 9 }, (_, i) => <span key={i} className={'h-1.5 w-1.5 ' + ([1, 3, 4, 7].includes(i) ? 'bg-blue-600' : 'bg-slate-200')} />)}</span><span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500">Kora · Identity</span></div>
+          <div className="flex items-center gap-3"><span aria-hidden="true" className="grid grid-cols-3 gap-0.5">{Array.from({ length: 9 }, (_, i) => <span key={i} className={'h-1.5 w-1.5 ' + ([1, 3, 4, 7].includes(i) ? 'bg-blue-600' : 'bg-slate-200')} />)}</span><span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500">{t('app.koraIdentity')}</span></div>
           <button autoFocus type="button" onClick={dismiss} aria-label={t('identity.close')} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xl text-slate-500 transition-colors hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-blue-600">×</button>
         </header>
         <div className="min-h-0 overflow-y-auto px-5 py-6 sm:px-8 sm:py-8">

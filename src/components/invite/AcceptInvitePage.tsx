@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { acceptWorkspaceInvite, fetchWorkspaceInviteByToken } from '../../services/invite.service';
 import type { AppUser, WorkspaceInvite } from '../../types/auth.type';
+import { useI18n } from '../../i18n';
 
 interface AcceptInvitePageProps {
   token: string | null;
@@ -30,6 +31,7 @@ export default function AcceptInvitePage({
   onGoHome,
   onSignOut,
 }: AcceptInvitePageProps) {
+  const { t } = useI18n();
   const [invite, setInvite] = useState<WorkspaceInvite | null>(null);
   const [isLoadingInvite, setIsLoadingInvite] = useState(true);
   const [isAccepting, setIsAccepting] = useState(false);
@@ -126,18 +128,18 @@ export default function AcceptInvitePage({
   }, [currentUser.email, emailMatchesInvite, invite, onAccepted, token]);
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#F8F9FA] px-5 py-10">
+    <main id="main" className="flex min-h-screen items-center justify-center bg-[#F8F9FA] px-5 py-10">
       <section className="w-full max-w-xl rounded-3xl border border-slate-200/80 bg-white p-6 shadow-[0_28px_90px_rgba(15,23,42,0.13)] sm:p-8">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-blue-600">
-              Workspace invite
+              {t('invite.workspaceInvite')}
             </p>
             <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em] text-slate-950">
-              Join a Kora workspace
+              {t('invite.joinAKoraWorkspace')}
             </h1>
             <p className="mt-2 text-sm leading-6 text-slate-500">
-              Signed in as {currentUser.email || currentUser.name}.
+              {t('invite.signedInAs')}{' '}{currentUser.email || currentUser.name}.
             </p>
           </div>
           <button
@@ -145,20 +147,20 @@ export default function AcceptInvitePage({
             onClick={() => void onSignOut()}
             className="cursor-pointer rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-sky-100"
           >
-            Switch user
+            {t('invite.switchUser')}
           </button>
         </div>
 
         <div className="mt-7 rounded-3xl border border-slate-200 bg-slate-50/70 p-5">
           {isLoadingInvite ? (
-            <p className="text-sm text-slate-500">Loading invite...</p>
+            <p className="text-sm text-slate-500">{t('invite.loadingInvite')}</p>
           ) : invite ? (
             <div>
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-slate-900">{invite.email}</p>
                   <p className="mt-1 text-xs text-slate-500">
-                    Role: <span className="font-semibold capitalize text-slate-700">{invite.role}</span>
+                    {t('invite.role')}{' '}<span className="font-semibold capitalize text-slate-700">{invite.role}</span>
                   </p>
                 </div>
                 <span className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold capitalize text-blue-700">
@@ -166,23 +168,23 @@ export default function AcceptInvitePage({
                 </span>
               </div>
               <p className="mt-4 text-sm text-slate-500">
-                Expires {formatInviteDate(invite.expiresAt)}
+                {t('invite.expires')}{' '}{formatInviteDate(invite.expiresAt)}
               </p>
             </div>
           ) : (
-            <p className="text-sm text-slate-500">No invite details available.</p>
+            <p className="text-sm text-slate-500">{t('invite.noInviteDetailsAvailable')}</p>
           )}
         </div>
 
         {invite && !emailMatchesInvite && (
           <p className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-            This invite belongs to {invite.email}. Sign in with that email to accept it.
+            {t('invite.belongsTo', { email: invite.email })}
           </p>
         )}
 
         {invite?.acceptedAt && (
           <p className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-            This invite has already been accepted.
+            {t('invite.thisInviteHasAlreadyBeenAccepted')}
           </p>
         )}
 
@@ -205,14 +207,14 @@ export default function AcceptInvitePage({
             onClick={() => void handleAcceptInvite()}
             className="cursor-pointer rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(37,99,235,0.28)] transition hover:-translate-y-0.5 hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-60"
           >
-            {isAccepting ? 'Accepting...' : 'Accept invite'}
+            {isAccepting ? t('invite.accepting') : t('invite.acceptInvite')}
           </button>
           <button
             type="button"
             onClick={onGoHome}
             className="cursor-pointer rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-sky-100"
           >
-            Go to dashboard
+            {t('app.goDashboard')}
           </button>
         </div>
       </section>

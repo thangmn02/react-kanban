@@ -23,7 +23,7 @@ test('layered shell retains routes, context filters, collapsed state and running
   await page.screenshot({ path: `${evidence}/shell-board-desktop.png` });
   await nav.getByRole('button', { name: 'Focus', exact: true }).click();
   await expect.poll(async () => (await context.boundingBox())!.width).toBe(40);
-  const dock = page.getByRole('main', { name: 'Floating Focus' });
+  const dock = page.getByRole('region', { name: 'Floating Focus' });
   const marker = await dock.evaluate(el => { el.setAttribute('data-continuity-probe', 'mounted'); return true; }); expect(marker).toBe(true);
   await nav.getByRole('button', { name: 'Notes', exact: true }).click();
   await nav.getByRole('button', { name: 'Focus', exact: true }).click();
@@ -45,7 +45,7 @@ test('notes autosave rich text/checklist, pin, move, resize, Peek, link, convers
   const resize = note.getByRole('button', { name: 'Resize note' }); await resize.focus(); await resize.press('ArrowDown');
   await expect.poll(async () => (await rows(page))[0]?.height).toBe(380);
   expect((await rows(page))[0]).toMatchObject({ pinned: true, x: 10, checklist: [{ text: 'Review integration', isDone: true }] });
-  await note.getByRole('button', { name: 'Peek', exact: true }).click();
+  await note.getByRole('button', { name: 'See through', exact: true }).click();
   const restore = page.getByRole('button', { name: 'Restore note: Integration note' }); await expect(restore).toBeVisible();
   expect(await note.evaluate(el => { const r = el.getBoundingClientRect(); return el.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)); })).toBe(false);
   await restore.click(); await expect(note).not.toHaveAttribute('inert');

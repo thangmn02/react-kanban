@@ -176,7 +176,7 @@ export default function TodayPage({
   };
 
   return (
-    <main className="bg-canvas px-4 py-4 sm:px-6" aria-busy={isLoading}>
+    <main id="main" className="bg-canvas px-4 py-4 sm:px-6" aria-busy={isLoading}>
       <section id="today-content" tabIndex={-1} className="mx-auto max-w-7xl focus-visible:outline-2 focus-visible:outline-blue-600">
         <PageHeader
           eyebrow={t('today.eyebrow')}

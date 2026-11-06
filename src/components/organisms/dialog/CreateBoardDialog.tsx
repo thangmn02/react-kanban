@@ -8,6 +8,7 @@ import InputField from '../../molecules/InputField';
 import TextAreaField from '../../molecules/TextAreaField';
 import BoardTemplatePicker from '../../board/BoardTemplatePicker';
 import { DEFAULT_BOARD_TEMPLATE_ID } from '../../../data/boardTemplates';
+import { useI18n } from '../../../i18n';
 
 interface CreateBoardDialogProps {
   onClose: () => void;
@@ -27,6 +28,7 @@ const createBoardSchema = yup.object({
 }).required();
 
 function CreateBoardDialog({ onClose, onSubmitBoard }: CreateBoardDialogProps) {
+  const { t } = useI18n();
   const {
     register,
     handleSubmit,
@@ -54,9 +56,9 @@ function CreateBoardDialog({ onClose, onSubmitBoard }: CreateBoardDialogProps) {
     <ContentDialog
       title={(
         <div className="mb-6">
-          <h3 className="text-xl font-semibold text-gray-900">Create new board</h3>
+          <h3 className="text-xl font-semibold text-gray-900">{t('board.createNewBoard')}</h3>
           <p className="mt-1 text-sm text-gray-500">
-            Start from a lightweight template instead of an empty board.
+            {t('board.startFromALightweightTemplateInstead')}
           </p>
         </div>
       )}
@@ -67,22 +69,22 @@ function CreateBoardDialog({ onClose, onSubmitBoard }: CreateBoardDialogProps) {
     >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <InputField
-          label="Board title"
+          label={t('board.boardTitle')}
           messageError={errors.title?.message || ''}
-          placeholder="Frontend System Upgrade"
+          placeholder={t('board.frontendSystemUpgrade')}
           {...register('title')}
         />
 
         <TextAreaField
-          label="Board description"
+          label={t('onboarding.boardDescription')}
           messageError={errors.description?.message || ''}
-          placeholder="Short context for this board"
+          placeholder={t('onboarding.shortContextForThisBoard')}
           {...register('description')}
         />
 
         <div>
           <label className="mb-3 block text-sm font-semibold text-gray-700">
-            Template
+            {t('board.template')}
           </label>
           <BoardTemplatePicker
             selectedTemplateId={selectedTemplateId}

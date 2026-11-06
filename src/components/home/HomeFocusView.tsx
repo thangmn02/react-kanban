@@ -63,7 +63,7 @@ export default function HomeFocusView({ task, session, onMarkDone, onOpenTask, o
   };
 
   return (
-    <main className="mx-auto min-h-[70vh] w-full max-w-[720px] px-5 pb-40 pt-12 sm:px-8 sm:pt-20" aria-busy={saving}>
+    <main id="main" className="mx-auto min-h-[70vh] w-full max-w-[720px] px-5 pb-40 pt-12 sm:px-8 sm:pt-20" aria-busy={saving}>
       <p className="flex items-center gap-2 text-sm text-slate-500"><span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" />{t('briefing.focusingOn')}</p>
       <h1 ref={heading} tabIndex={-1} className="mt-3 break-words text-4xl font-semibold leading-tight tracking-tight text-slate-950 outline-none">{task.title}</h1>
       <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-slate-500"><span>{task.boardTitle}</span>{task.listTitle && <span>{task.listTitle}</span>}<DueDateBadge dueDate={task.dueDate} /></div>

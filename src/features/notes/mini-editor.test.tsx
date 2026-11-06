@@ -1,6 +1,9 @@
-import {act,cleanup,render,screen} from '@testing-library/react';
+import { act, cleanup, render as renderBare, screen } from '@testing-library/react';
+import type { ReactElement } from 'react';
+import { I18nProvider } from '../../i18n';
 import {afterEach,expect,it,vi} from 'vitest';
 import MiniEditor from './mini-editor';
+const render = (ui: ReactElement) => renderBare(ui, { wrapper: I18nProvider });
 
 afterEach(cleanup);
 it('does not save content when mounting or changing editing permission',async()=>{

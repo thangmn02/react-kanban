@@ -1,3 +1,4 @@
+import { translateNow } from '../i18n/context';
 export interface BoardTemplateDefinition {
   id: string;
   name: string;
@@ -8,20 +9,20 @@ export interface BoardTemplateDefinition {
 export const BOARD_TEMPLATES: BoardTemplateDefinition[] = [
   {
     id: 'simple-kanban',
-    name: 'Simple Kora',
-    description: 'A lightweight board for personal tasks and straightforward delivery tracking.',
+    get name() { return translateNow('board.simpleKora'); },
+    get description() { return translateNow('board.aLightweightBoardForPersonalTasks'); },
     lists: ['To-do', 'Doing', 'Done'],
   },
   {
     id: 'software-mini-project',
-    name: 'Software Mini Project',
-    description: 'A small product workflow for planning, building, reviewing, and shipping.',
+    get name() { return translateNow('board.softwareMiniProject'); },
+    get description() { return translateNow('board.aSmallProductWorkflowForPlanning'); },
     lists: ['Backlog', 'In Progress', 'Nearly done', 'Done'],
   },
   {
     id: 'presentation',
-    name: 'Presentation',
-    description: 'A communication-focused flow from research to rehearsal and delivery.',
+    get name() { return translateNow('board.presentation'); },
+    get description() { return translateNow('board.aCommunicationFocusedFlowFromResearch'); },
     lists: ['Research', 'Outline', 'Design Slides', 'Rehearse', 'Delivered'],
   },
 ];

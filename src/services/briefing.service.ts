@@ -7,6 +7,7 @@ import {
 } from '../infrastructure/local/localBoardStore';
 import type { BriefingPin, CreateBriefingPinInput } from '../types/briefing.type';
 import type { BriefingPinInsert, BriefingPinRow } from '../types/supabase.type';
+import { translateNow } from '../i18n/context';
 
 function mapBriefingPin(row: BriefingPinRow): BriefingPin {
   return {
@@ -51,7 +52,7 @@ export async function createBriefingPin(input: CreateBriefingPinInput): Promise<
   if (!supabase) return mapBriefingPin(localCreateBriefingPin(payload));
   const { data, error } = await requireSupabaseClient().from('briefing_pins').insert(payload).select('*').single();
   if (error) throw error;
-  if (!data) throw new Error('Briefing pin was not created.');
+  if (!data) throw new Error(translateNow('app.briefingPinWasNotCreated'));
   return mapBriefingPin(data);
 }
 

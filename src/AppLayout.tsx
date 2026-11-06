@@ -1,4 +1,5 @@
 import {runNotesTransition} from './features/notes/native-notes-lifecycle';
+import { translateNow } from './i18n/context';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import ViewContextBoundary from './app/ViewContextBoundary';
@@ -11,6 +12,7 @@ import { ARCANA_ENABLED, NOTES_PREVIEW_ENABLED } from './constants/features';
 import { useI18n } from './i18n';
 import AppHeader from './components/layout/AppHeader';
 import AppNavigation from './components/layout/AppNavigation';
+import SkipLink from './components/layout/SkipLink';
 import ContextSidebar from './components/layout/context-sidebar';
 import { useAuth } from './hooks/useAuth';
 import { useGlobalKeyboardShortcuts } from './hooks/useGlobalKeyboardShortcuts';
@@ -63,11 +65,11 @@ function AppLayout() {
     if(native)await nativeNotesControl('await_settled');
     if(actorId)await Promise.all([prepareConnectedNotesToClose(actorId),prepareDeviceNotesToClose(actorId)]);
   }catch(reason){if(native)await nativeNotesControl('cancel_close').catch(()=>{});throw reason;}},[actorId,native]);
-  const signOut=useCallback(async()=>{try{await runNotesTransition(async()=>{try{await prepareNotesToLeave();await finishSignOut();}catch(reason){if(native)await nativeNotesControl('cancel_close').catch(()=>{});throw reason;}});}catch(reason){notify.error(`${String(reason)} Your account stays open so you can retry or export the retained draft.`);}},[prepareNotesToLeave,finishSignOut,native]);
+  const signOut=useCallback(async()=>{try{await runNotesTransition(async()=>{try{await prepareNotesToLeave();await finishSignOut();}catch(reason){if(native)await nativeNotesControl('cancel_close').catch(()=>{});throw reason;}});}catch(reason){notify.error(translateNow('app.accountStaysOpen', { reason: String(reason) }));}},[prepareNotesToLeave,finishSignOut,native]);
   const { t } = useI18n();
   const navigate = useNavigate();
   const location = useLocation();
-  useEffect(()=>{if(!native)return;const blocked=(event:Event)=>{setNativeDock(false);navigate('/notes');notify.error(`Kora stayed open: ${String((event as CustomEvent).detail)}`);};window.addEventListener('kora:notes-quit-blocked',blocked);return()=>window.removeEventListener('kora:notes-quit-blocked',blocked);},[native,navigate]);
+  useEffect(()=>{if(!native)return;const blocked=(event:Event)=>{setNativeDock(false);navigate('/notes');notify.error(translateNow('app.stayedOpen', { reason: String((event as CustomEvent).detail) }));};window.addEventListener('kora:notes-quit-blocked',blocked);return()=>window.removeEventListener('kora:notes-quit-blocked',blocked);},[native,navigate]);
   const {
     workspaces,
     activeWorkspace,
@@ -311,6 +313,7 @@ function AppLayout() {
     navigate,
     openEditTaskDialog,
     onTaskCompleted: handleArcanaTaskCompleted,
+    onAddTask: () => setIsQuickTaskOpen(true),
     t,
   });
   const {
@@ -389,7 +392,7 @@ function AppLayout() {
       onWorkspaceChange={(workspaceId) => {
         void(async()=>{try{
           await setActiveWorkspaceId(workspaceId);setIsBoardLoading(true);navigate('/home');
-        }catch(reason){notify.error(`${String(reason)} Your workspace stays open so you can retry or export retained edits.`);}})();
+        }catch(reason){notify.error(translateNow('app.workspaceStaysOpen', { reason: String(reason) }));}})();
       }}
       onSignOut={() => void signOut()}
       onOpenArcanaBooth={() => handleOpenArcanaBooth()}
@@ -491,7 +494,7 @@ function AppLayout() {
   });
 
   if (activeView !== 'contact' && ((activeView !== 'home' && isAuthLoading) || (authMode === 'supabase' && user && isWorkspaceLoading))) {
-    return <div className="flex min-h-screen items-center justify-center bg-canvas text-sm font-medium text-slate-500">Preparing secure workspace...</div>;
+    return <div className="flex min-h-screen items-center justify-center bg-canvas text-sm font-medium text-slate-500">{t('app.preparingSecureWorkspace')}</div>;
   }
 
   const showNavigation = (Boolean(user) && !['auth', 'onboarding', 'invite', 'not-found'].includes(activeView)) || ['home', 'contact'].includes(activeView);
@@ -499,6 +502,7 @@ function AppLayout() {
 
   const content = (
     <FocusSessionProvider value={focusSession}>
+      <SkipLink />
       {showNavigation && <AppNavigation activeView={activeView} onNavigate={setActiveViewWithPath} />}
       <div className={showNavigation ? 'min-h-screen bg-white lg:ml-14 lg:flex' : undefined}>
         {showNavigation && <ContextSidebar key={`${user?.id}:${activeWorkspaceId}`} activeView={activeView} workspaceId={activeWorkspaceId} workspaceName={activeWorkspace?.name} boards={boardController.boardSummaries} activeBoardId={activeBoardId} boardData={boardData} onBoard={boardController.handleOpenBoardFromHome} onHighPriority={filterHighPriority} onDueToday={filterDueToday} onClearFilters={clearBoardFilters} notesSharing={Boolean(user && !user.isMock)} />}

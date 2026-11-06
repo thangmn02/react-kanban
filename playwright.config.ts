@@ -7,7 +7,7 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './e2e',
   globalSetup: './e2e/global-setup.ts',
-  testIgnore: '**/public-auth.spec.ts',
+  testIgnore: ['**/public-auth.spec.ts', '**/first-run.spec.ts'],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -32,6 +32,7 @@ export default defineConfig({
     timeout: 120_000,
     env: {
       VITE_AUTH_MODE: 'mock',
+      VITE_LOCAL_SAMPLE: 'true',
     },
   },
 });

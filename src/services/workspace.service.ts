@@ -2,10 +2,11 @@ import supabase, { requireSupabaseClient } from '../lib/supabase';
 import { DEFAULT_IDENTITY_IMAGE, resolveProfileImage } from './profile.service';
 import type { AppUser, WorkspaceMember, WorkspaceRole, WorkspaceSummary } from '../types/auth.type';
 import { mockWorkspaceMembers } from '../utils/workspaceMembers';
+import { translateNow } from '../i18n/context';
 
 const localWorkspace: WorkspaceSummary = {
   id: 'local-mock-workspace',
-  name: 'Local Workspace',
+  get name() { return translateNow('workspace.localWorkspace'); },
   role: 'owner',
   ownerId: 'mock-user',
 };
@@ -154,7 +155,7 @@ export async function createWorkspaceForCurrentUser(workspaceName: string): Prom
   }
 
   if (!workspaceId) {
-    throw new Error('Workspace was not created.');
+    throw new Error(translateNow('workspace.workspaceWasNotCreated'));
   }
 
   return {

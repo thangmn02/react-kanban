@@ -1,4 +1,5 @@
 import Typography from '../atoms/Typography';
+import { useI18n } from '../../i18n';
 
 interface BoardEmptyStateProps {
   workspaceName?: string;
@@ -6,6 +7,7 @@ interface BoardEmptyStateProps {
 }
 
 export default function BoardEmptyState({ workspaceName, onCreateBoard }: BoardEmptyStateProps) {
+  const { t } = useI18n();
   return (
     <section className="flex min-h-[520px] items-center justify-center bg-canvas px-6 py-12">
       <div className="max-w-xl rounded-3xl border border-slate-200/80 bg-white p-8 text-center shadow-card">
@@ -16,12 +18,12 @@ export default function BoardEmptyState({ workspaceName, onCreateBoard }: BoardE
         />
         <Typography
           component="h2"
-          content="Create your first board"
+          content={t('board.createYourFirstBoard')}
           className="mt-3 text-3xl font-semibold tracking-[-0.03em] text-slate-950"
         />
         <Typography
           component="p"
-          content="Start from a lightweight template so your workspace has useful lists immediately."
+          content={t('board.startFromALightweightTemplateSo')}
           className="mt-3 text-sm leading-6 text-slate-500"
         />
         <button
@@ -29,7 +31,7 @@ export default function BoardEmptyState({ workspaceName, onCreateBoard }: BoardE
           onClick={onCreateBoard}
           className="mt-6 cursor-pointer rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-blue-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-100"
         >
-          Create board
+          {t('home.createBoard')}
         </button>
       </div>
     </section>

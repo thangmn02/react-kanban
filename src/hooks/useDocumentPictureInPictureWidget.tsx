@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import FloatingFocus, { type FloatingFocusProps } from '../components/focus/FloatingFocus';
 import floatingFocusStyles from '../components/focus/floatingFocus.css?inline';
 import { useI18n } from '../i18n';
+import { translateNow } from '../i18n/context';
 
 // Copy readable rules; external sheets fall back to a link instead of breaking
 // PiP on a cross-origin SecurityError. Relative assets keep the opener's base.
@@ -95,8 +96,8 @@ export function useDocumentPictureInPicture(props: FloatingFocusProps) {
   }, [ensureHost, returnToTab]);
 
   const openPictureInPicture = useCallback(async () => {
-    if (!window.documentPictureInPicture) throw new Error('Floating timer is not supported in this browser.');
-    if (!hasRunnableTimer && !pageRef.current) throw new Error('Pin a focus task before opening the floating timer.');
+    if (!window.documentPictureInPicture) throw new Error(translateNow('toast.floatingTimerUnsupported'));
+    if (!hasRunnableTimer && !pageRef.current) throw new Error(translateNow('app.pinAFocusTaskBeforeOpening'));
     if (pipWindowRef.current && !pipWindowRef.current.closed) { pipWindowRef.current.focus(); return; }
     if (openingRef.current) return;
     openingRef.current = true;
@@ -156,7 +157,7 @@ export function useDocumentPictureInPicture(props: FloatingFocusProps) {
       {...props} isWidget={Boolean(pipWindow)} canPopOut={isSupported} widgetError={widgetError}
       isMinimized={!pipWindow && (props.isMinimized || parked)}
       onPopOut={() => { void openPictureInPicture().catch(() => { if (mountedRef.current) setWidgetError(t('dock.widgetFailed')); }); }}
-      onReturnToTab={closePictureInPicture} onDismiss={dismiss}
+      onReturnToTab={closePictureInPicture} onDismiss={dismiss} onAddTask={pipWindow ? undefined : props.onAddTask}
     />, target) : null,
   };
 }
