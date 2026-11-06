@@ -8,6 +8,7 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: 'jsdom',
+    env: { VITE_LOCAL_SAMPLE: 'true' },
     // Discover both `.ts` and `.tsx` test/spec files. Previously this only
     // matched `*.test.ts`, so component/route tests written in TSX were
     // silently ignored by Vitest.

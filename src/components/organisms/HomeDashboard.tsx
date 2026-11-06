@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import FirstRunCard from '../home/FirstRunCard';
+import { isLocalDemoMode } from '../../lib/supabase';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 import { fetchHomeDashboardData, type HomeDashboardData, type HomeTaskSummary } from '../../services/home.service';
 import type { AppUser, WorkspaceSummary } from '../../types/auth.type';
@@ -187,6 +189,7 @@ function HomeBriefing({ currentUser, activeWorkspace, onOpenTask, onOpenBoard,
           {error && <div className="mt-8"><ErrorState title={t('today.errorTitle')} description={t('today.errorDescription')} details={error} onRetry={() => { setError(null); setAttempt((value) => value + 1); }} /></div>}
 
           {showBriefing && <>
+            {currentUser && !tasks.length && !plannedTasks.length && <FirstRunCard localPreview={isLocalDemoMode} onAddTask={onCreateTask} primaryButton={primaryButton} quietButton={quietButton} />}
             {resumeTask ? <ContinueCard task={resumeTask} nextSteps={focusControls!.session.nextSteps} currentUser={currentUser} taskRevision={taskRevision}
               onContinue={() => startTask(resumeTask)} onOpenTask={() => onOpenTask(resumeTask.id, resumeTask.boardId)}
               primaryButton={primaryButton} quietButton={quietButton} sectionLabel={sectionLabel} />

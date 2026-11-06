@@ -11,7 +11,7 @@ import type { AppUser } from '../types/auth.type';
 
 const mockUser: AppUser = {
   id: 'mock-user',
-  email: 'bonnie@example.com',
+  email: 'guest@example.com',
   name: CURRENT_USER.name,
   avatarUrl: DEFAULT_IDENTITY_IMAGE,
   legacyName: CURRENT_USER.name,

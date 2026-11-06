@@ -21,6 +21,7 @@ import { data as seedBoardData } from '../../data';
 import { findBoardTemplateById } from '../../data/boardTemplates';
 import {
   DEFAULT_BOARD_TITLE,
+  SAMPLE_BOARD_TITLE,
   DEFAULT_TASK_CATEGORIES,
   DEFAULT_TASK_PRIORITY,
   ERROR_MESSAGES,
@@ -76,6 +77,9 @@ const BOARD_STORE_FEATURE = 'board_store';
 const MOCK_SCOPE: StorageScope = { userId: 'mock-user', workspaceId: 'local-mock-workspace' };
 export const LOCAL_MOCK_WORKSPACE_ID = 'local-mock-workspace';
 const LOCAL_MOCK_BOARD_ID = 'local-mock-board';
+export const LOCAL_SAMPLE_BOARD_ID = 'local-sample-board';
+/** Development and tests opt in; a new local workspace otherwise starts empty. */
+const seedsSample = () => import.meta.env.VITE_LOCAL_SAMPLE === 'true';
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -91,13 +95,25 @@ function serializeAssignees(assignees: TaskAssignee[] | undefined): Json {
 }
 
 
-function seedState(): LocalBoardState {
+function emptyState(): LocalBoardState {
+  const now = nowIso();
+  const board: BoardRow = { id: LOCAL_MOCK_BOARD_ID, workspace_id: LOCAL_MOCK_WORKSPACE_ID, title: DEFAULT_BOARD_TITLE, description: null, created_by: null, created_at: now, updated_at: null, archived_at: null };
+  const lists: ListRow[] = ['To do', 'In progress', 'Done'].map((title, index) => ({
+    id: `local-list-${index + 1}`, workspace_id: LOCAL_MOCK_WORKSPACE_ID, board_id: LOCAL_MOCK_BOARD_ID, title,
+    position: index * LIST_POSITION_STEP, created_at: now, updated_at: null, archived_at: null,
+  }));
+  return { boards: [board], lists, tasks: [], checklistItems: [], labels: [], labelLinks: [], activities: [], briefingPins: [] };
+}
+
+const seedState = () => seedsSample() ? sampleState(LOCAL_MOCK_BOARD_ID) : emptyState();
+
+function sampleState(boardId: string): LocalBoardState {
   const now = nowIso();
   const boardRow: BoardRow = {
-    id: LOCAL_MOCK_BOARD_ID,
+    id: boardId,
     workspace_id: LOCAL_MOCK_WORKSPACE_ID,
-    title: DEFAULT_BOARD_TITLE,
-    description: 'Local demo board',
+    title: SAMPLE_BOARD_TITLE,
+    description: 'Sample tasks to explore Kora',
     created_by: null,
     created_at: now,
     updated_at: null,
@@ -117,7 +133,7 @@ function seedState(): LocalBoardState {
     lists.push({
       id: listItem.id,
       workspace_id: LOCAL_MOCK_WORKSPACE_ID,
-      board_id: LOCAL_MOCK_BOARD_ID,
+      board_id: boardId,
       title: listItem.title,
       position: listIndex * LIST_POSITION_STEP,
       created_at: now,
@@ -131,7 +147,7 @@ function seedState(): LocalBoardState {
 
       tasks.push({
         id: task.id,
-        board_id: LOCAL_MOCK_BOARD_ID,
+        board_id: boardId,
         list_id: listItem.id,
         workspace_id: LOCAL_MOCK_WORKSPACE_ID,
         title: task.title,
@@ -166,7 +182,7 @@ function seedState(): LocalBoardState {
       task.labels.forEach((label) => {
         if (!labels.some((l) => l.id === label.id)) {
           labels.push({
-            id: label.id, board_id: LOCAL_MOCK_BOARD_ID,
+            id: label.id, board_id: boardId,
             workspace_id: LOCAL_MOCK_WORKSPACE_ID,
             name: label.name, color: label.color,
             created_at: now, updated_at: null,
@@ -256,6 +272,31 @@ function saveState(): void {
 
 export function resetLocalBoardStore(): void {
   cachedState = seedState();
+  saveState();
+}
+
+/** Adds the labeled sample next to whatever the workspace already holds. Safe to call twice. */
+export function localCreateSampleBoard(): BoardRow {
+  const state = getState();
+  const existing = state.boards.find(board => board.id === LOCAL_SAMPLE_BOARD_ID);
+  if (existing) return existing;
+  const sample = sampleState(LOCAL_SAMPLE_BOARD_ID);
+  for (const key of ['boards', 'lists', 'tasks', 'checklistItems', 'labels', 'labelLinks'] as const) (state[key] as unknown[]).push(...sample[key]);
+  saveState();
+  return sample.boards[0];
+}
+
+/** Removes the on-demand sample and everything in it. Other boards are untouched. */
+export function localRemoveSampleBoard(): void {
+  const state = getState();
+  const tasks = new Set(state.tasks.filter(task => task.board_id === LOCAL_SAMPLE_BOARD_ID).map(task => task.id));
+  state.boards = state.boards.filter(board => board.id !== LOCAL_SAMPLE_BOARD_ID);
+  state.lists = state.lists.filter(list => list.board_id !== LOCAL_SAMPLE_BOARD_ID);
+  state.tasks = state.tasks.filter(task => !tasks.has(task.id));
+  state.checklistItems = state.checklistItems.filter(item => !tasks.has(item.task_id));
+  state.labelLinks = state.labelLinks.filter(link => !tasks.has(link.task_id));
+  state.labels = state.labels.filter(label => label.board_id !== LOCAL_SAMPLE_BOARD_ID);
+  state.activities = state.activities.filter(activity => activity.board_id !== LOCAL_SAMPLE_BOARD_ID);
   saveState();
 }
 

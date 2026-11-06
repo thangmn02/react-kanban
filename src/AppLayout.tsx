@@ -311,6 +311,7 @@ function AppLayout() {
     navigate,
     openEditTaskDialog,
     onTaskCompleted: handleArcanaTaskCompleted,
+    onAddTask: () => setIsQuickTaskOpen(true),
     t,
   });
   const {

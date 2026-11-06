@@ -22,7 +22,7 @@ test('canonical workflow agrees across Board, Task Detail, Focus, Today and drag
  await page.reload();expect((await storedTask(page,'Workflow proof')).task.completed_at).toBeNull();
  await page.getByRole('button',{name:'Open task: Workflow proof',exact:true}).click();
  const editor=page.getByRole('dialog',{name:'Edit task'});
- await editor.getByRole('button',{name:'Assign members',exact:true}).click();await editor.getByRole('button',{name:/Bonnie Green/}).click();
+ await editor.getByRole('button',{name:'Assign members',exact:true}).click();await editor.getByRole('button',{name:/Guest/}).click();
  await editor.locator('div.fixed.inset-0.z-10').click({position:{x:5,y:5}});
  await editor.getByLabel('Due date',{exact:true}).fill(await page.evaluate(()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}));
  const rich=editor.locator('[contenteditable="true"]');await rich.fill('First paragraph');await rich.press('Enter');await rich.pressSequentially('Second paragraph');

@@ -8,7 +8,7 @@ export const mockWorkspaceMembers: WorkspaceMember[] = AVAILABLE_ASSIGNEES.map((
   workspaceId: 'local-mock-workspace',
   role: index === 0 ? 'owner' : 'member',
   name: assignee.name,
-  email: index === 0 ? 'bonnie@example.com' : null,
+  email: index === 0 ? 'guest@example.com' : null,
   avatarUrl: assignee.avatar,
   createdAt: new Date(0).toISOString(),
 }));
