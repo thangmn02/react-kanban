@@ -73,7 +73,7 @@ export default function NativeNoteWindow() {
           <button type="button" aria-label="Collapse external note" className="min-h-8 px-2" onClick={()=>{void nativeNoteRequest('flags',{collapsed:true});}}>−</button>
           <button type="button" aria-label="Hide external note" className="min-h-8 px-2" onClick={()=>{void nativeNoteRequest('hide');}}>×</button>
         </header>
-        <div className="min-h-0 flex-1 space-y-2 overflow-auto p-3">
+        <div className="quiet-scroll-fade min-h-0 flex-1 space-y-2 overflow-auto p-3">
           <input aria-label="Note title" value={note.title} maxLength={160} readOnly={snapshot.readOnly||preparingClose} className="w-full bg-transparent text-base font-semibold outline-none focus-visible:ring-2 focus-visible:ring-blue-500" placeholder="Untitled note" onChange={event=>change({title:event.target.value})}/>
           <MiniEditor html={note.html} compact={false} minimal readOnly={snapshot.readOnly||preparingClose} onChange={html=>change({html})}/>
           {!!note.checklist.length&&<ul className="space-y-2">{note.checklist.map(item=><li key={item.id}><label className="flex gap-2 text-sm"><input type="checkbox" disabled={snapshot.readOnly||preparingClose} checked={item.isDone} onChange={event=>change({checklist:note.checklist.map(row=>row.id===item.id?{...row,isDone:event.target.checked}:row)})}/><span className={item.isDone?'line-through opacity-60':''}>{item.text}</span></label></li>)}</ul>}

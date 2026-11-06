@@ -19,6 +19,7 @@
 /* Appearance: generated dark palette and accent ramps, then the hand-written exceptions. */
 @import "./styles/kora-appearance.css";
 @import "./styles/kora-appearance-overrides.css";
+@import "./styles/quiet-scrollbars.css";
 
 /*
  * Design foundation tokens (Phase 0).
