@@ -10,7 +10,7 @@ import type { Json, TaskActivityInsert, TaskActivityRow } from '../types/supabas
 
 const DEFAULT_ACTOR = {
   name: 'You',
-  avatar: 'https://flowbite.com/application-ui/demo/images/users/bonnie-green.png',
+  avatar: '/logo.png',
 };
 
 const TASK_ACTIVITY_ACTIONS: ITaskActivity['action'][] = [

@@ -156,7 +156,7 @@ export function useDocumentPictureInPicture(props: FloatingFocusProps) {
       {...props} isWidget={Boolean(pipWindow)} canPopOut={isSupported} widgetError={widgetError}
       isMinimized={!pipWindow && (props.isMinimized || parked)}
       onPopOut={() => { void openPictureInPicture().catch(() => { if (mountedRef.current) setWidgetError(t('dock.widgetFailed')); }); }}
-      onReturnToTab={closePictureInPicture} onDismiss={dismiss}
+      onReturnToTab={closePictureInPicture} onDismiss={dismiss} onAddTask={pipWindow ? undefined : props.onAddTask}
     />, target) : null,
   };
 }

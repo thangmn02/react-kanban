@@ -24,17 +24,25 @@ afterEach(() => cleanup());
 const renderDock = (value = props) => render(<I18nProvider><FloatingFocus {...value} /></I18nProvider>);
 
 it('defaults to glass Tabs with a persistent timer and real focus-task actions', () => {
-  const view = renderDock();
+  const view = renderDock({ ...props, isWidget: true });
   expect(view.container.querySelector('.floating-focus.glass')).toHaveAttribute('data-style', 'tabs');
   expect(screen.getByRole('tab', { name: 'Tasks' })).toHaveAttribute('aria-selected', 'true');
   fireEvent.click(screen.getByRole('button', { name: /Next task.*Personal Tasks/ }));
   expect(props.onActiveTaskChange).toHaveBeenCalledWith('two');
   fireEvent.click(screen.getByRole('button', { name: 'Mark done: Next task' }));
   expect(props.onMarkDoneAndNext).toHaveBeenCalledWith('two');
-  fireEvent.click(screen.getByRole('button', { name: 'Open Kora' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Back to Kora' }));
   expect(props.onReturnToTab).toHaveBeenCalledOnce();
   fireEvent.click(screen.getByRole('button', { name: 'Start' }));
   expect(props.onStart).toHaveBeenCalledOnce();
+});
+
+it('offers Add a task when empty inside Kora and no dead return link', () => {
+  const onAddTask = vi.fn();
+  renderDock({ ...props, activeTask: null, focusTasks: [], onAddTask });
+  expect(screen.queryByRole('button', { name: 'Back to Kora' })).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Add a task' }));
+  expect(onAddTask).toHaveBeenCalledOnce();
 });
 
 it('reserves the same mini-player wrapper across tabs and idle playback', () => {

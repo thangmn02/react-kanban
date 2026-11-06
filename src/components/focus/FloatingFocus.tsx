@@ -31,6 +31,8 @@ export interface FloatingFocusProps {
   onPopOut?: () => void;
   onOpenNotes?: () => void;
   onReturnToTab?: () => void;
+  /** Present inside Kora; an empty task list offers this instead of a return link. */
+  onAddTask?: () => void;
   onDismiss?: () => void;
   isWidget?: boolean;
   canPopOut?: boolean;
@@ -224,8 +226,9 @@ export default function FloatingFocus(props: FloatingFocusProps) {
             <button type="button" className="dock-work-task" disabled={!onActiveTaskChange || task.isDone} aria-pressed={task.id === taskId}
               onClick={() => onActiveTaskChange?.(task.id)}><span>{task.title}</span><small>{[task.boardTitle, task.listTitle].filter(Boolean).join(' · ')}</small></button>
             {task.id === taskId && !task.isDone && <span className="dock-work-current">{t('dock.currentTask')}</span>}
-          </li>)}</ul> : <p className="dock-empty muted">{t('home.focusEmptyTitle')}</p>}
-          {props.onReturnToTab && <button type="button" className="dock-plan-link" onClick={props.onReturnToTab}>{props.returnLabel || t('dock.openKora')} <span aria-hidden="true">→</span></button>}
+          </li>)}</ul> : <p className="dock-empty muted">{t('home.focusEmptyTitle')} {t('home.focusEmptyDescription')}</p>}
+          {!tasks.length && props.onAddTask ? <button type="button" className="dock-plan-link" onClick={props.onAddTask}>{t('dock.addTask')} <span aria-hidden="true">→</span></button>
+            : props.isWidget && props.onReturnToTab && <button type="button" className="dock-plan-link" onClick={props.onReturnToTab}>{props.returnLabel || t('dock.openKora')} <span aria-hidden="true">→</span></button>}
         </section>
         <motion.section id={`${groupId}-beat`} layout layoutId="beat-grid" className={`dock-panel dock-beat-pane${preferences.palette === 'ultraviolet' ? ' ultraviolet' : ''}`}
           data-card="beat" aria-label={t('dock.beat')} aria-hidden={hidden('beat')} inert={hidden('beat')}
