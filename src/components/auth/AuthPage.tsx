@@ -88,7 +88,7 @@ export default function AuthPage({ onAuthenticated }: AuthPageProps) {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-canvas px-5 py-10">
+    <main id="main" className="flex min-h-screen items-center justify-center bg-canvas px-5 py-10">
       <section className="grid w-full max-w-5xl overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-card lg:grid-cols-[0.95fr_1.05fr]">
         <aside className="hidden bg-slate-950 p-8 lg:flex lg:flex-col lg:justify-between">
           <div>

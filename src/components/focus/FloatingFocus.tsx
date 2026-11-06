@@ -108,7 +108,7 @@ export default function FloatingFocus(props: FloatingFocusProps) {
   const hidden = (card: Card) => card !== 'focus' && card !== activeTab;
 
   return <LayoutGroup id={groupId}>
-    <main ref={dockRef} className="floating-focus glass" aria-label="Floating Focus" data-style="tabs" data-appearance={appearance.resolved}>
+    <section ref={dockRef} className="floating-focus glass" aria-label="Floating Focus" data-style="tabs" data-appearance={appearance.resolved}>
       <div className="dock-toolbar" ref={toolbarRef} data-draggable={Boolean(props.onDragStart)} onPointerDown={(event) => {
         if (event.button === 0 && !(event.target as HTMLElement).closest('button, a, input, select, textarea, [role="dialog"]')) props.onDragStart?.();
       }}>
@@ -245,6 +245,6 @@ export default function FloatingFocus(props: FloatingFocusProps) {
       </motion.div>
       <MusicSetup music={music} />
       {props.widgetError && <p className="widget-error muted" role="status">{props.widgetError}</p>}
-    </main>
+    </section>
   </LayoutGroup>;
 }

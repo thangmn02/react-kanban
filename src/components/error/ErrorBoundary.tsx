@@ -84,7 +84,7 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
       : 'The app ran into an unexpected problem. Reloading usually fixes it.';
 
     return (
-      <main
+      <main id="main"
         role="alert"
         className="flex min-h-screen items-center justify-center bg-[#F8F9FA] px-6 py-12"
       >

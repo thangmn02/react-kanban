@@ -126,7 +126,7 @@ export default function AcceptInvitePage({
   }, [currentUser.email, emailMatchesInvite, invite, onAccepted, token]);
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#F8F9FA] px-5 py-10">
+    <main id="main" className="flex min-h-screen items-center justify-center bg-[#F8F9FA] px-5 py-10">
       <section className="w-full max-w-xl rounded-3xl border border-slate-200/80 bg-white p-6 shadow-[0_28px_90px_rgba(15,23,42,0.13)] sm:p-8">
         <div className="flex items-start justify-between gap-4">
           <div>

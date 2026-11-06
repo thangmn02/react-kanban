@@ -12,7 +12,7 @@ const shades = ['50', '100', '200', '300', '400', '500', '600', '700', '800', '9
 const neutrals = ['slate', 'gray', 'zinc', 'neutral', 'stone'];
 const chromatic = Object.keys(palette).filter(hue => !neutrals.includes(hue) && shades.every(shade => palette[hue][shade]));
 // Apple-style graphite ramp, inverted: 900 is primary text, 500 secondary, 200 a hairline, 50 an inset fill.
-const graphite = { 50: '#19191c', 100: '#242428', 200: '#303035', 300: '#424248', 400: '#7c7c82', 500: '#98989f',
+const graphite = { 50: '#19191c', 100: '#242428', 200: '#303035', 300: '#424248', 400: '#8e8e93', 500: '#98989f',
   600: '#b4b4ba', 700: '#cdcdd2', 800: '#e3e3e8', 900: '#f2f2f7', 950: '#fbfbfd' };
 const surface = '#1c1c1e';
 // Tints sit on the dark card; mid shades keep their weight; text shades lighten.

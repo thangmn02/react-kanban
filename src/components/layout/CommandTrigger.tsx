@@ -30,7 +30,7 @@ export default function CommandTrigger({
         </svg>
         <span className="hidden text-sm font-medium sm:inline">{placeholder}</span>
       </span>
-      <kbd className="hidden rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[11px] font-semibold text-slate-400 sm:inline">
+      <kbd className="hidden rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[11px] font-semibold text-slate-500 sm:inline">
         {shortcutHint}
       </kbd>
     </button>

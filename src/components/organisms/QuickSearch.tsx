@@ -157,6 +157,7 @@ export default function QuickSearch({
           type="text"
           value={searchQuery}
           onChange={(e) => onSearchQueryChange(e.target.value)}
+          aria-label={t('board.searchTasksLabel')}
           placeholder={t('board.searchTasks')}
           className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 py-2.5 pl-10 pr-4 text-sm text-slate-800 shadow-inner outline-none transition focus:border-sky-200 focus:bg-white focus:ring-4 focus:ring-sky-100"
         />

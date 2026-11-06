@@ -11,6 +11,7 @@ import { ARCANA_ENABLED, NOTES_PREVIEW_ENABLED } from './constants/features';
 import { useI18n } from './i18n';
 import AppHeader from './components/layout/AppHeader';
 import AppNavigation from './components/layout/AppNavigation';
+import SkipLink from './components/layout/SkipLink';
 import ContextSidebar from './components/layout/context-sidebar';
 import { useAuth } from './hooks/useAuth';
 import { useGlobalKeyboardShortcuts } from './hooks/useGlobalKeyboardShortcuts';
@@ -499,6 +500,7 @@ function AppLayout() {
 
   const content = (
     <FocusSessionProvider value={focusSession}>
+      <SkipLink />
       {showNavigation && <AppNavigation activeView={activeView} onNavigate={setActiveViewWithPath} />}
       <div className={showNavigation ? 'min-h-screen bg-white lg:ml-14 lg:flex' : undefined}>
         {showNavigation && <ContextSidebar key={`${user?.id}:${activeWorkspaceId}`} activeView={activeView} workspaceId={activeWorkspaceId} workspaceName={activeWorkspace?.name} boards={boardController.boardSummaries} activeBoardId={activeBoardId} boardData={boardData} onBoard={boardController.handleOpenBoardFromHome} onHighPriority={filterHighPriority} onDueToday={filterDueToday} onClearFilters={clearBoardFilters} notesSharing={Boolean(user && !user.isMock)} />}

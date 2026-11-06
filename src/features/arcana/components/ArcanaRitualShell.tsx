@@ -123,7 +123,7 @@ function ArcanaRitualShell({
           })}
         </div>
 
-        <main className="arcana-stage" aria-live="polite">
+        <main id="main" className="arcana-stage" aria-live="polite">
           {children}
         </main>
       </section>

@@ -44,7 +44,7 @@ export default function OnboardingPage({
   };
 
   return (
-    <main className="min-h-screen bg-canvas px-6 py-10">
+    <main id="main" className="min-h-screen bg-canvas px-6 py-10">
       <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
         <section className="rounded-3xl border border-slate-200/80 bg-white p-8 shadow-card">
           <Typography

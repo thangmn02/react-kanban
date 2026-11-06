@@ -75,7 +75,7 @@ function CalendarBoardView({ boardData, searchQuery, filterPriority, filterAssig
   };
 
   return (
-    <main className="px-4 pb-8 pt-2 sm:px-6">
+    <div className="px-4 pb-8 pt-2 sm:px-6">
       <div className="mx-auto grid max-w-6xl gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)]">
         <section className="rounded-[1.4rem] border border-slate-200 bg-white p-4 shadow-sm sm:p-6" aria-label={t('calendar.title')}>
           <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
@@ -130,7 +130,7 @@ function CalendarBoardView({ boardData, searchQuery, filterPriority, filterAssig
           )}
         </aside>
       </div>
-    </main>
+    </div>
   );
 }
 

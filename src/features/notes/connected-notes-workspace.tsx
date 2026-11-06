@@ -70,7 +70,7 @@ export default function ConnectedNotesWorkspace({ user, workspace, members, pers
     }setTransferStatus(`Imported ${imported} private copies; reused ${reused} existing copies. Originals retained.`);setShowImport(false);setBundle(null);
   });
   const button = 'min-h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 disabled:opacity-50';
-  return <main className="p-4 sm:p-6" aria-busy={snapshot.loading}>
+  return <main id="main" className="p-4 sm:p-6" aria-busy={snapshot.loading}>
     <NativeNotesControls userId={user.id}/>
     <input type="file" ref={importFile} accept="application/json,.json" aria-label="Choose Notes bundle" className="hidden" onChange={event=>{const file=event.target.files?.[0];event.target.value='';if(!file)return;if(file.size>20*1024*1024){setError('Choose a Notes bundle under 20 MB.');return;}void file.text().then(text=>{setBundle(parseNotesBundle(text));setShowImport(true);setError('');}).catch(reason=>setError(String(reason)));}}/>
     {canCreate&&<button type="button" disabled={busy} className={`${button} mb-3`} onClick={()=>importFile.current?.click()}>Import Notes bundle…</button>}

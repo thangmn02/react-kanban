@@ -13,6 +13,8 @@ export default function BoardChrome({ context, children }: { context: AppLayoutR
   return (
     <div className="min-h-screen bg-canvas">
       {context.header}
+      <main id="main">
+      <h1 className="sr-only">{context.board.header.activeBoardSummary?.title || t('navigation.board')}</h1>
       <BoardHeader {...context.board.header} />
       {(context.isBoardLoading || context.isSavingBoard) && (
         <div role="status" className="border-b border-gray-200 bg-white px-4 py-2 text-sm text-gray-600">
@@ -34,6 +36,7 @@ export default function BoardChrome({ context, children }: { context: AppLayoutR
       <BoardToolbar {...context.board.toolbar} />
       {workflow.mode === 'completion-only' && <p role="note" className="px-4 py-2 text-xs text-slate-600 sm:px-6">{t('board.noDoneList')}</p>}
       <div aria-busy={context.isBoardLoading} inert={context.isBoardLoading || Boolean(context.boardErrorMessage)}>{children}</div>
+      </main>
     </div>
   );
 }
