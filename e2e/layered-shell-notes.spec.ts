@@ -23,7 +23,7 @@ test('layered shell retains routes, context filters, collapsed state and running
   await page.screenshot({ path: `${evidence}/shell-board-desktop.png` });
   await nav.getByRole('button', { name: 'Focus', exact: true }).click();
   await expect.poll(async () => (await context.boundingBox())!.width).toBe(40);
-  const dock = page.getByRole('main', { name: 'Floating Focus' });
+  const dock = page.getByRole('region', { name: 'Floating Focus' });
   const marker = await dock.evaluate(el => { el.setAttribute('data-continuity-probe', 'mounted'); return true; }); expect(marker).toBe(true);
   await nav.getByRole('button', { name: 'Notes', exact: true }).click();
   await nav.getByRole('button', { name: 'Focus', exact: true }).click();
