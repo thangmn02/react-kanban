@@ -51,7 +51,7 @@ function NoteCard({ note, onChange, tasks, boardId, onConvert, onOpenTask, readO
         <button type="button" aria-label="Pin note" aria-pressed={note.pinned} className={button} onClick={() => onChange({ pinned: !note.pinned })}>{note.pinned ? 'Pinned' : 'Pin'}</button>
         <button type="button" aria-label="Minimize note" aria-expanded={!note.minimized} className={button} onClick={() => onChange({ minimized: !note.minimized })}>{note.minimized ? '+' : '−'}</button>
       </header>
-      <div hidden={note.minimized} className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
+      <div hidden={note.minimized} className="quiet-scroll-fade min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
         {ownerLabel && <p className="text-xs opacity-80">Owner: {ownerLabel}{readOnly ? ' · Read only' : ''}</p>}
         <input aria-label="Note title" readOnly={readOnly} maxLength={160} value={note.title} placeholder="Untitled note" onChange={event => onChange({ title: event.target.value })} className="w-full bg-transparent text-base font-semibold text-inherit outline-none focus-visible:ring-2 focus-visible:ring-blue-500" />
         <MiniEditor html={note.html} compact={!note.expanded} readOnly={readOnly} onConvertSelection={onConvertSelection} conversionPending={conversionPending} onChange={html => onChange({ html })} />
