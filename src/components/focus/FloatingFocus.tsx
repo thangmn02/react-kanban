@@ -16,6 +16,8 @@ export interface FloatingFocusProps {
   onTabChange?: (tab: 'focus' | 'beat' | 'music') => void;
   isMinimized?: boolean;
   activeTask: FocusTask | null;
+  /** Where to pick the active task up again; shown on the dock so it is visible without opening the app. */
+  nextStep?: string;
   focusTasks: FocusTask[];
   timerState: PomodoroTimerState;
   timerSettings?: PomodoroTimerSettings;
@@ -199,6 +201,7 @@ export default function FloatingFocus(props: FloatingFocusProps) {
           <motion.div key={timerState.mode} className="dock-cycle" role="status" aria-live="polite"
             initial={reducedMotion ? false : { opacity: 0, y: 3 }} animate={{ opacity: 1, y: 0 }}
             transition={reducedMotion ? { duration: 0 } : uiFade}>{modeLabel}</motion.div>
+          {props.nextStep && !activeTask?.isDone && <p className="max-w-full truncate text-xs text-slate-400" title={props.nextStep}>{t('focus.dock.nextStep', { step: props.nextStep })}</p>}
           <div className="dock-focus-actions">
             <button type="button" className="solid dock-start" onClick={timerState.isRunning ? onPause : onStart}
               disabled={!timerState.isRunning && timerState.mode === 'focus' && Boolean(activeTask?.isDone)}

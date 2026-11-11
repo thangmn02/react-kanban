@@ -35,6 +35,8 @@ export default function HomeFocusView({ task, session, onMarkDone, onOpenTask, o
     setDraftIntention('');
     setExiting(false);
   }, [task.id]);
+  // One press when something pulls you away: the timer stops and the only question is where to pick up.
+  const interrupt = () => { session.pauseTimer(); setExitDraft(intention); setExiting(true); };
   const exit = (save: boolean) => {
     if (save) session.saveNextStep(task.id, exitDraft, { paused: true });
     else session.saveNextStep(task.id, intention, { paused: true });
@@ -118,6 +120,7 @@ export default function HomeFocusView({ task, session, onMarkDone, onOpenTask, o
           </button>
         )}
         <button type="button" disabled={saving || task.isDone} className={primaryAction} onClick={() => void complete()}>{t('common.markDone')}</button>
+        <button type="button" disabled={saving} className={button} aria-expanded={exiting} onClick={interrupt}>{t('focus.interrupted')}</button>
         <button type="button" disabled={saving} className={button} aria-expanded={exiting} onClick={() => { setExitDraft(intention); setExiting(true); }}>{t('briefing.exitFocus')}</button>
       </div>
       {exiting && (

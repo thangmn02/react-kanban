@@ -159,6 +159,7 @@ export function useAppFocusIntegration({
     onDismiss: () => navigate('/home'),
     onAddTask,
     activeTask: focus.selectedTimerTask || focus.activeFocusTask,
+    nextStep: focus.nextSteps[(focus.selectedTimerTask || focus.activeFocusTask)?.id ?? '']?.text,
     focusTasks: focus.focusTasks,
     timerState: focus.timerState,
     remainingSeconds: focus.remainingSeconds,

@@ -10,6 +10,8 @@ interface FocusTaskMiniCardProps {
   onOpenTask: (task: FocusTask) => void;
   onMarkDone: (task: FocusTask) => void;
   onRemove: (taskId: string) => void;
+  /** Where to pick this task up again. */
+  nextStep?: string;
 }
 
 function FocusTaskMiniCard({
@@ -19,6 +21,7 @@ function FocusTaskMiniCard({
   onOpenTask,
   onMarkDone,
   onRemove,
+  nextStep,
 }: FocusTaskMiniCardProps) {
   const { t } = useI18n();
   const priorityBadgeClass = getPriorityBadgeClass(task.priority);
@@ -54,6 +57,7 @@ function FocusTaskMiniCard({
               {task.boardTitle}{task.listTitle ? ` - ${task.listTitle}` : ''}
             </p>
           </button>
+          {nextStep && !task.isDone && <p className="mt-1 line-clamp-2 text-xs text-sky-200" title={nextStep}>{t('focus.dock.nextStep', { step: nextStep })}</p>}
 
           <div className="mt-2 flex flex-wrap items-center gap-2">
             {task.priority && priorityBadgeClass && (

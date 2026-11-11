@@ -16,6 +16,7 @@ src/components/organisms/HomeDashboard.tsx	`${t('home.startFocus')}: ${task.titl
 src/components/organisms/QuickSearch.tsx	`${t('command.deleteSavedFilter')}: ${filter.name}`
 src/components/organisms/dialog/CreateBoardDialog.tsx	templateId
 src/components/organisms/dialog/ProgressReportDialog.tsx	Clipboard API unavailable
+src/components/organisms/dialog/TaskDialog.tsx	`${t('link.openBeside')}: ${item.name || item.url}`
 src/components/organisms/dialog/TaskDialog.tsx	`${t('task.labelColor')}: ${color}`
 src/components/organisms/dialog/TaskDialog.tsx	`${t('task.removeAttachment')}: ${attachment.name}`
 src/components/organisms/dialog/TaskDialog.tsx	`${t('task.removeChecklistItem')}: ${item.text || t('task.untitled')}`

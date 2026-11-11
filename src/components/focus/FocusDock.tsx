@@ -16,6 +16,8 @@ import FocusTaskMiniCard from './FocusTaskMiniCard';
 import PomodoroTimer from './PomodoroTimer';
 
 interface FocusDockProps {
+  /** Each task's Next step, shown on its card. */
+  nextSteps?: Record<string, { text: string }>;
   focusTasks: FocusTask[];
   showWhenEmpty?: boolean;
   activeTaskId: string | null;
@@ -41,6 +43,7 @@ interface FocusDockProps {
 }
 
 function FocusDock({
+  nextSteps,
   focusTasks,
   showWhenEmpty = false,
   activeTaskId,
@@ -117,6 +120,7 @@ function FocusDock({
                   key={focusTask.id}
                   task={focusTask}
                   isActive={focusTask.id === activeTaskId}
+                  nextStep={nextSteps?.[focusTask.id]?.text}
                   onActivate={onActiveTaskChange}
                   onOpenTask={onOpenTask}
                   onMarkDone={onMarkDone}

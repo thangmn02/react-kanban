@@ -52,3 +52,15 @@ it('keeps the view on failed completion and exits only after persisted success',
   // A finished task needs no place to resume.
   expect(props.session.clearNextStep).toHaveBeenCalledWith('a');
 });
+it('Interrupted stops the timer, asks only where to pick up, and leaves once answered', () => {
+  const props = controls(); const exit = vi.fn();
+  render(<I18nProvider><HomeFocusView {...props} task={task} onExit={exit} /></I18nProvider>);
+  fireEvent.click(screen.getByRole('button', { name: 'Interrupted' }));
+  expect(props.session.pauseTimer).toHaveBeenCalledOnce();
+  expect(props.session.resetTimer).not.toHaveBeenCalled();
+  expect(exit).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByRole('textbox', { name: 'Where will you start next time?' }), { target: { value: 'Reply to Linh first' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save and exit' }));
+  expect(props.session.saveNextStep).toHaveBeenCalledWith('a', 'Reply to Linh first', { paused: true });
+  expect(exit).toHaveBeenCalledOnce();
+});

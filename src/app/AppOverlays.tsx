@@ -122,6 +122,7 @@ export default function AppOverlays(props: Props) {
           timerSettings={focus.timerSettings}
           dailyFocusStats={focus.dailyFocusStats}
           remainingSeconds={focus.remainingSeconds}
+          nextSteps={focus.nextSteps}
           onCollapseChange={focus.setIsFocusDockCollapsed}
           onActiveTaskChange={focusIntegration.handleActiveTaskChange}
           onModeChange={focus.setMode}

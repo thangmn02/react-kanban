@@ -90,3 +90,11 @@ it('pauses through the existing controller and remembers keyboard movement', () 
   fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
   expect(props.onPauseTimer).toHaveBeenCalledOnce();
 });
+
+it('shows where to pick a task up on its card, and nothing when there is no next step', () => {
+  const first = setup({ isCollapsed: false, nextSteps: { task: { text: 'Add the budget table' } } });
+  expect(screen.getByText('Next: Add the budget table')).toBeInTheDocument();
+  first.unmount();
+  setup({ isCollapsed: false, nextSteps: {} });
+  expect(screen.queryByText(/^Next:/)).toBeNull();
+});

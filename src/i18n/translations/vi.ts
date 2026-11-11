@@ -1311,6 +1311,11 @@ const vi = {
   'share.page.errorBody': "Kiểm tra kết nối rồi tải lại trang.",
   'share.page.progress': "Xong {done} trên {total} việc",
   'share.page.footer': "Trang này cập nhật khi bạn tải lại.",
+  'focus.interrupted': "Bị ngắt quãng",
+  'focus.dock.nextStep': "Tiếp theo: {step}",
+  'link.openBeside': "Mở bên cạnh việc",
+  'link.openNewTab': "Mở trong thẻ mới",
+  'link.previewNote': "Nội dung do dịch vụ được liên kết hiển thị. Nếu vẫn trống, hãy đăng nhập ở đó hoặc mở trong thẻ mới.",
 } as const;
 
 export default vi;

@@ -1311,6 +1311,11 @@ const en = {
   'share.page.errorBody': "Check your connection and reload the page.",
   'share.page.progress': "{done} of {total} tasks done",
   'share.page.footer': "This page updates when you reload it.",
+  'focus.interrupted': "Interrupted",
+  'focus.dock.nextStep': "Next: {step}",
+  'link.openBeside': "Open beside the task",
+  'link.openNewTab': "Open in new tab",
+  'link.previewNote': "Shown by the linked service. If it stays blank, sign in there or open it in a new tab.",
 } as const;
 
 export default en;

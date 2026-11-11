@@ -1,3 +1,6 @@
+import LinkPreviewPanel from '../LinkPreviewPanel';
+import { embedUrlFor } from '../../../utils/linkEmbed';
+import { isNativeWidget } from '../../../features/native/runtime';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDialogFocus } from '../../../hooks/use-dialog-focus';
 import { uiSpring } from '../../../shared/motion';
@@ -139,6 +142,7 @@ function TaskDialog({
   const [showAssigneeSelect, setShowAssigneeSelect] = useState(false);
   const [labels, setLabels] = useState<TaskLabel[]>([]);
   const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
+  const [linkPreview, setLinkPreview] = useState<{ name: string; url: string; embedUrl: string } | null>(null);
   const [checklistItems, setChecklistItems] = useState<TaskChecklistItem[]>([]);
   const [formDrafts, setFormDrafts] = useState<TaskFormDrafts>(INITIAL_FORM_DRAFTS);
 
@@ -445,7 +449,16 @@ function TaskDialog({
         {isEditMode && <div className="border-b border-slate-100 px-4 py-3 sm:px-6" aria-label={t('ux.context')}>
           <p className="break-words text-xs text-slate-500">{[boardTitle, columnTitle].filter(Boolean).join(' · ')}</p>
           {onStartFocus && hasUnsavedChanges && <p id="task-focus-save-hint" className="mt-2 text-xs text-slate-600">{t('ux.savedTaskFocus')}</p>}
-          {Boolean(taskData?.attachments?.length) && <div className="mt-2 flex flex-wrap gap-2">{taskData?.attachments.filter(item => /^https?:\/\//i.test(item.url)).map(item => <a key={item.id} href={item.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-9 max-w-full items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-blue-700 focus-visible:outline-2 focus-visible:outline-blue-600"><span className="truncate">{item.name || item.url}</span><span aria-hidden="true">↗</span></a>)}</div>}
+          {Boolean(taskData?.attachments?.length) && <div className="mt-2 flex flex-wrap gap-2">{taskData?.attachments.filter(item => /^https?:\/\//i.test(item.url)).map(item => {
+            // Documents, designs and boards open beside the task on the web; the desktop app keeps them in the browser.
+            const embedUrl = isNativeWidget() ? null : embedUrlFor(item.url);
+            const chip = 'inline-flex min-h-9 max-w-full items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-blue-700 focus-visible:outline-2 focus-visible:outline-blue-600';
+            return embedUrl
+              ? <button key={item.id} type="button" className={`${chip} cursor-pointer`} aria-label={`${t('link.openBeside')}: ${item.name || item.url}`}
+                  onClick={() => setLinkPreview({ name: item.name || item.url, url: item.url, embedUrl })}><span className="truncate">{item.name || item.url}</span><span aria-hidden="true">◧</span></button>
+              : <a key={item.id} href={item.url} target="_blank" rel="noopener noreferrer" className={chip}><span className="truncate">{item.name || item.url}</span><span aria-hidden="true">↗</span></a>;
+          })}</div>}
+          {linkPreview && <LinkPreviewPanel {...linkPreview} onClose={() => setLinkPreview(null)} />}
         </div>}
 
         <form onSubmit={handleSubmit(handleFormSubmit)} className="flex min-h-0 flex-1 flex-col">
