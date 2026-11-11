@@ -19,6 +19,13 @@ import TodayTaskCard from './TodayTaskCard';
 import { Skeleton, SkeletonTaskCard } from '../atoms/skeleton';
 import { useI18n } from '../../i18n';
 import { NOTES_PREVIEW_ENABLED } from '../../constants/features';
+import { followUpDue, useTaskFollowUps } from '../../features/today/task-followups';
+import { splitStaleTasks } from '../../features/today/utils/staleTasks';
+
+const localDay = (offset = 0) => {
+  const date = new Date(); date.setDate(date.getDate() + offset);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+};
 
 interface TodayPageProps {
   currentUser: AppUser;
@@ -32,6 +39,8 @@ interface TodayPageProps {
   onQuickCreateTask: () => void;
   onCreateNote?: () => void;
   onCompleteTask?: (task: TodayTaskSummary) => Promise<boolean>;
+  /** Writes a new due date, or none. Resolves false when it could not be saved. */
+  onRescheduleTask?: (task: TodayTaskSummary, dueDate: string | null) => Promise<boolean>;
   taskRevision?: BoardData['task'];
   /** Yesterday's unfinished tasks, offered once at the top of Today. */
   carryover?: { summary: DailyCarryoverSummary | null; onCarry: (taskIds: string[]) => void; onDismiss: () => void };
@@ -58,14 +67,25 @@ export default function TodayPage({
   onQuickCreateTask,
   onCreateNote,
   onCompleteTask,
+  onRescheduleTask,
   taskRevision,
   carryover,
 }: TodayPageProps) {
   const [loadedData, setTodayData] = useState<TodayPageData>(getEmptyTodayData);
   const completion = useSummaryCompletion(onCompleteTask);
   const focusTasks = plannedTasks.filter(task => !task.isDone && !completion.completed.has(task.id));
+  const { followUps, wait, clear: stopWaiting } = useTaskFollowUps({ userId: currentUser.id, workspaceId: activeWorkspace?.id ?? null });
+  // Waiting tasks are someone else's move, so they leave every other group and get their own.
   const todayData = useMemo(() => Object.fromEntries(Object.entries(loadedData).map(([key, tasks]) => [key,
-    (tasks as TodayTaskSummary[]).filter(task => !completion.completed.has(task.id))])) as unknown as TodayPageData, [loadedData, completion.completed]);
+    (tasks as TodayTaskSummary[]).filter(task => !completion.completed.has(task.id) && !followUps[task.id])])) as unknown as TodayPageData, [loadedData, completion.completed, followUps]);
+  const waitingTasks = useMemo(() => {
+    const byId = new Map<string, TodayTaskSummary>();
+    for (const tasks of Object.values(loadedData) as TodayTaskSummary[][]) for (const task of tasks)
+      if (followUps[task.id] && !completion.completed.has(task.id)) byId.set(task.id, task);
+    return [...byId.values()].sort((a, b) => followUps[a.id].followUpOn.localeCompare(followUps[b.id].followUpOn));
+  }, [loadedData, completion.completed, followUps]);
+  const [rescheduling, setRescheduling] = useState<ReadonlySet<string>>(new Set());
+  const [notice, setNotice] = useState('');
   const handleComplete = async (task: TodayTaskSummary) => {
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const section = opener?.closest<HTMLElement>('[data-task-section]');
@@ -143,8 +163,26 @@ export default function TodayPage({
     return () => { window.removeEventListener(TASK_WORKFLOW_CHANGED, refresh); window.removeEventListener('focus', refresh); window.removeEventListener('storage', refresh); };
   }, [loadTodayData]);
 
+  const handleReschedule = async (task: TodayTaskSummary, to: 'tomorrow' | 'none') => {
+    if (!onRescheduleTask || rescheduling.has(task.id)) return;
+    setRescheduling(current => new Set(current).add(task.id));
+    const saved = await onRescheduleTask(task, to === 'tomorrow' ? localDay(1) : null);
+    if (saved) await loadTodayData();
+    setNotice(t(saved ? to === 'tomorrow' ? 'today.overdue.movedTomorrow' : 'today.overdue.dateDropped' : 'today.overdue.saveFailed', { task: task.title }));
+    setRescheduling(current => { const next = new Set(current); next.delete(task.id); return next; });
+  };
+  const handleWait = (task: TodayTaskSummary, who: string, followUpOn: string) => {
+    if (wait(task.id, who, followUpOn)) setNotice(t('today.waiting.saved', { task: task.title }));
+  };
+  const today = localDay();
   const hasUrgentTasks = todayData.overdueTasks.length > 0 || todayData.dueTodayTasks.length > 0;
-  const hasSecondaryTasks = todayData.assignedTasks.length > 0 || todayData.recentlyActiveTasks.length > 0;
+  // Each task appears once under More tasks; ones left alone for two weeks fold behind a single line.
+  const assigned = splitStaleTasks(todayData.assignedTasks);
+  const assignedIds = new Set(todayData.assignedTasks.map(task => task.id));
+  const recent = splitStaleTasks(todayData.recentlyActiveTasks.filter(task => !assignedIds.has(task.id)));
+  const staleTasks = [...assigned.stale, ...recent.stale];
+  const moreCount = assigned.fresh.length + recent.fresh.length + staleTasks.length;
+  const hasSecondaryTasks = moreCount > 0 || waitingTasks.length > 0;
 
   const focusSuggestions = useMemo(() => {
     const focusTaskIds = new Set(focusTasks.map((task) => task.id));
@@ -200,7 +238,7 @@ export default function TodayPage({
           </div>
         )}
 
-        <p role="status" aria-live="polite" className="mb-3 text-sm text-slate-700">{completion.message}</p>
+        <p role="status" aria-live="polite" className="mb-3 text-sm text-slate-700">{completion.message || notice}</p>
 
         {isLoading && (
           <div className="grid items-start gap-4 lg:grid-cols-2">
@@ -358,6 +396,8 @@ export default function TodayPage({
                     {todayData.overdueTasks.length > 0 && (
                       <TodayTaskSection
                         title={t('common.overdue')}
+                        description={onRescheduleTask ? t('today.overdue.question') : undefined}
+                        cardProps={task => ({ onReschedule: onRescheduleTask ? handleReschedule : undefined, isRescheduling: rescheduling.has(task.id), onWait: handleWait })}
                         tasks={todayData.overdueTasks}
                         emptyMessage={t('today.noOverdue')}
                         isFocusTask={isFocusTask}
@@ -373,6 +413,7 @@ export default function TodayPage({
                     {todayData.dueTodayTasks.length > 0 && (
                       <TodayTaskSection
                         title={t('today.dueTodayTitle')}
+                        cardProps={() => ({ onWait: handleWait })}
                         tasks={todayData.dueTodayTasks}
                         emptyMessage={t('today.emptyUrgent')}
                         isFocusTask={isFocusTask}
@@ -388,40 +429,64 @@ export default function TodayPage({
                 </SectionCard>
               )}
 
-              {hasSecondaryTasks && (
+              {waitingTasks.length > 0 && (
+                <SectionCard className="p-4">
+                  <TodayTaskSection
+                    title={t('today.waiting.title')}
+                    tasks={waitingTasks}
+                    cardProps={task => ({ waiting: followUps[task.id], followUpDue: followUpDue(followUps[task.id], today), onStopWaiting: item => stopWaiting(item.id) })}
+                    isFocusTask={isFocusTask}
+                    onOpenTask={onOpenTask}
+                    onStartFocus={onStartFocus}
+                    onToggleTodayFocus={onToggleTodayFocus}
+                    onCompleteTask={handleComplete}
+                    completingIds={completion.pending}
+                    emptyMessage=""
+                    compactShell
+                  />
+                </SectionCard>
+              )}
+
+              {moreCount > 0 && (
                 <details className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-card">
                   <summary className="cursor-pointer text-sm font-bold uppercase tracking-[0.2em] text-slate-600">
-                    {t('today.moreTasks')} ({todayData.assignedTasks.length + todayData.recentlyActiveTasks.length})
+                    {t('today.moreTasks')} ({moreCount})
                   </summary>
                   <div className="mt-3 grid gap-4">
-                    {todayData.assignedTasks.length > 0 && (
+                    {([[t('today.assignedTitle'), assigned.fresh], [t('today.recentTitle'), recent.fresh]] as const).map(([title, tasks]) => tasks.length > 0 && (
                       <TodayTaskSection
-                        title={t('today.assignedTitle')}
-                        tasks={todayData.assignedTasks}
-                        emptyMessage={t('today.noAssigned')}
+                        key={title}
+                        title={title}
+                        tasks={tasks}
+                        cardProps={() => ({ onWait: handleWait })}
                         isFocusTask={isFocusTask}
-                        onOpenTask={onOpenTask}
-                        onStartFocus={onStartFocus}
-                        onToggleTodayFocus={onToggleTodayFocus}
-                        onCompleteTask={handleComplete}
-                        completingIds={completion.pending}
-                        compactShell
+                    onOpenTask={onOpenTask}
+                    onStartFocus={onStartFocus}
+                    onToggleTodayFocus={onToggleTodayFocus}
+                    onCompleteTask={handleComplete}
+                    completingIds={completion.pending}
+                    emptyMessage=""
+                    compactShell
                       />
-                    )}
-
-                    {todayData.recentlyActiveTasks.length > 0 && (
-                      <TodayTaskSection
-                        title={t('today.recentTitle')}
-                        tasks={todayData.recentlyActiveTasks}
-                        emptyMessage={t('today.noRecent')}
-                        isFocusTask={isFocusTask}
-                        onOpenTask={onOpenTask}
-                        onStartFocus={onStartFocus}
-                        onToggleTodayFocus={onToggleTodayFocus}
-                        onCompleteTask={handleComplete}
-                        completingIds={completion.pending}
-                        compactShell
-                      />
+                    ))}
+                    {staleTasks.length > 0 && (
+                      <details>
+                        <summary className="cursor-pointer text-sm font-semibold text-slate-600">{t('today.stale.summary', { count: staleTasks.length })}</summary>
+                        <div className="mt-3">
+                          <TodayTaskSection
+                            title={t('today.stale.title')}
+                            tasks={staleTasks}
+                            isFocusTask={isFocusTask}
+                    onOpenTask={onOpenTask}
+                    onStartFocus={onStartFocus}
+                    onToggleTodayFocus={onToggleTodayFocus}
+                    onCompleteTask={handleComplete}
+                    completingIds={completion.pending}
+                    emptyMessage=""
+                    compactShell
+                          />
+                        </div>
+                      </details>
                     )}
                   </div>
                 </details>

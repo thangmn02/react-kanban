@@ -37,6 +37,10 @@ src/components/today/TodayPage.tsx	`${t('today.removeFromToday')}: ${task.title}
 src/components/today/TodayTaskCard.tsx	`${isFocusTask ? t('today.removeFromToday') : t('today.planToday')}: ${task.title}`
 src/components/today/TodayTaskCard.tsx	`${t('common.markDone')}: ${task.title}`
 src/components/today/TodayTaskCard.tsx	`${t('task.startFocus')}: ${task.title}`
+src/components/today/TodayTaskCard.tsx	`${t('today.overdue.noDate')}: ${task.title}`
+src/components/today/TodayTaskCard.tsx	`${t('today.overdue.tomorrow')}: ${task.title}`
+src/components/today/TodayTaskCard.tsx	`${t('today.waiting.action')}: ${task.title}`
+src/components/today/TodayTaskCard.tsx	`${t('today.waiting.stop')}: ${task.title}`
 src/components/workspace/WorkspaceInviteRow.tsx	invite ·
 src/components/workspace/WorkspaceMembersDialog.tsx	teammate@example.com
 src/data.ts	Bugfix

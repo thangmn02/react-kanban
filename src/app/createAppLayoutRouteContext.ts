@@ -13,6 +13,7 @@ import type { TodayTaskSummary } from '../services/today.service';
 import type { ITaskItem } from '../types/task.type';
 import { readReturnTo } from './auth-routing';
 import { openQuickNotes } from '../features/notes/quick-notes-events';
+import { updateTask } from '../services/task.service';
 
 interface Params {
   header: ReactNode;
@@ -145,6 +146,15 @@ export function useAppLayoutRouteContextValue(params: Params): AppLayoutRouteCon
       onToggleTodayFocus: focus.handleToggleFocusTaskFromToday,
       onCompleteTask: (task) => params.onMarkFocusDone({ ...task, priority: task.priority ?? undefined, dueDate: task.dueDate ?? undefined }),
       taskRevision: board.boardData.task,
+      // Today lists tasks from every board, so the date is written directly and the open board is reloaded.
+      onRescheduleTask: async (task, dueDate) => {
+        try {
+          await updateTask(task.id, { due_date: dueDate });
+          focus.updateFocusedTask(task.id, { dueDate: dueDate ?? undefined });
+          if (task.boardId === board.activeBoardId) await board.refreshBoardData({ boardId: task.boardId });
+          return true;
+        } catch { return false; }
+      },
       onQuickCreateTask: board.handleQuickAddTask,
       carryover: params.carryover,
     },
@@ -208,7 +218,7 @@ export function useAppLayoutRouteContextValue(params: Params): AppLayoutRouteCon
         activeBoardId: board.activeBoardId,
       },
       calendar: { boardData: board.boardData, searchQuery: board.searchQuery, filterPriority: board.filterPriority, filterAssignee: board.filterAssignee, filterDueDate: board.filterDueDate, onOpenTask: openBoardTask },
-      table: { workspaceMembers: params.workspaceMembers, boardData: board.boardData, searchQuery: board.searchQuery, filterPriority: board.filterPriority, filterAssignee: board.filterAssignee, filterDueDate: board.filterDueDate, onOpenTask: openBoardTask },
+      table: { onUpdateTask: board.handleUpdateTask, workspaceMembers: params.workspaceMembers, boardData: board.boardData, searchQuery: board.searchQuery, filterPriority: board.filterPriority, filterAssignee: board.filterAssignee, filterDueDate: board.filterDueDate, onOpenTask: openBoardTask },
       empty: { workspaceName: params.activeWorkspace?.name, onCreateBoard: params.boardDialogs.openCreateBoardDialog },
     },
   };

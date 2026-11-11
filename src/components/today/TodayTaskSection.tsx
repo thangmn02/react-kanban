@@ -1,3 +1,4 @@
+import type { ComponentProps } from 'react';
 import type { TodayTaskSummary } from '../../services/today.service';
 import SectionCard from '../atoms/SectionCard';
 import EmptyState from '../atoms/EmptyState';
@@ -17,6 +18,8 @@ interface TodayTaskSectionProps {
   compactShell?: boolean;
   onCompleteTask?: (task: TodayTaskSummary) => void;
   completingIds?: ReadonlySet<string>;
+  /** Per-task extras (reschedule, waiting on) passed straight to each card. */
+  cardProps?: (task: TodayTaskSummary) => Partial<ComponentProps<typeof TodayTaskCard>>;
 }
 
 export default function TodayTaskSection({
@@ -31,6 +34,7 @@ export default function TodayTaskSection({
   compactShell = false,
   onCompleteTask,
   completingIds,
+  cardProps,
 }: TodayTaskSectionProps) {
   const reduced = useReducedMotion();
   const content = (
@@ -60,6 +64,7 @@ export default function TodayTaskSection({
               onToggleTodayFocus={onToggleTodayFocus}
               onCompleteTask={onCompleteTask}
               isCompleting={completingIds?.has(task.id)}
+              {...cardProps?.(task)}
             />
             </motion.div>
           ))}</AnimatePresence>

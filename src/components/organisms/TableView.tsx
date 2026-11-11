@@ -13,6 +13,7 @@ import {
 } from '../../utils/boardTableRows';
 import EmptyState from '../atoms/EmptyState';
 import { useI18n } from '../../i18n';
+import { TASK_PRIORITIES } from '../../constants/task';
 import type { WorkspaceMember } from '../../types/auth.type';
 import { resolveAssigneeIdentity } from '../../utils/workspaceMembers';
 
@@ -24,6 +25,8 @@ interface TableViewProps {
   filterAssignee: string;
   filterDueDate: string;
   onOpenTask: (task: ITaskItem) => void;
+  /** When given, priority and due date are edited in the row. */
+  onUpdateTask?: (taskId: string, fields: Partial<ITaskItem>) => Promise<void> | void;
 }
 
 function formatUpdatedAt(value: string): string {
@@ -42,6 +45,7 @@ function TableView({
   filterAssignee,
   filterDueDate,
   onOpenTask,
+  onUpdateTask,
 }: TableViewProps) {
   const { t } = useI18n();
   const [sortKey, setSortKey] = useRetainedViewState<TableSortKey>('table-sort', () => 'dueDate');
@@ -152,8 +156,18 @@ function TableView({
                       <span className="text-slate-400">—</span>
                     )}
                   </td>
-                  <td className="px-4 py-3">
-                    {row.priority ? (
+                  <td className="px-4 py-3" onClick={onUpdateTask ? event => event.stopPropagation() : undefined}>
+                    {onUpdateTask ? (
+                      <select
+                        aria-label={t('table.editPriority', { task: row.title })}
+                        value={row.priority || ''}
+                        onChange={event => { void onUpdateTask(row.id, { priority: (event.target.value || undefined) as ITaskItem['priority'] }); }}
+                        className={`min-h-9 cursor-pointer rounded-full border border-transparent px-2 py-0.5 text-xs font-semibold hover:border-slate-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${row.priority ? priorityClass : 'bg-transparent text-slate-500'}`}
+                      >
+                        <option value="">—</option>
+                        {TASK_PRIORITIES.map(priority => <option key={priority} value={priority}>{priority}</option>)}
+                      </select>
+                    ) : row.priority ? (
                       <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${priorityClass}`}>
                         {row.priority}
                       </span>
@@ -161,8 +175,22 @@ function TableView({
                       <span className="text-slate-400">—</span>
                     )}
                   </td>
-                  <td className="px-4 py-3">
-                    {row.dueDate ? (
+                  <td className="px-4 py-3" onClick={onUpdateTask ? event => event.stopPropagation() : undefined}>
+                    {onUpdateTask ? (
+                      <input
+                        type="date"
+                        aria-label={t('table.editDueDate', { task: row.title })}
+                        value={row.dueDate ? row.dueDate.slice(0, 10) : ''}
+                        min={row.task.startDate ? row.task.startDate.slice(0, 10) : undefined}
+                        onChange={event => {
+                          const next = event.target.value;
+                          // A due date before the start date is not a valid task; keep the old value.
+                          if (next && row.task.startDate && next < row.task.startDate.slice(0, 10)) return;
+                          void onUpdateTask(row.id, { dueDate: next || undefined });
+                        }}
+                        className={`min-h-9 cursor-pointer rounded-full border border-transparent px-2 py-0.5 text-xs font-medium hover:border-slate-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${row.dueDate ? dueMeta.className : 'bg-transparent text-slate-500'}`}
+                      />
+                    ) : row.dueDate ? (
                       <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${dueMeta.className}`}>
                         {dueMeta.label}
                       </span>

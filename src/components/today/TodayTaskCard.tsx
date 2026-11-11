@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
+import type { WaitingOn } from '../../features/today/task-followups';
 import type { TodayTaskSummary } from '../../services/today.service';
 import { getPriorityBadgeClass } from '../../utils/taskMetadata';
 import DueDateBadge from '../atoms/DueDateBadge';
@@ -15,7 +16,20 @@ interface TodayTaskCardProps {
   isCompleting?: boolean;
   /** Extra context shown inside the card, e.g. why a task is suggested. */
   reasons?: ReactNode;
+  /** Overdue tasks only: move the date to tomorrow, or drop it. */
+  onReschedule?: (task: TodayTaskSummary, to: 'tomorrow' | 'none') => void;
+  isRescheduling?: boolean;
+  waiting?: WaitingOn;
+  /** True once the follow-up day has arrived. */
+  followUpDue?: boolean;
+  onWait?: (task: TodayTaskSummary, who: string, followUpOn: string) => void;
+  onStopWaiting?: (task: TodayTaskSummary) => void;
 }
+
+const dayFromNow = (days: number) => {
+  const date = new Date(); date.setDate(date.getDate() + days);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+};
 
 export default function TodayTaskCard({
   task,
@@ -26,9 +40,18 @@ export default function TodayTaskCard({
   onCompleteTask,
   isCompleting = false,
   reasons,
+  onReschedule,
+  isRescheduling = false,
+  waiting,
+  followUpDue = false,
+  onWait,
+  onStopWaiting,
 }: TodayTaskCardProps) {
   const priorityClassName = getPriorityBadgeClass(task.priority || undefined);
   const { t } = useI18n();
+  const formId = useId();
+  const [waitOpen, setWaitOpen] = useState(false), [who, setWho] = useState(''), [followUpOn, setFollowUpOn] = useState(() => dayFromNow(3));
+  const quiet = 'min-h-11 cursor-pointer rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-wait disabled:opacity-50';
   const preview = stripTaskHtml(task.description);
 
   return (
@@ -90,6 +113,9 @@ export default function TodayTaskCard({
           </>
         )}
         {reasons}
+        {waiting && <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${followUpDue ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'}`}>
+          {followUpDue ? t('today.waiting.followUpNow', { who: waiting.who || t('today.waiting.someone') }) : t('today.waiting.until', { who: waiting.who || t('today.waiting.someone'), date: waiting.followUpOn })}
+        </span>}
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -121,7 +147,23 @@ export default function TodayTaskCard({
         >
           {isFocusTask ? t('today.removeFromToday') : t('today.planToday')}
         </button>
+        {!task.isDone && onReschedule && <>
+          <button type="button" disabled={isRescheduling} className={quiet} aria-label={`${t('today.overdue.tomorrow')}: ${task.title}`} onClick={() => onReschedule(task, 'tomorrow')}>{t('today.overdue.tomorrow')}</button>
+          <button type="button" disabled={isRescheduling} className={quiet} aria-label={`${t('today.overdue.noDate')}: ${task.title}`} onClick={() => onReschedule(task, 'none')}>{t('today.overdue.noDate')}</button>
+        </>}
+        {!task.isDone && waiting && onStopWaiting && <button type="button" className={quiet} aria-label={`${t('today.waiting.stop')}: ${task.title}`} onClick={() => onStopWaiting(task)}>{t('today.waiting.stop')}</button>}
+        {!task.isDone && !waiting && onWait && <button type="button" className={quiet} aria-expanded={waitOpen} aria-controls={formId} aria-label={`${t('today.waiting.action')}: ${task.title}`} onClick={() => setWaitOpen(open => !open)}>{t('today.waiting.action')}</button>}
       </div>
+      {!task.isDone && !waiting && onWait && waitOpen && <form id={formId} className="mt-3 flex flex-wrap items-end gap-2 rounded-xl bg-slate-50 p-3"
+        onSubmit={event => { event.preventDefault(); if (!followUpOn) return; onWait(task, who, followUpOn); setWaitOpen(false); }}>
+        <label className="min-w-0 flex-1 text-xs font-semibold text-slate-600">{t('today.waiting.who')}
+          <input autoFocus value={who} maxLength={80} onChange={event => setWho(event.target.value)} className="mt-1 block min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900" />
+        </label>
+        <label className="text-xs font-semibold text-slate-600">{t('today.waiting.followUpOn')}
+          <input type="date" required value={followUpOn} min={dayFromNow(0)} onChange={event => setFollowUpOn(event.target.value)} className="mt-1 block min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900" />
+        </label>
+        <button type="submit" className="min-h-11 cursor-pointer rounded-xl bg-slate-950 px-4 text-xs font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">{t('common.save')}</button>
+      </form>}
     </article>
   );
 }

@@ -263,9 +263,13 @@ export function buildTaskUpdatePayload({
 }
 
 export function buildTaskFieldUpdatePayload(
-  fields: Partial<Pick<BoardTaskItem, 'priority' | 'assignees' | 'isDone'>>,
+  fields: Partial<Pick<BoardTaskItem, 'priority' | 'assignees' | 'isDone' | 'dueDate'>>,
 ): TaskUpdate {
   const payload: TaskUpdate = {};
+
+  if ('dueDate' in fields) {
+    payload.due_date = fields.dueDate || null;
+  }
 
   if ('priority' in fields) {
     payload.priority = fields.priority ?? null;
