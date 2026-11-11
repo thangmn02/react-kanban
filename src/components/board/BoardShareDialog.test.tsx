@@ -16,7 +16,8 @@ beforeEach(() => {
 const open = (onClose = vi.fn()) => render(<I18nProvider><BoardShareDialog boardId="b" workspaceId="w" boardTitle="Launch" onClose={onClose} /></I18nProvider>);
 
 it('lists active links and shows a new address once, ready to copy', async () => {
-  service.createShareLink.mockResolvedValue({ link: { id: 'new', createdAt: '2026-11-11T00:00:00Z' }, url: 'https://kora.test/share/TOKEN' });
+  service.createShareLink.mockResolvedValue({ link: { id: 'new', createdAt: '2026-11-11T00:00:00Z' }, url: 'https://kora.test/share/TOKEN',
+    sheetsFormula: '=IMPORTDATA("https://kora.test/api/share-feed?format=csv&token=TOKEN")', calendarUrl: 'https://kora.test/api/share-feed?format=ics&token=TOKEN' });
   open();
   expect(await screen.findByText('Active links: 1')).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Create link' }));
@@ -24,6 +25,8 @@ it('lists active links and shows a new address once, ready to copy', async () =>
   expect(service.createShareLink).toHaveBeenCalledWith('b', 'w');
   expect(screen.getByText('Active links: 2')).toBeTruthy();
   expect(screen.getByRole('status').textContent).toBe('Link created. Copy it now.');
+  expect((screen.getByLabelText('Google Sheets formula') as HTMLInputElement).value).toBe('=IMPORTDATA("https://kora.test/api/share-feed?format=csv&token=TOKEN")');
+  expect((screen.getByLabelText('Google Calendar address') as HTMLInputElement).value).toBe('https://kora.test/api/share-feed?format=ics&token=TOKEN');
 });
 
 it('turns a link off and removes it from the list', async () => {

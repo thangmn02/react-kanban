@@ -1,6 +1,6 @@
 import sql from '../../supabase/migrations/20261111100000_board_share_links.sql?raw';
 import { expect, it } from 'vitest';
-import { createShareToken, fetchSharedBoard, hashShareToken, parseSharedBoard, shareUrl } from './share-link.service';
+import { createShareToken, fetchSharedBoard, hashShareToken, parseSharedBoard, shareFeedUrl, shareUrl } from './share-link.service';
 
 it('makes long unguessable tokens that are safe in a URL and never repeat', () => {
   const tokens = new Set(Array.from({ length: 50 }, createShareToken));
@@ -14,6 +14,7 @@ it('hashes a token with SHA-256, matching what the database computes', async () 
 
 it('builds the public address from the token', () => {
   expect(shareUrl('tok', 'https://example.test')).toBe('https://example.test/share/tok');
+  expect(shareFeedUrl('tok', 'ics', 'https://example.test')).toBe('https://example.test/api/share-feed?format=ics&token=tok');
 });
 
 it('keeps only the fields the public page shows', () => {

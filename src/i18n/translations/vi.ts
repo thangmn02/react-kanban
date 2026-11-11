@@ -1316,6 +1316,14 @@ const vi = {
   'link.openBeside': "Mở bên cạnh việc",
   'link.openNewTab': "Mở trong thẻ mới",
   'link.previewNote': "Nội dung do dịch vụ được liên kết hiển thị. Nếu vẫn trống, hãy đăng nhập ở đó hoặc mở trong thẻ mới.",
+  'share.google.title': "Theo dõi bảng này từ Google Sheets hoặc Calendar",
+  'share.google.copy': "Sao chép",
+  'share.google.sheetsLabel': "Công thức Google Sheets",
+  'share.google.sheetsCopy': "Sao chép công thức Google Sheets",
+  'share.google.sheetsHelp': "Dán vào ô A1 của một trang tính trống. Google làm mới khoảng mỗi giờ một lần. Thay đổi trong trang tính không quay về Kora.",
+  'share.google.calendarLabel': "Địa chỉ Google Calendar",
+  'share.google.calendarCopy': "Sao chép địa chỉ Google Calendar",
+  'share.google.calendarHelp': "Trong Google Calendar chọn Lịch khác, rồi Từ URL, và dán vào. Việc có hạn sẽ hiện thành sự kiện cả ngày. Google có thể mất tới một ngày để hiện thay đổi.",
 } as const;
 
 export default vi;

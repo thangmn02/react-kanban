@@ -2,13 +2,15 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import supabase, { requireSupabaseClient } from '../lib/supabase';
 import { translateNow } from '../i18n/context';
 import { isNativeWidget } from '../features/native/runtime';
+import { parseSharedBoard, type SharedBoard } from './share-link-shape';
+
+export { parseSharedBoard };
+export type { SharedBoard, SharedTask } from './share-link-shape';
 
 /** Read-only share links exist only with a real backend; local demo mode has nobody to share with. */
 export const shareLinksAvailable = () => Boolean(supabase);
 
 export interface ShareLink { id: string; createdAt: string }
-export interface SharedTask { title: string; list: string; priority: string | null; dueDate: string | null; isDone: boolean; updatedAt: string | null; assignees: string[] }
-export interface SharedBoard { title: string; lists: string[]; tasks: SharedTask[] }
 
 // The table and function are newer than the generated database types.
 const client = () => requireSupabaseClient() as unknown as SupabaseClient;
@@ -27,13 +29,18 @@ export async function hashShareToken(token: string) {
 // The desktop app has no public address of its own, so its links point at the website.
 export const shareUrl = (token: string, origin = isNativeWidget() ? 'https://koraspace.online' : window.location.origin) => `${origin}/share/${token}`;
 
+/** The same link as a feed Google can follow: `csv` for Sheets (IMPORTDATA), `ics` for Calendar (add by URL). */
+export const shareFeedUrl = (token: string, format: 'csv' | 'ics', origin = isNativeWidget() ? 'https://koraspace.online' : window.location.origin) =>
+  `${origin}/api/share-feed?format=${format}&token=${token}`;
+
 /** Creates a link and returns its URL. The token is shown once; only its hash is stored. */
 export async function createShareLink(boardId: string, workspaceId: string) {
   const token = createShareToken();
   const { data, error } = await client().from('board_share_links')
     .insert({ board_id: boardId, workspace_id: workspaceId, token_hash: await hashShareToken(token) }).select('id,created_at').single();
   if (error || !data) throw new Error(translateNow('share.error.create'));
-  return { link: { id: data.id as string, createdAt: data.created_at as string }, url: shareUrl(token) };
+  return { link: { id: data.id as string, createdAt: data.created_at as string }, url: shareUrl(token),
+    sheetsFormula: `=IMPORTDATA("${shareFeedUrl(token, 'csv')}")`, calendarUrl: shareFeedUrl(token, 'ics') };
 }
 
 export async function listShareLinks(boardId: string): Promise<ShareLink[]> {
@@ -46,26 +53,6 @@ export async function revokeShareLink(id: string) {
   const { data, error } = await client().from('board_share_links').update({ revoked_at: new Date().toISOString() }).eq('id', id).is('revoked_at', null).select('id');
   // No row back means nothing was revoked (no permission, or already gone); say so rather than report success.
   if (error || !data?.length) throw new Error(translateNow('share.error.revoke'));
-}
-
-const text = (value: unknown) => typeof value === 'string' ? value : '';
-
-/** Never trusts the shape of what comes back: this page is shown to people outside the workspace. */
-export function parseSharedBoard(value: unknown): SharedBoard | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  const raw = value as { board?: { title?: unknown }; lists?: unknown; tasks?: unknown };
-  if (!raw.board || typeof raw.board.title !== 'string') return null;
-  const tasks = Array.isArray(raw.tasks) ? raw.tasks : [];
-  return {
-    title: raw.board.title,
-    lists: Array.isArray(raw.lists) ? raw.lists.filter((item): item is string => typeof item === 'string') : [],
-    tasks: tasks.filter(item => item && typeof item === 'object' && typeof (item as SharedTask).title === 'string').map(item => {
-      const task = item as Record<string, unknown>;
-      return { title: text(task.title), list: text(task.list), priority: text(task.priority) || null, dueDate: text(task.dueDate) || null,
-        isDone: task.isDone === true, updatedAt: text(task.updatedAt) || null,
-        assignees: Array.isArray(task.assignees) ? task.assignees.filter((name): name is string => typeof name === 'string' && name.length > 0) : [] };
-    }),
-  };
 }
 
 /** Resolves null when the link is unknown, revoked or malformed; the page shows one message for all three. */

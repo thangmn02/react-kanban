@@ -50,6 +50,12 @@
   force = true
 
 [[redirects]]
+  from = "/api/share-feed"
+  to = "/.netlify/functions/share-feed"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200

@@ -1316,6 +1316,14 @@ const en = {
   'link.openBeside': "Open beside the task",
   'link.openNewTab': "Open in new tab",
   'link.previewNote': "Shown by the linked service. If it stays blank, sign in there or open it in a new tab.",
+  'share.google.title': "Follow this board from Google Sheets or Calendar",
+  'share.google.copy': "Copy",
+  'share.google.sheetsLabel': "Google Sheets formula",
+  'share.google.sheetsCopy': "Copy the Google Sheets formula",
+  'share.google.sheetsHelp': "Paste it into cell A1 of an empty sheet. Google refreshes it about once an hour. Changes made in the sheet do not come back to Kora.",
+  'share.google.calendarLabel': "Google Calendar address",
+  'share.google.calendarCopy': "Copy the Google Calendar address",
+  'share.google.calendarHelp': "In Google Calendar choose Other calendars, then From URL, and paste it. Tasks with a due date appear as all-day events. Google can take up to a day to show changes.",
 } as const;
 
 export default en;
