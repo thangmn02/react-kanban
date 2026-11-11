@@ -58,3 +58,27 @@ where routine_schema = 'public'
 ```
 
 Expected: one `public.update_task_positions` function with `security_type = INVOKER`.
+
+## Read-only Share Links
+
+Migration `20261111100000_board_share_links.sql` lets a workspace owner or admin publish one board as a read-only page.
+
+- `board_share_links` stores only the SHA-256 of each token. RLS is enabled; `anon` has no table grant.
+- `authenticated` may select and insert, and update the `revoked_at` column only; every policy requires `app_private.can_manage_workspace_members`.
+- `anon` reads through `public.get_shared_board(text)` alone. It is `SECURITY DEFINER` with an empty `search_path` and returns the board title, list titles, and per task: title, list, priority, due date, done flag, update time and assignee display names. Nothing else.
+
+```sql
+select grantee, privilege_type from information_schema.role_table_grants
+where table_schema = 'public' and table_name = 'board_share_links' order by 1, 2;
+```
+
+Expected: no row for `anon`; `authenticated` has `SELECT` and `INSERT` only (plus a column grant on `revoked_at`).
+
+```sql
+select public.get_shared_board('not-a-real-token-not-a-real-token-not-a-real-token');
+```
+
+Expected: `null`. A revoked link and a link whose board is archived must also return `null`.
+
+Before relying on this in production, run these on the real database as `anon`: a member (not manager) cannot insert a link; a manager of workspace A cannot insert a link for a board of workspace B; a revoked link returns `null`.
+

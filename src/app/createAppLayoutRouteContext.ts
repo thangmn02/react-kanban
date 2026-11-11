@@ -14,6 +14,7 @@ import type { ITaskItem } from '../types/task.type';
 import { readReturnTo } from './auth-routing';
 import { openQuickNotes } from '../features/notes/quick-notes-events';
 import { updateTask } from '../services/task.service';
+import { shareLinksAvailable } from '../services/share-link.service';
 
 interface Params {
   header: ReactNode;
@@ -182,6 +183,9 @@ export function useAppLayoutRouteContextValue(params: Params): AppLayoutRouteCon
           if (params.activeWorkspaceId) routing.navigate(`/workspaces/${params.activeWorkspaceId}/members`);
         },
         onOpenActivity: params.boardDialogs.openActivityDialog,
+        // Sharing exposes a board outside the workspace, so it is a manager's decision. The database enforces the same rule.
+        share: shareLinksAvailable() && board.activeBoardId && params.activeWorkspaceId && ['owner', 'admin'].includes(params.activeWorkspace?.role ?? '')
+          ? { boardId: board.activeBoardId, workspaceId: params.activeWorkspaceId, boardTitle: board.activeBoardSummary?.title ?? '' } : undefined,
         onQuickAddTask: board.handleQuickAddTask,
         onOpenQuickPlan: params.handleOpenQuickPlan,
         onOpenProgressReport: params.onOpenProgressReport,

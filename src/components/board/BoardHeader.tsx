@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { BoardRow } from '../../types/supabase.type';
 import type { WorkspaceMember } from '../../types/auth.type';
 import BoardTabs, { type BoardTabId } from './BoardTabs';
+import BoardShareDialog from './BoardShareDialog';
 import { useI18n } from '../../i18n';
 import BoardBackgroundPicker from './BoardBackgroundPicker';
 
@@ -21,6 +22,8 @@ interface BoardHeaderProps {
   onOpenProgressReport: () => void;
   onExportCsv: () => void;
   onImportCsv: (file: File) => void;
+  /** Present only for workspace managers on a real backend; adds "Share read-only link". */
+  share?: { boardId: string; workspaceId: string; boardTitle: string };
 }
 
 export default function BoardHeader({
@@ -38,8 +41,10 @@ export default function BoardHeader({
   onOpenProgressReport,
   onExportCsv,
   onImportCsv,
+  share,
 }: BoardHeaderProps) {
   const [isOptionsOpen, setIsOptionsOpen] = useState(false);
+  const [isShareOpen, setIsShareOpen] = useState(false);
   const optionsRef = useRef<HTMLDivElement | null>(null);
   const csvInputRef = useRef<HTMLInputElement | null>(null);
   const hasTeamMembers = workspaceMembers.length > 1;
@@ -139,6 +144,17 @@ export default function BoardHeader({
                   {t('report.title')}
                 </button>
 
+                {share && <button
+                  type="button"
+                  onClick={() => {
+                    setIsOptionsOpen(false);
+                    setIsShareOpen(true);
+                  }}
+                  className="inline-flex w-full cursor-pointer items-center gap-2 rounded-xl px-2 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-200"
+                >
+                  {t('share.menu')}
+                </button>}
+
                 <button
                   type="button"
                   onClick={() => {
@@ -222,6 +238,7 @@ export default function BoardHeader({
           </div>
         </div>
       </div>
+      {share && isShareOpen && <BoardShareDialog {...share} onClose={() => setIsShareOpen(false)} />}
     </section>
   );
 }

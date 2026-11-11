@@ -21,6 +21,7 @@ const TableRoute = lazy(() => import('./pages/board/TableRoute'));
 const WorkspaceMembersRoute = lazy(() => import('./pages/workspace/WorkspaceMembersRoute'));
 const ArcanaRoute = lazy(() => import('./pages/arcana/ArcanaRoute'));
 const NotFoundRoute = lazy(() => import('./pages/not-found/NotFoundRoute'));
+const SharedBoardRoute = lazy(() => import('./pages/share/SharedBoardRoute'));
 
 const routeFallback = <div className="flex min-h-screen items-center justify-center bg-canvas text-sm font-medium text-slate-500">{translateNow('app.loadingWorkspace')}</div>;
 
@@ -30,6 +31,8 @@ export default function App() {
     <Router>
       <Suspense fallback={routeFallback}>
         <Routes>
+          {/* Public and read-only: outside the app layout, so it needs no session and shows no app chrome. */}
+          <Route path="share/:token" element={<SharedBoardRoute />} />
           <Route element={<AppLayout />}>
             <Route index element={<HomeRoute />} />
             <Route path="home" element={<HomeRoute />} />
