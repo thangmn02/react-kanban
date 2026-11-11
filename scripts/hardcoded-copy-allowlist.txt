@@ -39,6 +39,8 @@ src/components/today/TodayTaskCard.tsx	`${t('common.markDone')}: ${task.title}`
 src/components/today/TodayTaskCard.tsx	`${t('task.startFocus')}: ${task.title}`
 src/components/today/TodayTaskCard.tsx	`${t('today.overdue.noDate')}: ${task.title}`
 src/components/today/TodayTaskCard.tsx	`${t('today.overdue.tomorrow')}: ${task.title}`
+src/components/today/TodayTaskCard.tsx	`${t('today.own.action')}: ${task.title}`
+src/components/today/TodayTaskCard.tsx	`${t('today.own.clear')}: ${task.title}`
 src/components/today/TodayTaskCard.tsx	`${t('today.waiting.action')}: ${task.title}`
 src/components/today/TodayTaskCard.tsx	`${t('today.waiting.stop')}: ${task.title}`
 src/components/workspace/WorkspaceInviteRow.tsx	invite ·

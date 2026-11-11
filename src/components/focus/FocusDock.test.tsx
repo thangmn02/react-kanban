@@ -15,7 +15,7 @@ function setup(overrides: Partial<ComponentProps<typeof FocusDock>> = {}) {
     focusTasks: [{ id: 'task', boardId: 'board', boardTitle: 'Project', title: 'Write a first draft' }],
     activeTaskId: 'task', isCollapsed: true,
     timerState: { mode: 'focus', activeTaskId: 'task', isRunning: false, remainingSeconds: 89, endsAt: null, startedAt: null, plannedSeconds: 1500, completedCycleFocus: 1 },
-    timerSettings: { focusMinutes: 25, shortBreakMinutes: 5, longBreakMinutes: 15, longBreakEvery: 4, autoStartBreaks: false, autoStartFocus: false },
+    timerSettings: { focusMinutes: 25, shortBreakMinutes: 5, longBreakMinutes: 15, longBreakEvery: 4, autoStartBreaks: false, autoStartFocus: false, countUp: false },
     dailyFocusStats: { focusedMinutes: 0, completedSessions: 0, interruptedSessions: 0, topTaskTitle: null },
     remainingSeconds: 89,
     onCollapseChange: vi.fn(), onActiveTaskChange: vi.fn(), onModeChange: vi.fn(), onTimerSettingsChange: vi.fn(),

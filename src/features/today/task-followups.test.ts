@@ -46,3 +46,35 @@ it('folds only undated tasks left alone for two weeks', () => {
   expect(stale.map(item => item.id)).toEqual(['old']);
   expect(fresh.map(item => item.id)).toEqual(['recent', 'old-but-dated', 'unknown']);
 });
+
+it('keeps a personal deadline only when it is earlier than the real one, and clears it', async () => {
+  const { readOwnDeadlines, setOwnDeadline } = await import('./task-followups');
+  expect(setOwnDeadline(scope, 't1', '2026-11-20', '2026-11-20')).toBe(false);
+  expect(setOwnDeadline(scope, 't1', '2026-11-25', '2026-11-20T00:00:00Z')).toBe(false);
+  expect(setOwnDeadline(scope, 't1', 'next week', '2026-11-20')).toBe(false);
+  expect(readOwnDeadlines(scope)).toEqual({});
+  expect(setOwnDeadline(scope, 't1', '2026-11-18', '2026-11-20')).toBe(true);
+  expect(readOwnDeadlines(scope).t1).toEqual({ on: '2026-11-18' });
+  expect(setOwnDeadline(scope, 't1', '')).toBe(true);
+  expect(readOwnDeadlines(scope)).toEqual({});
+});
+
+it('nudges once when a personal deadline arrives, and only for open tasks', async () => {
+  const { setOwnDeadline, takeDueNudges } = await import('./task-followups');
+  setOwnDeadline(scope, 'due', '2026-11-18', '2026-11-30');
+  setOwnDeadline(scope, 'later', '2026-11-25', '2026-11-30');
+  setOwnDeadline(scope, 'gone', '2026-11-18', '2026-11-30');
+  const open = new Set(['due', 'later']);
+  expect(takeDueNudges(scope, '2026-11-17', open)).toEqual([]);
+  expect(takeDueNudges(scope, '2026-11-18', open)).toEqual(['due']);
+  expect(takeDueNudges(scope, '2026-11-18', open)).toEqual([]);
+  expect(takeDueNudges(scope, '2026-11-19', open)).toEqual([]);
+  expect(takeDueNudges(scope, '2026-11-25', open)).toEqual(['later']);
+});
+
+it('finds tasks worked on during a day from their Next step', async () => {
+  const { touchedOn } = await import('../focus/next-steps');
+  const day = new Date(2026, 10, 12, 15), at = (d: number, h: number) => new Date(2026, 10, d, h).toISOString();
+  const steps = { paused: { text: '', updatedAt: at(10, 9), pausedAt: at(12, 9) }, written: { text: 'x', updatedAt: at(12, 23) }, old: { text: 'x', updatedAt: at(11, 23), pausedAt: at(11, 23) } };
+  expect(touchedOn(steps, ['paused', 'written', 'old', 'none'], day)).toEqual(['paused', 'written']);
+});

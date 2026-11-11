@@ -45,6 +45,8 @@ export interface PomodoroTimerSettings {
   longBreakEvery: number;
   autoStartBreaks: boolean;
   autoStartFocus: boolean;
+  /** Focus counts up with no set length and no break afterwards. */
+  countUp: boolean;
 }
 
 export type FocusSessionStatus = 'completed' | 'interrupted' | 'cancelled';

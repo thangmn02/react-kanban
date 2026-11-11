@@ -83,3 +83,19 @@ it('lists each task once under More tasks and folds the untouched ones', async (
   expect(within(more).getAllByText('Fresh idea')).toHaveLength(1);
   expect(within(more).getAllByText('Send the quote')).toHaveLength(1);
 });
+
+it('moves a task up when its personal deadline arrives and says so once', async () => {
+  const ahead = task('ahead', 'Draft the report', { dueDate: '2999-06-10' });
+  data.current = { overdueTasks: [], dueTodayTasks: [], assignedTasks: [ahead, fresh], recentlyActiveTasks: [] } satisfies TodayPageData;
+  localStorage.setItem('kora.ownDeadlines.v1:u:w', JSON.stringify({ ahead: { on: '2020-01-01' } }));
+  const first = show();
+  const section = (await screen.findByRole('heading', { name: 'Your own deadline' })).closest('[data-task-section]') as HTMLElement;
+  expect(within(section).getByText('Draft the report')).toBeTruthy();
+  expect(within(section).getByText('Your own deadline is here')).toBeTruthy();
+  await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Your own deadline is here: Draft the report'));
+  expect(screen.getByText('More tasks (1)')).toBeTruthy();
+  first.unmount();
+  show();
+  await screen.findByRole('heading', { name: 'Your own deadline' });
+  expect(screen.getByRole('status').textContent).toBe('');
+});

@@ -8,8 +8,10 @@ import type {
   PomodoroTimerState,
 } from '../types/focus.type';
 import {
+  COUNT_UP_CAP_SECONDS,
   DEFAULT_POMODORO_TIMER_SETTINGS,
   formatPomodoroTime,
+  isCountUpSession,
   getPomodoroModeSeconds,
   sanitizePomodoroTimerSettings,
 } from '../utils/pomodoroTime';
@@ -271,7 +273,10 @@ export function usePomodoroTimer({
         let completedCycleFocus = timerState.completedCycleFocus || 0;
         let nextMode: PomodoroMode;
 
-        if (completedMode === 'focus') {
+        if (completedMode === 'focus' && timerState.plannedSeconds === COUNT_UP_CAP_SECONDS) {
+          // A count-up session that reaches the ceiling just stops; it never forces a break.
+          nextMode = 'focus';
+        } else if (completedMode === 'focus') {
           completedCycleFocus += 1;
           if (completedCycleFocus >= settings.longBreakEvery) {
             completedCycleFocus = 0;
@@ -283,7 +288,7 @@ export function usePomodoroTimer({
           nextMode = 'focus';
         }
 
-        const shouldAutoStart = completedMode === 'focus'
+        const shouldAutoStart = nextMode === completedMode ? false : completedMode === 'focus'
           ? settings.autoStartBreaks
           : settings.autoStartFocus && !resolveTimerTask(timerState)?.isDone;
         const nextDurationSeconds = getPomodoroModeSeconds(nextMode, settings);
@@ -313,6 +318,12 @@ export function usePomodoroTimer({
     return () => { disposed = true; unlisten?.(); window.clearInterval(intervalId); };
   }, [commitTimerState, onComplete, resolveTimerTask, timerState]);
 
+  const isCountUp = isCountUpSession(timerState, timerSettings);
+  // Count-up shows time spent; a countdown shows time left.
+  const displaySeconds = isCountUp
+    ? Math.max(0, (timerState.plannedSeconds || COUNT_UP_CAP_SECONDS) - visibleRemainingSeconds)
+    : visibleRemainingSeconds;
+
   useEffect(() => {
     if (typeof document === 'undefined') {
       return;
@@ -338,12 +349,12 @@ export function usePomodoroTimer({
     }
 
     if (timerState.isRunning && isPageHidden) {
-      document.title = `${formatPomodoroTime(visibleRemainingSeconds)} - ${resolveTimerTask(timerState)?.title || 'Focus session'}`;
+      document.title = `${formatPomodoroTime(displaySeconds)} - ${resolveTimerTask(timerState)?.title || 'Focus session'}`;
       return;
     }
 
     document.title = originalDocumentTitleRef.current;
-  }, [isPageHidden, resolveTimerTask, timerState, visibleRemainingSeconds]);
+  }, [isPageHidden, resolveTimerTask, timerState, displaySeconds]);
 
   useEffect(() => () => {
     if (originalDocumentTitleRef.current !== null) document.title = originalDocumentTitleRef.current;
@@ -390,7 +401,13 @@ export function usePomodoroTimer({
 
   const resetTimer = useCallback(() => {
     const currentState = timerStateRef.current;
-    reportInterruption(currentState, Date.now());
+    if (currentState.mode === 'focus' && currentState.plannedSeconds === COUNT_UP_CAP_SECONDS) {
+      // Stopping a count-up session is how it ends, so it is a finished session of the time spent, not an interruption.
+      const snapshot = buildSessionSnapshot(currentState, Date.now());
+      if (snapshot && snapshot.durationSeconds > 60) {
+        onComplete?.(resolveTimerTask(currentState), currentState.mode, { ...snapshot, plannedSeconds: snapshot.durationSeconds });
+      }
+    } else reportInterruption(currentState, Date.now());
     commitTimerState({
       ...currentState,
       isRunning: false,
@@ -400,7 +417,7 @@ export function usePomodoroTimer({
       plannedSeconds: null,
       sessionId: null,
     });
-  }, [commitTimerState, reportInterruption]);
+  }, [commitTimerState, onComplete, reportInterruption, resolveTimerTask]);
 
   const setMode = useCallback((mode: PomodoroMode) => {
     const currentState = timerStateRef.current;
@@ -441,7 +458,8 @@ export function usePomodoroTimer({
     timerSettings,
     updateTimerSettings,
     selectedTimerTask,
-    remainingSeconds: visibleRemainingSeconds,
+    remainingSeconds: displaySeconds,
+    isCountUp,
     startTimer,
     pauseTimer,
     resetTimer,

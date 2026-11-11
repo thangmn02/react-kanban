@@ -19,7 +19,7 @@ import TodayTaskCard from './TodayTaskCard';
 import { Skeleton, SkeletonTaskCard } from '../atoms/skeleton';
 import { useI18n } from '../../i18n';
 import { NOTES_PREVIEW_ENABLED } from '../../constants/features';
-import { followUpDue, useTaskFollowUps } from '../../features/today/task-followups';
+import { followUpDue, useOwnDeadlines, useTaskFollowUps } from '../../features/today/task-followups';
 import { splitStaleTasks } from '../../features/today/utils/staleTasks';
 
 const localDay = (offset = 0) => {
@@ -84,6 +84,7 @@ export default function TodayPage({
       if (followUps[task.id] && !completion.completed.has(task.id)) byId.set(task.id, task);
     return [...byId.values()].sort((a, b) => followUps[a.id].followUpOn.localeCompare(followUps[b.id].followUpOn));
   }, [loadedData, completion.completed, followUps]);
+  const { deadlines, set: setOwnDeadline, takeNudges } = useOwnDeadlines({ userId: currentUser.id, workspaceId: activeWorkspace?.id ?? null });
   const [rescheduling, setRescheduling] = useState<ReadonlySet<string>>(new Set());
   const [notice, setNotice] = useState('');
   const handleComplete = async (task: TodayTaskSummary) => {
@@ -149,6 +150,19 @@ export default function TodayPage({
     };
   }, [workspaceId, currentUser, t, taskRevision]);
 
+  // Tell the person once, on the day a personal deadline arrives. It never repeats.
+  useEffect(() => {
+    if (isLoading) return;
+    const day = localDay();
+    const open = [...loadedData.assignedTasks, ...loadedData.recentlyActiveTasks].filter(task => !task.isDone && task.dueDate && task.dueDate.slice(0, 10) > day);
+    const told = takeNudges(day, new Set(open.map(task => task.id)));
+    if (!told.length) return;
+    const first = open.find(task => task.id === told[0]);
+    const message = told.length === 1 && first ? t('today.own.nudgeOne', { task: first.title }) : t('today.own.nudgeMany', { count: told.length });
+    // Announced after this render, since taking the nudge has just written to storage.
+    queueMicrotask(() => setNotice(message));
+  }, [isLoading, loadedData, deadlines, takeNudges, t]);
+
   const handleRetry = useCallback(() => {
     setIsRetrying(true);
     void loadTodayData().finally(() => {
@@ -175,11 +189,17 @@ export default function TodayPage({
     if (wait(task.id, who, followUpOn)) setNotice(t('today.waiting.saved', { task: task.title }));
   };
   const today = localDay();
-  const hasUrgentTasks = todayData.overdueTasks.length > 0 || todayData.dueTodayTasks.length > 0;
+  // A personal deadline that has arrived moves the task up, while its real due date is still ahead.
+  const ownDue = (task: TodayTaskSummary) => Boolean(deadlines[task.id] && deadlines[task.id].on <= today && task.dueDate && task.dueDate.slice(0, 10) > today);
+  const ownDueTasks = [...new Map([...todayData.assignedTasks, ...todayData.recentlyActiveTasks].filter(ownDue).map(task => [task.id, task])).values()];
+  const handleOwnDeadline = (task: TodayTaskSummary, on: string) => {
+    if (setOwnDeadline(task.id, on, task.dueDate)) setNotice(t(on ? 'today.own.saved' : 'today.own.cleared', { task: task.title }));
+  };
+  const hasUrgentTasks = todayData.overdueTasks.length > 0 || todayData.dueTodayTasks.length > 0 || ownDueTasks.length > 0;
   // Each task appears once under More tasks; ones left alone for two weeks fold behind a single line.
-  const assigned = splitStaleTasks(todayData.assignedTasks);
+  const assigned = splitStaleTasks(todayData.assignedTasks.filter(task => !ownDue(task)));
   const assignedIds = new Set(todayData.assignedTasks.map(task => task.id));
-  const recent = splitStaleTasks(todayData.recentlyActiveTasks.filter(task => !assignedIds.has(task.id)));
+  const recent = splitStaleTasks(todayData.recentlyActiveTasks.filter(task => !assignedIds.has(task.id) && !ownDue(task)));
   const staleTasks = [...assigned.stale, ...recent.stale];
   const moreCount = assigned.fresh.length + recent.fresh.length + staleTasks.length;
   const hasSecondaryTasks = moreCount > 0 || waitingTasks.length > 0;
@@ -385,7 +405,7 @@ export default function TodayPage({
             </div>
 
             {(hasUrgentTasks || hasSecondaryTasks) && <div id="today-due-tasks" className="space-y-4">
-              {(todayData.overdueTasks.length > 0 || todayData.dueTodayTasks.length > 0) && (
+              {hasUrgentTasks && (
                 <SectionCard className="p-4">
                   <div className="mb-4">
                     <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-slate-600">
@@ -406,6 +426,22 @@ export default function TodayPage({
                         onToggleTodayFocus={onToggleTodayFocus}
                         onCompleteTask={handleComplete}
                         completingIds={completion.pending}
+                        compactShell
+                      />
+                    )}
+
+                    {ownDueTasks.length > 0 && (
+                      <TodayTaskSection
+                        title={t('today.own.title')}
+                        tasks={ownDueTasks}
+                        emptyMessage=""
+                        isFocusTask={isFocusTask}
+                        onOpenTask={onOpenTask}
+                        onStartFocus={onStartFocus}
+                        onToggleTodayFocus={onToggleTodayFocus}
+                        onCompleteTask={handleComplete}
+                        completingIds={completion.pending}
+                        cardProps={task => ({ ownDeadline: deadlines[task.id], ownDeadlineDue: true, onSetOwnDeadline: handleOwnDeadline, onWait: handleWait })}
                         compactShell
                       />
                     )}
@@ -458,7 +494,7 @@ export default function TodayPage({
                         key={title}
                         title={title}
                         tasks={tasks}
-                        cardProps={() => ({ onWait: handleWait })}
+                        cardProps={task => ({ onWait: handleWait, ownDeadline: deadlines[task.id], onSetOwnDeadline: handleOwnDeadline })}
                         isFocusTask={isFocusTask}
                     onOpenTask={onOpenTask}
                     onStartFocus={onStartFocus}

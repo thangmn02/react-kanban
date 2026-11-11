@@ -36,6 +36,13 @@ export function saveNextStep(scope: StorageScope, taskId: string, text: string, 
   writeNextSteps(scope, current);
 }
 
+/** Tasks worked on during the given local day: a session on them ended, or their Next step was written. */
+export function touchedOn(steps: NextSteps, taskIds: readonly string[], day = new Date()) {
+  const sameDay = (value?: string) => { if (!value) return false; const at = new Date(value);
+    return at.getFullYear() === day.getFullYear() && at.getMonth() === day.getMonth() && at.getDate() === day.getDate(); };
+  return taskIds.filter(id => sameDay(steps[id]?.pausedAt) || sameDay(steps[id]?.updatedAt));
+}
+
 /** Forget a task once it is done; it no longer needs a place to resume. */
 export function clearNextStep(scope: StorageScope, taskId: string) {
   const current = readNextSteps(scope);

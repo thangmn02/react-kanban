@@ -7,7 +7,7 @@ import type {
   PomodoroTimerSettings,
   PomodoroTimerState,
 } from '../../types/focus.type';
-import { formatPomodoroTime } from '../../utils/pomodoroTime';
+import { COUNT_UP_CAP_SECONDS, formatPomodoroTime } from '../../utils/pomodoroTime';
 import PomodoroModeSwitch from './PomodoroModeSwitch';
 import PomodoroTimerSettingsPanel from './PomodoroTimerSettingsPanel';
 import { useI18n } from '../../i18n';
@@ -146,9 +146,9 @@ function PomodoroTimer({
           type="button"
           onClick={onReset}
           className="cursor-pointer rounded-2xl border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-semibold text-slate-100 transition hover:bg-white/20 focus:outline-none focus-visible:ring-4 focus-visible:ring-sky-400/30 active:scale-[0.98]"
-          aria-label={t('focus.timer.reset')}
+          aria-label={t(timerState.plannedSeconds === COUNT_UP_CAP_SECONDS ? 'focus.timer.finish' : 'focus.timer.reset')}
         >
-          {t('focus.timer.reset')}
+          {t(timerState.plannedSeconds === COUNT_UP_CAP_SECONDS ? 'focus.timer.finish' : 'focus.timer.reset')}
         </button>
       </div>
 

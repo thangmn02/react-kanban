@@ -68,3 +68,67 @@ export function useTaskFollowUps(scope: StorageScope) {
     [key]);
   return { followUps, wait, clear };
 }
+
+/**
+ * A personal deadline ahead of the real due date. When its day arrives the task moves up on Today and the person is
+ * told once; `nudgedOn` records that so the reminder never repeats. Kept on this device.
+ */
+export interface OwnDeadline { on: string; nudgedOn?: string }
+export type OwnDeadlines = Record<string, OwnDeadline>;
+
+const DEADLINE_EVENT = 'kora:own-deadlines';
+const deadlineKey = (scope: StorageScope) => `kora.ownDeadlines.v1:${scope.userId}:${scope.workspaceId ?? 'none'}`;
+
+export function readOwnDeadlines(scope: StorageScope): OwnDeadlines {
+  try {
+    const value = JSON.parse(localStorage.getItem(deadlineKey(scope)) || '{}') as unknown;
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+    return Object.fromEntries(Object.entries(value as OwnDeadlines).filter(([, item]) => item && typeof item.on === 'string' && DAY.test(item.on)));
+  } catch { return {}; }
+}
+
+function writeOwnDeadlines(scope: StorageScope, next: OwnDeadlines) {
+  const kept = Object.entries(next).sort(([, a], [, b]) => b.on.localeCompare(a.on)).slice(0, MAX_TASKS);
+  try { localStorage.setItem(deadlineKey(scope), JSON.stringify(Object.fromEntries(kept))); } catch { /* Lasts for this window only. */ }
+  window.dispatchEvent(new CustomEvent(DEADLINE_EVENT, { detail: deadlineKey(scope) }));
+}
+
+/** Saves the day, or clears it when `on` is empty. A day on or after the real due date is refused: it would not be earlier. */
+export function setOwnDeadline(scope: StorageScope, taskId: string, on: string, dueDate?: string | null) {
+  const current = readOwnDeadlines(scope);
+  if (!on) { if (!(taskId in current)) return true; delete current[taskId]; writeOwnDeadlines(scope, current); return true; }
+  if (!DAY.test(on) || dueDate && on >= dueDate.slice(0, 10)) return false;
+  current[taskId] = { on };
+  writeOwnDeadlines(scope, current);
+  return true;
+}
+
+/** Marks arrived deadlines as told and returns the task ids that had not been told before. */
+export function takeDueNudges(scope: StorageScope, today: string, openTaskIds: ReadonlySet<string>) {
+  const current = readOwnDeadlines(scope), fresh: string[] = [];
+  for (const [taskId, item] of Object.entries(current)) if (openTaskIds.has(taskId) && item.on <= today && !item.nudgedOn) { item.nudgedOn = today; fresh.push(taskId); }
+  if (fresh.length) writeOwnDeadlines(scope, current);
+  return fresh;
+}
+
+export function useOwnDeadlines(scope: StorageScope) {
+  const key = deadlineKey(scope);
+  const [deadlines, setDeadlines] = useState(() => readOwnDeadlines(scope));
+  useEffect(() => {
+    setDeadlines(readOwnDeadlines(scope));
+    const local = (event: Event) => { if ((event as CustomEvent<string>).detail === key) setDeadlines(readOwnDeadlines(scope)); };
+    const storage = (event: StorageEvent) => { if (event.key === key || event.key === null) setDeadlines(readOwnDeadlines(scope)); };
+    window.addEventListener(DEADLINE_EVENT, local);
+    window.addEventListener('storage', storage);
+    return () => { window.removeEventListener(DEADLINE_EVENT, local); window.removeEventListener('storage', storage); };
+  // The scope object is rebuilt each render; its key identifies it.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  const set = useCallback((taskId: string, on: string, dueDate?: string | null) => setOwnDeadline(scope, taskId, on, dueDate),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [key]);
+  const takeNudges = useCallback((today: string, openTaskIds: ReadonlySet<string>) => takeDueNudges(scope, today, openTaskIds),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [key]);
+  return { deadlines, set, takeNudges };
+}

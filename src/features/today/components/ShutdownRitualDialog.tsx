@@ -2,7 +2,7 @@ import { useEffect, useId } from 'react';
 
 import { useI18n } from '../../../i18n';
 import type { DailyFocusStats, FocusTask } from '../../../types/focus.type';
-import type { NextSteps } from '../../focus/next-steps';
+import { touchedOn, type NextSteps } from '../../focus/next-steps';
 
 interface ShutdownRitualDialogProps {
   isOpen: boolean;
@@ -42,6 +42,8 @@ export default function ShutdownRitualDialog({
 
   const completedTasks = focusTasks.filter((task) => task.isDone);
   const unfinishedTasks = focusTasks.filter((task) => !task.isDone);
+  // Work that moved forward without finishing still counts as a day's work.
+  const touched = new Set(touchedOn(nextSteps, unfinishedTasks.map((task) => task.id)));
 
   return (
     <div className="fixed inset-0 z-[65] overflow-y-auto">
@@ -76,6 +78,8 @@ export default function ShutdownRitualDialog({
             </div>
           </div>
 
+          {touched.size > 0 && <p className="mt-3 text-sm text-slate-600">{t('shutdown.touched', { count: touched.size })}</p>}
+
           <div className="mt-5 rounded-3xl border border-slate-200 p-4">
             <p className="text-sm font-semibold text-slate-900">
               {unfinishedTasks.length > 0
@@ -87,6 +91,7 @@ export default function ShutdownRitualDialog({
                 {unfinishedTasks.map((task) => (
                   <li key={task.id} className="rounded-2xl bg-slate-50 px-3 py-2 text-sm">
                     <label htmlFor={`${titleId}-${task.id}`} className="block font-medium text-slate-700">{task.title}</label>
+                    {touched.has(task.id) && <span className="mt-1 inline-flex rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-700">{t('shutdown.touchedBadge')}</span>}
                     <input
                       id={`${titleId}-${task.id}`}
                       type="text"

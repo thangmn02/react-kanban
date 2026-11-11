@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'framer-motion';
 import { uiFade, uiSpring } from '../../shared/motion';
 import type { FocusTask, PomodoroTimerState, PomodoroTimerSettings, PomodoroMode } from '../../types/focus.type';
-import { formatPomodoroTime } from '../../utils/pomodoroTime';
+import { COUNT_UP_CAP_SECONDS, formatPomodoroTime } from '../../utils/pomodoroTime';
 import { useI18n } from '../../i18n';
 import { CopyFolderButton, MusicFeedback, MusicGrid, MusicSetup, MusicTrack, MusicNowPlaying } from '../../features/music/MusicPlayer';
 import { useBrowserMusic } from '../../features/music/useBrowserMusic';
@@ -205,7 +205,7 @@ export default function FloatingFocus(props: FloatingFocusProps) {
               aria-label={timerState.isRunning ? t('focus.timer.pause') : t('focus.timer.start')}>
               <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">{timerState.isRunning ? <path d="M7 5h4v14H7zm6 0h4v14h-4z" /> : <path d="m8 5 11 7-11 7z" />}</svg>
               <span>{timerState.isRunning ? t('focus.timer.pause') : t('focus.timer.start')}</span></button>
-            <button className="dock-reset" type="button" onClick={onReset}>{t('focus.timer.reset')}</button>
+            <button className="dock-reset" type="button" onClick={onReset}>{t(timerState.plannedSeconds === COUNT_UP_CAP_SECONDS ? 'focus.timer.finish' : 'focus.timer.reset')}</button>
             <button className="dock-next" type="button" disabled={!taskId || !onMarkDoneAndNext || activeTask?.isDone} onClick={() => onMarkDoneAndNext?.(taskId)}>{t('floating.completeNext')}</button>
           </div>
         </motion.section>

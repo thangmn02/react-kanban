@@ -149,6 +149,11 @@ function PomodoroTimerSettingsPanel({
       </div>
 
       <ToggleRow
+        label={t('focus.timer.countUp')}
+        checked={settings.countUp}
+        onChange={(countUp) => onChange({ countUp })}
+      />
+      <ToggleRow
         label={t('focus.timer.autoStartBreaks')}
         checked={settings.autoStartBreaks}
         onChange={(autoStartBreaks) => onChange({ autoStartBreaks })}

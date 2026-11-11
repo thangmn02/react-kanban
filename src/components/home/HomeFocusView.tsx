@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { FocusTask, PomodoroMode } from '../../types/focus.type';
 import type { FocusSessionValue } from '../../features/focus/useFocusSessionController';
 import { useI18n } from '../../i18n';
-import { formatPomodoroTime } from '../../utils/pomodoroTime';
+import { COUNT_UP_CAP_SECONDS, formatPomodoroTime } from '../../utils/pomodoroTime';
 import DueDateBadge from '../atoms/DueDateBadge';
 
 export interface HomeFocusControls {
@@ -73,7 +73,7 @@ export default function HomeFocusView({ task, session, onMarkDone, onOpenTask, o
       <div className="mt-5 flex flex-wrap items-center gap-4">
         <span role="timer" aria-label={t('focus.timer.pomodoro')} className="text-5xl font-semibold tabular-nums tracking-tight text-slate-800">{formatPomodoroTime(session.remainingSeconds)}</span>
         <button type="button" disabled={saving} className={primaryAction} onClick={() => session.timerState.isRunning ? session.pauseTimer() : session.handleStartFocusTimer(task.id)}>{t(session.timerState.isRunning ? 'focus.timer.pause' : session.timerState.startedAt ? 'briefing.resume' : 'focus.timer.start')}</button>
-        <button type="button" disabled={saving} className={button} onClick={session.resetTimer}>{t('focus.timer.reset')}</button>
+        <button type="button" disabled={saving} className={button} onClick={session.resetTimer}>{t(session.timerState.plannedSeconds === COUNT_UP_CAP_SECONDS ? 'focus.timer.finish' : 'focus.timer.reset')}</button>
       </div>
       <div className="mt-7 border-l-2 border-slate-200 pl-4">
         <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-500">{t('briefing.nextStep')}</h2>

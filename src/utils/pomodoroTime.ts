@@ -1,4 +1,4 @@
-import type { PomodoroMode, PomodoroTimerSettings } from '../types/focus.type';
+import type { PomodoroMode, PomodoroTimerSettings, PomodoroTimerState } from '../types/focus.type';
 
 export const POMODORO_MODE_SECONDS: Record<PomodoroMode, number> = {
   focus: 25 * 60,
@@ -19,7 +19,16 @@ export const DEFAULT_POMODORO_TIMER_SETTINGS: PomodoroTimerSettings = {
   longBreakEvery: 4,
   autoStartBreaks: false,
   autoStartFocus: false,
+  countUp: false,
 };
+
+/** A count-up session is stored as a countdown from this ceiling, so the rest of the timer needs no second code path. */
+export const COUNT_UP_CAP_SECONDS = 4 * 60 * 60;
+
+/** A started session is count-up if it was planned at the ceiling; an idle timer follows the setting. */
+export function isCountUpSession(state: Pick<PomodoroTimerState, 'mode' | 'plannedSeconds'>, settings: Pick<PomodoroTimerSettings, 'countUp'>) {
+  return state.mode === 'focus' && (state.plannedSeconds ? state.plannedSeconds === COUNT_UP_CAP_SECONDS : settings.countUp);
+}
 
 export const FOCUS_LENGTH_PRESETS = [15, 25, 45, 60, 90] as const;
 export const SHORT_BREAK_PRESETS = [5, 10, 15] as const;
@@ -30,7 +39,7 @@ export const LONG_BREAK_EVERY_MAX = 6;
 export function getPomodoroModeSeconds(mode: PomodoroMode, settings: PomodoroTimerSettings): number {
   switch (mode) {
     case 'focus':
-      return settings.focusMinutes * 60;
+      return settings.countUp ? COUNT_UP_CAP_SECONDS : settings.focusMinutes * 60;
     case 'shortBreak':
       return settings.shortBreakMinutes * 60;
     case 'longBreak':
@@ -59,6 +68,7 @@ export function sanitizePomodoroTimerSettings(
     ),
     autoStartBreaks: merged.autoStartBreaks === true,
     autoStartFocus: merged.autoStartFocus === true,
+    countUp: merged.countUp === true,
   };
 }
 

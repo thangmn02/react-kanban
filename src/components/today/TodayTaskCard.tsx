@@ -1,5 +1,5 @@
 import { useId, useState, type ReactNode } from 'react';
-import type { WaitingOn } from '../../features/today/task-followups';
+import type { OwnDeadline, WaitingOn } from '../../features/today/task-followups';
 import type { TodayTaskSummary } from '../../services/today.service';
 import { getPriorityBadgeClass } from '../../utils/taskMetadata';
 import DueDateBadge from '../atoms/DueDateBadge';
@@ -24,6 +24,11 @@ interface TodayTaskCardProps {
   followUpDue?: boolean;
   onWait?: (task: TodayTaskSummary, who: string, followUpOn: string) => void;
   onStopWaiting?: (task: TodayTaskSummary) => void;
+  /** A personal deadline ahead of the real due date. */
+  ownDeadline?: OwnDeadline;
+  ownDeadlineDue?: boolean;
+  /** An empty day clears it. */
+  onSetOwnDeadline?: (task: TodayTaskSummary, on: string) => void;
 }
 
 const dayFromNow = (days: number) => {
@@ -46,11 +51,20 @@ export default function TodayTaskCard({
   followUpDue = false,
   onWait,
   onStopWaiting,
+  ownDeadline,
+  ownDeadlineDue = false,
+  onSetOwnDeadline,
 }: TodayTaskCardProps) {
   const priorityClassName = getPriorityBadgeClass(task.priority || undefined);
   const { t } = useI18n();
   const formId = useId();
   const [waitOpen, setWaitOpen] = useState(false), [who, setWho] = useState(''), [followUpOn, setFollowUpOn] = useState(() => dayFromNow(3));
+  const [aimOpen, setAimOpen] = useState(false), [aimOn, setAimOn] = useState(ownDeadline?.on ?? '');
+  const realDue = task.dueDate ? task.dueDate.slice(0, 10) : '';
+  // The latest useful personal deadline is the day before the real one.
+  const dayBeforeDue = (() => { if (!realDue) return ''; const date = new Date(`${realDue}T12:00:00`); date.setDate(date.getDate() - 1);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; })();
+  const canAim = Boolean(!task.isDone && onSetOwnDeadline && realDue && dayBeforeDue >= dayFromNow(0));
   const quiet = 'min-h-11 cursor-pointer rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-wait disabled:opacity-50';
   const preview = stripTaskHtml(task.description);
 
@@ -113,6 +127,9 @@ export default function TodayTaskCard({
           </>
         )}
         {reasons}
+        {ownDeadline && !task.isDone && <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${ownDeadlineDue ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'}`}>
+          {ownDeadlineDue ? t('today.own.due') : t('today.own.badge', { date: ownDeadline.on })}
+        </span>}
         {waiting && <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${followUpDue ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'}`}>
           {followUpDue ? t('today.waiting.followUpNow', { who: waiting.who || t('today.waiting.someone') }) : t('today.waiting.until', { who: waiting.who || t('today.waiting.someone'), date: waiting.followUpOn })}
         </span>}
@@ -154,6 +171,17 @@ export default function TodayTaskCard({
         {!task.isDone && waiting && onStopWaiting && <button type="button" className={quiet} aria-label={`${t('today.waiting.stop')}: ${task.title}`} onClick={() => onStopWaiting(task)}>{t('today.waiting.stop')}</button>}
         {!task.isDone && !waiting && onWait && <button type="button" className={quiet} aria-expanded={waitOpen} aria-controls={formId} aria-label={`${t('today.waiting.action')}: ${task.title}`} onClick={() => setWaitOpen(open => !open)}>{t('today.waiting.action')}</button>}
       </div>
+      {(canAim || ownDeadline && onSetOwnDeadline && !task.isDone) && <div className="mt-2 flex flex-wrap items-center gap-2">
+        {canAim && <button type="button" className={quiet} aria-expanded={aimOpen} aria-controls={`${formId}-aim`} aria-label={`${t('today.own.action')}: ${task.title}`} onClick={() => setAimOpen(open => !open)}>{t('today.own.action')}</button>}
+        {ownDeadline && onSetOwnDeadline && <button type="button" className={quiet} aria-label={`${t('today.own.clear')}: ${task.title}`} onClick={() => { onSetOwnDeadline(task, ''); setAimOn(''); setAimOpen(false); }}>{t('today.own.clear')}</button>}
+      </div>}
+      {canAim && aimOpen && <form id={`${formId}-aim`} className="mt-3 flex flex-wrap items-end gap-2 rounded-xl bg-slate-50 p-3"
+        onSubmit={event => { event.preventDefault(); if (!aimOn || aimOn > dayBeforeDue) return; onSetOwnDeadline!(task, aimOn); setAimOpen(false); }}>
+        <label className="text-xs font-semibold text-slate-600">{t('today.own.label')}
+          <input autoFocus type="date" required value={aimOn} min={dayFromNow(0)} max={dayBeforeDue} onChange={event => setAimOn(event.target.value)} className="mt-1 block min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900" />
+        </label>
+        <button type="submit" className="min-h-11 cursor-pointer rounded-xl bg-slate-950 px-4 text-xs font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">{t('common.save')}</button>
+      </form>}
       {!task.isDone && !waiting && onWait && waitOpen && <form id={formId} className="mt-3 flex flex-wrap items-end gap-2 rounded-xl bg-slate-50 p-3"
         onSubmit={event => { event.preventDefault(); if (!followUpOn) return; onWait(task, who, followUpOn); setWaitOpen(false); }}>
         <label className="min-w-0 flex-1 text-xs font-semibold text-slate-600">{t('today.waiting.who')}

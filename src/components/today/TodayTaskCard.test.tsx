@@ -53,3 +53,30 @@ it('shows who a task waits on, flags the follow-up day, and can stop waiting', (
   show({ waiting, followUpDue: true });
   expect(screen.getByText('Follow up with Linh')).toBeTruthy();
 });
+
+it('sets a personal deadline before the real one, and clears it', () => {
+  const onSetOwnDeadline = vi.fn(), future = { ...task, dueDate: '2999-06-10' };
+  const view = show({ task: future, onSetOwnDeadline });
+  fireEvent.click(screen.getByRole('button', { name: 'Aim earlier…: Send the quote' }));
+  const input = screen.getByLabelText('Aim to finish by');
+  expect(input.getAttribute('max')).toBe('2999-06-09');
+  fireEvent.change(input, { target: { value: '2999-06-10' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  expect(onSetOwnDeadline).not.toHaveBeenCalled();
+  fireEvent.change(input, { target: { value: '2999-06-05' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  expect(onSetOwnDeadline).toHaveBeenCalledWith(future, '2999-06-05');
+  view.unmount();
+  show({ task: future, onSetOwnDeadline, ownDeadline: { on: '2999-06-05' } });
+  expect(screen.getByText('Aiming for 2999-06-05')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Clear my deadline: Send the quote' }));
+  expect(onSetOwnDeadline).toHaveBeenLastCalledWith(future, '');
+});
+
+it('offers no personal deadline when the task has no due date or it is already past', () => {
+  const view = show({ task: { ...task, dueDate: null }, onSetOwnDeadline: vi.fn() });
+  expect(screen.queryByRole('button', { name: /Aim earlier/ })).toBeNull();
+  view.unmount();
+  show({ onSetOwnDeadline: vi.fn() });
+  expect(screen.queryByRole('button', { name: /Aim earlier/ })).toBeNull();
+});

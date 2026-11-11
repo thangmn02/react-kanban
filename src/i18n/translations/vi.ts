@@ -1271,6 +1271,20 @@ const vi = {
   'today.stale.title': 'Chưa đụng tới trong 2 tuần',
   'table.editPriority': 'Ưu tiên: {task}',
   'table.editDueDate': 'Hạn: {task}',
+  'focus.timer.countUp': 'Không giới hạn: đếm lên, không nghỉ',
+  'focus.timer.finish': 'Xong',
+  'today.own.title': 'Hạn bạn tự đặt',
+  'today.own.action': 'Đặt hạn sớm hơn…',
+  'today.own.label': 'Muốn xong trước ngày',
+  'today.own.clear': 'Bỏ hạn tự đặt',
+  'today.own.badge': 'Muốn xong trước {date}',
+  'today.own.due': 'Đã tới hạn bạn tự đặt',
+  'today.own.saved': 'Đã đặt hạn riêng: {task}',
+  'today.own.cleared': 'Đã bỏ hạn riêng: {task}',
+  'today.own.nudgeOne': 'Đã tới hạn bạn tự đặt: {task}',
+  'today.own.nudgeMany': 'Đã tới hạn bạn tự đặt cho {count} việc',
+  'shutdown.touched': 'Đã làm nhưng chưa xong: {count}',
+  'shutdown.touchedBadge': 'Đã làm hôm nay',
 } as const;
 
 export default vi;

@@ -1271,6 +1271,20 @@ const en = {
   'today.stale.title': 'Not touched in 2 weeks',
   'table.editPriority': 'Priority: {task}',
   'table.editDueDate': 'Due date: {task}',
+  'focus.timer.countUp': 'No time limit: count up, no breaks',
+  'focus.timer.finish': 'Finish',
+  'today.own.title': 'Your own deadline',
+  'today.own.action': 'Aim earlier…',
+  'today.own.label': 'Aim to finish by',
+  'today.own.clear': 'Clear my deadline',
+  'today.own.badge': 'Aiming for {date}',
+  'today.own.due': 'Your own deadline is here',
+  'today.own.saved': 'Your deadline is set: {task}',
+  'today.own.cleared': 'Your deadline is cleared: {task}',
+  'today.own.nudgeOne': 'Your own deadline is here: {task}',
+  'today.own.nudgeMany': 'Your own deadline is here for {count} tasks',
+  'shutdown.touched': 'Worked on but not finished: {count}',
+  'shutdown.touchedBadge': 'Worked on today',
 } as const;
 
 export default en;

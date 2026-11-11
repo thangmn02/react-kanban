@@ -88,4 +88,65 @@ describe('usePomodoroTimer', () => {
     expect(result.current.timerState.mode).toBe('focus');
     expect(result.current.timerState.activeTaskId).toBeNull();
   });
+
+  it('counts up with no limit, pauses and resumes, and logs the time spent as a finished session', () => {
+    vi.useFakeTimers();
+    const onComplete = vi.fn(), onInterrupt = vi.fn();
+    const { result } = renderHook(() => usePomodoroTimer({ scope: scopeA, activeFocusTask: null, onComplete, onInterrupt }));
+    act(() => result.current.updateTimerSettings({ countUp: true }));
+    expect(result.current.isCountUp).toBe(true);
+    expect(result.current.remainingSeconds).toBe(0);
+    act(() => result.current.startTimer('task-a'));
+    act(() => vi.advanceTimersByTime(40 * 60_000));
+    expect(result.current.remainingSeconds).toBe(2400);
+    expect(result.current.timerState.mode).toBe('focus');
+    act(() => result.current.pauseTimer());
+    act(() => vi.advanceTimersByTime(10 * 60_000));
+    expect(result.current.remainingSeconds).toBe(2400);
+    act(() => result.current.startTimer('task-a'));
+    act(() => vi.advanceTimersByTime(5 * 60_000));
+    act(() => result.current.resetTimer());
+    expect(onInterrupt).not.toHaveBeenCalled();
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(onComplete.mock.calls[0][1]).toBe('focus');
+    expect(onComplete.mock.calls[0][2]).toMatchObject({ durationSeconds: 2700, plannedSeconds: 2700 });
+    expect(result.current.timerState).toMatchObject({ mode: 'focus', isRunning: false, startedAt: null });
+    expect(result.current.remainingSeconds).toBe(0);
+  });
+
+  it('does not log a count-up session of a minute or less', () => {
+    vi.useFakeTimers();
+    const onComplete = vi.fn();
+    const { result } = renderHook(() => usePomodoroTimer({ scope: scopeA, activeFocusTask: null, onComplete }));
+    act(() => result.current.updateTimerSettings({ countUp: true }));
+    act(() => result.current.startTimer('task-a'));
+    act(() => vi.advanceTimersByTime(30_000));
+    act(() => result.current.resetTimer());
+    expect(onComplete).not.toHaveBeenCalled();
+  });
+
+  it('stops at the count-up ceiling without starting a break', () => {
+    vi.useFakeTimers();
+    const onComplete = vi.fn();
+    const { result } = renderHook(() => usePomodoroTimer({ scope: scopeA, activeFocusTask: null, onComplete }));
+    act(() => result.current.updateTimerSettings({ countUp: true, autoStartBreaks: true }));
+    act(() => result.current.startTimer('task-a'));
+    act(() => vi.advanceTimersByTime(4 * 60 * 60_000 + 2000));
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(result.current.timerState).toMatchObject({ mode: 'focus', isRunning: false });
+  });
+
+  it('keeps a running countdown a countdown when count-up is switched on mid-session', () => {
+    vi.useFakeTimers();
+    const onInterrupt = vi.fn();
+    const { result } = renderHook(() => usePomodoroTimer({ scope: scopeA, activeFocusTask: null, onInterrupt }));
+    act(() => result.current.startTimer('task-a'));
+    act(() => vi.advanceTimersByTime(120_000));
+    act(() => result.current.updateTimerSettings({ countUp: true }));
+    expect(result.current.isCountUp).toBe(false);
+    expect(result.current.remainingSeconds).toBe(1380);
+    act(() => result.current.resetTimer());
+    expect(onInterrupt).toHaveBeenCalledTimes(1);
+    expect(result.current.isCountUp).toBe(true);
+  });
 });
