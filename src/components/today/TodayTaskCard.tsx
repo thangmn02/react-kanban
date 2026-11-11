@@ -184,7 +184,7 @@ export default function TodayTaskCard({
       </form>}
       {!task.isDone && !waiting && onWait && waitOpen && <form id={formId} className="mt-3 flex flex-wrap items-end gap-2 rounded-xl bg-slate-50 p-3"
         onSubmit={event => { event.preventDefault(); if (!followUpOn) return; onWait(task, who, followUpOn); setWaitOpen(false); }}>
-        <label className="min-w-0 flex-1 text-xs font-semibold text-slate-600">{t('today.waiting.who')}
+        <label className="min-w-40 flex-1 text-xs font-semibold text-slate-600">{t('today.waiting.who')}
           <input autoFocus value={who} maxLength={80} onChange={event => setWho(event.target.value)} className="mt-1 block min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900" />
         </label>
         <label className="text-xs font-semibold text-slate-600">{t('today.waiting.followUpOn')}
