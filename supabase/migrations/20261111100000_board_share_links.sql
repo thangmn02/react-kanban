@@ -42,7 +42,9 @@ create policy "Workspace managers can create share links" on public.board_share_
     and created_by = auth.uid()
     and revoked_at is null
     -- The link must name a live board of that same workspace.
-    and exists (select 1 from public.boards b where b.id = board_id and b.workspace_id = workspace_id and b.archived_at is null)
+    -- Columns of the new row are named in full: inside the subquery a bare workspace_id would mean b.workspace_id.
+    and exists (select 1 from public.boards b where b.id = board_share_links.board_id
+      and b.workspace_id = board_share_links.workspace_id and b.archived_at is null)
   );
 
 drop policy if exists "Workspace managers can revoke share links" on public.board_share_links;
