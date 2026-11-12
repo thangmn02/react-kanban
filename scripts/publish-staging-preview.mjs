@@ -50,7 +50,7 @@ const downloads=resolve(site,'downloads');assert.ok(inside(site,downloads));
 for(const name of await readdir(downloads).catch(error=>{if(error.code==='ENOENT')return [];throw error;})){
   const file=join(downloads,name);assert.ok((await lstat(file)).isFile(),'Unexpected nested download artifact.');await unlink(file);
 }
-await writeFile(join(site,'_redirects'),'/api/note-images /.netlify/functions/note-images 200\n/downloads/* https://koraspace.online/downloads/:splat 302\n/* /index.html 200\n');
+await writeFile(join(site,'_redirects'),'/api/note-images /.netlify/functions/note-images 200\n/api/share-feed /.netlify/functions/share-feed 200\n/downloads/* https://koraspace.online/downloads/:splat 302\n/* /index.html 200\n');
 await writeFile(join(site,'_headers'),'/*\n  X-Robots-Tag: noindex, nofollow\n  Referrer-Policy: strict-origin-when-cross-origin\n');
 await writeFile(join(site,'robots.txt'),'User-agent: *\nDisallow: /\n');
 await writeFile(join(site,'staging-preview.json'),JSON.stringify({target:'authorized staging only',projectRef:'enzzyuhchizfmruxhfhg',sourceCommit,notes:true,opalPreview:true,productionData:false,publicCompanionReplaced:false,nativeInstallerReplaced:false}));
@@ -76,16 +76,23 @@ assert.ok(!credentialValues.some(value=>value?.length>=8&&zip.includes(Buffer.fr
 const manifest=JSON.parse(await readFile(join(functionsRoot,'manifest.json'),'utf8'));assert.equal(manifest.system.platform,'linux');assert.equal(manifest.system.arch,'x64');
 const fn=manifest.functions.find(fn=>fn.name==='note-images');assert.equal(fn.runtimeVersion,'nodejs24.x');
 const functionHash=hash(zip);
+// The read-only share feeds (CSV for Sheets, ICS for Calendar) are plain JavaScript with no native module and use
+// only the public staging client key. They come from the same credential-free Linux build as the image function.
+const feed=manifest.functions.find(fn=>fn.name==='share-feed');assert.ok(feed,'The Linux build must include the share-feed function.');assert.equal(feed.runtimeVersion,'nodejs24.x');
+const feedZip=await readFile(join(functionsRoot,'share-feed.zip')),feedHash=hash(feedZip);
+assert.ok(!credentialValues.some(value=>value?.length>=8&&feedZip.includes(Buffer.from(value))),'Private credential match in the feed function; values withheld.');
+assert.ok(!feedZip.includes(Buffer.from(productionRef)),'Production routing leaked into the feed function.');
 const environment=Object.entries({VITE_SUPABASE_URL:config.API_URL,VITE_SUPABASE_ANON_KEY:config.ANON_KEY,SUPABASE_SERVICE_ROLE_KEY:config.SERVICE_ROLE_KEY}).map(([key,value])=>({key,value,scopes:['functions'],is_secret:key==='SUPABASE_SERVICE_ROLE_KEY'}));
 assert.ok(process.argv.includes('--publish-draft'),'Build prepared. Explicit --publish-draft is required for an external draft.');
-const deploy=await api('/sites/'+siteId+'/deploys?title='+encodeURIComponent('Kora staging Notes and Opal test preview'),{method:'POST',body:{draft:true,async:false,files,functions:{'note-images':functionHash},functions_config:{'note-images':{build_data:fn.buildData,priority:fn.priority}},environment}});
+const deploy=await api('/sites/'+siteId+'/deploys?title='+encodeURIComponent('Kora staging Notes and Opal test preview'),{method:'POST',body:{draft:true,async:false,files,functions:{'note-images':functionHash,'share-feed':feedHash},functions_config:{'note-images':{build_data:fn.buildData,priority:fn.priority},'share-feed':{build_data:feed.buildData,priority:feed.priority}},environment}});
 let completed=false;
 try{
 assert.equal(deploy.site_id,siteId);assert.ok(!deploy.published_at,'The new draft must not already be published.');
-const receipt={at:new Date().toISOString(),siteId,deployId:deploy.id,sourceCommit,productionDeployBefore:publishedId,projectRef:'enzzyuhchizfmruxhfhg',draft:true,functions:['note-images'],functionSha256:functionHash,secretScope:'this draft/functions only',files:Object.keys(files).length,productionDatabaseWrites:false,productionPublished:false};
+const receipt={at:new Date().toISOString(),siteId,deployId:deploy.id,sourceCommit,productionDeployBefore:publishedId,projectRef:'enzzyuhchizfmruxhfhg',draft:true,functions:['note-images','share-feed'],functionSha256:functionHash,shareFeedSha256:feedHash,secretScope:'this draft/functions only',files:Object.keys(files).length,productionDatabaseWrites:false,productionPublished:false};
 await writeFile(join(output,'deployment.json'),JSON.stringify(receipt,null,2));
 for(const sha of deploy.required||[]){const file=fileBytes.get(sha);assert.ok(file,'Unknown requested file.');await api('/deploys/'+deploy.id+'/files'+file.path,{method:'PUT',bytes:file.bytes});}
 if((deploy.required_functions||[]).includes(functionHash))await api('/deploys/'+deploy.id+'/functions/note-images?runtime=nodejs24.x&invocation_mode=stream',{method:'PUT',bytes:zip});
+if((deploy.required_functions||[]).includes(feedHash))await api('/deploys/'+deploy.id+'/functions/share-feed?runtime=nodejs24.x&invocation_mode='+(feed.invocationMode||'stream'),{method:'PUT',bytes:feedZip});
 let ready;
 for(let attempt=0;attempt<90;attempt++){
   const current=await api('/deploys/'+deploy.id);
