@@ -19,7 +19,9 @@ if (staging) {
   const api = new URL(env.API_URL);
   if (!['127.0.0.1', 'localhost', '[::1]'].includes(api.hostname)) throw new Error('Without --staging this check only runs against a local Supabase stack.');
 }
-const feedOrigin = process.argv.find(arg => arg.startsWith('http://localhost:') || arg.startsWith('http://127.0.0.1:'));
+// The feed origin is a local dev server, or (staging only) an unpublished staging draft of the Kora site.
+const feedOrigin = process.argv.find(arg => arg.startsWith('http://localhost:') || arg.startsWith('http://127.0.0.1:')
+  || (staging && /^https:\/\/[a-f0-9]{24}--kanthangboard\.netlify\.app$/.test(arg)));
 const stateFile = 'scratch/share-link-real/state.json';
 mkdirSync('scratch/share-link-real', { recursive: true });
 const admin = createClient(env.API_URL, env.SERVICE_ROLE_KEY, { auth: { persistSession: false } });
@@ -37,8 +39,33 @@ if (process.argv.includes('--cleanup')) {
   process.exit(0);
 }
 
+// --paste-link: after a run, give the test owner one live link on a small clean board, so the two feed addresses
+// can be pasted into a real Google Sheet and Calendar. It is removed with everything else by --cleanup.
+if (process.argv.includes('--paste-link')) {
+  if (!feedOrigin) throw new Error('Give the feed origin the addresses should use.');
+  const state = JSON.parse(readFileSync(stateFile, 'utf8'));
+  const client = anon();
+  const signedIn = await client.auth.signInWithPassword({ email: state.ownerEmail, password: state.password });
+  if (signedIn.error) throw new Error('The test owner could not sign in.');
+  const need = (result, what) => { if (result.error) throw new Error(`${what}: ${result.error.message}`); return result.data; };
+  const board = need(await admin.from('boards').insert({ title: 'Kora feed test', workspace_id: state.workspace }).select().single(), 'board');
+  const lists = need(await admin.from('lists').insert([{ board_id: board.id, workspace_id: state.workspace, title: 'To do', position: 0 },
+    { board_id: board.id, workspace_id: state.workspace, title: 'Done', position: 1000 }]).select(), 'lists');
+  const day = offset => new Date(Date.now() + offset * 864e5).toISOString().slice(0, 10);
+  const row = (list, title, position, extra = {}) => ({ board_id: board.id, list_id: lists.find(item => item.title === list).id, workspace_id: state.workspace, title,
+    description: null, priority: null, due_date: null, is_done: false, position, assignees: [], image: null, deleted_at: null, archived_at: null, ...extra });
+  need(await admin.from('tasks').insert([row('To do', 'Draft the release note', 1000, { priority: 'High', due_date: day(2) }), row('To do', 'Review with the team', 2000, { priority: 'Medium', due_date: day(5) }),
+    row('To do', 'No date yet', 3000), row('Done', 'Collect feedback', 1000, { priority: 'Low', due_date: day(-1), is_done: true })]), 'tasks');
+  const value = newToken();
+  need(await client.from('board_share_links').insert({ board_id: board.id, workspace_id: state.workspace, token_hash: sha(value) }).select('id').single(), 'link');
+  const address = format => `${feedOrigin}/api/share-feed?format=${format}&token=${value}`;
+  for (const format of ['csv', 'ics']) { const response = await fetch(address(format)); if (response.status !== 200) throw new Error(`${format} feed answered ${response.status}`); }
+  console.log(JSON.stringify({ page: `${feedOrigin}/share/${value}`, sheetsFormula: `=IMPORTDATA("${address('csv')}")`, calendarUrl: address('ics') }, null, 2));
+  process.exit(0);
+}
+
 let failed = 0;
-const ok = (name, pass, detail = '') => { if (!pass) failed++; console.log(`${pass ? 'PASS' : 'FAIL'}  ${name}${!pass && detail ? '  -> ' + detail : ''}`); };
+const ok =(name, pass, detail = '') => { if (!pass) failed++; console.log(`${pass ? 'PASS' : 'FAIL'}  ${name}${!pass && detail ? '  -> ' + detail : ''}`); };
 const must = (result, what) => { if (result.error) throw new Error(`${what}: ${result.error.message}`); return result.data; };
 
 // ---- accounts and data (service role, as a seed script would)
