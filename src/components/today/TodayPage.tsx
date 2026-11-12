@@ -21,6 +21,7 @@ import { useI18n } from '../../i18n';
 import { NOTES_PREVIEW_ENABLED } from '../../constants/features';
 import { followUpDue, useOwnDeadlines, useTaskFollowUps } from '../../features/today/task-followups';
 import { splitStaleTasks } from '../../features/today/utils/staleTasks';
+import { taskFollowUpRemote } from '../../services/task-follow-ups.service';
 
 const localDay = (offset = 0) => {
   const date = new Date(); date.setDate(date.getDate() + offset);
@@ -74,7 +75,8 @@ export default function TodayPage({
   const [loadedData, setTodayData] = useState<TodayPageData>(getEmptyTodayData);
   const completion = useSummaryCompletion(onCompleteTask);
   const focusTasks = plannedTasks.filter(task => !task.isDone && !completion.completed.has(task.id));
-  const { followUps, wait, clear: stopWaiting } = useTaskFollowUps({ userId: currentUser.id, workspaceId: activeWorkspace?.id ?? null });
+  const followUpRemote = useMemo(() => taskFollowUpRemote(currentUser, activeWorkspace?.id ?? null), [currentUser, activeWorkspace?.id]);
+  const { followUps, wait, clear: stopWaiting } = useTaskFollowUps({ userId: currentUser.id, workspaceId: activeWorkspace?.id ?? null }, followUpRemote);
   // Waiting tasks are someone else's move, so they leave every other group and get their own.
   const todayData = useMemo(() => Object.fromEntries(Object.entries(loadedData).map(([key, tasks]) => [key,
     (tasks as TodayTaskSummary[]).filter(task => !completion.completed.has(task.id) && !followUps[task.id])])) as unknown as TodayPageData, [loadedData, completion.completed, followUps]);

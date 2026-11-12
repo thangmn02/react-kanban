@@ -31,6 +31,8 @@ export type Database = Omit<GeneratedDatabase, 'public'> & {
       set_saved_context:NoteRpc;
       restore_note_revision:NoteRpc;
       list_saved_context:{Args:{actor_user_id:string};Returns:Json};
+      set_task_follow_up:NoteRpc;
+      list_task_follow_ups:{Args:{target_workspace_id:string};Returns:Json};
     };
     Tables: Omit<GeneratedDatabase['public']['Tables'], 'tasks'> & {
       notes: NoteTable<NoteRow>;

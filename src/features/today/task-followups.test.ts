@@ -1,5 +1,5 @@
-import { beforeEach, expect, it } from 'vitest';
-import { clearWaitingOn, followUpDue, readFollowUps, setWaitingOn } from './task-followups';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { clearWaitingOn, followUpDue, readFollowUps, setWaitingOn, syncFollowUps, type FollowUpRemote, type WaitingOn } from './task-followups';
 import { splitStaleTasks } from './utils/staleTasks';
 
 const scope = { userId: 'u', workspaceId: 'w' };
@@ -77,4 +77,70 @@ it('finds tasks worked on during a day from their Next step', async () => {
   const day = new Date(2026, 10, 12, 15), at = (d: number, h: number) => new Date(2026, 10, d, h).toISOString();
   const steps = { paused: { text: '', updatedAt: at(10, 9), pausedAt: at(12, 9) }, written: { text: 'x', updatedAt: at(12, 23) }, old: { text: 'x', updatedAt: at(11, 23), pausedAt: at(11, 23) } };
   expect(touchedOn(steps, ['paused', 'written', 'old', 'none'], day)).toEqual(['paused', 'written']);
+});
+
+describe('syncing Waiting on with the account', () => {
+  const fakeRemote = (rows: Array<{ taskId: string } & WaitingOn> = []) => {
+    const account = new Map(rows.map(({ taskId, ...item }) => [taskId, item]));
+    const remote: FollowUpRemote & { calls: string[]; failing?: { code?: string; message: string }; gone: Set<string> } = {
+      calls: [], gone: new Set(),
+      async list() { if (remote.failing) throw remote.failing; return [...account].map(([taskId, item]) => ({ taskId, ...item })); },
+      async set(taskId, change) {
+        remote.calls.push(taskId);
+        if (remote.failing) throw remote.failing;
+        if (remote.gone.has(taskId)) throw Object.assign(Error('gone'), { code: 'P0002' });
+        if (change.followUpOn === null) account.delete(taskId); else account.set(taskId, { ...change, followUpOn: change.followUpOn });
+      },
+    };
+    return { remote, account };
+  };
+
+  it('uploads marks made before syncing existed, once, then shows the account marks', async () => {
+    localStorage.setItem('kora.taskFollowUps.v1:u:w', JSON.stringify({ old: { who: 'An', followUpOn: '2026-11-12', setAt: '2026-11-01T00:00:00Z' } }));
+    const { remote, account } = fakeRemote([{ taskId: 'other', who: 'Bao', followUpOn: '2026-11-20', setAt: '2026-11-02T00:00:00Z' }]);
+    await syncFollowUps(scope, remote);
+    expect([...account.keys()].sort()).toEqual(['old', 'other']);
+    expect(Object.keys(readFollowUps(scope)).sort()).toEqual(['old', 'other']);
+    remote.calls.length = 0;
+    await syncFollowUps(scope, remote);
+    expect(remote.calls).toEqual([]);
+  });
+
+  it('sends marks and clears made on this device, and takes clears made on another', async () => {
+    const { remote, account } = fakeRemote();
+    await syncFollowUps(scope, remote);
+    setWaitingOn(scope, 't1', 'Linh', '2026-11-14');
+    setWaitingOn(scope, 't2', 'Minh', '2026-11-15');
+    await syncFollowUps(scope, remote);
+    expect([...account.keys()].sort()).toEqual(['t1', 't2']);
+    clearWaitingOn(scope, 't1');
+    account.delete('t2');
+    await syncFollowUps(scope, remote);
+    expect(account.has('t1')).toBe(false);
+    expect(readFollowUps(scope)).toEqual({});
+  });
+
+  it('keeps changes on the device while the account cannot be reached and sends them later', async () => {
+    const { remote, account } = fakeRemote();
+    remote.failing = { message: 'offline' };
+    setWaitingOn(scope, 't1', 'Linh', '2026-11-14');
+    await syncFollowUps(scope, remote);
+    expect(readFollowUps(scope).t1.who).toBe('Linh');
+    remote.failing = undefined;
+    await syncFollowUps(scope, remote);
+    expect(account.get('t1')?.who).toBe('Linh');
+  });
+
+  it('drops a change for a task that is gone instead of blocking the others', async () => {
+    const { remote, account } = fakeRemote();
+    remote.gone.add('deleted');
+    setWaitingOn(scope, 'deleted', 'An', '2026-11-14');
+    setWaitingOn(scope, 't1', 'Linh', '2026-11-14');
+    await syncFollowUps(scope, remote);
+    expect([...account.keys()]).toEqual(['t1']);
+    expect(Object.keys(readFollowUps(scope))).toEqual(['t1']);
+    remote.calls.length = 0;
+    await syncFollowUps(scope, remote);
+    expect(remote.calls).toEqual([]);
+  });
 });
