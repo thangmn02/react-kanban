@@ -23,7 +23,8 @@ on:
       - 'package.json'
       - 'package-lock.json'
 
-# Build signed update artifacts only. No automatic release or web deployment.
+# Pushes run the checks and tests. Signed update artifacts are built only when the workflow is started by hand,
+# and lack the Companion (see below); releases come from scripts/build-release.mjs. No automatic release or deploy.
 permissions:
   contents: read
 
@@ -62,24 +63,36 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npm run test
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      # The Music Companion bundle is built from private model assets by scripts/build-release.mjs on the release
+      # machine and is never committed, so the app's resource folder is missing here. Tests only need the folder.
+      - name: Stand in for the Music Companion bundle
+        run: |
+          if (!(Test-Path src-tauri/generated/music-companion)) {
+            New-Item -ItemType Directory -Force src-tauri/generated/music-companion | Out-Null
+            Set-Content src-tauri/generated/music-companion/PLACEHOLDER.txt 'CI placeholder; releases bundle the real Companion.'
+          }
       - name: Test native bridge and analysis regressions
         run: cargo test --locked --manifest-path src-tauri/Cargo.toml
       - name: Validate connected-app configuration
-        if: ${{ !inputs.demo }}
+        if: ${{ github.event_name == 'workflow_dispatch' && !inputs.demo }}
         run: |
           if (!$env:VITE_SUPABASE_URL -or !$env:VITE_SUPABASE_ANON_KEY) {
             throw 'Set repository Actions variables VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY, or manually run this workflow with demo enabled. Never use a service-role or Gemini key.'
           }
       - name: Validate updater signing configuration
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
           if (!$env:TAURI_SIGNING_PRIVATE_KEY) {
             throw 'Configure the protected TAURI_SIGNING_PRIVATE_KEY Actions secret. Never commit the private signing key.'
           }
       - name: Build Windows installer with updater signature
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         run: npm run tauri build -- --ci
       - name: Prepare web download
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         run: npm run desktop:package
       - name: Upload installer and portable executable
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         uses: actions/upload-artifact@v4
         with:
           name: Kora-Windows-${{ inputs.demo && 'demo' || 'connected' }}-${{ github.sha }}
