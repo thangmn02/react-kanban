@@ -69,21 +69,59 @@ it('returns to the same workspace controller without displaying a second dock', 
 it('pins only Dock, unpins Tasks, and starts with a normal native window', async () => {
   expect(nativeConfig.app.windows[0].alwaysOnTop).toBe(false);
   expect(nativeCapability.permissions).toContain('core:window:allow-set-always-on-top');
+  const pins = () => nativeInvoke.mock.calls.filter(([command]) => command === 'native_pin_dock').map(([, args]) => (args as { pinned: boolean }).pinned);
+  const shapes = () => nativeInvoke.mock.calls.filter(([command]) => command === 'native_dock_shape').map(([, args]) => (args as { rounded: boolean }).rounded);
   const surface = (dock: boolean) => <I18nProvider><NativeSurface dock={dock} focusProps={props}>Workspace</NativeSurface></I18nProvider>;
   const view = render(surface(false));
-  await waitFor(() => expect(nativeWindow.setAlwaysOnTop).toHaveBeenLastCalledWith(false));
+  await waitFor(() => expect(pins()).toEqual([false]));
   expect(nativeWindow.clearEffects).not.toHaveBeenCalled();
   view.rerender(surface(true));
-  await waitFor(() => expect(nativeWindow.setAlwaysOnTop).toHaveBeenLastCalledWith(true));
+  await waitFor(() => expect(pins()).toEqual([false, true]));
   expect(nativeWindow.clearEffects).not.toHaveBeenCalled();
   expect(nativeWindow.setEffects).not.toHaveBeenCalled();
-  await waitFor(() => expect(nativeInvoke).toHaveBeenCalledWith('native_dock_shape', { rounded: true }));
+  await waitFor(() => expect(shapes().at(-1)).toBe(true));
   view.rerender(surface(false));
-  await waitFor(() => expect(nativeWindow.setAlwaysOnTop).toHaveBeenLastCalledWith(false));
-  expect(nativeWindow.setAlwaysOnTop.mock.calls.map(([enabled]) => enabled)).toEqual([false, true, false]);
+  await waitFor(() => expect(pins()).toEqual([false, true, false]));
+  // The native command is the one that pins; the window API is only its fallback.
+  expect(nativeWindow.setAlwaysOnTop).not.toHaveBeenCalled();
   expect(nativeWindow.clearEffects).not.toHaveBeenCalled();
-  await waitFor(() => expect(nativeInvoke).toHaveBeenLastCalledWith('native_dock_shape', { rounded: false }));
+  await waitFor(() => expect(shapes().at(-1)).toBe(false));
   expect(nativeCapability.permissions).toContain('core:window:allow-set-effects');
+});
+it('puts the dock back on top whenever focus changes and on a timer, and stops when it is no longer the dock', async () => {
+  vi.useFakeTimers();
+  try {
+    const pins = () => nativeInvoke.mock.calls.filter(([command]) => command === 'native_pin_dock').map(([, args]) => (args as { pinned: boolean }).pinned);
+    const surface = (dock: boolean) => <I18nProvider><NativeSurface dock={dock} focusProps={props}>Workspace</NativeSurface></I18nProvider>;
+    const view = render(surface(true));
+    await act(async () => {});
+    expect(pins()).toEqual([true]);
+    // Another app takes focus, then the dock gets it back: both re-assert the order.
+    act(() => nativeWindow.onFocusChanged.mock.calls[0][0]({ payload: false }));
+    act(() => nativeWindow.onFocusChanged.mock.calls[0][0]({ payload: true }));
+    expect(pins()).toEqual([true, true, true]);
+    await act(async () => { vi.advanceTimersByTime(20_000); });
+    expect(pins()).toEqual([true, true, true, true]);
+    view.rerender(surface(false));
+    await act(async () => {});
+    expect(pins().at(-1)).toBe(false);
+    const settled = pins().length;
+    await act(async () => { vi.advanceTimersByTime(60_000); });
+    expect(pins()).toHaveLength(settled);
+  } finally { vi.useRealTimers(); }
+});
+it('falls back to the window API when the native pin command is missing', async () => {
+  nativeInvoke.mockImplementation(async (command: string) => { if (command === 'native_pin_dock') throw new Error('command not found'); return undefined; });
+  render(<I18nProvider><NativeSurface dock focusProps={props}>Workspace</NativeSurface></I18nProvider>);
+  await waitFor(() => expect(nativeWindow.setAlwaysOnTop).toHaveBeenCalledWith(true));
+});
+it('gives the pin command the same permission as the other dock commands', async () => {
+  const [permissions, build, main] = await Promise.all([
+    import('../../../src-tauri/permissions/notes.toml?raw'), import('../../../src-tauri/build.rs?raw'), import('../../../src-tauri/src/main.rs?raw')]);
+  expect(permissions.default.split('notes-frame')[0]).toContain('"native_pin_dock"');
+  expect(permissions.default.split('notes-frame')[1]).not.toContain('native_pin_dock');
+  expect(build.default).toContain('"native_pin_dock"');
+  expect(main.default).toContain('window_chrome::native_pin_dock');
 });
 it('maximizes and restores the workspace with an accessible window control', async () => {
   const view = render(<I18nProvider><NativeSurface dock={false} focusProps={props}>Workspace</NativeSurface></I18nProvider>);
@@ -178,27 +216,5 @@ it('badges the update button and offers one quiet note for a Kora update, then f
     await waitFor(() => expect(nativeInvoke).toHaveBeenCalledWith('native_music_setup'));
     expect(view.queryByRole('status')).toBeNull();
     expect(shadow.querySelector('.dock-update-badge')).not.toBeNull();
-  } finally { vi.useRealTimers(); }
-});
-
-it('pins the dock above other windows again when focus moves away and every minute, and only while docked', async () => {
-  vi.useFakeTimers({ shouldAdvanceTime: true });
-  try {
-    let focusChanged: ((event: { payload: boolean }) => void) | undefined;
-    nativeWindow.onFocusChanged.mockImplementation(async (listener: (event: { payload: boolean }) => void) => { focusChanged = listener; return () => {}; });
-    const view = render(<I18nProvider><NativeSurface dock focusProps={props}>Workspace</NativeSurface></I18nProvider>);
-    await waitFor(() => expect(focusChanged).toBeTypeOf('function'));
-    const pins = () => nativeWindow.setAlwaysOnTop.mock.calls.filter(([enabled]) => enabled === true).length;
-    expect(pins()).toBe(1);
-    act(() => focusChanged!({ payload: true }));
-    expect(pins()).toBe(1);
-    act(() => focusChanged!({ payload: false }));
-    expect(pins()).toBe(2);
-    await act(async () => { vi.advanceTimersByTime(60_000); });
-    expect(pins()).toBe(3);
-    view.rerender(<I18nProvider><NativeSurface dock={false} focusProps={props}>Workspace</NativeSurface></I18nProvider>);
-    await waitFor(() => expect(nativeWindow.setAlwaysOnTop).toHaveBeenLastCalledWith(false));
-    await act(async () => { vi.advanceTimersByTime(120_000); });
-    expect(nativeWindow.setAlwaysOnTop).toHaveBeenLastCalledWith(false);
   } finally { vi.useRealTimers(); }
 });

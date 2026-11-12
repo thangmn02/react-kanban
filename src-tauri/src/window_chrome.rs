@@ -125,6 +125,43 @@ pub async fn native_dock_shape(window: WebviewWindow, state: tauri::State<'_, Wi
     receive.await.map_err(|_| "Window shape update interrupted")?
 }
 
+/// Keeps the dock above other windows, or releases it for the normal Tasks window.
+///
+/// The windowing library remembers that it already asked for "always on top" and then ignores a repeated
+/// request, so once Windows moves the dock down (another topmost window, a fullscreen app, a display change)
+/// asking again through it does nothing. This asks Windows directly, every time.
+#[tauri::command]
+pub async fn native_pin_dock(window: WebviewWindow, pinned: bool) -> Result<(), String> {
+    if window.label() != "main" { return Err("Unknown window".into()); }
+    // Keep the library's own record in step, so its later changes start from the truth.
+    window.set_always_on_top(pinned).map_err(|e| e.to_string())?;
+    #[cfg(windows)]
+    {
+        let native_window = window.clone();
+        let (send, receive) = tokio::sync::oneshot::channel();
+        window.run_on_main_thread(move || { let _ = send.send(assert_topmost(&native_window, pinned)); }).map_err(|e| e.to_string())?;
+        receive.await.map_err(|_| "Window pin update interrupted")??;
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn assert_topmost(window: &WebviewWindow, pinned: bool) -> Result<(), String> {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{SetWindowPos, HWND_NOTOPMOST, HWND_TOPMOST};
+    let hwnd = window.hwnd().map_err(|e| e.to_string())?.0;
+    // Z-order only: the dock is never moved, resized or given focus by pinning.
+    if unsafe { SetWindowPos(hwnd as _, if pinned { HWND_TOPMOST } else { HWND_NOTOPMOST }, 0, 0, 0, 0, pin_flags()) } == 0 {
+        return Err("Could not update window order".into());
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn pin_flags() -> u32 {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE};
+    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
+}
+
 fn apply_shape(window: WebviewWindow, state: Arc<Mutex<Option<(bool, u32, u32, bool)>>>, rounded: bool) -> Result<u32, String> {
     if window.label() != "main" { return Err("Unknown window".into()); }
     #[cfg(windows)]
@@ -188,6 +225,12 @@ mod tests {
         assert_eq!(geometry(780, 690, 1.5).unwrap(), (780, 690, 66));
         assert_eq!(geometry(1040, 920, 2.0).unwrap(), (1040, 920, 88));
         assert!(geometry(u32::MAX, 460, 1.0).is_err());
+    }
+    #[cfg(windows)]
+    #[test]
+    fn pinning_changes_order_only_never_position_size_or_focus() {
+        // SWP_NOSIZE 0x1, SWP_NOMOVE 0x2, SWP_NOACTIVATE 0x10
+        assert_eq!(super::pin_flags(), 0x13);
     }
     #[cfg(windows)]
     #[test]

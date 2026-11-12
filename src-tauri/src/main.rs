@@ -42,6 +42,7 @@ fn main() {
             browser_audio::native_audio_renew,
             browser_audio::native_audio_stop,
             window_chrome::native_dock_shape,
+            window_chrome::native_pin_dock,
             note_windows::native_notes_control,
             note_windows::native_note_request
         ])
