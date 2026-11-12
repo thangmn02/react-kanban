@@ -84,6 +84,7 @@ export function netlifyRules(toml){
 }
 const rules=netlifyRules(await readFile('netlify.toml','utf8'));
 assert.ok(rules.redirects.includes('/* /index.html 200\n')&&rules.redirects.includes('/api/note-images /.netlify/functions/note-images 200!'),'Routing rules are incomplete.');
+assert.ok(rules.redirects.includes('/api/share-feed /.netlify/functions/share-feed 200'),'The share-feed route is missing.');
 for(const[path,text]of [['/_redirects',rules.redirects],['/_headers',rules.headers]]){
   assert.ok(!files[path],`${path} already exists in dist.`);const bytes=Buffer.from(text),sha=hash(bytes,'sha1');
   files[path]=sha;bytesBySha.set(sha,{path,bytes});inventory.push({path,sha256:hash(bytes),size:bytes.length});
@@ -96,11 +97,12 @@ const manifest=JSON.parse(await readFile(join(functionsRoot,'manifest.json'),'ut
 assert.equal(manifest.system.platform,'linux');assert.equal(manifest.system.arch,'x64');
 const functions={},functionsConfig={},zips={},modes={};
 for(const fn of manifest.functions){
-  assert.ok(['beat-event-cache','note-images','task-breakdown'].includes(fn.name));assert.equal(fn.runtimeVersion,'nodejs24.x');
+  assert.ok(['beat-event-cache','note-images','task-breakdown','share-feed'].includes(fn.name));assert.equal(fn.runtimeVersion,'nodejs24.x');
   const zip=await readFile(join(functionsRoot,fn.name+'.zip'));assert.ok(!credentials.some(value=>zip.includes(Buffer.from(value))),'Credential in a function bundle; values withheld.');
   functions[fn.name]=hash(zip);functionsConfig[fn.name]={build_data:fn.buildData,priority:fn.priority};zips[fn.name]=zip;modes[fn.name]=fn.invocationMode;
 }
 assert.equal(functions['note-images'],'e0f8b0e45281eda9571dac4fed9d7bff1b03060f76a0b4381b54bc40b279f06b','Only the image function verified on Linux is admitted.');
+assert.ok(functions['share-feed'],'The Linux build must include the share-feed function.');
 // Netlify reuses an uploaded function by hash, including its invocation mode. These two bundles were once uploaded
 // without stream mode, so give them a release-specific archive comment: identical entries, new hash, fresh upload.
 function withZipComment(zip,text){
@@ -149,6 +151,8 @@ if(!verifiedDraft){
   for(const path of ['/','/today','/notes','/focus?tab=beat'])await check(path,async()=>(await fetch(live+path,{signal:AbortSignal.timeout(30000)})).status===200);
   await check('feed',async()=>(await (await fetch(live+'/downloads/latest.json?'+Date.now())).json()).version===version);
   const expectations={'/api/note-images':[401,'Sign in'],'/api/beat-events':[400,'invalid_asset'],'/api/task-breakdown':[415,'invalid_request']};
+  // An unknown share link answers 404 only when the function is routed and can reach the database function.
+  await check('/api/share-feed',async()=>(await fetch(live+'/api/share-feed?format=csv&token='+'a'.repeat(43),{signal:AbortSignal.timeout(30000)})).status===404);
   for(const[path,[status,text]]of Object.entries(expectations))await check(path,async()=>{const response=await fetch(live+path,{method:'POST',signal:AbortSignal.timeout(30000)});return response.status===status&&(await response.text()).includes(text);});
   if(failures.length){
     await api('/sites/'+siteId+'/deploys/'+previous+'/restore',{method:'POST'});
