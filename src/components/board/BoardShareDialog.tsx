@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useI18n } from '../../i18n';
 import { createShareLink, listShareLinks, revokeShareLink, type ShareLink } from '../../services/share-link.service';
 
@@ -49,7 +50,8 @@ export default function BoardShareDialog({ boardId, workspaceId, boardTitle, onC
   };
   const button = 'min-h-11 cursor-pointer rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-wait disabled:opacity-50';
 
-  return (
+  // Rendered at page level: the board header it is opened from clips fixed children to its own box.
+  return createPortal(
     <div className="fixed inset-0 z-[65] overflow-y-auto">
       <div className="fixed inset-0 bg-slate-950/45" onClick={onClose} aria-hidden="true" />
       <div className="flex min-h-screen items-center justify-center px-4 py-6">
@@ -99,6 +101,7 @@ export default function BoardShareDialog({ boardId, workspaceId, boardTitle, onC
           </div>
         </section>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

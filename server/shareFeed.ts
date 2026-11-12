@@ -12,7 +12,8 @@ export interface ShareFeedConfig { supabaseUrl?: string; supabaseAnonKey?: strin
 
 const TOKEN = /^[A-Za-z0-9_-]{40,128}$/;
 const text = (body: string, status: number, type = 'text/plain; charset=utf-8') => new Response(body, { status, headers: {
-  'Content-Type': type, 'Cache-Control': status === 200 ? 'private, max-age=300' : 'no-store', 'X-Robots-Tag': 'noindex, nofollow', 'X-Content-Type-Options': 'nosniff' } });
+  // Never cached: a link that is turned off must stop being served at once, not when a cache expires.
+  'Content-Type': type, 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow', 'X-Content-Type-Options': 'nosniff' } });
 
 /** A spreadsheet treats a cell starting with = + - @ as a formula. Task titles are other people's text, so those are neutralised. */
 function cell(value: string | null | undefined) {

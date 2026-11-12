@@ -19,6 +19,7 @@ describe('share feed', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('Content-Type')).toBe('text/csv; charset=utf-8');
     expect(response.headers.get('X-Robots-Tag')).toBe('noindex, nofollow');
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
     const lines = (await response.text()).split('\r\n');
     expect(lines[0]).toBe('Task,Status,Assignee,Priority,Due date,Done,Updated');
     expect(lines[1]).toBe('"Ship ""v2"", then rest",Done,Linh; An,High,2026-11-30,yes,2026-11-11');

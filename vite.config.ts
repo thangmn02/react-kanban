@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from 'vite'
 import { aiDevelopmentPlugin } from './server/viteAiPlugin'
+import { shareFeedDevelopmentPlugin } from './server/vite-share-feed-plugin'
 import { beatCacheDevelopmentPlugin } from './server/vite-beat-cache-plugin'
 import { noteImagesDevelopmentPlugin } from './server/vite-note-images-plugin'
 import {localHybridDevelopmentPlugin} from './server/vite-local-hybrid-plugin'
@@ -61,6 +62,7 @@ export default defineConfig(({ mode }) => ({
       },
     },
     aiDevelopmentPlugin({ ...loadEnv(mode, process.cwd(), ''), ...process.env } as Record<string, string>),
+    shareFeedDevelopmentPlugin({ ...loadEnv(mode, process.cwd(), ''), ...process.env } as Record<string, string>),
     beatCacheDevelopmentPlugin({ ...loadEnv(mode, process.cwd(), ''), ...process.env } as Record<string, string>)
   ],
   server: {
