@@ -1,14 +1,24 @@
-// Real-backend check of read-only share links against the LOCAL Supabase stack (Kong -> PostgREST/GoTrue -> Postgres).
-// Usage: node scripts/verify-share-links-local.mjs <env file from `supabase status -o env`> [feed origin]
-// Refuses any non-loopback API address. Leaves its test accounts and data in place for the browser check;
+// Real-backend check of read-only share links, against the local Supabase stack or the authorized staging project.
+// Usage: node scripts/verify-share-links.mjs <env file from `supabase status -o env`> [feed origin]
+// Never targets production. Leaves its test accounts and data in place for the browser check;
 // run with --cleanup to remove everything it created.
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { createHash, randomBytes } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 
-const env = Object.fromEntries(readFileSync(process.argv[2], 'utf8').split(/\r?\n/).filter(Boolean).map(line => { const i = line.indexOf('='); return [line.slice(0, i), line.slice(i + 1).replace(/^"|"$/g, '')]; }));
-const api = new URL(env.API_URL);
-if (!['127.0.0.1', 'localhost', '[::1]'].includes(api.hostname)) throw new Error('This check only runs against a local Supabase stack.');
+// Local: an env file from `supabase status -o env`, loopback only.
+// Staging: `--staging --authorized-project=<ref> --backup=<fresh manifest> --history-receipt=<committed receipt> --output=scratch/<dir>`,
+// admitted by the project's own qualification-target (authorized project, fresh restore-verified backup, matching history).
+const staging = process.argv.includes('--staging');
+let env;
+if (staging) {
+  const { qualificationTarget } = await import('./qualification-target.mjs');
+  env = (await qualificationTarget('scratch/share-links-staging')).config;
+} else {
+  env = Object.fromEntries(readFileSync(process.argv[2], 'utf8').split(/\r?\n/).filter(Boolean).map(line => { const i = line.indexOf('='); return [line.slice(0, i), line.slice(i + 1).replace(/^"|"$/g, '')]; }));
+  const api = new URL(env.API_URL);
+  if (!['127.0.0.1', 'localhost', '[::1]'].includes(api.hostname)) throw new Error('Without --staging this check only runs against a local Supabase stack.');
+}
 const feedOrigin = process.argv.find(arg => arg.startsWith('http://localhost:') || arg.startsWith('http://127.0.0.1:'));
 const stateFile = 'scratch/share-link-real/state.json';
 mkdirSync('scratch/share-link-real', { recursive: true });

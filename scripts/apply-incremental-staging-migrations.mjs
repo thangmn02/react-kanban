@@ -42,7 +42,10 @@ assert.equal(read(applicationFingerprintSql),receipt.applicationFingerprint,'Liv
 const countQuery=countsSqlFor(Object.keys(receipt.counts));assert.deepEqual(JSON.parse(read(`select json_object_agg(name,count order by name) from (${countQuery}) counts`)),receipt.counts,'Staging row counts changed since the verified backup.');
 const dataQuery=Object.keys(receipt.dataFingerprints).map(key=>{const [schema,table]=key.split('.');assert.ok(schema&&table&&key.split('.').length===2);return `select '${key.replaceAll("'","''")}' as name,md5(coalesce(jsonb_agg(to_jsonb(t) order by to_jsonb(t)::text collate "C")::text,'[]')) as checksum from ${quoteIdentifier(schema)}.${quoteIdentifier(table)} t`;}).join(' union all ');
 assert.deepEqual(JSON.parse(read(`select json_object_agg(name,checksum order by name) from (${dataQuery}) data`)),receipt.dataFingerprints,'Existing staging row values changed since the verified backup.');
-assert.equal(read("select count(*) from storage.buckets where id='kora-note-images'"),'0','The missing image migration cannot replace an unrecorded existing bucket.');
+// The bucket is created by the Notes image migration. A batch that contains it must not find the bucket already there;
+// any later batch must find it, since that migration is then part of the verified history.
+const createsImageBucket=names.slice(historyBefore.length).includes('20261027111000_note_images_and_presentation.sql');
+assert.equal(read("select count(*) from storage.buckets where id='kora-note-images'"),createsImageBucket?'0':'1',createsImageBucket?'The missing image migration cannot replace an unrecorded existing bucket.':'The private Notes image bucket from the committed history is missing.');
 const mutableMetadata=['supabase_migrations.schema_migrations','storage.buckets','realtime.messages'],preservedRows=Object.fromEntries(Object.entries(receipt.dataFingerprints).filter(([name])=>!mutableMetadata.includes(name)));
 const preservationQuery=`select jsonb_object_agg(name,checksum order by name) from (${dataQuery}) data where name not in (${mutableMetadata.map(name=>`'${name}'`).join(',')})`;
 const storage=createClient(`https://${authorizedProject}.supabase.co`,config.KORA_STAGING_SERVICE_ROLE_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
