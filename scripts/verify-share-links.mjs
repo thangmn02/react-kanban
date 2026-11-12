@@ -145,7 +145,7 @@ if (feedOrigin) {
   ok('CSV feed serves the board', f.status === 200 && /^text\/csv/.test(f.type) && f.body.startsWith('Task,Status,Assignee,Priority,Due date,Done,Updated\r\n'), `${f.status} ${f.type}`);
   ok('CSV has the two live tasks and no private text', f.body.trim().split('\r\n').length === 3 && !/SECRET|Other workspace|Deleted|Archived|Hidden/.test(f.body), f.body.slice(0, 200));
   ok('CSV neutralises a formula-shaped title', f.body.includes(`"'=HYPERLINK(""https://evil.test"",""x"")"`), f.body);
-  ok('CSV row is right', f.body.includes(`Write the announcement,To do,E2E owner,High,${in30},no,`), f.body);
+  ok('CSV row is right', f.body.includes(`Write the announcement,To do,E2E owner,High,${in30} (${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(`${in30}T00:00:00Z`).getUTCDay()]}),no,`), f.body);
   f = await feed('ics', token);
   ok('ICS feed serves a calendar', f.status === 200 && /^text\/calendar/.test(f.type) && f.body.startsWith('BEGIN:VCALENDAR\r\n') && f.body.endsWith('END:VCALENDAR\r\n'), `${f.status} ${f.type}`);
   ok('ICS has one all-day event for the one dated task', (f.body.match(/BEGIN:VEVENT/g) ?? []).length === 1 && f.body.includes(`DTSTART;VALUE=DATE:${in30.replace(/-/g, '')}`) && f.body.includes('SUMMARY:Write the announcement'), f.body.slice(0, 300));

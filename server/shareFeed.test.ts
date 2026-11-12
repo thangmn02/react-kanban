@@ -22,9 +22,9 @@ describe('share feed', () => {
     expect(response.headers.get('Cache-Control')).toBe('no-store');
     const lines = (await response.text()).split('\r\n');
     expect(lines[0]).toBe('Task,Status,Assignee,Priority,Due date,Done,Updated');
-    expect(lines[1]).toBe('"Ship ""v2"", then rest",Done,Linh; An,High,2026-11-30,yes,2026-11-11');
+    expect(lines[1]).toBe('"Ship ""v2"", then rest",Done,Linh; An,High,2026-11-30 (Mon),yes,2026-11-11 (Wed)');
     expect(lines[2]).toBe('"\'=HYPERLINK(""https://evil.test"",""click"")",To do,,,,no,');
-    expect(lines[3]).toBe('Gửi báo giá; kiểm tra hợp đồng,To do,,Low,2026-12-31,no,');
+    expect(lines[3]).toBe('Gửi báo giá; kiểm tra hợp đồng,To do,,Low,2026-12-31 (Thu),no,');
     expect(lines.join('')).not.toContain('SECRET');
     expect(options.fetchMock).toHaveBeenCalledWith('https://db.test/rest/v1/rpc/get_shared_board', expect.objectContaining({ method: 'POST', body: JSON.stringify({ share_token: token }) }));
   });

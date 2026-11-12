@@ -22,9 +22,22 @@ function cell(value: string | null | undefined) {
   return /[",]/.test(out) ? `"${out.replace(/"/g, '""')}"` : out;
 }
 
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+/**
+ * A bare 2026-11-14 is turned into a date number by Google Sheets, and under some sheet locales IMPORTDATA then
+ * shows the raw number (46340). The weekday keeps the cell as text, so it reads as a date everywhere and still
+ * sorts in date order.
+ */
+export function sheetDay(value: string | null | undefined) {
+  const day = /^\d{4}-\d{2}-\d{2}/.exec(value ?? '')?.[0];
+  if (!day) return '';
+  const date = new Date(`${day}T00:00:00Z`);
+  return Number.isNaN(date.getTime()) ? day : `${day} (${WEEKDAYS[date.getUTCDay()]})`;
+}
+
 export function boardToCsv(board: SharedBoard) {
   const rows = [['Task', 'Status', 'Assignee', 'Priority', 'Due date', 'Done', 'Updated'],
-    ...board.tasks.map(task => [task.title, task.list, task.assignees.join('; '), task.priority ?? '', task.dueDate ?? '', task.isDone ? 'yes' : 'no', (task.updatedAt ?? '').slice(0, 10)])];
+    ...board.tasks.map(task => [task.title, task.list, task.assignees.join('; '), task.priority ?? '', sheetDay(task.dueDate), task.isDone ? 'yes' : 'no', sheetDay(task.updatedAt)])];
   return rows.map(row => row.map(cell).join(',')).join('\r\n') + '\r\n';
 }
 
