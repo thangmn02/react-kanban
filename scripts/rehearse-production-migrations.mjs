@@ -23,7 +23,13 @@ await withProductionClone({manifestFile:arg('manifest'),output:arg('output')},as
  assert.ok(history.some(row=>row.version==='20260713000000'),'Known squashed baseline is required; never replay it blindly.');
  assert.ok(history.some(row=>row.version==='20261007080000'),'Historical sparse-cache entry must remain present.');
  const pending=migrations.filter(row=>!history.some(entry=>entry.version===row.name.slice(0,14)));
- const contact=pending.find(row=>row.name.endsWith('_contact_messages.sql'));assert.ok(contact,'Exact contact reconciliation must be reviewed for this history.');
+ assert.ok(pending.length,'Nothing is pending for this history.');
+ // The contact objects existed in production before their migration was recorded. Once that record is in the
+ // history (release 0.1.33), later additive batches have no contact step and skip the equivalence review.
+ const contact=pending.find(row=>row.name.endsWith('_contact_messages.sql'));
+ assert.ok(contact||history.some(row=>row.version==='20261005120000'),'Exact contact reconciliation must be reviewed for this history.');
+ let guards=[];
+ if(contact){
  const reference=contact.body.replaceAll('app_private.','kora_contact_reference.').replaceAll('schema app_private','schema kora_contact_reference').replaceAll('public.submit_contact_message','kora_contact_reference.submit_contact_message').replaceAll('public.record_contact_notification','kora_contact_reference.record_contact_notification');
  const schemaAcl=JSON.parse(sql("select json_agg(json_build_object('owner',pg_get_userbyid(n.nspowner),'grantor',pg_get_userbyid(a.grantor),'grantee',case when a.grantee=0 then null else pg_get_userbyid(a.grantee) end,'privilege',a.privilege_type,'grantable',a.is_grantable)) from pg_namespace n cross join lateral aclexplode(coalesce(n.nspacl,acldefault('n',n.nspowner))) a where n.nspname='app_private'"));
  const quote=value=>'"'+value.replaceAll('"','""')+'"';
@@ -32,7 +38,7 @@ await withProductionClone({manifestFile:arg('manifest'),output:arg('output')},as
  const normalize=value=>JSON.stringify(value).replaceAll('kora_contact_reference.','app_private.').replaceAll('FUNCTION app_private.','FUNCTION public.');
  await writeFile(join(output,'contact-comparison-private.json'),JSON.stringify({actual,expected},null,2));
  assert.ok(normalize(actual)===normalize(expected),'Existing contact definitions differ; inspect the private comparison before proposing any migration.');
- const guards=[
+ guards=[
   {change:'grant execute on function public.submit_contact_message(text,text,text,text,text) to public;',restore:'revoke execute on function public.submit_contact_message(text,text,text,text,text) from public;'},
   {change:'revoke execute on function public.record_contact_notification(uuid,text) from service_role;',restore:'grant execute on function public.record_contact_notification(uuid,text) to service_role;'},
   {change:'revoke usage on schema app_private from service_role;',restore:'grant usage on schema app_private to service_role;'},
@@ -40,6 +46,7 @@ await withProductionClone({manifestFile:arg('manifest'),output:arg('output')},as
  for(const guard of guards){sql(guard.change);assert.ok(normalize(JSON.parse(sql(contactSql('app_private'))))!==normalize(expected),'Permission drift must be rejected.');sql(guard.restore);assert.ok(normalize(JSON.parse(sql(contactSql('app_private'))))===normalize(expected),'Permission guard must restore the original clone state.');}
 
  sql('drop schema kora_contact_reference cascade;');
+ }
  const owningTables=Object.keys(manifest.counts).filter(name=>/^(public|app_private)\./.test(name));
  const rowQuery="select jsonb_object_agg(name,rows order by name) from ("+owningTables.map(name=>{const [schema,table]=name.split('.');assert.match(table,/^[a-z_][a-z0-9_]*$/);return `select '${name}' name,coalesce(jsonb_agg(to_jsonb(t) order by to_jsonb(t)::text collate "C"),'[]') rows from "${schema}"."${table}" t`;}).join(' union all ')+") data";
  const beforeRows=JSON.parse(sql(rowQuery));
@@ -56,6 +63,6 @@ await withProductionClone({manifestFile:arg('manifest'),output:arg('output')},as
  await writeFile(join(output,'legacy-compatibility.json'),JSON.stringify(legacyCompatibility,null,2));
  const afterHistory=JSON.parse(sql("select json_agg(jsonb_build_object('version',version,'name',name,'statements',statements) order by version) from supabase_migrations.schema_migrations"));
  for(const entry of history)assert.deepEqual(afterHistory.find(row=>row.version===entry.version),entry,'Existing history must remain byte-for-byte equivalent.');
- const result={at:new Date().toISOString(),sourceCommit:arg('source-commit')||null,status:'PASS',hostedConnections:false,hostedWrites:false,network:'none',backupSha256:manifest.sha256,historyBefore:history.map(row=>row.version),historyAfter:afterHistory.map(row=>row.version),contactDdl:'Skipped only after definition/owner/ACL equivalence',authorizationDriftGuards:guards.length,historicalTaskRowsUnchanged:true,owningTablesPreserved:owningTables.length,planSha256:sha256(transaction),migrations:pending.map(row=>({name:row.name,sha256:sha256(row.body),operation:row===contact?'record verified-equivalent existing definitions':'apply additive source'})),applicationFingerprintAfter:sql('set search_path=pg_catalog;'+applicationFingerprintSql),publicationStateAfter:JSON.parse(sql('set search_path=pg_catalog;'+publicationStateSql)),productionAuthorization:'Not granted; SQL retained privately for exact owner review.'};
+ const result={at:new Date().toISOString(),sourceCommit:arg('source-commit')||null,status:'PASS',hostedConnections:false,hostedWrites:false,network:'none',backupSha256:manifest.sha256,historyBefore:history.map(row=>row.version),historyAfter:afterHistory.map(row=>row.version),contactDdl:contact?'Skipped only after definition/owner/ACL equivalence':'Already recorded; not part of this batch',authorizationDriftGuards:guards.length,historicalTaskRowsUnchanged:true,owningTablesPreserved:owningTables.length,planSha256:sha256(transaction),migrations:pending.map(row=>({name:row.name,sha256:sha256(row.body),operation:row===contact?'record verified-equivalent existing definitions':'apply additive source'})),applicationFingerprintAfter:sql('set search_path=pg_catalog;'+applicationFingerprintSql),publicationStateAfter:JSON.parse(sql('set search_path=pg_catalog;'+publicationStateSql)),productionAuthorization:'Not granted; SQL retained privately for exact owner review.'};
  await writeFile(join(output,'rehearsal.json'),JSON.stringify(result,null,2));console.log(JSON.stringify({status:result.status,hostedConnections:false,migrations:pending.length,planSha256:result.planSha256}));
 });
