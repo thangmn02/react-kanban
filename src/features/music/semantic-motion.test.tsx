@@ -75,14 +75,14 @@ it('gives every instrument its own Kinetic palette and signature pulse',()=>{
     expect((f.cells[1].querySelector('.motion-body')!.animate as ReturnType<typeof vi.fn>).mock.calls[0][1]).toMatchObject({duration:220,fill:'forwards'});
   }finally{engine.dispose();f.remove();}
 });
-it('maps all five shapes to center-out ripples on both grid heights',()=>{
+it('maps every shape to center-out ripples on both grid heights',()=>{
   for(const name of patternNames)for(const rows of [4,5]){
     const cells=patternCells(name,rows);
     expect(cells.length).toBeGreaterThan(6);expect(cells.every(c=>c.row<rows&&c.step<8&&c.delay>=0)).toBe(true);
   }
   const heart=patternCells('heart',5);
   expect(heart.find(c=>c.row===2&&c.step===3)!.delay).toBeLessThan(heart.find(c=>c.row===0&&c.step===2)!.delay);
-  expect(burstIntervalMs(120)).toBe(8000);expect(burstIntervalMs(null)).toBe(8000);expect(burstIntervalMs(240)).toBe(8000);
+  expect(burstIntervalMs(120)).toBe(48000);expect(burstIntervalMs(null)).toBe(50000);expect(burstIntervalMs(240)).toBe(50000);
 });
 it('gives a shape exclusive ownership of the grid until its last cell fades',()=>{
   vi.useFakeTimers();vi.setSystemTime(1000);const f=fixture(),engine=createSemanticMotion(f.host,'focus',false);
@@ -93,6 +93,8 @@ it('gives a shape exclusive ownership of the grid until its last cell fades',()=
     expect(earlier.every(a=>a.cancel.mock.calls.length===1)).toBe(true);
     expect(f.host).toHaveAttribute('data-presentation-state','EXCLUSIVE_ACTIVE');expect(f.cells[0]).toHaveAttribute('data-pat-theme','diamond');
     expect(engine.play({key:'during',band:'hat',deadlineMs:1300},f.cells[1])).toBe('pattern-exclusive');
+    // A live hit for a beat just before the shape arrives late, while the shape shows: it must not flash on top.
+    vi.setSystemTime(1200);expect(engine.play({key:'late',band:'kick',deadlineMs:950},f.cells[1])).toBe('pattern-exclusive');
     vi.setSystemTime(1300);engine.sustainMelody(f.cells[1],.8);expect(f.cells[1]).not.toHaveAttribute('data-motion-sustain');
     vi.advanceTimersByTime(800);
     expect(f.host).not.toHaveAttribute('data-presentation-state');expect(f.cells[0]).not.toHaveAttribute('data-pat-theme');
@@ -111,13 +113,14 @@ it('fires a shape on a real Kick after the interval and suppresses the rows mean
   const kick=(key:string,at:number)=>({key,band:'kick' as const,deadlineMs:at});
   view.rerender(<SemanticMotionPattern session={session} beat={{...base,visualAttacks:[kick('first',1000)]}} profile="focus"/>);
   expect(view.container.querySelector('[data-pattern-hit]')).toBeNull();
-  vi.setSystemTime(9000);
-  view.rerender(<SemanticMotionPattern session={session} beat={{...base,visualAttacks:[kick('first',1000),kick('drop',9000)]}} profile="focus"/>);
+  // No tempo lock: the next shape waits 50 s (three or four per 3-minute song).
+  vi.setSystemTime(51000);
+  view.rerender(<SemanticMotionPattern session={session} beat={{...base,visualAttacks:[kick('first',1000),kick('drop',51000)]}} profile="focus"/>);
   const lit=[...view.container.querySelectorAll<HTMLElement>('[data-pattern-hit]')];
   expect(lit).toHaveLength(patternCells(lit[0].dataset.patternHit as 'heart',4).length);
   act(()=>{vi.advanceTimersByTime(0);});
   expect(view.container.querySelector('[data-motion-band="kick"] [data-motion-active]')).toBeNull();
-  view.rerender(<SemanticMotionPattern session={session} beat={{...base,visualAttacks:[kick('first',1000),kick('drop',9000),{key:'hat',band:'hat',deadlineMs:9100}]}} profile="focus"/>);
+  view.rerender(<SemanticMotionPattern session={session} beat={{...base,visualAttacks:[kick('first',1000),kick('drop',51000),{key:'hat',band:'hat',deadlineMs:51100}]}} profile="focus"/>);
   expect(view.container.querySelector('[data-motion-band="hat"] [data-motion-active]')).toBeNull();
 });
 it.each(['focus','dynamic'] as const)('renders fixed full-cell %s Kinetic layers and reuses their nodes for real retriggers',profile=>{

@@ -48,8 +48,9 @@ export function lateLivePresentation(attack:VisualAttack,enabled:boolean,now=Dat
     ?{...attack,deadlineMs:now}:attack;
 }
 
-export type PatternName='heart'|'star'|'diamond'|'nova'|'wave';
-export const patternNames:PatternName[]=['heart','star','diamond','nova','wave'];
+export type PatternName='heart'|'star'|'diamond'|'nova'|'wave'|'smile'|'note'|'moon'|'arrow'|'plus';
+/** Shown in this order across songs, so consecutive bursts never repeat a shape. */
+export const patternNames:PatternName[]=['heart','star','note','diamond','smile','nova','moon','wave','arrow','plus'];
 /** 5×8 silhouettes and 4×8 variants for the default four-row grid. Center is the ripple origin. */
 export const geometricPatterns:Record<PatternName,{theme:'heart'|'star'|'diamond'|'nova';glow:string;five:string[];four:string[];center:[number,number]}>={
   heart:{theme:'heart',glow:'rgba(236,72,153,.75)',center:[2,3.5],five:['00100100','01111110','01111110','00111100','00011000'],four:['01100110','11111111','01111110','00011000']},
@@ -57,12 +58,20 @@ export const geometricPatterns:Record<PatternName,{theme:'heart'|'star'|'diamond
   diamond:{theme:'diamond',glow:'rgba(56,189,248,.75)',center:[2,3.5],five:['00011000','00111100','01100110','00111100','00011000'],four:['00111100','01100110','01100110','00111100']},
   nova:{theme:'nova',glow:'rgba(192,132,252,.75)',center:[2,3.5],five:['11000011','01100110','00011000','01100110','11000011'],four:['11000011','00111100','00111100','11000011']},
   wave:{theme:'diamond',glow:'rgba(56,189,248,.75)',center:[2,0],five:['00110000','01111001','11001111','10000110','00000000'],four:['00110000','01111001','11001111','10000110']},
+  smile:{theme:'star',glow:'rgba(250,204,21,.75)',center:[2,3.5],five:['01100110','01100110','00000000','10000001','01111110'],four:['01100110','00000000','10000001','01111110']},
+  note:{theme:'heart',glow:'rgba(236,72,153,.75)',center:[2,3.5],five:['00011110','00010010','00010010','01110110','01110000'],four:['00011110','00010010','01110010','01110000']},
+  moon:{theme:'nova',glow:'rgba(192,132,252,.75)',center:[2,3.5],five:['00111100','01110000','01100000','01110000','00111100'],four:['00111100','01100000','01100000','00111100']},
+  arrow:{theme:'diamond',glow:'rgba(56,189,248,.75)',center:[2,0],five:['00001000','00001100','11111110','00001100','00001000'],four:['00001100','11111110','11111110','00001100']},
+  plus:{theme:'nova',glow:'rgba(192,132,252,.75)',center:[2,3.5],five:['00011000','00011000','11111111','00011000','00011000'],four:['00011000','11111111','11111111','00011000']},
 };
 export const PATTERN_CELL_MS=720,PATTERN_RIPPLE_MS=24;
 /** A detection arriving later than this after its audio deadline is stale and not shown. */
 export const LATE_ARRIVAL_MS=600;
-/** Shape bursts land on a real Kick every 16 beats of a locked tempo, else every 8 s. */
-export const burstIntervalMs=(bpm?:number|null)=>bpm&&bpm>=60&&bpm<=200?16*60000/bpm:8000;
+/**
+ * Shape bursts are rare treats: they land on a real Kick every 96 beats of a locked tempo (48 s at 120 BPM), else every
+ * 50 s, so a 3-minute song shows three or four.
+ */
+export const burstIntervalMs=(bpm?:number|null)=>bpm&&bpm>=60&&bpm<=200?96*60000/bpm:50000;
 /** Lit cells of a shape with their center-out ripple delays. */
 export function patternCells(name:PatternName,rowCount:number){
   const pattern=geometricPatterns[name],grid=rowCount>=5?pattern.five:pattern.four;
@@ -168,8 +177,9 @@ export function createSemanticMotion(root:HTMLElement,profile:MotionProfile,redu
       // Live percussion reaches the grid ~200 ms after its audio deadline. Scheduling it at that past deadline played
       // only the faded tail (a 220 ms hat was invisible), so a late arrival flashes from its start on arrival instead.
       if(elapsed>=Math.max(duration,LATE_ARRIVAL_MS))return 'expired';
-      if(owned(attack.deadlineMs))return 'pattern-exclusive';
       const startAt=Math.max(attack.deadlineMs,now());
+      // While a shape is on the grid nothing else flashes, including a late hit whose beat came just before it.
+      if(owned(attack.deadlineMs)||owned(startAt)||exclusive!==undefined&&startAt<exclusive.end&&startAt+duration>exclusive.start)return 'pattern-exclusive';
       if(reduced||typeof cells[0].animate!=='function'){
         const band=root.querySelector(`[data-motion-band="${attack.band}"]`);
         band?.querySelectorAll<HTMLElement>('.instrument-motion-layer').forEach(clearTrace);
