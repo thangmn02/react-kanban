@@ -30,3 +30,13 @@ it('treats sub-second page sounds as interface clips, never as music', () => {
   expect(isInterfaceClip(session(0.49))).toBe(true);
   for (const duration of [undefined, 0, Infinity, 155.7]) expect(isInterfaceClip(session(duration))).toBe(false);
 });
+
+it('keeps a song identity while the page moves, and drops it for a new song', () => {
+  const asset = { provider: 'youtube' as const, id: 'abcdefghijk' };
+  const base = { id: 's', title: 'Song', artist: '', source: 'www.youtube.com', paused: false, sampledAt: 1 };
+  const before = [{ ...base, asset }];
+  expect(mergeMusicSessions(before, [{ ...base, sampledAt: 2 }])[0].asset).toEqual(asset);
+  expect(mergeMusicSessions(before, [{ ...base, title: 'Next', sampledAt: 2 }])[0].asset).toBeUndefined();
+  const other = { provider: 'youtube' as const, id: 'bbbbbbbbbbb' };
+  expect(mergeMusicSessions(before, [{ ...base, asset: other, sampledAt: 2 }])[0].asset).toEqual(other);
+});

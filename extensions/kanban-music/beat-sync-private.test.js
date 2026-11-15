@@ -35,11 +35,13 @@ function fixture() {
   return {sync,api,session,owner,clock,setCalibration:value=>{calibration=value;}};
 }
 it.each([
-  ['buffering with paused=false',{buffering:true,paused:false,playing:true},0],
-  ['short reported stall',{buffering:true,paused:false,playing:false},0],
-  ['long reported stall',{buffering:true,paused:false,playing:false,currentTime:10},0],
+  // A stall or a brief second source keeps the delay: rebuilding the route mid-song skips audio (zero-stutter plan).
+  ['buffering with paused=false',{buffering:true,paused:false,playing:true},'held'],
+  ['short reported stall',{buffering:true,paused:false,playing:false},'held'],
+  ['long reported stall',{buffering:true,paused:false,playing:false,currentTime:10},'held'],
   ['genuine seek',{generation:2,seeking:true,currentTime:40},0],
-  ['source loses single-source proof',{mediaFacts:{kind:'audio-only',singleSource:false,noVideo:true,noFrames:true}},0],
+  ['source loses single-source proof',{mediaFacts:{kind:'audio-only',singleSource:false,noVideo:true,noFrames:true}},'held'],
+  ['muted by the person',{muted:true},0],
   ['unsupported playback rate',{playbackRate:1.25},0],
   ['harmless advancing clock',{currentTime:10.001},170],
   ['same-source pause',{playing:false,paused:true},170],
@@ -51,8 +53,10 @@ it.each([
     expect(await f.sync.configure(f.session,f.owner,{enabled:true,captureId,generation:1,compensationMs:170,
       intentionalDelay:true,authorizedAudio:true,outputHeard:true,preview:true})).toBe(true);
     f.clock({playing:true,paused:false});f.clock(sample);
-    expect(f.sync.status(f.session).capability.bufferMs).toBe(expected);
-    if(expected===0){
+    // Held: eligibility is momentarily lost, but the audio route keeps its delay (no flush is sent).
+    if(expected==='held')expect(f.api.runtime.sendMessage.mock.calls.filter(([m])=>m.kind==='synchronization').at(-1)[0].settings).toMatchObject({bufferMs:170,paused:false});
+    else expect(f.sync.status(f.session).capability.bufferMs).toBe(expected);
+    if(expected===0&&!sample.muted){
       if(sample.seeking||sample.playbackRate!==undefined)await vi.waitFor(()=>expect(f.api.runtime.sendMessage).toHaveBeenCalledWith(expect.objectContaining({kind:'stop',captureId})));
       else expect(f.api.runtime.sendMessage.mock.calls.filter(([m])=>m.kind==='synchronization').at(-1)[0].settings).toMatchObject({bufferMs:0,flush:true,eligible:false});
     }
@@ -242,7 +246,41 @@ it('cancels a raced live activation without replacing its zero-delay output grap
     .toMatchObject({bufferMs:0,eligible:false,allowTypedPreview:false,flush:true,live:true});
   expect(f.sync.status(f.session).capability).toMatchObject({allowTypedPreview:false,bufferMs:0});await f.sync.stop();
 });
-it.each(['frames','multiple-sources','ownership-loss'])('flushes actual output when %s revokes eligibility during playback',async(reason)=>{
+it('holds the route through a stall and a second source, then flushes on a real pause; capture survives buffering',async()=>{
+  const f=fixture();await f.sync.start(f.session,f.owner,'sub');
+  await vi.waitFor(()=>expect(f.sync.status(f.session).mode).toBe('capture'));
+  await f.sync.start(f.session,f.owner,'sub');f.clock({playing:false,paused:true});
+  const captureId=f.sync.status(f.session).captureId;
+  expect(await f.sync.configure(f.session,f.owner,{enabled:true,captureId,generation:1,compensationMs:170,
+    intentionalDelay:true,authorizedAudio:true,outputHeard:true,preview:true})).toBe(true);
+  f.clock({playing:true,paused:false});
+  const syncs=()=>f.api.runtime.sendMessage.mock.calls.filter(([m])=>m.kind==='synchronization').length,before=syncs();
+  f.clock({buffering:true,playing:false,paused:false});
+  f.clock({mediaFacts:{kind:'audio-only',noVideo:true,noFrames:false,singleSource:false}});
+  f.clock({playing:true,paused:false});
+  expect(syncs()).toBe(before);
+  expect(f.api.runtime.sendMessage).not.toHaveBeenCalledWith(expect.objectContaining({kind:'stop',captureId}));
+  expect(f.sync.status(f.session).capability.bufferMs).toBe(170);
+  f.clock({buffering:true,playing:false,paused:false});f.clock({playing:false,paused:true});
+  expect(syncs()).toBe(before+1);
+  expect(f.api.runtime.sendMessage.mock.calls.filter(([m])=>m.kind==='synchronization').at(-1)[0].settings).toMatchObject({flush:true,paused:true});
+  await f.sync.stop();
+});
+it.each(['frames','multiple-sources'])('keeps the delay mid-song when %s briefly breaks eligibility',async(reason)=>{
+  const f=fixture();await f.sync.start(f.session,f.owner,'sub');
+  await vi.waitFor(()=>expect(f.sync.status(f.session).mode).toBe('capture'));
+  await f.sync.start(f.session,f.owner,'sub');f.clock({playing:false,paused:true});
+  const captureId=f.sync.status(f.session).captureId;
+  expect(await f.sync.configure(f.session,f.owner,{enabled:true,captureId,generation:1,
+    intentionalDelay:true,authorizedAudio:true,outputHeard:true,preview:true})).toBe(true);
+  f.clock({playing:true,paused:false});
+  const last=()=>f.api.runtime.sendMessage.mock.calls.filter(([message])=>message.kind==='synchronization').at(-1)[0].settings;
+  const configured=last();
+  f.clock({mediaFacts:{kind:'audio-only',noVideo:true,noFrames:reason!=='frames',singleSource:reason!=='multiple-sources'}});
+  expect(last()).toBe(configured);
+  await f.sync.stop();
+});
+it.each(['ownership-loss'])('flushes actual output when %s revokes eligibility during playback',async(reason)=>{
   const f=fixture();await f.sync.start(f.session,f.owner,'sub');
   await vi.waitFor(()=>expect(f.sync.status(f.session).mode).toBe('capture'));
   await f.sync.start(f.session,f.owner,'sub');f.clock({playing:false,paused:true});

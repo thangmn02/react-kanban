@@ -6,7 +6,7 @@ import { mediaSites } from './sites.js';
 import { diagnoseDiscovery } from './discovery-diagnostics.js';
 import { createWidgetBridge } from './widget-bridge.js';
 import { beatTelemetry } from './beat-telemetry.js';
-import { mediaAssetFromUrl } from './media-asset.js';
+import { mediaAssetFromUrl, stableAsset } from './media-asset.js';
 import { authorizedLeadAudio } from './lead-audio-authorization.js';
 import { hasLearnedPercussion } from './percussion-capability.js';
 
@@ -21,6 +21,10 @@ const companion = createCompanionAction(chrome, beats, () => Boolean(widget?.con
 
 let scanInFlight;
 let learnedPercussion;
+// The asset comes from the page address, which YouTube changes on Home, in the miniplayer and on every YouTube Music
+// browse page while the same song keeps playing. Keep the last asset for a player until its media source or title
+// changes, so browsing never looks like a new track.
+const playerAssets = new Map();
 
 async function scan() {
   if (scanInFlight) return scanInFlight;
@@ -41,13 +45,16 @@ async function scan() {
           await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'MAIN', func: controlMedia, args: [0, '', 'install'] });
           frames = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'MAIN', func: readMedia });
         }
-        return frames.flatMap((frame) => (frame.result || []).map((media) => ({
-          ...media, asset: mediaAssetFromUrl(media.assetUrl, leadAudioTestScope), tabId: tab.id, tabMuted: Boolean(tab.mutedInfo?.muted), documentId: frame.documentId,
-          id: `${tab.id}:${frame.documentId}:${media.index}`,
-        })));
+        return frames.flatMap((frame) => (frame.result || []).map((media) => {
+          const id = `${tab.id}:${frame.documentId}:${media.index}`;
+          return { ...media, asset: stableAsset(playerAssets, id, media, mediaAssetFromUrl(media.assetUrl, leadAudioTestScope)),
+            tabId: tab.id, tabMuted: Boolean(tab.mutedInfo?.muted), documentId: frame.documentId, id };
+        }));
       } catch { return []; } // Closed, restricted, or permission-blocked tabs are unavailable.
     }));
-    return results.flat();
+    const found = results.flat();
+    for (const key of playerAssets.keys()) if (!found.some(item => item.id === key)) playerAssets.delete(key);
+    return found;
   })();
   try { return await scanInFlight; } finally { scanInFlight = undefined; }
 }

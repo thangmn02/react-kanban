@@ -260,3 +260,20 @@ it('expires abandoned observation and ignores malformed/wrong-token samples', as
   media.dispatchEvent(new Event('playing'));
   expect(send).not.toHaveBeenCalled();
 });
+
+it('does not count a muted hover preview as a second source, and the clock reuses page facts for a second', () => {
+  const song = ready(new Audio(), 'blob:song');
+  const preview = ready(document.createElement('video'), 'blob:preview');
+  document.body.append(song, preview);
+  preview.muted = true;
+  const observer = globalThis.__kanbanMusicMedia;
+  expect(observer.sourceFacts(song).singleSource).toBe(true);
+  preview.muted = false;
+  expect(observer.sourceFacts(song).singleSource).toBe(false);
+  const query = vi.spyOn(document, 'querySelector');
+  observer.sourceFacts(song, 1000);
+  expect(query).not.toHaveBeenCalled();
+  vi.advanceTimersByTime(1001);
+  observer.sourceFacts(song, 1000);
+  expect(query).toHaveBeenCalled();
+});

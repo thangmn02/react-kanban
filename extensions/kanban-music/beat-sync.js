@@ -68,6 +68,11 @@ export function createBeatSync(api, nativePublish) {
     &&!current.owner.native&&(current.clock?.mediaFacts?.kind==='audio-only'&&current.clock.mediaFacts.noVideo===true
       ||capability(current).compensationEligible);
 
+  // Playback that stalled on its own: still meant to play, not paused, seeking or muted.
+  const bufferingOnly = clock => !clock.playing&&!clock.paused&&!clock.seeking&&!clock.muted&&clock.buffering===true;
+  const holdsRoute = (clock,discontinuity,seeable,facts) => !discontinuity&&!seeable&&!clock.paused&&!clock.seeking&&!clock.muted
+    &&facts?.outputOwned!==false&&facts?.captureHealthy!==false;
+
   function clockReason(current) {
     if (current.mode === 'capture') return undefined;
     if (!current.clock?.playing) return 'not-playing';
@@ -447,7 +452,13 @@ export function createBeatSync(api, nativePublish) {
       const bufferAllowed=privateBeatCandidate&&(current.experiment?.compensationMs!==undefined?capability(current).compensationEligible:capability(current).bufferEligible);
       const decisionFacts=diagnostic?decideBeatMode({...modeFacts(current),diagnostics:true}):undefined;
       let decisionReason=discontinuity?'clock-discontinuity':bufferAllowed?'eligible':'prerequisite-invalid';
-      if(privateBeatCandidate&&current.delaySeconds&&((!clock.playing&&previous?.playing)||!bufferAllowed)) {
+      // Buffering, a muted hover preview or a brief failed source check is not the person pausing. Rebuilding the
+      // route mid-song skips or repeats the delayed audio, so the delay stays until a real pause, seek, track change,
+      // mute, a video that can be seen (it must stay in sync with its sound) or losing the captured output.
+      const seeable=!(clock.mediaFacts?.kind==='audio-only'&&clock.mediaFacts?.noVideo===true)&&current.tabHidden!==true;
+      const held=current.delaySeconds>0&&(!clock.playing||!bufferAllowed)&&holdsRoute(clock,discontinuity,seeable,capability(current));
+      if(held){current.routeHeld=true;decisionReason='route-held-mid-song';}
+      if(privateBeatCandidate&&current.delaySeconds&&!held&&((!clock.playing&&(previous?.playing||current.routeHeld))||!bufferAllowed)) {
         const facts=capability(current);
         telemetry.record('COMPENSATION_REVOKED',undefined,{captureId:current.captureId,synchronizationEpoch:current.synchronizationEpoch,
           sourceGeneration:clock.generation||0,configuredAudioDelayMs:current.delaySeconds*1000,
@@ -465,8 +476,10 @@ export function createBeatSync(api, nativePublish) {
               if(state===current&&current.synchronizationEpoch===epoch&&result?.ok!==true)cancelCapture(current);
             },()=>{if(state===current&&current.synchronizationEpoch===epoch)cancelCapture(current);});
         if(!retain){current.delaySeconds=0;current.experiment=undefined;}
+        current.routeHeld=false;
       }
-      if(privateBeatCandidate&&resumed&&current.delaySeconds>0&&bufferAllowed) {
+      // A held route never stopped, so playing again needs no new route.
+      if(privateBeatCandidate&&resumed&&current.delaySeconds>0&&bufferAllowed&&!current.routeHeld) {
         decisionReason='resume-clean-route';
         const epoch=crypto.randomUUID();current.synchronizationEpoch=epoch;
         void timeout(offscreenMessage({kind:'synchronization',captureId:current.captureId,
@@ -485,8 +498,10 @@ export function createBeatSync(api, nativePublish) {
           previousClock:parsePlaybackClock(previous),clock:parsePlaybackClock(clock),discontinuity:Boolean(discontinuity)};
         if(diagnostic.decisions.length<2048)diagnostic.decisions.push(row);else diagnostic.decisionOverflow++;
       }
+      if(clock.playing&&bufferAllowed)current.routeHeld=false;
       publish(current, { kind: 'clock', clock: audibleClock(fencedClock(current), clock.playing ? current.delaySeconds || 0 : 0) || clock });
-      if ((!clock.playing&&!pauseRetainsCapture(current)) || clock.muted || current.tabMuted) cancelCapture(current);
+      // Buffering keeps the capture: tearing it down and starting again is a longer gap than the stall itself.
+      if ((!clock.playing&&!pauseRetainsCapture(current)&&!bufferingOnly(clock)) || clock.muted || current.tabMuted) cancelCapture(current);
       else void capture(current);
     },
     offscreen(message, sender) {

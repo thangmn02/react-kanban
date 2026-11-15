@@ -24,3 +24,17 @@ it('requires a live exact-URL development grant for content-addressed first-part
   }
   expect(mediaAssetFromUrl(sourceUrl, { ...scope, expiresAt: Date.now() - 1 })).toBeUndefined();
 });
+
+it('keeps a player asset through YouTube Home, the miniplayer and browse pages until the song itself changes', async () => {
+  const { stableAsset } = await import('./media-asset.js');
+  const memory = new Map(), song = { provider: 'youtube', id: 'abcdefghijk' }, media = { src: 'blob:a', title: 'Song' };
+  expect(stableAsset(memory, 'p', media, song)).toEqual(song);
+  expect(stableAsset(memory, 'p', media, undefined)).toEqual(song);
+  expect(stableAsset(memory, 'other', media, undefined)).toBeUndefined();
+  expect(stableAsset(memory, 'p', { ...media, title: 'Next song' }, undefined)).toBeUndefined();
+  expect(stableAsset(memory, 'p', media, undefined)).toBeUndefined();
+  stableAsset(memory, 'p', media, song);
+  expect(stableAsset(memory, 'p', { ...media, src: 'blob:b' }, undefined)).toBeUndefined();
+  const next = { provider: 'youtube', id: 'bbbbbbbbbbb' };
+  expect(stableAsset(memory, 'p', { src: 'blob:b', title: 'Next' }, next)).toEqual(next);
+});

@@ -1,7 +1,7 @@
 // MAIN-world, document-start hook. Some players keep new Audio() outside the
 // DOM. Observe standard media APIs, not site-specific controls or page state.
 (() => {
-  if (globalThis.__kanbanMusicMedia?.version === 3) return;
+  if (globalThis.__kanbanMusicMedia?.version === 4) return;
   globalThis.__kanbanMusicMedia?.dispose();
   const entries = new Map();
   const ids = new WeakMap();
@@ -27,11 +27,21 @@
       return [{ index, media }];
     });
   };
-  const sourceFacts = media => ({
-    kind: media?.tagName === 'AUDIO' ? 'audio-only' : media?.tagName === 'VIDEO' ? 'video' : 'unknown',
-    noVideo: !document.querySelector('video'), noFrames: !document.querySelector('iframe,frame'),
-    singleSource: list().every(entry => entry.media === media || entry.media.paused || entry.media.ended),
-  });
+  // Muted or silent media (YouTube's hover previews on Home) is not a second sound source.
+  const silent = media => media.paused || media.ended || media.muted || media.volume === 0;
+  // The facts query the page, which YouTube is busy rebuilding while it navigates. The 100 ms clock reuses them for
+  // up to a second; a media event on the watched element refreshes them at once.
+  let cachedFacts;
+  const sourceFacts = (media, maxAgeMs = 0) => {
+    if (cachedFacts?.media === media && Date.now() - cachedFacts.at < maxAgeMs) return cachedFacts.facts;
+    const facts = {
+      kind: media?.tagName === 'AUDIO' ? 'audio-only' : media?.tagName === 'VIDEO' ? 'video' : 'unknown',
+      noVideo: !document.querySelector('video'), noFrames: !document.querySelector('iframe,frame'),
+      singleSource: list().every(entry => entry.media === media || silent(entry.media)),
+    };
+    cachedFacts = { media, at: Date.now(), facts };
+    return facts;
+  };
   const stop = () => {
     if (!watcher) return;
     clearInterval(watcher.interval);
@@ -55,6 +65,7 @@
       if (watcher !== state) return;
       if (Date.now() > state.leaseUntil) { stop(); return; }
       if (event?.target === media) {
+        cachedFacts = undefined;
         if (event.type === 'seeking' || event.type === 'emptied') state.generation++;
         if (event.type === 'waiting') state.buffering = true;
         if (event.type === 'playing' || event.type === 'seeked') state.buffering = false;
@@ -67,7 +78,7 @@
         playbackRate: media.playbackRate, sampledAt: Date.now(), paused: media.paused,
         playing: valid && !media.paused && !media.seeking && !state.buffering && media.readyState >= 3,
         seeking: media.seeking, buffering: state.buffering || media.readyState < 3, generation: state.generation,
-        muted: media.muted || media.volume === 0, protectedMedia: Boolean(media.mediaKeys), mediaFacts: sourceFacts(media) };
+        muted: media.muted || media.volume === 0, protectedMedia: Boolean(media.mediaKeys), mediaFacts: sourceFacts(media, 1000) };
       document.dispatchEvent(new CustomEvent('kanban-music-media-clock', { detail: JSON.stringify({ token: state.token, valid, clock }) }));
       if (!valid) stop();
     };
@@ -86,7 +97,7 @@
   });
   globalThis.Audio = ObservedAudio;
   document.addEventListener('kanban-music-media-watch', receive);
-  globalThis.__kanbanMusicMedia = { version: 3, entries: list, sourceFacts,
+  globalThis.__kanbanMusicMedia = { version: 4, entries: list, sourceFacts,
     mediaEntries: () => Array.from(entries.values()).flatMap(reference => reference.deref() ? [reference.deref()] : []),
     dispose() {
       stop();

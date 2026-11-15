@@ -33,3 +33,12 @@ export function mediaAssetFromUrl(value, developmentScope) {
     return parseMediaAsset(asset);
   } catch { return undefined; }
 }
+
+// Keeps the last asset for a player while its media source and title are unchanged; see background.js scan().
+export function stableAsset(memory, key, media, asset) {
+  const known = memory.get(key);
+  if (asset) { memory.set(key, { src: media.src, title: media.title, asset }); return asset; }
+  if (known && known.src === media.src && known.title === media.title) return known.asset;
+  memory.delete(key);
+  return undefined;
+}

@@ -37,3 +37,10 @@
 .dock-update-badge { position:relative; }
 .dock-update-badge::after { content:''; position:absolute; top:5px; right:5px; width:7px; height:7px; border-radius:50%; background:#0a84ff; box-shadow:0 0 0 2px rgba(255,255,255,.9); }
 .floating-focus[data-appearance='dark'] .dock-update-badge::after { box-shadow:0 0 0 2px rgba(28,28,32,.95); }
+
+/* Windows acrylic frosts the desktop behind the Dock window. Inside the WebView the page behind the Dock is
+   transparent, so CSS blur on the Dock face and the player pane blurs nothing visible, yet it is redrawn on every
+   Beat Grid frame. The settings popover keeps its blur: it sits over the grid and must stay readable. */
+.floating-focus.glass, .floating-focus[data-style='tabs'], .floating-focus[data-style='tabs'] .dock-track-pane {
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
