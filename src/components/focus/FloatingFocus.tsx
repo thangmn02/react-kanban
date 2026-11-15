@@ -12,6 +12,7 @@ import { useAppearance, type Appearance } from '../../features/appearance/appear
 import { dockDemoEnabled, useDockDemoMusic, useTrackPalette } from '../../features/music/dock-demo';
 import { trackAccentVariables } from '../../features/music/track-accent';
 import { rgbToHueSaturation, trackPaletteVariables } from '../../features/music/track-palette';
+import { useVideoPalette } from '../../features/music/use-video-palette';
 
 export interface FloatingFocusProps {
   initialTab?: 'focus' | 'beat' | 'music';
@@ -82,6 +83,9 @@ export default function FloatingFocus(props: FloatingFocusProps) {
   const preferences = useDockPreferences();
   const appearance = useAppearance();
   const trackPalette = useTrackPalette(music.selected, demo);
+  // The music panel takes its background from the same video hue as the Beat Grid; demo covers use their own sample.
+  const videoHues = useVideoPalette(music.selected, preferences.videoColours === 'on');
+  const accentHue = videoHues[0] ?? (trackPalette ? rgbToHueSaturation(trackPalette.kick).hue : undefined);
   const reducedMotion = useReducedMotion();
   const groupId = useId();
   const settingsId = useId();
@@ -119,7 +123,8 @@ export default function FloatingFocus(props: FloatingFocusProps) {
 
   return <LayoutGroup id={groupId}>
     <section ref={dockRef} className="floating-focus glass" aria-label={t('app.floatingFocus')} data-style="tabs" data-appearance={appearance.resolved}
-      data-dock-demo={demo || undefined} data-widget={props.isWidget || undefined} data-demo-beats={demo && music.playing && music.selected?.id.startsWith('dock-demo') || undefined}data-track-accent={trackPalette ? "" : undefined} style={trackPalette ? { ...trackPaletteVariables(trackPalette, appearance.resolved), ...trackAccentVariables(rgbToHueSaturation(trackPalette.kick)), '--track-art': `url("${music.selected?.artwork}")` } as CSSProperties : undefined}>
+      data-dock-panel="" data-dock-demo={demo || undefined} data-widget={props.isWidget || undefined} data-demo-beats={demo && music.playing && music.selected?.id.startsWith('dock-demo') || undefined} data-track-accent={accentHue !== undefined ? "" : undefined} style={accentHue !== undefined ? { ...(demo && trackPalette ? trackPaletteVariables(trackPalette, appearance.resolved) : {}),
+        ...trackAccentVariables({ hue: accentHue, saturation: 68 }), ...(music.selected?.artwork ? { '--track-art': `url("${music.selected.artwork}")` } : {}) } as CSSProperties : undefined}>
       <div className="dock-toolbar" ref={toolbarRef} data-draggable={Boolean(props.onDragStart)} onPointerDown={(event) => {
         if (event.button === 0 && !(event.target as HTMLElement).closest('button, a, input, select, textarea, [role="dialog"]')) props.onDragStart?.();
       }}>
@@ -255,7 +260,7 @@ export default function FloatingFocus(props: FloatingFocusProps) {
           data-card="music" aria-label={t('focus.island.music')} aria-hidden={hidden('music')} inert={hidden('music')}
           role="tabpanel" aria-labelledby={`${groupId}-music-tab`} tabIndex={0}
           animate={{ opacity: hidden('music') ? 0 : 1 }} transition={{ ...layoutTransition, layout: layoutTransition }}>
-          {hasMusic ? <><MusicTrack music={music} demo={demo} /><MusicFeedback music={music} /></> : <p className="dock-empty muted">{t(emptyMusic)}</p>}
+          {hasMusic ? <><MusicTrack music={music} demo /><MusicFeedback music={music} /></> : <p className="dock-empty muted">{t(emptyMusic)}</p>}
         </motion.section>
         </div>
       </motion.div>

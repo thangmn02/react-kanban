@@ -406,71 +406,71 @@
    Review-only presentation, switched on by dockDemoEnabled(); live docks never carry the attribute.
    Sizes are fluid tokens tied to the dock's own width (cqi), so the dock adapts to its box, not the window:
    each clamp() floors at the compact widget size and tops out at the comfortable page size. */
-.floating-focus[data-style='tabs'][data-dock-demo] {
+.floating-focus[data-style='tabs'][data-dock-panel] {
   --dk-text-xs:clamp(11px,2cqi,12px); --dk-text-sm:clamp(11px,2.3cqi,14px); --dk-text-md:clamp(13px,2.7cqi,17px); --dk-text-lg:clamp(15px,3.4cqi,22px);
   --dk-control:clamp(30px,6.6cqi,44px); --dk-pad:clamp(10px,3cqi,20px); --dk-gap:clamp(6px,1.8cqi,12px);
   --dk-ring:clamp(64px,16cqi,104px); --dk-art:clamp(44px,12cqi,64px); --dk-play:clamp(38px,8.5cqi,56px);
   max-width:680px;
 }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-style-name { font-size:var(--dk-text-xs); }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-toolbar .dock-icon-button { width:var(--dk-control); height:var(--dk-control); }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-focus-pane { grid-template-columns:var(--dk-ring) minmax(0,1fr); grid-template-areas:'task task' 'ring mode' 'ring actions'; justify-items:stretch; gap:4px var(--dk-pad); padding:var(--dk-gap) var(--dk-pad) var(--dk-pad); }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-session-row { grid-area:task; }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-task-select { min-height:var(--dk-control); font-size:var(--dk-text-md); }
-.floating-focus[data-style='tabs'][data-dock-demo] .cycle { font-size:var(--dk-text-sm); }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-ring { grid-area:ring; width:var(--dk-ring); height:var(--dk-ring); }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-ring .time { font-size:clamp(17px,4.2cqi,26px); }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-ring .dock-time-button { padding-block:6px; }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-cycle { grid-area:mode; justify-self:start; align-self:end; font-size:var(--dk-text-sm); }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-focus-actions { grid-area:actions; justify-self:start; align-self:start; justify-content:flex-start; flex-wrap:wrap; gap:6px; }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-focus-actions button { min-height:var(--dk-control); padding:4px clamp(8px,2.2cqi,16px); font-size:var(--dk-text-sm); }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-start svg { width:clamp(12px,3cqi,18px); height:clamp(12px,3cqi,18px); }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-tabbar { margin:var(--dk-gap) var(--dk-pad) 0; }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-tabbar button { min-height:var(--dk-control); padding:4px; font-size:var(--dk-text-sm); }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-now-playing { padding:var(--dk-gap) var(--dk-pad) 0; }
-.floating-focus[data-style='tabs'][data-dock-demo] .mini-player-wrapper { height:var(--dk-control); }
-.floating-focus[data-style='tabs'][data-dock-demo] .music-now-playing-strip { height:100%; }
-.floating-focus[data-style='tabs'][data-dock-demo] .music-now-playing-title { font-size:var(--dk-text-sm); }
-.floating-focus[data-style='tabs'][data-dock-demo] .music-strip-play { width:var(--dk-control); height:100%; }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-style-name { font-size:var(--dk-text-xs); }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-toolbar .dock-icon-button { width:var(--dk-control); height:var(--dk-control); }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-focus-pane { grid-template-columns:var(--dk-ring) minmax(0,1fr); grid-template-areas:'task task' 'ring mode' 'ring actions'; justify-items:stretch; gap:4px var(--dk-pad); padding:var(--dk-gap) var(--dk-pad) var(--dk-pad); }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-session-row { grid-area:task; }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-task-select { min-height:var(--dk-control); font-size:var(--dk-text-md); }
+.floating-focus[data-style='tabs'][data-dock-panel] .cycle { font-size:var(--dk-text-sm); }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-ring { grid-area:ring; width:var(--dk-ring); height:var(--dk-ring); }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-ring .time { font-size:clamp(17px,4.2cqi,26px); }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-ring .dock-time-button { padding-block:6px; }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-cycle { grid-area:mode; justify-self:start; align-self:end; font-size:var(--dk-text-sm); }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-focus-actions { grid-area:actions; justify-self:start; align-self:start; justify-content:flex-start; flex-wrap:wrap; gap:6px; }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-focus-actions button { min-height:var(--dk-control); padding:4px clamp(8px,2.2cqi,16px); font-size:var(--dk-text-sm); }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-start svg { width:clamp(12px,3cqi,18px); height:clamp(12px,3cqi,18px); }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-tabbar { margin:var(--dk-gap) var(--dk-pad) 0; }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-tabbar button { min-height:var(--dk-control); padding:4px; font-size:var(--dk-text-sm); }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-now-playing { padding:var(--dk-gap) var(--dk-pad) 0; }
+.floating-focus[data-style='tabs'][data-dock-panel] .mini-player-wrapper { height:var(--dk-control); }
+.floating-focus[data-style='tabs'][data-dock-panel] .music-now-playing-strip { height:100%; }
+.floating-focus[data-style='tabs'][data-dock-panel] .music-now-playing-title { font-size:var(--dk-text-sm); }
+.floating-focus[data-style='tabs'][data-dock-panel] .music-strip-play { width:var(--dk-control); height:100%; }
 /* The scrollbar is hidden, so reserve no gutter: panels sit centred under the tab bar. */
-.floating-focus[data-style='tabs'][data-dock-demo] .tab-content-area { max-height:min(560px,calc(100dvh - 240px)); scrollbar-gutter:auto; scrollbar-width:none; }
-.floating-focus[data-style='tabs'][data-dock-demo]:not([data-widget]) { max-height:none; }
-.floating-focus[data-style='tabs'][data-dock-demo]:not([data-widget]) .tab-content-area { max-height:none; overflow:visible; }
-.floating-focus[data-style='tabs'][data-dock-demo] .tab-content-area > .dock-panel:not(.dock-focus-pane) { padding:var(--dk-pad); }
-.floating-focus[data-style='tabs'][data-dock-demo] :is(.dock-work-pane,.dock-beat-pane) { margin:var(--dk-gap) var(--dk-pad) var(--dk-pad); }
-.floating-focus[data-style='tabs'][data-dock-demo] .eyebrow { font-size:var(--dk-text-xs); }
-.floating-focus[data-style='tabs'][data-dock-demo] .muted { font-size:var(--dk-text-sm); }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-work-task > span { font-size:var(--dk-text-md); }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-work-task > small { font-size:var(--dk-text-sm); }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-beat-pane .music-pattern.horizontal { grid-template-rows:repeat(var(--beat-rows,4),clamp(16px,5cqi,34px)); gap:clamp(4px,1.2cqi,8px); }
+.floating-focus[data-style='tabs'][data-dock-panel] .tab-content-area { max-height:min(560px,calc(100dvh - 240px)); scrollbar-gutter:auto; scrollbar-width:none; }
+.floating-focus[data-style='tabs'][data-dock-panel]:not([data-widget]) { max-height:none; }
+.floating-focus[data-style='tabs'][data-dock-panel]:not([data-widget]) .tab-content-area { max-height:none; overflow:visible; }
+.floating-focus[data-style='tabs'][data-dock-panel] .tab-content-area > .dock-panel:not(.dock-focus-pane) { padding:var(--dk-pad); }
+.floating-focus[data-style='tabs'][data-dock-panel] :is(.dock-work-pane,.dock-beat-pane) { margin:var(--dk-gap) var(--dk-pad) var(--dk-pad); }
+.floating-focus[data-style='tabs'][data-dock-panel] .eyebrow { font-size:var(--dk-text-xs); }
+.floating-focus[data-style='tabs'][data-dock-panel] .muted { font-size:var(--dk-text-sm); }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-work-task > span { font-size:var(--dk-text-md); }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-work-task > small { font-size:var(--dk-text-sm); }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-beat-pane .music-pattern.horizontal { grid-template-rows:repeat(var(--beat-rows,4),clamp(16px,5cqi,34px)); gap:clamp(4px,1.2cqi,8px); }
 
 /* Music panel: artwork hero, thin progress, centred transport, secondary volume row, up-next rows. */
-.floating-focus[data-style='tabs'][data-dock-demo] .tab-content-area > .dock-panel.dock-track-pane:not(.dock-focus-pane) {
+.floating-focus[data-style='tabs'][data-dock-panel] .tab-content-area > .dock-panel.dock-track-pane:not(.dock-focus-pane) {
   position:relative; isolation:isolate; display:grid; grid-template-columns:var(--dk-art) minmax(0,1fr) auto;
   grid-template-areas:'art copy state' 'timeline timeline timeline' 'controls controls controls' 'volume volume volume';
   align-items:center; gap:var(--dk-gap) var(--dk-pad); margin:var(--dk-gap) var(--dk-pad) var(--dk-pad); padding:var(--dk-pad); overflow:clip; min-height:auto; flex-shrink:0;
 }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-track-pane > * { grid-column:1 / -1; }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-track-pane .music-heading { display:contents; }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-track-pane .music-art { grid-area:art; width:var(--dk-art); height:var(--dk-art); border-radius:clamp(8px,2cqi,14px); overflow:hidden; box-shadow:0 8px 22px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.35); }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-track-pane .music-art img { display:block; width:100%; height:100%; object-fit:cover; }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-track-pane .music-art svg { width:50%; height:50%; }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-track-pane .track-copy { grid-area:copy; min-width:0; }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-track-pane .music-playing-state { grid-area:state; }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-track-pane .music-heading .eyebrow { display:none; }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-track-pane .track-copy h2 { font-size:var(--dk-text-lg); line-height:1.25; -webkit-line-clamp:2; }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-track-pane .track-artist { margin:2px 0 0; font-size:var(--dk-text-sm); color:rgba(255,255,255,.82); }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-track-pane .music-timeline { grid-area:timeline; }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-track-pane .music-times { font-size:var(--dk-text-xs); }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-track-pane .music-controls { grid-area:controls; gap:clamp(14px,5cqi,36px); }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-track-pane .music-play { width:var(--dk-play); height:var(--dk-play); }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-track-pane .music-play svg { width:45%; height:45%; }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-track-pane :is(.music-skip,.music-mute) { width:var(--dk-control); height:var(--dk-control); }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-track-pane .music-volume { grid-area:volume; justify-self:center; width:min(100%,320px); gap:var(--dk-gap); }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-track-pane .music-feedback .music-status { white-space:normal; overflow:visible; font-size:var(--dk-text-sm); }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-track-pane .music-feedback:empty { display:none; }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-track-pane .music-sync-status { font-size:var(--dk-text-sm); }
-.floating-focus[data-style='tabs'][data-dock-demo] .dock-track-pane .music-sync-status .text-button { margin-left:6px; padding:4px 10px; min-height:28px; border:1px solid rgba(255,255,255,.4); border-radius:999px; font-size:var(--dk-text-xs); text-decoration:none; }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-track-pane > * { grid-column:1 / -1; }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-track-pane .music-heading { display:contents; }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-track-pane .music-art { grid-area:art; width:var(--dk-art); height:var(--dk-art); border-radius:clamp(8px,2cqi,14px); overflow:hidden; box-shadow:0 8px 22px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.35); }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-track-pane .music-art img { display:block; width:100%; height:100%; object-fit:cover; }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-track-pane .music-art svg { width:50%; height:50%; }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-track-pane .track-copy { grid-area:copy; min-width:0; }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-track-pane .music-playing-state { grid-area:state; }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-track-pane .music-heading .eyebrow { display:none; }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-track-pane .track-copy h2 { font-size:var(--dk-text-lg); line-height:1.25; -webkit-line-clamp:2; }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-track-pane .track-artist { margin:2px 0 0; font-size:var(--dk-text-sm); color:rgba(255,255,255,.82); }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-track-pane .music-timeline { grid-area:timeline; }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-track-pane .music-times { font-size:var(--dk-text-xs); }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-track-pane .music-controls { grid-area:controls; gap:clamp(14px,5cqi,36px); }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-track-pane .music-play { width:var(--dk-play); height:var(--dk-play); }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-track-pane .music-play svg { width:45%; height:45%; }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-track-pane :is(.music-skip,.music-mute) { width:var(--dk-control); height:var(--dk-control); }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-track-pane .music-volume { grid-area:volume; justify-self:center; width:min(100%,320px); gap:var(--dk-gap); }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-track-pane .music-feedback .music-status { white-space:normal; overflow:visible; font-size:var(--dk-text-sm); }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-track-pane .music-feedback:empty { display:none; }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-track-pane .music-sync-status { font-size:var(--dk-text-sm); }
+.floating-focus[data-style='tabs'][data-dock-panel] .dock-track-pane .music-sync-status .text-button { margin-left:6px; padding:4px 10px; min-height:28px; border:1px solid rgba(255,255,255,.4); border-radius:999px; font-size:var(--dk-text-xs); text-decoration:none; }
 .music-queue { list-style:none; margin:0; padding:var(--dk-gap) 0 0; border-top:1px solid rgba(255,255,255,.16); }
 .music-queue-title { margin:0 0 4px; color:rgba(255,255,255,.72); font:600 var(--dk-text-xs)/1.5 ui-monospace,monospace; letter-spacing:.14em; text-transform:uppercase; }
 .floating-focus[data-style='tabs'] .music-queue button { display:grid; grid-template-columns:clamp(28px,6cqi,36px) minmax(0,1fr) auto; align-items:center; gap:var(--dk-gap); width:100%; min-height:var(--dk-control); padding:4px 6px; border:0; border-radius:10px; background:transparent; color:#fff; text-align:left; }
@@ -486,11 +486,11 @@
 /* From 520px of dock width the artwork becomes a hero beside the title, progress and transport. */
 @container dock (min-width:520px) {
   /* Set on the panel, not the dock: a container cannot restyle itself from its own query. */
-  .floating-focus[data-style='tabs'][data-dock-demo] .dock-track-pane { --dk-art:clamp(120px,26cqi,168px); }
-  .floating-focus[data-style='tabs'][data-dock-demo] .tab-content-area > .dock-panel.dock-track-pane:not(.dock-focus-pane) { grid-template-areas:'art copy state' 'art timeline timeline' 'art controls controls' 'volume volume volume'; }
-  .floating-focus[data-style='tabs'][data-dock-demo] .dock-track-pane .music-timeline { grid-column:2 / -1; }
-  .floating-focus[data-style='tabs'][data-dock-demo] .dock-track-pane .music-controls { grid-column:2 / -1; }
-  .floating-focus[data-style='tabs'][data-dock-demo] .dock-track-pane .music-art { align-self:start; }
+  .floating-focus[data-style='tabs'][data-dock-panel] .dock-track-pane { --dk-art:clamp(120px,26cqi,168px); }
+  .floating-focus[data-style='tabs'][data-dock-panel] .tab-content-area > .dock-panel.dock-track-pane:not(.dock-focus-pane) { grid-template-areas:'art copy state' 'art timeline timeline' 'art controls controls' 'volume volume volume'; }
+  .floating-focus[data-style='tabs'][data-dock-panel] .dock-track-pane .music-timeline { grid-column:2 / -1; }
+  .floating-focus[data-style='tabs'][data-dock-panel] .dock-track-pane .music-controls { grid-column:2 / -1; }
+  .floating-focus[data-style='tabs'][data-dock-panel] .dock-track-pane .music-art { align-self:start; }
 }
 
 /* Track accent: one colour per track for the panel background and the Beat Grid. Falls back to the neutral faces above. */
@@ -500,17 +500,17 @@
 .floating-focus[data-style='tabs'][data-track-accent] .dock-track-pane::after { content:''; position:absolute; inset:0; z-index:-1; background:linear-gradient(180deg,rgba(6,8,16,.42),rgba(6,8,16,.62)); pointer-events:none; }
 /* Beat flashes: each instrument row takes a colour sampled from the track's artwork (track-palette.ts).
    The values land on the row element only, with no transition on cells: the next hit simply picks up the new colour. */
-.floating-focus[data-track-accent] .music-pattern .beat-channel[data-channel='drum'] { --tf:var(--track-flash-kick); --tf-deep:var(--track-flash-kick-deep); --tf-bright:var(--track-flash-kick-bright); --tf-hot:var(--track-flash-kick-hot); --tf-glow:var(--track-flash-kick-glow); }
-.floating-focus[data-track-accent] .music-pattern .beat-channel[data-channel='clap'] { --tf:var(--track-flash-clap); --tf-deep:var(--track-flash-clap-deep); --tf-bright:var(--track-flash-clap-bright); --tf-hot:var(--track-flash-clap-hot); --tf-glow:var(--track-flash-clap-glow); }
-.floating-focus[data-track-accent] .music-pattern .beat-channel[data-channel='hat'] { --tf:var(--track-flash-hat); --tf-deep:var(--track-flash-hat-deep); --tf-bright:var(--track-flash-hat-bright); --tf-hot:var(--track-flash-hat-hot); --tf-glow:var(--track-flash-hat-glow); }
-.floating-focus[data-track-accent] .music-pattern .beat-channel[data-channel='bass'] { --tf:var(--track-flash-bass); --tf-deep:var(--track-flash-bass-deep); --tf-bright:var(--track-flash-bass-bright); --tf-hot:var(--track-flash-bass-hot); --tf-glow:var(--track-flash-bass-glow); }
-.floating-focus[data-track-accent] .music-pattern .beat-channel[data-channel='melody'] { --tf:var(--track-flash-melody); --tf-deep:var(--track-flash-melody-deep); --tf-bright:var(--track-flash-melody-bright); --tf-hot:var(--track-flash-melody-hot); --tf-glow:var(--track-flash-melody-glow); }
+.floating-focus[data-dock-demo][data-track-accent] .music-pattern .beat-channel[data-channel='drum'] { --tf:var(--track-flash-kick); --tf-deep:var(--track-flash-kick-deep); --tf-bright:var(--track-flash-kick-bright); --tf-hot:var(--track-flash-kick-hot); --tf-glow:var(--track-flash-kick-glow); }
+.floating-focus[data-dock-demo][data-track-accent] .music-pattern .beat-channel[data-channel='clap'] { --tf:var(--track-flash-clap); --tf-deep:var(--track-flash-clap-deep); --tf-bright:var(--track-flash-clap-bright); --tf-hot:var(--track-flash-clap-hot); --tf-glow:var(--track-flash-clap-glow); }
+.floating-focus[data-dock-demo][data-track-accent] .music-pattern .beat-channel[data-channel='hat'] { --tf:var(--track-flash-hat); --tf-deep:var(--track-flash-hat-deep); --tf-bright:var(--track-flash-hat-bright); --tf-hot:var(--track-flash-hat-hot); --tf-glow:var(--track-flash-hat-glow); }
+.floating-focus[data-dock-demo][data-track-accent] .music-pattern .beat-channel[data-channel='bass'] { --tf:var(--track-flash-bass); --tf-deep:var(--track-flash-bass-deep); --tf-bright:var(--track-flash-bass-bright); --tf-hot:var(--track-flash-bass-hot); --tf-glow:var(--track-flash-bass-glow); }
+.floating-focus[data-dock-demo][data-track-accent] .music-pattern .beat-channel[data-channel='melody'] { --tf:var(--track-flash-melody); --tf-deep:var(--track-flash-melody-deep); --tf-bright:var(--track-flash-melody-bright); --tf-hot:var(--track-flash-melody-hot); --tf-glow:var(--track-flash-melody-glow); }
 /* The live Kinetic grid draws flashes from these; they override the per-instrument defaults set inline on the row. */
-.floating-focus[data-track-accent] .music-pattern .beat-channel { --instrument-color:var(--tf) !important; --c-mid:var(--tf) !important; --c-deep:var(--tf-deep) !important; --c-bright:var(--tf-bright) !important; --c-hot:var(--tf-hot) !important; --c-glow:var(--tf-glow) !important;
+.floating-focus[data-dock-demo][data-track-accent] .music-pattern .beat-channel { --instrument-color:var(--tf) !important; --c-mid:var(--tf) !important; --c-deep:var(--tf-deep) !important; --c-bright:var(--tf-bright) !important; --c-hot:var(--tf-hot) !important; --c-glow:var(--tf-glow) !important;
   /* The older grid reads these two. */ --c:var(--tf) !important; --ci:color-mix(in srgb,var(--tf) 16%,#fff) !important; }
-.floating-focus[data-track-accent] .music-pattern .beat-square { transition:none; }
-.floating-focus[data-track-accent] .music-pattern .channel-icon { color:var(--tf); }
-.floating-focus[data-track-accent] .dock-ring-progress { stroke:var(--track-flash-kick); filter:none; }
+.floating-focus[data-dock-demo][data-track-accent] .music-pattern .beat-square { transition:none; }
+.floating-focus[data-dock-demo][data-track-accent] .music-pattern .channel-icon { color:var(--tf); }
+.floating-focus[data-dock-demo][data-track-accent] .dock-ring-progress { stroke:var(--track-flash-kick); filter:none; }
 /* Demo tracks have no audio to detect, so a fixed decorative pattern shows the flash colours in motion.
    It never runs for a live source and is not a beat: nothing reads it. */
 @keyframes dock-demo-flash { 0%,100% { background:var(--ci); box-shadow:none; } 6% { background:var(--c); box-shadow:0 0 14px color-mix(in srgb,var(--c) 60%,transparent); } 30% { background:var(--ci); box-shadow:none; } }

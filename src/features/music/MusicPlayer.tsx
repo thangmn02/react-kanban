@@ -48,7 +48,7 @@ export function MusicNowPlaying({ music, showPaused = false }: { music: BrowserM
   </div>;
 }
 
-/** `demo` switches on the review-only layout: remaining time and an up-next list in place of the source menu. */
+/** `demo` turns on the full music panel: remaining time and an up-next list in place of the source menu (the Dock always uses it). */
 export function MusicTrack({ music, demo = false }: { music: BrowserMusicController; demo?: boolean }) {
   const { t } = useI18n();
   const { sessions, selected, setSelectedId } = music;
@@ -72,7 +72,7 @@ export function MusicTrack({ music, demo = false }: { music: BrowserMusicControl
     {selected&&music.sourceAudioDelay&&<SourceAudioDelayControl key={music.sourceAudioDelay.owner} music={music}/>}
     {selected&&(!isNativeWidget()||nativeCompanionPreviewEnabled())&&<ExperimentalBeatControl key={`experimental:${selected.id}`} session={selected} refresh={music.refresh} compensationOnly={nativeCompanionPreviewEnabled()}/>}
     {demo && sessions.length > 1 ? queue.length > 1 && <div><p className="music-queue-title" id="music-queue-title">{t('music.upNext')}</p><ul className="music-queue" aria-labelledby="music-queue-title">{queue.map(session => <li key={session.id}>
-      <button type="button" aria-current={session.id === selected?.id ? 'true' : undefined} onClick={() => setSelectedId(session.id)}>
+      <button type="button" data-session-id={session.id} aria-current={session.id === selected?.id ? 'true' : undefined} onClick={() => setSelectedId(session.id)}>
         <span className="music-queue-art" aria-hidden="true">{session.artwork ? <img src={session.artwork} alt="" /> : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 18V5l11-2v13M9 8l11-2" /><ellipse cx="6" cy="18" rx="3" ry="2" /><ellipse cx="17" cy="16" rx="3" ry="2" /></svg>}</span>
         <span className="music-queue-copy"><span>{session.title}</span><small>{[session.artist, session.source].filter(Boolean).join(' · ')}</small></span>
         {session.id === selected?.id && <span className="music-queue-now">{t('dock.nowPlaying')}</span>}

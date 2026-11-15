@@ -5,6 +5,8 @@ import FloatingFocus, { type FloatingFocusProps } from '../../components/focus/F
 import { MusicBridgeError, sendMusicRequest, sendBeatRequest, type BeatEvent } from './mediaBridge';
 import { decideBeatMode } from '../../../extensions/kanban-music/beat-mode.js';
 
+// The Dock lists other music tabs as Up next; choosing one is a click.
+const pickSource = (id: string) => fireEvent.click(document.querySelector(`.music-queue button[data-session-id="${id}"]`)!);
 const beatReceiver = vi.hoisted(() => ({ receive: undefined as undefined | ((event: BeatEvent) => void) }));
 vi.mock('./mediaBridge', async (importOriginal) => ({ ...await importOriginal<typeof import('./mediaBridge')>(), sendMusicRequest: vi.fn(), sendBeatRequest: vi.fn(),
   subscribeBeatEvents: (_id: string, _subscription: string, receive: (event: BeatEvent) => void) => {
@@ -179,7 +181,7 @@ it('selects the toolbar-clicked song but preserves manual choices until a new to
   renderPlayer();
   await act(async () => {});
   expect(screen.getByRole('heading', { name: 'Clicked track' })).toBeInTheDocument();
-  fireEvent.change(screen.getByRole('combobox', { name: 'Choose a music tab' }), { target: { value: session.id } });
+  pickSource(session.id);
   await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
   expect(screen.getByRole('heading', { name: session.title })).toBeInTheDocument();
   await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
@@ -192,7 +194,7 @@ it('does not let a stale paused YouTube toolbar selection displace playing Sound
   vi.mocked(sendMusicRequest).mockResolvedValue([paused, playing]);
   renderPlayer();
   await screen.findByRole('heading', { name: playing.title });
-  fireEvent.change(screen.getByRole('combobox', { name: 'Choose a music tab' }), { target: { value: paused.id } });
+  pickSource(paused.id);
   expect(screen.getByRole('heading', { name: paused.title })).toBeInTheDocument();
 });
 
@@ -237,7 +239,7 @@ it('preserves a manual paused selection across polls until another tab starts pl
   vi.mocked(sendMusicRequest).mockResolvedValue([session, chosen, other]);
   renderPlayer();
   await act(async () => {});
-  fireEvent.change(screen.getByRole('combobox', { name: 'Choose a music tab' }), { target: { value: chosen.id } });
+  pickSource(chosen.id);
   await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
   expect(screen.getByRole('heading', { name: chosen.title })).toBeInTheDocument();
   vi.mocked(sendMusicRequest).mockResolvedValue([session, chosen, { ...other, playing: true, paused: false }]);
@@ -362,10 +364,10 @@ it('uses the selected track playback state, independently of the focus timer', a
   const view = renderPlayer();
   await screen.findByRole('heading', { name: session.title });
   expect(view.container.querySelector('.music-dot')).toHaveClass('music-dot', 'playing');
-  fireEvent.change(screen.getByRole('combobox', { name: 'Choose a music tab' }), { target: { value: 'paused' } });
+  pickSource('paused');
   expect(view.container.querySelector('.music-dot')).toBeNull();
   expect(screen.getByRole('heading', { name: 'Paused track' })).toBeInTheDocument();
-  fireEvent.change(screen.getByRole('combobox', { name: 'Choose a music tab' }), { target: { value: session.id } });
+  pickSource(session.id);
   view.rerender(<I18nProvider><FloatingFocus {...focusProps} timerState={{ ...focusProps.timerState, isRunning: false }} /></I18nProvider>);
   expect(view.container.querySelector('.music-dot')).toHaveClass('music-dot', 'playing');
 });
@@ -394,7 +396,8 @@ it('shows a real timeline and volume, and routes committed changes to the select
   renderPlayer();
   const seek = await screen.findByRole('slider', { name: 'Seek music' });
   expect(screen.getByText('0:30')).toBeInTheDocument();
-  expect(screen.getByText('3:00')).toBeInTheDocument();
+  // The music panel counts down the time left.
+  expect(screen.getByText('-2:30')).toBeInTheDocument();
   fireEvent.change(seek, { target: { value: '90' } });
   expect(sendMusicRequest).not.toHaveBeenCalledWith('media.seek', session.id, 90);
   fireEvent.pointerUp(seek);

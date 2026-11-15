@@ -59,9 +59,8 @@ export function useDockDemoMusic(live: BrowserMusicController, enabled: boolean)
     const withArt = live.sessions.map(withArtwork), covers = new Map(withArt.filter(session => session.artwork).map(session => [trackKey(session), session.artwork]));
     return withArt.map(session => session.artwork || !covers.has(trackKey(session)) ? session : { ...session, artwork: covers.get(trackKey(session)) });
   }, [live.sessions]);
-  // A live source keeps its own controller; the demo only adds the cover its video already has.
-  if (enabled && !active) return { ...live, sessions: liveSessions, selected: liveSessions.find(session => session.id === live.selected?.id) ?? live.selected } as BrowserMusicController;
-  if (!active) return live;
+  // A live source keeps its own controller, with the cover its video already has (in demo mode and live).
+  if (!active) return { ...live, sessions: liveSessions, selected: liveSessions.find(session => session.id === live.selected?.id) ?? live.selected } as BrowserMusicController;
   const now = () => Date.now();
   const elapsed = (current: DemoState) => current.paused ? current.position : current.position + (now() - current.sampledAt) / 1000;
   const selected = sessions.find(session => session.id === state.selectedId) ?? sessions[0];
