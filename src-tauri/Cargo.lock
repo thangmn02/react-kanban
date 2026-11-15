@@ -1867,7 +1867,7 @@ dependencies = [
 
 [[package]]
 name = "kora"
-version = "0.1.50"
+version = "0.1.51"
 dependencies = [
  "futures-util",
  "rustfft",
