@@ -16,11 +16,14 @@ export function useDockPreferences() {
   const [colorMode, setColorMode] = useState<BeatColorMode>(() => storedChoice('floatingDock.colors', beatColorModes, 'random'));
   const [palette, setPalette] = useState<BeatPalette>(() => storedChoice('floatingDock.palette', beatPalettes, 'bloom'));
   const [motionProfile,setMotionProfile]=useState<MotionProfile>(()=>storedChoice('floatingDock.motionProfile',['focus','dynamic'],'focus'));
+  // Video colours default to on; 'off' keeps the Kora palette exactly as before.
+  const [videoColours,setVideoColours]=useState<'on'|'off'>(()=>storedChoice('floatingDock.videoColours',['on','off'],'on'));
   const [motionReduction,setMotionReduction]=useState<MotionReduction>(()=>storedChoice('floatingDock.motionReduction',['system','reduced'],'system'));
   useEffect(() => { try { window.localStorage.removeItem('floatingDock.style'); } catch { /* Old layouts cannot override Tabs. */ } }, []);
   useEffect(() => { try { window.localStorage.setItem('floatingDock.colors', colorMode); } catch { /* Preferences remain usable this session. */ } }, [colorMode]);
   useEffect(() => { try { window.localStorage.setItem('floatingDock.palette', palette); } catch { /* Preferences remain usable this session. */ } }, [palette]);
   useEffect(()=>{try{window.localStorage.setItem('floatingDock.motionProfile',motionProfile);}catch{/* Session preference still works. */}},[motionProfile]);
   useEffect(()=>{try{window.localStorage.setItem('floatingDock.motionReduction',motionReduction);}catch{/* Session preference still works. */}},[motionReduction]);
-  return { colorMode, setColorMode, palette, setPalette,motionProfile,setMotionProfile,motionReduction,setMotionReduction };
+  useEffect(()=>{try{window.localStorage.setItem('floatingDock.videoColours',videoColours);}catch{/* Session preference still works. */}},[videoColours]);
+  return { colorMode, setColorMode, palette, setPalette,motionProfile,setMotionProfile,motionReduction,setMotionReduction,videoColours,setVideoColours };
 }

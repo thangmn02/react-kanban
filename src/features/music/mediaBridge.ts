@@ -18,6 +18,8 @@ export interface BrowserMusicSession {
   canControl?: boolean;
   canAnalyze?: boolean;
   asset?: MediaAsset;
+  /** Hue histogram (36 chroma-weighted 10° bins) from a few tiny video frames, collected on this device by the Companion. */
+  palette?: { bins: number[]; pixels: number };
   currentTime?: number;
   duration?: number;
   volume?: number;

@@ -29,6 +29,9 @@ export interface MusicVisualOptions {
   motionProfile?:MotionProfile;
   motionReduction?:MotionReduction;
   visualActive?:boolean;
+  /** Beat Grid colours from the playing video; off keeps the Kora palette. */
+  videoColours?:boolean;
+  appearance?:'light'|'dark';
 }
 
 export function MusicNowPlaying({ music }: { music: BrowserMusicController }) {
@@ -68,7 +71,7 @@ export function MusicTrack({ music }: { music: BrowserMusicController }) {
   </>;
 }
 
-export function MusicGrid({ music, colorMode = 'random', palette = 'bloom', orientation = 'horizontal',motionProfile='focus',motionReduction='system',visualActive=true }: { music: BrowserMusicController } & MusicVisualOptions) {
+export function MusicGrid({ music, colorMode = 'random', palette = 'bloom', orientation = 'horizontal',motionProfile='focus',motionReduction='system',visualActive=true,videoColours=false,appearance='light' }: { music: BrowserMusicController } & MusicVisualOptions) {
   const {t}=useI18n();
   const systemReduced=useMotionReduction(),reduced=motionReduction==='reduced'||systemReduced;
   const [legacy,setLegacy]=useState(false);
@@ -114,7 +117,8 @@ export function MusicGrid({ music, colorMode = 'random', palette = 'bloom', orie
     :capability.livePreviewEligible?'Instrument preview is off for this source. Open Music → Private candidate → Live preview to enable it. Pause, seek and source changes turn preview off.'
     :null:null;
   const grid=<BeatPattern key={music.selected?.id} session={music.selected} beat={music.beat} colorMode={colorMode} palette={palette} orientation={orientation} semanticOnly={music.beta?.enabled?true:undefined} melodyEnabled={music.beta?.enabled?music.beta.melody:liveLead} independentRows={music.beta?.enabled} melodyEvents={music.beta?.enabled?music.beta.clip?.lead?.events:undefined}
-    motionProfile={compareLegacy?'legacy':motionProfile} motionReduced={reduced} motionActive={visualActive} lateLivePreview={lateLivePreview}/>;
+    motionProfile={compareLegacy?'legacy':motionProfile} motionReduced={reduced} motionActive={visualActive} lateLivePreview={lateLivePreview}
+    videoColours={videoColours} appearance={appearance==='dark'||palette==='ultraviolet'?'dark':'light'}/>;
   return <>
     {motionPreview&&<div className="music-motion-controls"><span>{t('dock.motion.preview')} · {compareLegacy?'Legacy':t(`dock.motion.${motionProfile}`)}</span>
       <button type="button" className="text-button motion-legacy" disabled={reduced} aria-pressed={compareLegacy} onClick={()=>setLegacy(value=>!value)}>{t(compareLegacy?'dock.motion.restore':'dock.motion.legacy')}</button>

@@ -1,4 +1,4 @@
-import {useLayoutEffect,useRef,useState,type CSSProperties} from 'react';
+import {useLayoutEffect,useMemo,useRef,useState,type CSSProperties} from 'react';
 import type {BrowserMusicSession,BeatBand} from './mediaBridge';
 import type {MusicBeatState} from './useMusicBeatSync';
 import {activeSteps,reshuffleEpoch} from './beatVisuals';
@@ -8,13 +8,15 @@ import {beatTelemetry} from '../../../extensions/kanban-music/beat-telemetry.js'
 import {beatPresentationDiagnostics} from './beat-presentation-diagnostics';
 import './semantic-motion.css';
 import {BeatHeartbeat} from './beat-heartbeat';
+import {useVideoPalette} from './use-video-palette';
+import {phraseAnchor,phraseIndex,rampFromHue,videoRowColours,type Appearance} from './video-palette';
 
 const bands:BeatBand[]=['kick','clap','hat','bass','melody'];
 const telemetry=beatTelemetry.at('beat-renderer');
-export function SemanticMotionPattern({session,beat,profile,reduced=false,active=true,orientation='horizontal',melodyEnabled=false,semanticOnly=false,melodyEvents,lateLivePreview=false}: {
+export function SemanticMotionPattern({session,beat,profile,reduced=false,active=true,orientation='horizontal',melodyEnabled=false,semanticOnly=false,melodyEvents,lateLivePreview=false,videoColours=false,appearance='light'}: {
   session?:BrowserMusicSession;beat:MusicBeatState;profile:MotionProfile;reduced?:boolean;orientation?:'horizontal'|'vertical';
   melodyEnabled?:boolean;semanticOnly?:boolean;active?:boolean;melodyEvents?:readonly {id:string;duration:number}[];
-  lateLivePreview?:boolean;
+  lateLivePreview?:boolean;videoColours?:boolean;appearance?:Appearance;
 }){
   const root=useRef<HTMLDivElement>(null),renderer=useRef<ReturnType<typeof createSemanticMotion>|null>(null);
   const frames=useRef(new Set<number>());
@@ -144,6 +146,15 @@ export function SemanticMotionPattern({session,beat,profile,reduced=false,active
     engine.sustainMelody(melody,Boolean(owner)&&melodyEnabled&&beat.melody?.active&&beat.melody.note!==gate.current.melodyNote?beat.melody.level:0);
   },[beat,owner,melodyEnabled,semanticOnly,session,melodyEvents,profile,inspect,active,lateLivePreview,reduce]);
   const visible=bands.filter(b=>melodyEnabled||b!=='melody');
+  // Colours from the video change only at phrase boundaries (16 bars, 8 when slow), never on a camera cut. Horizon
+  // Eclipse (calm) keeps the track's main colour on the grid and rotates only the ambient glow; Eclipse Halo rotates both.
+  const peaks=useVideoPalette(session,videoColours);
+  const bpm=beat.tempo?.locked?beat.tempo.bpm:null,phrase=phraseIndex(reshuffleEpoch(session?.currentTime||0,bpm),bpm);
+  const ambientHue=phraseAnchor(peaks,phrase),gridHue=profile==='dynamic'?ambientHue:peaks[0];
+  const rowColours=useMemo(()=>gridHue===undefined?undefined:videoRowColours(gridHue,appearance,peaks.find(hue=>hue!==gridHue),visible),
+    // visible.join keeps the memo stable across renders that rebuild the array.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [gridHue,appearance,peaks.join(),visible.join()]);
   return <div ref={root} className={`music-pattern semantic-motion ${orientation}${semanticOnly?' semantic-only':''}`} data-motion-profile={profile}
     data-motion-variant="kinetic"
     data-late-live-preview={lateLivePreview}
@@ -152,10 +163,13 @@ export function SemanticMotionPattern({session,beat,profile,reduced=false,active
     data-motion-inputs={beat.visualAttacks?.length||0}
     data-motion-reduced={reduce} style={{'--beat-rows':visible.length} as CSSProperties} role="img"
     aria-label={`Instrument activity: ${visible.map(b=>instrumentMotion[b].name).join(', ')}. Cells are not rhythmic subdivisions.`}>
+    {ambientHue!==undefined&&<VideoAmbient hue={ambientHue} appearance={appearance}/>}
     {!semanticOnly&&<BeatHeartbeat owner={owner} beat={beat} reduced={reduce}/>}
     {visible.map(band=><div key={band} className="beat-channel" data-channel={band==='kick'?'drum':band} data-track={instrumentMotion[band].name}
-      data-motion-band={band} style={{'--instrument-color':instrumentMotion[band].color,'--c-deep':instrumentMotion[band].deep,'--c-mid':instrumentMotion[band].color,
-        '--c-bright':instrumentMotion[band].bright,'--c-hot':instrumentMotion[band].hot,'--c-glow':instrumentMotion[band].glow} as CSSProperties}>
+      data-motion-band={band} data-video-colour={rowColours?'true':undefined} style={(rowColours?{'--instrument-color':rowColours[band].mid,'--c-deep':rowColours[band].deep,'--c-mid':rowColours[band].mid,
+        '--c-bright':rowColours[band].bright,'--c-hot':rowColours[band].hot,'--c-glow':rowColours[band].glow}
+        :{'--instrument-color':instrumentMotion[band].color,'--c-deep':instrumentMotion[band].deep,'--c-mid':instrumentMotion[band].color,
+        '--c-bright':instrumentMotion[band].bright,'--c-hot':instrumentMotion[band].hot,'--c-glow':instrumentMotion[band].glow}) as CSSProperties}>
       <span className="channel-icon" title={instrumentMotion[band].name}>{({kick:'●',clap:'⌁',hat:'⌃',bass:'∿',melody:'~'})[band]}</span>
       {Array.from({length:8},(_,i)=><span key={i} className="beat-square" data-motion-cell={i}>
         <span className="motion-shock"/>
@@ -167,4 +181,18 @@ export function SemanticMotionPattern({session,beat,profile,reduced=false,active
       </span>)}
     </div>)}
   </div>;
+}
+
+/**
+ * Two stacked glow layers behind the grid. A new colour goes onto the hidden layer, which then fades in by opacity
+ * only (about 900 ms); the background itself never transitions.
+ */
+function VideoAmbient({hue,appearance}:{hue:number;appearance:Appearance}){
+  const [layers,setLayers]=useState<{colours:[number,number];front:0|1}>({colours:[hue,hue],front:0});
+  if(layers.colours[layers.front]!==hue){
+    const back=layers.front===0?1:0,colours:[number,number]=[...layers.colours];colours[back]=hue;
+    setLayers({colours,front:back});
+  }
+  return <>{layers.colours.map((value,index)=><span key={index} className="video-ambient" aria-hidden="true" data-front={index===layers.front?'true':undefined}
+    style={{'--ambient':rampFromHue(value,appearance).glow} as CSSProperties}/>)}</>;
 }

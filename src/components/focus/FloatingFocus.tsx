@@ -149,6 +149,8 @@ export default function FloatingFocus(props: FloatingFocusProps) {
             {/* The Kinetic grid owns its per-instrument colours, so the legacy colour-mode choice is no longer offered. */}
             <label>{t('dock.palette')}<select value={preferences.palette} onChange={(event) => preferences.setPalette(event.target.value as typeof preferences.palette)}>
               {beatPalettes.map((value) => <option key={value} value={value}>{t(`dock.palette.${value}`)}</option>)}</select></label>
+            <label>{t('dock.videoColours')}<select value={preferences.videoColours} onChange={event=>preferences.setVideoColours(event.target.value as typeof preferences.videoColours)}>
+              <option value="on">{t('dock.videoColours.on')}</option><option value="off">{t('dock.videoColours.off')}</option></select></label>
             <>
               <label>{t('dock.visualStyle')}<select value={preferences.motionProfile} onChange={event=>preferences.setMotionProfile(event.target.value as typeof preferences.motionProfile)}>
                 <option value="focus">{t('dock.motion.focus')}</option><option value="dynamic">{t('dock.motion.dynamic')}</option>
@@ -239,6 +241,7 @@ export default function FloatingFocus(props: FloatingFocusProps) {
           animate={{ opacity: hidden('beat') ? 0 : 1 }} transition={{ ...layoutTransition, layout: layoutTransition }}>
           {!hasMusic && <p className="dock-empty muted">{t(emptyMusic)}</p>}
           <MusicGrid music={music} colorMode={preferences.colorMode} palette={preferences.palette} motionProfile={preferences.motionProfile} motionReduction={preferences.motionReduction}
+            videoColours={preferences.videoColours==='on'} appearance={appearance.resolved==='dark'?'dark':'light'}
             visualActive={selectedTab==='beat'&&visible&&!props.isMinimized}/>
         </motion.section>
         <motion.section id={`${groupId}-music`} layout layoutId="music-row" className={`dock-panel dock-track-pane${preferences.palette === 'ultraviolet' ? ' ultraviolet' : ''}`}

@@ -1,6 +1,6 @@
 // These functions are self-contained because Chrome runs them in a media tab.
 // With ensureObserved, a tab whose observer or control listener is missing returns null so the caller installs them.
-export function readMedia(ensureObserved = false) {
+export function readMedia(ensureObserved = false, paletteWanted = false) {
   if (ensureObserved && !globalThis.__kanbanMusicMedia?.controlListener) return null;
   const metadata = navigator.mediaSession?.metadata;
   const navigation = (selectors) => [...document.querySelectorAll(selectors)].find(button =>
@@ -37,7 +37,9 @@ export function readMedia(ensureObserved = false) {
       volume: media.volume, canSeek: Number.isFinite(media.duration) && media.duration > 0 && media.seekable.length > 0,
       canPrevious: Boolean(skip()[0]), canNext: Boolean(skip()[1]),
       assetUrl: assetUrl?.slice(0, 2048), protectedMedia: Boolean(media.mediaKeys), observed: Boolean(globalThis.__kanbanMusicMedia),
-      mediaFacts: globalThis.__kanbanMusicMedia?.sourceFacts?.(media) || { kind:'unknown' } }];
+      mediaFacts: globalThis.__kanbanMusicMedia?.sourceFacts?.(media) || { kind:'unknown' },
+      // Only the canonical player collects video colours, and only while Kora has none cached for this video.
+      ...(media.closest?.('#movie_player, ytmusic-player') ? { palette: globalThis.__kanbanMusicMedia?.videoPalette?.(media, paletteWanted) } : {}) }];
   });
 }
 

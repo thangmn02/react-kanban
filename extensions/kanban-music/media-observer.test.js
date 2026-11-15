@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readMedia, controlMedia } from './media.js';
 
 let nativePlay;
@@ -276,4 +276,57 @@ it('does not count a muted hover preview as a second source, and the clock reuse
   vi.advanceTimersByTime(1001);
   observer.sourceFacts(song, 1000);
   expect(query).toHaveBeenCalled();
+});
+
+describe('video colours', () => {
+  const frames = [];
+  beforeEach(() => {
+    frames.length = 0;
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
+    location.hostname !== 'www.youtube.com' && vi.stubGlobal('location', { ...location, hostname: 'www.youtube.com' });
+    vi.stubGlobal('createImageBitmap', vi.fn(async () => ({ close: vi.fn() })));
+    vi.stubGlobal('OffscreenCanvas', class { getContext() { return { drawImage() {}, getImageData: () => ({ data: frames.shift() ?? new Uint8ClampedArray(1024) }) }; } });
+  });
+  const colourFrame = (rgb = [255, 40, 150]) => { const data = new Uint8ClampedArray(1024); for (let i = 0; i < 1024; i += 4) { data.set(i < 512 ? rgb : [20, 20, 20], i); data[i + 3] = 255; } return data; };
+  const player = () => { const shell = document.createElement('div'); shell.id = 'movie_player'; const video = ready(document.createElement('video'), 'blob:mv'); shell.append(video); document.body.append(shell); return video; };
+  const run = async ms => { for (let t = 0; t < ms; t += 2500) { await vi.advanceTimersByTimeAsync(2500); } };
+
+  it('collects a few frames while playing and stops once the colour holds after 30 s', async () => {
+    const video = player(), observer = globalThis.__kanbanMusicMedia;
+    for (let i = 0; i < 30; i++) frames.push(colourFrame());
+    expect(observer.videoPalette(video, true)).toBeUndefined();
+    await run(10000);
+    const partial = observer.videoPalette(video, true);
+    expect(partial.done).toBe(false);
+    expect(partial.bins.some(value => value > 0)).toBe(true);
+    await run(25000);
+    expect(observer.videoPalette(video, true).done).toBe(true);
+    const calls = createImageBitmap.mock.calls.length;
+    expect(calls).toBeLessThanOrEqual(13);
+    await run(10000);
+    expect(createImageBitmap.mock.calls.length).toBe(calls);
+  });
+
+  it('reads nothing while paused or when Kora already has the colours, and gives up on blank (protected) frames', async () => {
+    const video = player(), observer = globalThis.__kanbanMusicMedia;
+    video.paused = true;
+    observer.videoPalette(video, true);
+    await run(10000);
+    expect(createImageBitmap).not.toHaveBeenCalled();
+    video.paused = false;
+    observer.videoPalette(video, false);
+    await run(10000);
+    expect(createImageBitmap).not.toHaveBeenCalled();
+    observer.videoPalette(video, true);
+    await run(10000);
+    expect(observer.videoPalette(video, true)).toEqual({ done: true });
+    expect(createImageBitmap.mock.calls.length).toBe(3);
+  });
+
+  it('matches Kora\'s own hue histogram for the same pixels', async () => {
+    const { hueBins } = await import('../../src/features/music/video-palette.ts');
+    const frame = colourFrame([30, 120, 255]);
+    const page = globalThis.__kanbanMusicMedia.hueBins(frame), kora = hueBins(frame);
+    page.forEach((value, index) => expect(value).toBeCloseTo(kora[index], 10));
+  });
 });

@@ -9,6 +9,7 @@ import { beatTelemetry } from './beat-telemetry.js';
 import { mediaAssetFromUrl, stableAsset } from './media-asset.js';
 import { authorizedLeadAudio } from './lead-audio-authorization.js';
 import { hasLearnedPercussion } from './percussion-capability.js';
+import { createVideoPaletteCache } from './video-palette-cache.js';
 
 void chrome.storage.local.get('beatTelemetryEnabled').then((data) => beatTelemetry.enable(data.beatTelemetryEnabled === true)).catch(() => {});
 chrome.storage.onChanged.addListener((changes, area) => {
@@ -25,6 +26,7 @@ let learnedPercussion;
 // browse page while the same song keeps playing. Keep the last asset for a player until its media source or title
 // changes, so browsing never looks like a new track.
 const playerAssets = new Map();
+const videoPalettes = createVideoPaletteCache(chrome.storage.local);
 
 async function scan() {
   if (scanInFlight) return scanInFlight;
@@ -36,19 +38,31 @@ async function scan() {
       && leadAudioTestScope.expiresAt > Date.now() && leadAudioTestScope.expiresAt <= Date.now() + 3600000
       ? `${source.origin}/*` : undefined;
     const tabs = await chrome.tabs.query({ url: developmentOrigin ? [...mediaSites, developmentOrigin] : mediaSites });
+    await videoPalettes.load();
+    // A tab collects video colours only while its video has none cached: its address names the video, or, on YouTube
+    // Home or in the miniplayer, the player's last known asset does.
+    const paletteWanted = tab => {
+      const known = [mediaAssetFromUrl(tab.url), ...[...playerAssets].filter(([key]) => key.startsWith(`${tab.id}:`)).map(([, value]) => value.asset)];
+      return !known.some(asset => videoPalettes.has(asset));
+    };
     const results = await Promise.all(tabs.map(async (tab) => {
       try {
         // One injection per tab per scan. Install observation only where it is missing (tabs left open during a reload).
-        let frames = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'MAIN', func: readMedia, args: [true] });
+        const wanted = paletteWanted(tab);
+        let frames = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'MAIN', func: readMedia, args: [true, wanted] });
         if (frames.some((frame) => frame.result === null)) {
           await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'MAIN', files: ['spotify-player.js', 'media-observer.js'] });
           await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'MAIN', func: controlMedia, args: [0, '', 'install'] });
-          frames = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'MAIN', func: readMedia });
+          frames = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'MAIN', func: readMedia, args: [false, wanted] });
         }
         return frames.flatMap((frame) => (frame.result || []).map((media) => {
           const id = `${tab.id}:${frame.documentId}:${media.index}`;
-          return { ...media, asset: stableAsset(playerAssets, id, media, mediaAssetFromUrl(media.assetUrl, leadAudioTestScope)),
-            tabId: tab.id, tabMuted: Boolean(tab.mutedInfo?.muted), documentId: frame.documentId, id };
+          const asset = stableAsset(playerAssets, id, media, mediaAssetFromUrl(media.assetUrl, leadAudioTestScope));
+          if (media.palette?.done && media.palette.bins) videoPalettes.set(asset, media.palette);
+          const cached = videoPalettes.get(asset);
+          if (cached) videoPalettes.touch(asset);
+          const palette = cached || (media.palette?.bins ? { bins: media.palette.bins, pixels: media.palette.pixels } : undefined);
+          return { ...media, asset, palette, tabId: tab.id, tabMuted: Boolean(tab.mutedInfo?.muted), documentId: frame.documentId, id };
         }));
       } catch { return []; } // Closed, restricted, or permission-blocked tabs are unavailable.
     }));
@@ -61,9 +75,9 @@ async function scan() {
 
 const publicSessions = (items, percussionAvailable = false) => items.map((session) => {
   const { id, title, artist, source, paused, playing, currentTime, playbackRate, sampledAt, selectionToken,
-    duration, volume, muted, canSeek, canPrevious, canNext, asset } = session;
+    duration, volume, muted, canSeek, canPrevious, canNext, asset, palette } = session;
   return { id, title, artist, source, paused, playing, currentTime, playbackRate, sampledAt,
-    duration, volume, muted, canSeek, canPrevious, canNext, asset,
+    duration, volume, muted, canSeek, canPrevious, canNext, asset, ...(palette ? { palette } : {}),
     canAnalyze: Boolean(chrome.offscreen && chrome.tabCapture?.getMediaStreamId && chrome.runtime.getContexts), learnedPercussion: percussionAvailable, syncState: beats.status(session),
   ...(selectionToken ? { selectionToken } : {}),
   };

@@ -57,15 +57,18 @@ interface BeatPatternProps {
   motionReduced?:boolean;
   motionActive?:boolean;
   lateLivePreview?:boolean;
+  videoColours?:boolean;
+  appearance?:'light'|'dark';
 }
 
-export default function BeatPattern({ session, beat, colorMode = 'random', palette = 'bloom', orientation = 'horizontal', semanticOnly: requestedMode, melodyEnabled = false, independentRows = false, melodyEvents,motionProfile='legacy',motionReduced=false,motionActive=true,lateLivePreview=false }: BeatPatternProps) {
+export default function BeatPattern({ session, beat, colorMode = 'random', palette = 'bloom', orientation = 'horizontal', semanticOnly: requestedMode, melodyEnabled = false, independentRows = false, melodyEvents,motionProfile='legacy',motionReduced=false,motionActive=true,lateLivePreview=false,videoColours=false,appearance='light' }: BeatPatternProps) {
   const configuredMode = useSyncExternalStore(subscribeSemanticMode, getSemanticMode);
   const semanticOnly = requestedMode ?? configuredMode;
   const systemReduced=useMotionReduction();
   const reduced=motionReduced||systemReduced;
   if(motionProfile!=='legacy')return <SemanticMotionPattern session={session} beat={beat} profile={motionProfile} orientation={orientation}
-    melodyEnabled={melodyEnabled} semanticOnly={semanticOnly} melodyEvents={melodyEvents} active={motionActive} reduced={reduced} lateLivePreview={lateLivePreview}/>;
+    melodyEnabled={melodyEnabled} semanticOnly={semanticOnly} melodyEvents={melodyEvents} active={motionActive} reduced={reduced} lateLivePreview={lateLivePreview}
+    videoColours={videoColours} appearance={appearance}/>;
   return semanticOnly ? <SemanticBeatPattern session={session} beat={beat} orientation={orientation} melodyEnabled={melodyEnabled} independentRows={independentRows} melodyEvents={melodyEvents} active={motionActive} reduced={reduced}/>
     : <NormalBeatPattern session={session} beat={beat} colorMode={colorMode} palette={palette} orientation={orientation} melodyEnabled={melodyEnabled} independentRows={independentRows} melodyEvents={melodyEvents} motionActive={motionActive} motionReduced={reduced}/>;
 }

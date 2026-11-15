@@ -44,3 +44,5 @@
 .floating-focus.glass, .floating-focus[data-style='tabs'], .floating-focus[data-style='tabs'] .dock-track-pane {
   backdrop-filter: none; -webkit-backdrop-filter: none;
 }
+/* The same holds for the 32 Kinetic grid pads: behind them is the plain pane face, so their blur changed nothing. */
+.music-pattern.semantic-motion .beat-square { backdrop-filter: none; -webkit-backdrop-filter: none; }

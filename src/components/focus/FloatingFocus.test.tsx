@@ -68,8 +68,9 @@ it.each(['island', 'mixer', 'split', 'tabs', 'deck'])('opens only Tabs with the 
   }
   fireEvent.click(screen.getByRole('button', { name: 'Dock settings' }));
   expect(screen.queryByRole('combobox', { name: 'Dock style' })).toBeNull();
-  // Appearance, palette, and the Kinetic visual style and motion choices; the legacy colour mode does not affect Kinetic.
-  expect(screen.getAllByRole('combobox').filter((element) => !element.classList.contains('dock-task-select'))).toHaveLength(4);
+  // Appearance, palette, video colours, and the Kinetic visual style and motion choices; the legacy colour mode does not affect Kinetic.
+  expect(screen.getAllByRole('combobox').filter((element) => !element.classList.contains('dock-task-select'))).toHaveLength(5);
+  expect(screen.getByRole('combobox', { name: 'Colours from the video' })).toHaveValue('on');
   expect(screen.getByRole('combobox', { name: 'Appearance' })).toHaveValue('system');
   expect(screen.queryByRole('combobox', { name: 'Beat colors' })).toBeNull();
   expect(screen.getByRole('combobox', { name: 'Palette' })).toHaveValue('ultraviolet');

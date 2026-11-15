@@ -42,6 +42,69 @@
     cachedFacts = { media, at: Date.now(), facts };
     return facts;
   };
+  // Video colours. A few 16×16 frames of the playing YouTube video, read on this device only, give a hue histogram
+  // that Kora turns into Beat Grid colours. No frame or pixel leaves the page: only 36 numbers do. Sampling runs every
+  // 2.5 s of visible playback, stops once the main colour holds for three samples after 30 s, and never past 45 s.
+  // Keep hueBins in step with hueBins in src/features/music/video-palette.ts.
+  const PALETTE_MS = 2500, PALETTE_SETTLE_MS = 30000, PALETTE_LIMIT_MS = 45000;
+  const toLinear = value => { const c = value / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+  const hueBins = (rgba, bins = new Array(36).fill(0)) => {
+    for (let index = 0; index + 3 < rgba.length; index += 4) {
+      if (rgba[index + 3] < 128) continue;
+      const r = toLinear(rgba[index]), g = toLinear(rgba[index + 1]), b = toLinear(rgba[index + 2]);
+      const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b), m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b),
+        s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+      const L = 0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s, A = 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+        B = 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s, C = Math.hypot(A, B);
+      if (C < 0.03 || L < 0.18 || L > 0.95) continue;
+      bins[Math.floor(((Math.atan2(B, A) * 180 / Math.PI + 360) % 360) / 10) % 36] += C * C * Math.min(1, (L - 0.18) / 0.2);
+    }
+    return bins;
+  };
+  const uniform = rgba => {
+    let low = 255, high = 0;
+    for (let index = 0; index + 3 < rgba.length; index += 4) for (let channel = 0; channel < 3; channel++) { low = Math.min(low, rgba[index + channel]); high = Math.max(high, rgba[index + channel]); }
+    return high - low < 10;
+  };
+  const palette = { media: undefined, src: '', bins: undefined, pixels: 0, playedMs: 0, blank: 0, top: -1, steady: 0, done: false, timer: undefined, busy: false };
+  const stopPalette = () => { clearInterval(palette.timer); palette.timer = undefined; };
+  const readFrame = async media => {
+    const bitmap = await createImageBitmap(media, { resizeWidth: 16, resizeHeight: 16, resizeQuality: 'low' });
+    try {
+      const canvas = new OffscreenCanvas(16, 16), context = canvas.getContext('2d', { willReadFrequently: true });
+      context.drawImage(bitmap, 0, 0);
+      return context.getImageData(0, 0, 16, 16).data;
+    } finally { bitmap.close(); }
+  };
+  const samplePalette = async () => {
+    const media = palette.media?.deref();
+    if (!media || palette.done || source(media) !== palette.src) { stopPalette(); return; }
+    if (palette.busy || document.hidden || media.paused || media.ended || media.readyState < 2 || document.querySelector('.ad-showing')) return;
+    palette.playedMs += PALETTE_MS;
+    if (palette.playedMs > PALETTE_LIMIT_MS) { palette.done = true; stopPalette(); return; }
+    palette.busy = true;
+    let frame;
+    try { frame = await readFrame(media); } catch { palette.blank = 3; } finally { palette.busy = false; }
+    // Protected (DRM) or blocked frames read as black or one flat colour. Three of them: keep the thumbnail colours.
+    if (!frame || uniform(frame)) { if (++palette.blank >= 3) { palette.done = true; stopPalette(); } return; }
+    palette.bins = hueBins(frame, palette.bins);
+    palette.pixels += 256;
+    const top = palette.bins.indexOf(Math.max(...palette.bins));
+    palette.steady = top === palette.top ? palette.steady + 1 : 0;
+    palette.top = top;
+    if (palette.steady >= 2 && palette.playedMs >= PALETTE_SETTLE_MS) { palette.done = true; stopPalette(); }
+  };
+  /** The colours collected so far for this player, starting collection when wanted. */
+  const videoPalette = (media, wanted) => {
+    if (!wanted || !media || media.tagName !== 'VIDEO' || !/(^|\.)youtube\.com$/.test(location.hostname)) { stopPalette(); return undefined; }
+    const src = source(media);
+    if (palette.src !== src) {
+      stopPalette();
+      Object.assign(palette, { media: new WeakRef(media), src, bins: undefined, pixels: 0, playedMs: 0, blank: 0, top: -1, steady: 0, done: false });
+    }
+    if (!palette.done && !palette.timer && typeof createImageBitmap === 'function' && typeof OffscreenCanvas === 'function') palette.timer = setInterval(samplePalette, PALETTE_MS);
+    return palette.bins ? { bins: palette.bins.map(value => Math.round(value * 1e5) / 1e5), pixels: palette.pixels, done: palette.done } : palette.done ? { done: true } : undefined;
+  };
   const stop = () => {
     if (!watcher) return;
     clearInterval(watcher.interval);
@@ -97,10 +160,11 @@
   });
   globalThis.Audio = ObservedAudio;
   document.addEventListener('kanban-music-media-watch', receive);
-  globalThis.__kanbanMusicMedia = { version: 4, entries: list, sourceFacts,
+  globalThis.__kanbanMusicMedia = { version: 4, entries: list, sourceFacts, videoPalette, hueBins,
     mediaEntries: () => Array.from(entries.values()).flatMap(reference => reference.deref() ? [reference.deref()] : []),
     dispose() {
       stop();
+      stopPalette();
       document.removeEventListener('kanban-music-media-watch', receive);
       if (this.controlListener) document.removeEventListener('kanban-music-control', this.controlListener);
       if (HTMLMediaElement.prototype.play === observedPlay) HTMLMediaElement.prototype.play = originalPlay;
