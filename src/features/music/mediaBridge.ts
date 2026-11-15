@@ -13,6 +13,8 @@ export interface BrowserMusicSession {
   title: string;
   artist: string;
   source: string;
+  /** Cover art URL. Only the dock demo supplies one today; live sources leave it unset. */
+  artwork?: string;
   paused: boolean;
   playing?: boolean;
   canControl?: boolean;

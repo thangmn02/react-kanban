@@ -18,14 +18,14 @@ function controller(patch:Record<string,unknown>={}){
 it('offers a one-tap turn-on in the Music tab while Off, behind the same confirmation',()=>{
  const music=controller();render(<SourceAudioDelayControl music={music}/>);
  expect(screen.getByRole('status',{name:'Enhanced Beat Sync status'})).toHaveTextContent('Off');
- fireEvent.click(screen.getByRole('button',{name:'Turn on'}));expect(screen.getByText(/about 0.17 s later/)).toBeVisible();
+ fireEvent.click(screen.getByRole('button',{name:'Turn on sync'}));expect(screen.getByText(/about 0.17 s later/)).toBeVisible();
  expect(music.sourceAudioDelay!.setPreferred).not.toHaveBeenCalled();
- fireEvent.click(screen.getByRole('button',{name:'Turn on'}));expect(music.sourceAudioDelay!.setPreferred).toHaveBeenCalledWith(true);
+ fireEvent.click(screen.getByRole('button',{name:'Turn on sync'}));expect(music.sourceAudioDelay!.setPreferred).toHaveBeenCalledWith(true);
 });
 it('turns off from the Music tab and translates known hints',()=>{
  const music=controller({preferred:true,enabled:true,status:'unavailable',hint:'Not available for this source right now. Music plays normally.'});
  render(<SourceAudioDelayControl music={music}/>);expect(screen.getByText(/Not available for this source/)).toBeVisible();
- fireEvent.click(screen.getByRole('button',{name:'Turn off'}));expect(music.sourceAudioDelay!.setPreferred).toHaveBeenCalledWith(false);
+ fireEvent.click(screen.getByRole('button',{name:'Turn off sync'}));expect(music.sourceAudioDelay!.setPreferred).toHaveBeenCalledWith(false);
 });
 it('shows one compact status with a short hint, and no research or delay controls',()=>{
  render(<SourceAudioDelayControl music={controller({preferred:true,enabled:true,status:'preparing',hint:'Click the Kora Music Companion icon on the music tab once so it can take over the sound.'})}/>);
@@ -44,7 +44,7 @@ it('asks once before turning on, remembers the approval and turns off immediatel
  const toggle=screen.getByRole('checkbox',{name:/Line the Beat Grid up/});expect(toggle).not.toBeChecked();
  fireEvent.click(toggle);expect(screen.getByText(/about 0.17 s later/)).toBeVisible();expect(readEnhancedBeatSyncPreference()).toBeUndefined();
  fireEvent.click(screen.getByRole('button',{name:'Cancel'}));expect(readEnhancedBeatSyncPreference()).toBeUndefined();
- fireEvent.click(toggle);fireEvent.click(screen.getByRole('button',{name:'Turn on'}));
+ fireEvent.click(toggle);fireEvent.click(screen.getByRole('button',{name:'Turn on sync'}));
  expect(readEnhancedBeatSyncPreference()).toMatchObject({approvedDelayMs:170});expect(screen.getByRole('checkbox',{name:/Line the Beat Grid up/})).toBeChecked();
  fireEvent.click(screen.getByRole('checkbox',{name:/Line the Beat Grid up/}));expect(readEnhancedBeatSyncPreference()).toBeUndefined();
 });

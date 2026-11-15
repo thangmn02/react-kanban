@@ -3,7 +3,7 @@ import { useI18n } from '../../i18n';
 import type { BrowserMusicController } from './useBrowserMusic';
 
 const mediaTime = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
-export default function MusicPlaybackControls({ music }: { music: BrowserMusicController }) {
+export default function MusicPlaybackControls({ music, showRemaining = false }: { music: BrowserMusicController; showRemaining?: boolean }) {
   const { t } = useI18n();
   const { selected, busy, toggle, control } = music;
   const [now, setNow] = useState(Date.now);
@@ -33,7 +33,7 @@ export default function MusicPlaybackControls({ music }: { music: BrowserMusicCo
         onChange={event => setDraft({ id: selected.id, kind: 'seek', value: event.target.valueAsNumber })}
         onPointerUp={() => commit('seek')} onKeyUp={() => commit('seek')} onBlur={() => commit('seek')}
         style={{ '--music-progress': `${duration ? Math.min(100, seek / duration * 100) : 0}%` } as CSSProperties} />
-      <div className="music-times"><span>{mediaTime(seek)}</span><span>{duration ? mediaTime(duration) : t('music.live')}</span></div>
+      <div className="music-times"><span>{mediaTime(seek)}</span><span>{!duration ? t('music.live') : showRemaining ? `-${mediaTime(Math.max(0, duration - seek))}` : mediaTime(duration)}</span></div>
     </div>
     <div className="music-controls">
       <button className="music-skip" type="button" aria-label={t('music.previous')} disabled={disabled || selected.canPrevious !== true} onClick={() => void control('media.previous')}>

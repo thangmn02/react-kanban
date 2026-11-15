@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'framer-motion';
 import { uiFade, uiSpring } from '../../shared/motion';
 import type { FocusTask, PomodoroTimerState, PomodoroTimerSettings, PomodoroMode } from '../../types/focus.type';
@@ -9,6 +9,9 @@ import { useBrowserMusic } from '../../features/music/useBrowserMusic';
 import { EnhancedBeatSyncSetting } from '../../features/music/source-audio-delay-control';
 import { useDockPreferences, beatPalettes } from './useDockPreferences';
 import { useAppearance, type Appearance } from '../../features/appearance/appearance';
+import { dockDemoEnabled, useDockDemoMusic, useTrackPalette } from '../../features/music/dock-demo';
+import { trackAccentVariables } from '../../features/music/track-accent';
+import { rgbToHueSaturation, trackPaletteVariables } from '../../features/music/track-palette';
 
 export interface FloatingFocusProps {
   initialTab?: 'focus' | 'beat' | 'music';
@@ -73,9 +76,12 @@ export default function FloatingFocus(props: FloatingFocusProps) {
     owner.addEventListener('visibilitychange', update);
     return () => owner.removeEventListener('visibilitychange', update);
   }, [props.isWidget]);
-  const music = useBrowserMusic(selectedTab === 'beat' && visible && !props.isMinimized);
+  // Demo-only paths (saved demo tracks, track accent) stay off in live builds; see dockDemoEnabled.
+  const [demo] = useState(dockDemoEnabled);
+  const music = useDockDemoMusic(useBrowserMusic(selectedTab === 'beat' && visible && !props.isMinimized), demo);
   const preferences = useDockPreferences();
   const appearance = useAppearance();
+  const trackPalette = useTrackPalette(music.selected, demo);
   const reducedMotion = useReducedMotion();
   const groupId = useId();
   const settingsId = useId();
@@ -112,7 +118,8 @@ export default function FloatingFocus(props: FloatingFocusProps) {
   const hidden = (card: Card) => card !== 'focus' && card !== activeTab;
 
   return <LayoutGroup id={groupId}>
-    <section ref={dockRef} className="floating-focus glass" aria-label={t('app.floatingFocus')} data-style="tabs" data-appearance={appearance.resolved}>
+    <section ref={dockRef} className="floating-focus glass" aria-label={t('app.floatingFocus')} data-style="tabs" data-appearance={appearance.resolved}
+      data-dock-demo={demo || undefined} data-widget={props.isWidget || undefined} data-demo-beats={demo && music.playing && music.selected?.id.startsWith('dock-demo') || undefined}data-track-accent={trackPalette ? "" : undefined} style={trackPalette ? { ...trackPaletteVariables(trackPalette, appearance.resolved), ...trackAccentVariables(rgbToHueSaturation(trackPalette.kick)), '--track-art': `url("${music.selected?.artwork}")` } as CSSProperties : undefined}>
       <div className="dock-toolbar" ref={toolbarRef} data-draggable={Boolean(props.onDragStart)} onPointerDown={(event) => {
         if (event.button === 0 && !(event.target as HTMLElement).closest('button, a, input, select, textarea, [role="dialog"]')) props.onDragStart?.();
       }}>
@@ -215,8 +222,8 @@ export default function FloatingFocus(props: FloatingFocusProps) {
           </div>
         </motion.section>
         <div className="dock-now-playing mini-player-wrapper" data-reserved={hasMusic && activeTab !== 'music'}>
-          <div className="mini-player-content" aria-hidden={activeTab === 'music' || !music.playing} inert={activeTab === 'music' || !music.playing}>
-            {hasMusic && <MusicNowPlaying music={music} />}
+          <div className="mini-player-content" aria-hidden={activeTab === 'music' || !(music.playing || demo && hasMusic)} inert={activeTab === 'music' || !(music.playing || demo && hasMusic)}>
+            {hasMusic && <MusicNowPlaying music={music} showPaused={demo} />}
           </div>
         </div>
         <div className="tab-content-area">
@@ -248,7 +255,7 @@ export default function FloatingFocus(props: FloatingFocusProps) {
           data-card="music" aria-label={t('focus.island.music')} aria-hidden={hidden('music')} inert={hidden('music')}
           role="tabpanel" aria-labelledby={`${groupId}-music-tab`} tabIndex={0}
           animate={{ opacity: hidden('music') ? 0 : 1 }} transition={{ ...layoutTransition, layout: layoutTransition }}>
-          {hasMusic ? <><MusicTrack music={music} /><MusicFeedback music={music} /></> : <p className="dock-empty muted">{t(emptyMusic)}</p>}
+          {hasMusic ? <><MusicTrack music={music} demo={demo} /><MusicFeedback music={music} /></> : <p className="dock-empty muted">{t(emptyMusic)}</p>}
         </motion.section>
         </div>
       </motion.div>

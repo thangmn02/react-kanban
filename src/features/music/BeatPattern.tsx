@@ -354,6 +354,14 @@ function NormalBeatPattern({ session, beat, colorMode = 'random', palette = 'blo
       // Preserve decorative delays/masks but guarantee one immediate semantic
       // cell. A visual shape must never consume a detector's scheduled attack.
       const semanticStep = steps.findIndex(Boolean);
+      // Resolve each projected attack's cell once per row, not once per cell.
+      const attacksByStep = new Map<number, typeof attacks>();
+      for (const attack of attacks) {
+        if (attack.band !== band) continue;
+        const cell = activeSteps(session!.id, reshuffleEpoch(attack.trace?.targetPlaybackTime || 0), row).findIndex(Boolean);
+        const list = attacksByStep.get(cell);
+        if (list) list.push(attack); else attacksByStep.set(cell, [attack]);
+      }
       return <div key={band} className="beat-channel" data-channel={band === 'kick' ? 'drum' : band} data-track={trackNames[band]} style={rowStyle}>
         <svg className="channel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
           <title>{trackNames[band]}</title>
@@ -409,8 +417,7 @@ function NormalBeatPattern({ session, beat, colorMode = 'random', palette = 'blo
               {...flashAttributes(origin, row, step)}
               onAnimationStart={(event) => { recordCellFlash(event.currentTarget, 'animation'); rendered(origin); }}
               style={{ '--melody-flash-level': melodyLive ? beat.melody?.level : 1 } as CSSProperties} />}
-            {attacks.filter(a=>a.band===band&&activeSteps(session!.id,reshuffleEpoch(a.trace?.targetPlaybackTime||0),row).findIndex(Boolean)===step)
-              .map(attack=><ProjectedBeatFlash key={attack.key} attack={attack} row={row} cell={step} reduced={motionReduced}/>)}
+            {attacksByStep.get(step)?.map(attack=><ProjectedBeatFlash key={attack.key} attack={attack} row={row} cell={step} reduced={motionReduced}/>)}
           </span>;
         })}
       </div>;

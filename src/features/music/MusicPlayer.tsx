@@ -34,9 +34,9 @@ export interface MusicVisualOptions {
   appearance?:'light'|'dark';
 }
 
-export function MusicNowPlaying({ music }: { music: BrowserMusicController }) {
+export function MusicNowPlaying({ music, showPaused = false }: { music: BrowserMusicController; showPaused?: boolean }) {
   const { t } = useI18n();
-  if (!music.selected || !music.playing) return null;
+  if (!music.selected || !music.playing && !showPaused) return null;
   return <div className="music-now-playing-strip">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true"><path d="M9 18V5l11-2v13M9 8l11-2" /><ellipse cx="6" cy="18" rx="3" ry="2" /><ellipse cx="17" cy="16" rx="3" ry="2" /></svg>
     <span className="music-now-playing-label">{t(music.playing ? 'dock.nowPlaying' : 'focus.island.music')}</span>
@@ -48,13 +48,17 @@ export function MusicNowPlaying({ music }: { music: BrowserMusicController }) {
   </div>;
 }
 
-export function MusicTrack({ music }: { music: BrowserMusicController }) {
+/** `demo` switches on the review-only layout: remaining time and an up-next list in place of the source menu. */
+export function MusicTrack({ music, demo = false }: { music: BrowserMusicController; demo?: boolean }) {
   const { t } = useI18n();
   const { sessions, selected, setSelectedId } = music;
   if (!sessions.length) return null;
+  const queue = sessions.filter((session, index) => session.id === selected?.id
+    || !(selected && session.title === selected.title && session.artist === selected.artist)
+    && sessions.findIndex(other => other.title === session.title && other.artist === session.artist) === index);
   return <>
     <div className="music-heading">
-      <div className="music-art" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 18V5l11-2v13M9 8l11-2" /><ellipse cx="6" cy="18" rx="3" ry="2" /><ellipse cx="17" cy="16" rx="3" ry="2" /></svg></div>
+      <div className="music-art" aria-hidden="true">{selected?.artwork ? <img src={selected.artwork} alt="" /> : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 18V5l11-2v13M9 8l11-2" /><ellipse cx="6" cy="18" rx="3" ry="2" /><ellipse cx="17" cy="16" rx="3" ry="2" /></svg>}</div>
       <div className="track-copy">
         <p className="eyebrow">{t('focus.island.music')}</p>
         <h2 title={selected?.title}>{selected?.title || t('music.nothingPlaying')}</h2>
@@ -64,10 +68,16 @@ export function MusicTrack({ music }: { music: BrowserMusicController }) {
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 10h3v10H3zm5-6h3v16H8zm5 3h3v13h-3zm5-5h3v18h-3z" /></svg>
       </span>
     </div>
-    <MusicPlaybackControls key={selected?.id} music={music} />
+    <MusicPlaybackControls key={selected?.id} music={music} showRemaining={demo} />
     {selected&&music.sourceAudioDelay&&<SourceAudioDelayControl key={music.sourceAudioDelay.owner} music={music}/>}
     {selected&&(!isNativeWidget()||nativeCompanionPreviewEnabled())&&<ExperimentalBeatControl key={`experimental:${selected.id}`} session={selected} refresh={music.refresh} compensationOnly={nativeCompanionPreviewEnabled()}/>}
-    {sessions.length > 1 && <select className="music-sessions" aria-label={t('music.choose')} value={selected?.id || ''} onChange={(event) => setSelectedId(event.target.value)}>{sessions.map((session) => <option key={session.id} value={session.id}>{session.title} · {session.source}</option>)}</select>}
+    {demo && sessions.length > 1 ? queue.length > 1 && <div><p className="music-queue-title" id="music-queue-title">{t('music.upNext')}</p><ul className="music-queue" aria-labelledby="music-queue-title">{queue.map(session => <li key={session.id}>
+      <button type="button" aria-current={session.id === selected?.id ? 'true' : undefined} onClick={() => setSelectedId(session.id)}>
+        <span className="music-queue-art" aria-hidden="true">{session.artwork ? <img src={session.artwork} alt="" /> : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 18V5l11-2v13M9 8l11-2" /><ellipse cx="6" cy="18" rx="3" ry="2" /><ellipse cx="17" cy="16" rx="3" ry="2" /></svg>}</span>
+        <span className="music-queue-copy"><span>{session.title}</span><small>{[session.artist, session.source].filter(Boolean).join(' · ')}</small></span>
+        {session.id === selected?.id && <span className="music-queue-now">{t('dock.nowPlaying')}</span>}
+      </button></li>)}</ul></div>
+    : sessions.length > 1 && <select className="music-sessions" aria-label={t('music.choose')} value={selected?.id || ''} onChange={(event) => setSelectedId(event.target.value)}>{sessions.map((session) => <option key={session.id} value={session.id}>{session.title} · {session.source}</option>)}</select>}
   </>;
 }
 
