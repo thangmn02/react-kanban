@@ -165,8 +165,13 @@ chrome.action.onClicked.addListener((tab) => {
   void companion.invoke(tab).catch(() => {});
 });
 chrome.tabs.onRemoved.addListener((tabId) => beats.tabClosed(tabId));
+// True while the given document still exists in the tab: an in-page route change keeps it, a real page load does not.
+async function documentAlive(tabId, documentId) {
+  try { await chrome.scripting.executeScript({ target: { tabId, documentIds: [documentId] }, func: () => true }); return true; }
+  catch { return false; }
+}
 chrome.tabs.onUpdated.addListener((tabId, change) => {
-  if (change.status === 'loading') beats.tabLoading(tabId);
+  if (change.status === 'loading') beats.tabLoading(tabId, documentAlive);
   if (change.mutedInfo) beats.tabMuted(tabId, change.mutedInfo.muted);
 });
 

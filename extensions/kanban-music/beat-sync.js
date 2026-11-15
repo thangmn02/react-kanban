@@ -577,11 +577,20 @@ export function createBeatSync(api, nativePublish) {
       invokedTabs.delete(tabId);
       if (state && (state.session.tabId === tabId || state.owner.tabId === tabId)) void stopIfCurrent(state);
     },
-    tabLoading(tabId) {
-      // Source navigation invalidates its audio immediately. App SPA URL updates
-      // keep the same document; pagehide, receiver failure and leases release it. Navigation also ends the grant.
-      invokedTabs.delete(tabId);
-      if(state?.session.tabId===tabId)void stopIfCurrent(state,'track-changed');
+    tabLoading(tabId, documentAlive) {
+      // Chrome also reports in-page route changes as loading. YouTube, YouTube Music, SoundCloud, Spotify and Apple
+      // Music change routes for Home, search, the miniplayer and the next song while the same document keeps playing,
+      // so stopping here restarted capture on every click. Only a real page load (the playing document is gone) ends
+      // the capture and the grant; a new song in the same document is caught by its own media source changing.
+      const current=state,documentId=current?.session.tabId===tabId?current.session.documentId:undefined;
+      if(!documentId||typeof documentAlive!=='function'){invokedTabs.delete(tabId);if(current?.session.tabId===tabId)void stopIfCurrent(current,'track-changed');return;}
+      void (async()=>{
+        for(const wait of [300,1200,3000]){
+          await new Promise(resolve=>setTimeout(resolve,wait));
+          if(state!==current)return;
+          if(!await documentAlive(tabId,documentId).catch(()=>false)){invokedTabs.delete(tabId);if(state===current)void stopIfCurrent(current,'track-changed');return;}
+        }
+      })();
     },
     tabMuted(tabId, muted) {
       if (state?.session.tabId !== tabId) return;

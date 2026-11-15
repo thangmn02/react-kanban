@@ -297,3 +297,20 @@ it.each(['ownership-loss'])('flushes actual output when %s revokes eligibility d
     .toMatchObject({bufferMs:0,eligible:false,flush:true});
   await f.sync.stop();
 });
+it('keeps the capture through an in-page route change (YouTube Home, search) and ends it when the page really reloads',async()=>{
+  const f=fixture();try{
+    await f.sync.start(f.session,f.owner,'sub');await vi.waitFor(()=>expect(f.sync.status(f.session).mode).toBe('capture'));
+    const captureId=f.sync.status(f.session).captureId;
+    const alive=vi.fn(async(tabId,documentId)=>tabId===12&&documentId==='media');
+    vi.useFakeTimers();
+    f.sync.tabLoading(f.session.tabId,alive);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(alive).toHaveBeenCalledTimes(3);
+    expect(f.sync.status(f.session).captureId).toBe(captureId);
+    alive.mockResolvedValue(false);
+    f.sync.tabLoading(f.session.tabId,alive);
+    await vi.advanceTimersByTimeAsync(400);
+    vi.useRealTimers();
+    await vi.waitFor(()=>expect(f.sync.status(f.session).captureId).toBeUndefined());
+  }finally{vi.useRealTimers();await f.sync.stop();}
+});

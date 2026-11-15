@@ -330,3 +330,25 @@ describe('video colours', () => {
     page.forEach((value, index) => expect(value).toBeCloseTo(kora[index], 10));
   });
 });
+
+it('never lowers a player\'s generation when a new song starts on the same element', () => {
+  const media = ready(new Audio(), 'blob:first');
+  document.body.append(media);
+  globalThis.__kanbanMusicMedia.entries();
+  const samples = [];
+  const listen = event => samples.push(JSON.parse(event.detail));
+  document.addEventListener('kanban-music-media-clock', listen);
+  const watch = (token, src) => document.dispatchEvent(new CustomEvent('kanban-music-media-watch', { detail: JSON.stringify({ kind: 'watch', index: 0, src, token }) }));
+  try {
+    watch('one', 'blob:first');
+    media.dispatchEvent(new Event('emptied'));
+    const before = samples.filter(s => s.token === 'one').at(-1).clock.generation;
+    media.currentSrc = 'blob:second';
+    watch('two', 'blob:second');
+    const after = samples.filter(s => s.token === 'two').at(-1).clock.generation;
+    expect(before).toBe(1);
+    expect(after).toBeGreaterThan(before);
+    watch('three', 'blob:second');
+    expect(samples.filter(s => s.token === 'three').at(-1).clock.generation).toBe(after);
+  } finally { document.removeEventListener('kanban-music-media-clock', listen); }
+});

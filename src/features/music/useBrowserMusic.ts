@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '../../i18n';
 import { MusicBridgeError, sendMusicRequest, type BrowserMusicSession, type MusicClock, type MusicAction } from './mediaBridge';
 import { useMusicBeatSync } from './useMusicBeatSync';
@@ -48,11 +48,14 @@ export function useBrowserMusic(beatDemand = false) {
   const [busy, setBusy] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [checking, setChecking] = useState(true);
+  // Polls at once when the playing song stops on its own (a new song in the same tab), so its beats return sooner.
+  const pollNow = useRef<() => void>(() => {});
 
   useEffect(() => {
     let cancelled = false;
-    let timeout: ReturnType<typeof setTimeout>;
+    let timeout: ReturnType<typeof setTimeout>, inFlight = false, soon = false;
     const poll = async () => {
+      inFlight = true;
       try {
         const next = await sendMusicRequest('sessions.get');
         if (!cancelled) {
@@ -61,11 +64,15 @@ export function useBrowserMusic(beatDemand = false) {
       } catch (reason) {
         if (!cancelled) { setMusic((current) => ({ ...current, sessions: [], selectedId: '', explicitSelection: false })); setConnected(false); setChecking(false); setError(reason instanceof MusicBridgeError && reason.code === 'not-installed' ? '' : t('music.reconnect')); }
       } finally {
-        if (!cancelled) timeout = setTimeout(poll, 2000);
+        inFlight = false;
+        if (!cancelled) timeout = setTimeout(poll, soon ? 150 : 2000);
+        soon = false;
       }
     };
     const reconnect = () => setAttempt((value) => value + 1);
     window.addEventListener('focus', reconnect);
+    // One loop only: a running poll just schedules its successor sooner.
+    pollNow.current = () => { if (cancelled) return; if (inFlight) { soon = true; return; } clearTimeout(timeout); timeout = setTimeout(poll, 150); };
     void poll();
     return () => { cancelled = true; clearTimeout(timeout); window.removeEventListener('focus', reconnect); };
   }, [attempt, t]);
@@ -78,6 +85,7 @@ export function useBrowserMusic(beatDemand = false) {
     setMusic((current) => {
       const previous = current.sessions.find(item => item.id === sessionId);
       if (!previous || (previous.sampledAt || 0) > clock.sampledAt) return current;
+      if (isPlaying(previous) && clock.paused) queueMicrotask(() => pollNow.current());
       return { ...current,
         explicitSelection: current.explicitSelection && !(current.selectedId === sessionId && isPlaying(previous) && !isPlaying({ ...previous, ...clock })),
         sessions: current.sessions.map(item => item.id === sessionId ? { ...item, ...clock } : item) };

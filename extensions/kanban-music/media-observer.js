@@ -105,6 +105,16 @@
     if (!palette.done && !palette.timer && typeof createImageBitmap === 'function' && typeof OffscreenCanvas === 'function') palette.timer = setInterval(samplePalette, PALETTE_MS);
     return palette.bins ? { bins: palette.bins.map(value => Math.round(value * 1e5) / 1e5), pixels: palette.pixels, done: palette.done } : palette.done ? { done: true } : undefined;
   };
+  // A media element's generation only goes up, across watchers too: Kora keeps the highest generation it has seen for
+  // a player and ignores lower ones. A new song on the same element (same player, new source) starts a new generation,
+  // so its capture is not mistaken for an older one.
+  const generations = new WeakMap();
+  const nextGeneration = (media, src) => {
+    if (!media || typeof media !== 'object') return 0;
+    const known = generations.get(media), value = !known ? 0 : known.src === src ? known.value : known.value + 1;
+    generations.set(media, { src, value });
+    return value;
+  };
   const stop = () => {
     if (!watcher) return;
     clearInterval(watcher.interval);
@@ -122,14 +132,14 @@
     if (message?.kind !== 'watch' || !Number.isInteger(message.index) || typeof message.token !== 'string' || typeof message.src !== 'string') return;
     stop();
     const media = message.index === 2147483647 ? globalThis.__kanbanSpotifyPlayer : entries.get(message.index)?.deref();
-    const state = { media, token: message.token, leaseUntil: Date.now() + 6000, generation: 0, buffering: false,
+    const state = { media, token: message.token, leaseUntil: Date.now() + 6000, generation: nextGeneration(media, message.src), buffering: false,
       events: ['play', 'playing', 'pause', 'waiting', 'seeking', 'seeked', 'ended', 'emptied', 'ratechange', 'volumechange'] };
     state.report = (event) => {
       if (watcher !== state) return;
       if (Date.now() > state.leaseUntil) { stop(); return; }
       if (event?.target === media) {
         cachedFacts = undefined;
-        if (event.type === 'seeking' || event.type === 'emptied') state.generation++;
+        if (event.type === 'seeking' || event.type === 'emptied') { state.generation++; if (media) generations.set(media, { src: message.src, value: state.generation }); }
         if (event.type === 'waiting') state.buffering = true;
         if (event.type === 'playing' || event.type === 'seeked') state.buffering = false;
       }

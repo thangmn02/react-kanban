@@ -2,6 +2,10 @@
 (() => {
 try { if (globalThis.__kanbanMusicClock?.active()) return; globalThis.__kanbanMusicClock?.dispose(); } catch { /* Previous extension context was reloaded. */ }
 let watcher;
+  // A media element's generation only goes up, across watchers too: Kora keeps the highest generation it has seen for
+  // a player and ignores lower ones. A new song on the same element (same player, new source) starts a new generation,
+  // so its capture is not mistaken for an older one.
+const generations = new WeakMap();
 function stopClock() {
   if (!watcher) return;
   clearInterval(watcher.interval);
@@ -65,13 +69,15 @@ const receive = (message, sender, respond) => {
   }
   const media = document.querySelectorAll('audio,video')[message.index];
   if (!media) { respond({ ok: false }); return false; }
-  const state = { token: message.token, source:media.currentSrc||media.srcObject?.id,leaseUntil: Date.now() + 6000, generation: 0, buffering: false,
+  const source = media.currentSrc || media.srcObject?.id, known = generations.get(media);
+  const state = { token: message.token, source,leaseUntil: Date.now() + 6000, generation: !known ? 0 : known.src === source ? known.value : known.value + 1, buffering: false,
     events: ['play', 'playing', 'pause', 'waiting', 'seeking', 'seeked', 'ended', 'emptied', 'ratechange', 'volumechange'] };
   state.report = (event) => {
     if (watcher !== state) return;
     if (Date.now() > state.leaseUntil) { stopClock(); return; }
     if (event?.target === media) {
       if (event.type === 'seeking' || event.type === 'emptied') state.generation++;
+      generations.set(media, { src: state.source, value: state.generation });
       if (event.type === 'waiting') state.buffering = true;
       if (event.type === 'playing' || event.type === 'seeked') state.buffering = false;
     }
