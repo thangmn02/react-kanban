@@ -40,6 +40,7 @@ import { Skeleton } from '../../atoms/skeleton';
 import TaskCoverPicker from '../../task/TaskCoverPicker';
 import { useI18n } from '../../../i18n';
 import { parseSmartTaskInput } from '../../../utils/smartTaskParser';
+import { isSafeLinkUrl } from '../../../utils/safeLinkUrl';
 import TaskBreakdownEditor from '../../../features/today/components/TaskBreakdownEditor';
 import { generateTaskBreakdown } from '../../../services/taskBreakdown.service';
 
@@ -335,16 +336,7 @@ function TaskDialog({
     const nextAttachmentName = formDrafts.attachment.name.trim();
     const nextAttachmentUrl = formDrafts.attachment.url.trim();
 
-    let isValidAttachment = false;
-
-    if (nextAttachmentName && nextAttachmentUrl) {
-      try {
-        new URL(nextAttachmentUrl);
-        isValidAttachment = true;
-      } catch {
-        isValidAttachment = false;
-      }
-    }
+    const isValidAttachment = Boolean(nextAttachmentName) && isSafeLinkUrl(nextAttachmentUrl);
 
     addDraftItem<TaskAttachment>({
       isValid: isValidAttachment,
@@ -449,7 +441,7 @@ function TaskDialog({
         {isEditMode && <div className="border-b border-slate-100 px-4 py-3 sm:px-6" aria-label={t('ux.context')}>
           <p className="break-words text-xs text-slate-500">{[boardTitle, columnTitle].filter(Boolean).join(' · ')}</p>
           {onStartFocus && hasUnsavedChanges && <p id="task-focus-save-hint" className="mt-2 text-xs text-slate-600">{t('ux.savedTaskFocus')}</p>}
-          {Boolean(taskData?.attachments?.length) && <div className="mt-2 flex flex-wrap gap-2">{taskData?.attachments.filter(item => /^https?:\/\//i.test(item.url)).map(item => {
+          {Boolean(taskData?.attachments?.length) && <div className="mt-2 flex flex-wrap gap-2">{taskData?.attachments.filter(item => isSafeLinkUrl(item.url)).map(item => {
             // Documents, designs and boards open beside the task on the web; the desktop app keeps them in the browser.
             const embedUrl = isNativeWidget() ? null : embedUrlFor(item.url);
             const chip = 'inline-flex min-h-9 max-w-full items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-blue-700 focus-visible:outline-2 focus-visible:outline-blue-600';
@@ -848,7 +840,7 @@ function TaskDialog({
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-semibold text-gray-800">{attachment.name}</p>
                             <a
-                              href={attachment.url}
+                              href={isSafeLinkUrl(attachment.url) ? attachment.url : undefined}
                               target="_blank"
                               rel="noreferrer"
                               className="truncate text-xs text-blue-600 hover:text-blue-800"
