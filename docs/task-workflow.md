@@ -51,7 +51,7 @@ The [connected session](../src/features/notes/connected-notes-session.ts) persis
 
 Layout, pins and minimized/expanded state belong to each user. Dragging a grip left/right repeatedly activates Peek; the button provides the same action. Peek stays ephemeral, transparent, inert and pointer-transparent until restored. It never changes resource access. Notes provide shared/recent/pinned/search and owner Trash/Restore views, comments with author/owner editing, and current-member sharing controls. Task notes open above the task editor so its unsaved fields and page remain mounted. Today can create a note, and Focus exposes pinned Notes without replacing the timer owner. Whole-note and selected-text conversion use stable task identities for safe retries; original note content remains available.
 
-See [connected qualification and recovery](connected-qualification.md) for local backup/restore, migration preparation, actual authenticated checks and hosted gates.
+See connected qualification and recovery for local backup/restore, migration preparation, actual authenticated checks and hosted gates.
 
 ## Saved Context and external notes
 

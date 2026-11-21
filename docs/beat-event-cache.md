@@ -6,7 +6,7 @@ Without usable capture, Music reports decorative timing instead of instrument
 detections. Explicit detected silence and paused/stale clocks remain dark.
 Cache delivery itself requires a fresh authoritative media clock.
 
-The explicitly enabled private [local Hybrid Beta](private-acoustic-visual-lab.md#hybrid-beta-in-the-actual-application)
+The explicitly enabled private local Hybrid Beta
 injects an exact-source saved EventTrack client and one owned audio transport
 into this same engine. Only that route exempts the existing local Bass row from
 percussion-cache precedence. Saved Lead revisions participate in its cache
@@ -23,13 +23,13 @@ complete pipeline against prior Kora runs. Conversions and repackaging do not cr
 an independent detector; an ADTOF-dependent pipeline remains labeled as such.
 Reuse valid matching evidence and skip duplicate experiments. Unknown weight
 equivalence stays unresolved instead of being called new technology. The bounded
-[V2 sprint](../plans/261016-1459-beat-grid-v2-sprint/plan.md) records the bounded matrix.
-Its [completed decision](../plans/reports/engineering-261016-1459-beat-grid-v2-sprint.md)
+V2 sprint records the bounded matrix.
+Its completed decision
 is NO-GO for replacement: no evaluated candidate qualifies on natural public-row
 accuracy. Keep the current baseline/fallback and do not admit a new adapter merely
 because native inference is fast or cached model predictions are available.
 
-The [private acoustic and visual listening lab](private-acoustic-visual-lab.md)
+The private acoustic and visual listening lab
 replays three frozen prediction tracks against one exact local audio clock,
 supports blind provisional annotation and separates acoustic, live-pipeline and
 renderer evidence. It does not change the replacement decision or qualify a track.
@@ -40,7 +40,7 @@ detector qualification and intentional-delay consent. Its source flag is off in
 ordinary packages. `node scripts/package-music-extension.mjs --private` writes an
 isolated package and listening guide under ignored `scratch/browser-first-candidate/`.
 It does not update release downloads or the desktop bundle. The standalone
-[private listening harness](../scripts/verify-private-companion.mjs) serves the
+private listening harness serves the
 production bridge, event engine, scheduler, controller and renderer on local
 ports 5173/5174. Its `--serve` mode has no automated consent. Authorized local
 audio selected in the review tab stays in that browser.
