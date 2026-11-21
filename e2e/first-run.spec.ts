@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-// Runs against a server without VITE_LOCAL_SAMPLE: see playwright.first-run.config.ts.
+// Runs against a server without VITE_LOCAL_SAMPLE: see e2e/playwright.first-run.config.ts.
 test('a new local workspace is empty, and the sample is on demand, labeled and removable', async ({ page }) => {
   await page.goto('/home');
   await expect(page.getByRole('heading', { name: 'Start with your first task' })).toBeVisible();

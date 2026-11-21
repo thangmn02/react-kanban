@@ -125,9 +125,14 @@ Thumbs.db
 # =========================================================
 # Private/local documentation
 # =========================================================
-/docs/*
-!/docs/design-system.md
-!/docs/audio-distribution.md
+/docs/private-*.md
+/docs/connected-qualification.md
+
+# Internal plans, reports and journals
+/plans/
+
+# Internal qualification config (runs against scratch/ builds)
+/playwright-integration.config.ts
 
 # =========================================================
 # Third-party source repositories
