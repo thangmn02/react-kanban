@@ -1,583 +1,96 @@
 # Kora
 
-[![React 19](https://img.shields.io/badge/React-19-149eca?logo=react&logoColor=white)](https://react.dev)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Vite 8](https://img.shields.io/badge/Vite-8-646cff?logo=vite&logoColor=white)](https://vite.dev)
-[![Tailwind CSS v4](https://img.shields.io/badge/Tailwind_CSS-v4-06b6d4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
-[![License: MIT](https://img.shields.io/badge/code-MIT-success)](#license)
-[![Supabase](https://img.shields.io/badge/backend-Supabase(optional)-3ecf8e?logo=supabase&logoColor=white)](https://supabase.com)
+A calm, focus-first task manager for individuals and small teams. Plan your day,
+keep work on a drag-and-drop board, take notes and run focus sessions, in English
+or Vietnamese.
 
-A calm, focus-first task manager for **individuals and small teams**. Plan your
-day, organize work on a drag-and-drop Kora board, run Pomodoro focus sessions,
-and collaborate in shared workspaces — with a fully bilingual
-(English / Vietnamese) interface.
+**Website:** <https://koraspace.online>
 
-Kora is built to answer one question well: *what should I focus on
-right now?* Today planning surfaces a small set of recommended focus tasks,
-grouped by due/overdue context, while the board stays available for the wider
-picture. Arcana is currently hidden; its retained implementation is not a
-user-facing navigation option.
+## Features
 
-The web header offers **Download Kora** for Windows. The frameless desktop
-Dock and Tasks share one controller; only Dock stays on top. Install the
-update-enabled build once, then use **Update** inside Kora for later signed
-updates. See [Windows setup and updates](src-tauri/README.md).
+- **Boards**: drag-and-drop lists and cards with priorities, due dates and a
+  rich-text (TipTap) task editor. Completed tasks move to the board's Done list.
+- **Today**: a short list of tasks to focus on now, grouped by due and overdue.
+- **Notes**: Quick Notes with history, import/export and links to tasks.
+- **Focus**: a focus dock with a Pomodoro timer, your task list and music. The
+  optional [Kora Music Companion](extensions/kanban-music/README.md) browser
+  extension shows what's playing and drives the Beat Grid visuals.
+- **Workspaces**: with Supabase you get sign-in, shared workspaces, invites,
+  realtime sync and read-only share links.
+- **Desktop app**: a Windows app (Tauri 2) with a frameless dock, native notes
+  and signed in-app updates.
 
-> **Two ways to run it:** A no-backend **local mode** (mock auth + persistent
-> `localStorage`) for exploring and demoing, and a full **Supabase mode** with
-> auth, workspaces, invites, realtime sync, and Row-Level Security.
+## Download
 
----
+- **Web:** <https://koraspace.online>
+- **Windows:** choose **Download Kora** on the website, or get
+  <https://koraspace.online/downloads/Kora-setup.exe>. After you install it once,
+  later versions arrive through **Update** inside the app.
 
-## Table of contents
+## Run it locally
 
-Maintainers: [Kora design-system guide](docs/design-system.md) covers the pinned Astryx tooling, theme and shared controls.
-
-- [Feature matrix — Local vs Supabase](#feature-matrix--local-vs-supabase)
-- [Quick start — local mode](#quick-start--local-mode)
-- [Full Supabase setup (from a clean clone)](#full-supabase-setup-from-a-clean-clone)
-- [Tech stack](#tech-stack)
-- [Architecture and data model](#architecture-and-data-model)
-- [Testing and quality commands](#testing-and-quality-commands)
-- [Deployment](#deployment)
-- [Security / RLS model](#security--rls-model)
-- [Internationalization](#internationalization)
-- [Arcana mini-game](#arcana-mini-game)
-- [Design Lab](#design-lab)
-- [Accessibility & motion](#accessibility--motion)
-- [Known limitations and project status](#known-limitations-and-project-status)
-- [License](#license)
-
----
-
-## Feature matrix — Local vs Supabase
-
-| Feature | Local mode (`mock`) | Supabase mode (`supabase`) |
-| --- | :---: | :---: |
-| Kora board (drag-and-drop columns/cards, priorities, due dates, Tiptap rich-text) | ✅ | ✅ |
-| Today daily planning + focus task suggestions | ✅ | ✅ |
-| Home overview dashboard | ✅ | ✅ |
-| Focus dock + Pomodoro timer | ✅ | ✅ |
-| Centered identity profile, Settings and layered task shell | ✅ | ✅ |
-| Quick Notes, history, selected import/export and task links | ✅ (IndexedDB) | ✅ (qualified Notes schema required) |
-| Task comments and Saved Context references | ✅ (device scope) | ✅ (current resource permissions) |
-| Private note images and sharing | Device images | ✅ (private-image backend required) |
-| Command palette (keyboard navigation) | ✅ | ✅ |
-| Arcana tarot mini-game | ✅ | ✅ |
-| Bilingual UI (English / Vietnamese) | ✅ | ✅ |
-| **Persistent storage** | `localStorage` | PostgreSQL |
-| Real user authentication | ❌ (mock user) | ✅ (Supabase Auth) |
-| Multi-workspace organization | ❌ (single local workspace) | ✅ |
-| Member invites & workspace membership | ❌ | ✅ |
-| Realtime sync across devices/sessions | ❌ | ✅ (Supabase Realtime) |
-| Task cover image uploads | ❌ | ✅ (Supabase Storage bucket) |
-| Row-Level Security / tenant isolation | n/a | ✅ |
-| Works fully offline | ✅ | ❌ (needs Supabase) |
-
-Local mode is the easiest way to try the product end-to-end; Supabase mode is the
-collaborative, multi-user configuration.
-
-Notes capture is available through the header, task drawer and Focus as well as
-the manager. Windows adds native external notes with topmost, Ghost, bubble and
-durable recovery. Connected Notes is enabled with `VITE_ENABLE_NOTES_PREVIEW=true`
-only after qualifying the target schema. Native image uploads also require the
-approved HTTPS `VITE_NOTE_IMAGES_URL`; server credentials stay in the image
-backend. See [task workflows](docs/task-workflow.md) and
-[release readiness](plans/reports/kora-final-production-readiness.md) for the
-current qualification limits. A prepared release candidate is not a deployed
-production update.
-
-In Supabase mode, web and desktop must select the same workspace to show the
-same boards, cards and completed focus-session history. The workspace selector
-numbers duplicate names consistently so separate workspaces are distinguishable.
-The selected workspace, pinned focus tasks, timer settings and current Pomodoro
-cycle remain local to each browser or desktop app; they are not cloud-synced.
-
----
-
-## Quick start — local mode
-
-Run the whole app in your browser, no backend required. Data persists to
-`localStorage`, scoped per mock user/workspace.
-
-**Prerequisites:** Node.js 22.12+ and npm. CI uses Node 22, including its native WebSocket support.
+You need Node.js 22.12 or newer and npm.
 
 ```bash
-# 1. Install dependencies
 npm install
-
-# 2. Configure environment for local demo mode
-cp .env.example .env
-# .env contents (mock = no Supabase needed):
-#   VITE_AUTH_MODE=mock
-#   VITE_SUPABASE_URL=
-#   VITE_SUPABASE_ANON_KEY=
-
-# 3. Start the dev server
-npm run dev
+cp .env.example .env    # VITE_AUTH_MODE=mock is already set
+npm run dev             # http://localhost:5173
 ```
 
-The dev server prints a local URL (default: <http://localhost:5173>). Open it
-and you're ready to plan — your boards, tasks, and focus stats survive page
-refreshes because they're written to `localStorage`.
+With `VITE_AUTH_MODE=mock` there is no backend. You sign in as a mock user and
+data is saved in the browser. Set `VITE_LOCAL_SAMPLE=true` to start with a
+sample board. `.env.example` lists every other variable.
 
-> The only required variable for local mode is `VITE_AUTH_MODE=mock`. The
-> Supabase URL/key can be left blank.
-
----
-
-## Full Supabase setup (from a clean clone)
-
-For collaborative mode with auth, workspaces, invites, realtime sync, and RLS,
-run the full Supabase stack. Migrations are tracked in `supabase/migrations/`
-and applied by `supabase db reset`.
-
-> **Verified squashed baseline.** The active migration was dumped from the
-> authoritative hosted schema and verified with Supabase CLI `2.109.1` using
-> `supabase start`, reset from an empty local database, strict database lint,
-> and a 33-case two-user/two-workspace RLS suite. The former transitional
-> migrations remain in `supabase/migrations_archive/` for audit history.
-
-**Prerequisites:** the [Supabase CLI](https://supabase.com/docs/guides/cli)
-(`supabase` on your PATH) and Docker (the CLI runs a local stack in containers).
+**Supabase mode.** Install the [Supabase CLI](https://supabase.com/docs/guides/cli)
+and Docker, then:
 
 ```bash
-# 1. Install JS dependencies
-npm install
-
-# 2. Start the local Supabase stack (API, Postgres, Realtime, Studio, Storage)
 supabase start
-
-# 3. Apply all tracked migrations to a clean database
-#    (creates tables, RLS policies, RPCs, the cover-image storage bucket, …)
-supabase db reset
-
-# 4. Configure environment for Supabase mode
-cp .env.example .env
+supabase db reset       # applies supabase/migrations
 ```
 
-Edit `.env` with the local Supabase credentials printed by `supabase start`
-(`supabase status` shows them again any time):
+In `.env`, set `VITE_AUTH_MODE=supabase` and fill in `VITE_SUPABASE_URL` and
+`VITE_SUPABASE_ANON_KEY` from `supabase status`. The row-level security model is
+described in [docs/security-rls.md](docs/security-rls.md).
 
-```dotenv
-# Local Supabase (defaults shown — confirm with `supabase status`)
-VITE_SUPABASE_URL=http://127.0.0.1:54321
-VITE_SUPABASE_ANON_KEY=<anon key from `supabase status`>
-VITE_AUTH_MODE=supabase
-```
+**Desktop app.** You need Rust (MSVC), the Visual Studio C++ Build Tools and
+WebView2. Run `npm run tauri dev`. See [src-tauri/README.md](src-tauri/README.md).
 
-> `VITE_AUTH_MODE=supabase` requires valid `VITE_SUPABASE_URL` and
-> `VITE_SUPABASE_ANON_KEY` — the app throws at startup if they're missing or
-> empty. (See `src/lib/supabase.ts`.)
-
-```bash
-# 5. Start the dev server
-npm run dev
-```
-
-Local Supabase services (from `supabase/config.toml`, `project_id = "react-kanban"`):
-
-| Service      | Port  | Notes |
-| ---          | :---: | --- |
-| API (PostgREST) | 54321 | `public` + `app_private` schemas |
-| Postgres     | 54322 | major version 15 |
-| Studio       | 54323 | local admin UI |
-| Mailpit      | 54324 | test email (auth invites) |
-| Storage      | 54325 | task cover image bucket |
-
-To target a **remote** Supabase project, set `VITE_SUPABASE_URL` and
-`VITE_SUPABASE_ANON_KEY` to its values. Do not push the squashed baseline into
-the already-provisioned authoritative project: its migration-history alignment
-is intentionally deferred to a separately reviewed operation with verified
-backups. See `supabase/schema/README.md`.
-
-Signup confirmation links explicitly return to `https://koraspace.online/home`,
-including signup from Windows. In the hosted Supabase Auth URL Configuration,
-set Site URL to `https://koraspace.online` and allow that exact `/home` URL.
-Keep local development entries separate; `supabase/config.toml` configures the
-local stack and must not be pushed wholesale over production auth settings.
-Existing confirmed accounts can sign in normally without registering again.
-
----
-
----
-
-## Tech stack
-
-| Area | Choice |
-|---|---|
-| Framework | React 19 + TypeScript 5.9 |
-| Build tool | Vite 8 |
-| Styling | Tailwind CSS v4 (via `@tailwindcss/vite`) |
-| Drag & drop | dnd-kit |
-| Forms & validation | React Hook Form + Yup |
-| Rich text | Tiptap |
-| Animation | Framer Motion |
-| Backend / auth | Supabase (optional — local mock mode runs without it) |
-| Notifications | React Toastify |
-| Dates | date-fns |
-| Testing | Vitest 4 + `@vitest/coverage-v8` (jsdom) |
-| Linting | ESLint 9 (typescript-eslint) |
-
----
-
-## Architecture and data model
-
-### `src/` structure
-
-```
-src/
-  components/          UI organized by area:
-    atoms/               small primitives (Button, Badge, skeletons…)
-    molecules/           InputField, TextAreaField, dialogs
-    organisms/           KanbanBoard, HomeDashboard, CalendarBoardView,
-                         TableView, QuickSearch, dialogs & toasts
-    board/ today/ home/ focus/ task/ workspace/ invite/
-    auth/ onboarding/ command/ layout/ error/
-  features/            self-contained feature modules
-    arcana/              the tarot mini-game (cards, packs, reading engine)
-    today/               daily planning rituals + suggestions
-  infrastructure/
-    local/              LocalBoardStore — localStorage-backed repository
-  services/            data-access layer (one service per domain)
-    board.service.ts    workspace.service.ts   task.service.ts
-    list.service.ts     label.service.ts      checklist.service.ts
-    activity.service.ts focusSession.service.ts  invite.service.ts
-    home.service.ts     today.service.ts      taskCoverUpload.service.ts
-  hooks/               reusable hooks (task ops, Pomodoro, focus, realtime…)
-  contexts/ providers/ app-wide state (Auth, I18n, AstryxTheme)
-  i18n/                English / Vietnamese translations + useI18n()
-  design-lab/         dev-only UI preview sandbox (gated, stripped in prod)
-  shared/             cross-cutting helpers (e.g. storage adapter)
-  lib/ utils/ types/ constants/  shared helpers and TypeScript types
-  data/               seed data, board templates, holidays, assignees
-public/
-  arcana/             card/pack art atlases + generated reading data (runtime)
-docs/
-  sql/                reference SQL + RLS verification notes (NOT tracked — local only)
-  *.md                design/integration/handoff notes
-supabase/
-  migrations/         active verified squashed baseline
-  migrations_archive/ pre-squash transitional history (not applied by reset)
-  schema/              authoritative schema-only snapshots and workflow
-  tests/database/      pgTAP multi-user/workspace RLS isolation tests
-  config.toml         local Supabase project config
-scripts/
-  pull_hf_tarot.py    regenerates the local tarot reading corpus
-```
-
-### Services layer & local fallback
-
-Each `src/services/*.service.ts` is a thin domain module that branches on the
-active auth mode. When `import.meta.env.VITE_AUTH_MODE !== 'supabase'` (or no
-Supabase client is configured), every call falls back to the
-**`LocalBoardStore`** (`src/infrastructure/local/localBoardStore.ts`), a
-persistent, `localStorage`-backed repository.
-
-- `src/lib/supabase.ts` exports `authMode` (`'mock' | 'supabase'`) and a
-  `requireSupabaseClient()` guard used by Supabase-side code paths.
-- `LocalBoardStore` is the single source of truth for all mock-mode board
-  data. On first access it seeds itself from `src/data.ts` (converted to the
-  normalized row shape used elsewhere), and every read/write goes through the
-  store so mutations survive page refreshes.
-- Data is scoped under a typed storage key
-  (`kanban:mock-user:local-mock-workspace:board_store:v1`) so it's isolated
-  from any real Supabase user's cached data.
-
-### Data model (Supabase)
-
-The normalized core is `boards → lists → tasks`, plus supporting tables. Key
-tables and their workspace-scoped RLS boundaries (see `supabase/migrations/`):
-
-- `boards`, `lists`, `tasks` — read: workspace members; write: workspace editors
-- `workspace_invites` — read: workspace managers or the invited JWT email;
-  write: workspace managers
-- `task_activities`, `task_checklist_items`, `task_labels`, `task_label_links`
-- `focus_sessions`, `holidays`
-- RPCs: `create_workspace_with_owner(...)`, `update_task_positions(jsonb)` for
-  atomic, transaction-validated reordering
-- Storage bucket: task cover images (created by the squashed baseline)
-
-`supabase db reset` applies the active squashed baseline. The archived
-transitional files are retained for review but deliberately live outside the
-active migration directory.
-
-### Bundle & code splitting
-
-The production bundle is code-split: heavy views (`CalendarBoardView`,
-`TableView`, `HomeDashboard`, `TodayPage`, the Arcana dialogs) are loaded with
-`React.lazy`, and `vite.config.ts` defines manual vendor chunks
-(`react-vendor`, `supabase`, `dnd`, `tiptap`, `framer`).
-
-
----
-
-## Routes
-
-Navigation is URL-addressable. The browser URL is the single source of truth
-(`useViewRouting` is `react-router`-backed), so back/forward and deep links work.
-
-| Route | Surface |
-| --- | --- |
-| `/home` | Home overview dashboard |
-| `/today` | Daily planning + focus task suggestions |
-| `/board` | Kora board (default sub-view) |
-| `/calendar` | Calendar view of the current board |
-| `/auth` | Sign-in / sign-up |
-| `/contact` | Public private-message contact form |
-| `/onboarding` | First-run workspace + board setup |
-| `/invite/:token` | Accept a workspace invite |
-| anything else | Not-found page |
-
-> `/` renders the Home dashboard (same surface as `/home`). The focus dock,
-> command palette, task dialog, and Arcana dialogs are app-level chrome shared
-> across authenticated routes.
-
----
-
-## Testing and quality commands
+## Tests and checks
 
 | Command | What it does |
 | --- | --- |
-| `npm run dev` | Start the Vite dev server |
-| `npm test` | Run the Vitest suite once (`vitest run`) |
-| `npm run test:watch` | Run Vitest in watch mode |
-| `npm run test:coverage` | Run tests with V8 coverage (`vitest run --coverage`) |
-| `npm run lint` | Lint with ESLint 9 (`eslint .`) |
-| `npm run build` | Type-check (`tsc -b`) then build (`vite build`) |
-| `npm run typecheck` | Type-check only (`tsc -b`, project references) |
-| `npm run test:ci` | Run tests with coverage (CI gate) |
-| `npm run bundle-size` | Enforce the 1 MB main-entry bundle budget |
-| `npm run e2e` | Playwright E2E (local mock mode) |
-| `npm run quality` | lint + typecheck + test:ci + build + bundle-size |
-| `npm run preview` | Preview the production build locally |
+| `npm test` | Vitest unit and component tests (jsdom) |
+| `npm run lint` | ESLint |
+| `npm run typecheck` | TypeScript project check |
+| `npm run copy:check` | Flags UI text that bypasses the English/Vietnamese translations |
+| `npm run build` | Type-check and production build |
+| `npm run e2e` | Playwright end-to-end tests in mock mode (run `npx playwright install chromium` first) |
+| `npm run quality` | Lint, copy check, typecheck, tests with coverage, build and bundle-size budget |
 
-Tests run in jsdom via Vitest. Coverage is collected through
-`@vitest/coverage-v8`.
+Two more Playwright suites have their own configs:
+`npx playwright test --config e2e/playwright.first-run.config.ts` and
+`npx playwright test --config e2e/playwright.public-auth.config.ts`.
 
----
+## Project layout
 
-## Deployment
+| Path | Contents |
+| --- | --- |
+| `src/` | React 19 app: `features/` (board, today, notes, focus, music, …), `pages/`, `services/`, `i18n/` |
+| `server/` | Vite dev-server plugins and shared server code |
+| `netlify/functions/` | Serverless API: task breakdown, share feed, note images, beat events |
+| `supabase/` | Database migrations, tests and the contact Edge Function |
+| `src-tauri/` | Windows desktop app (Rust) |
+| `extensions/kanban-music/` | Kora Music Companion browser extension |
+| `e2e/` | Playwright tests |
+| `scripts/` | Build, packaging, release and maintenance scripts |
+| `docs/` | Design system and feature notes |
 
-### Public product identity
-
-`/about/`, `/privacy/` and `/terms/` are static public documents readable without
-signing in or JavaScript. About links to public Home at `/` and identifies Kora
-as an Early Access product. The Home layout is unchanged. Canonical URLs, sharing
-metadata and structured data use `https://koraspace.online` and the supplied public
-contact address `contact@koraspace.online`. See
-[public identity maintenance](docs/public-identity.md) for the owning files.
-
-Home (`/` and the existing `/home` alias) and `/contact` are public. Tasks,
-Today, Music, Beat Grid, Focus and workspace routes require sign-in. Protected
-destinations survive redirects and page refreshes in a validated `returnTo`
-query parameter, including first-workspace setup. Run the connected-auth browser
-checks with `pnpm exec playwright test --config playwright.public-auth.config.ts`.
-
-### Contact form
-
-The Contact tab uses a Supabase Edge Function, private message storage, Cloudflare
-Turnstile, a honeypot and a persistent three-message-per-IP hourly limit. Resend
-sends notifications to a server-configured owner inbox. Setup, sender verification,
-backups and activation are documented in [Contact setup](docs/contact-setup.md).
-The frontend also needs `VITE_TURNSTILE_SITE_KEY` at build time.
-Contact shows the running Kora version in its small footer, sourced at build
-time from `src-tauri/tauri.conf.json` for both web and Windows.
-
-### AI task planning (Gemini)
-
-The task drawer can turn a new task or mission into three editable checklist steps.
-Home → Plan my day supports reordering/removing suggested tasks, AI step planning,
-and saving a task's steps before starting Focus with the first step prefilled.
-Suggestions are never saved automatically, and appending them preserves existing
-checklist items and their completion state.
-
-For local development, put `GEMINI_API_KEY` in `.env` and restart `npm run dev`.
-`GEMINI_MODEL` optionally overrides the default `gemini-2.5-flash` model.
-The Vite server reads the key; it is never included in client JavaScript.
-Local mock AI requests are accepted only on loopback hosts with a matching origin.
-
-On Netlify, set `GEMINI_API_KEY` (Functions scope), `VITE_SUPABASE_URL`, and
-`VITE_SUPABASE_ANON_KEY` in the site's environment and use `VITE_AUTH_MODE=supabase`.
-Deploy the included `netlify/functions/task-breakdown.mts` and redirects together.
-Local `.env` files are ignored by Git and do not configure the hosted function.
-Other static hosts need an equivalent server endpoint at `/api/task-breakdown`.
-The production endpoint requires a valid Supabase session and checks workspace/task
-access with that user's RLS token; it does not accept unauthenticated demo calls.
-
-The selected task's title, notes, labels, due date, board/column names, and up to
-30 checklist items are sent to Gemini only after the user presses the AI button.
-AI input is capped at 200 title characters and 2,000 note characters (the saved
-task itself is not shortened). The server prompt requests concrete actions under
-30 minutes, in the title's language, and asks for missing facts instead of
-inventing them. Task fields are untrusted data, separate from fixed instructions.
-Responses must contain exactly three distinct plain-text steps of at most 200
-characters, without code fences or extra keys; invalid output is rejected.
-The endpoint has a 25-second upstream timeout and a
-per-instance limit of five requests per user per minute. Configure provider quotas
-for a project-wide spending limit; an in-memory limiter does not span server instances.
-Unit tests mock provider calls and never use the real key.
-
-API reference: [Gemini structured output](https://ai.google.dev/gemini-api/docs/structured-output).
-
-The repo ships with a `netlify.toml` containing a single SPA fallback redirect
-so client-side routing works on Netlify:
-
-```toml
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-  force = false
-```
-
-**Build command:** `npm run build`
-**Publish directory:** `dist`
-
-### Environment variables for the deployed build
-
-Set these in your hosting provider's environment (Netlify → Site settings →
-Environment variables). For the full Supabase deployment:
-
-```dotenv
-VITE_SUPABASE_URL=<your hosted Supabase project URL>
-VITE_SUPABASE_ANON_KEY=<your Supabase anon/public key>
-VITE_AUTH_MODE=supabase
-```
-
-For a deploy that runs in local/demo mode (no backend), use:
-
-```dotenv
-VITE_AUTH_MODE=mock
-```
-
-> All variables are Vite build-time (`VITE_` prefix) — they're inlined into the
-> bundle at build time, so they must be present during the build step, not just
-> at runtime.
-
-For a new hosted project, review the baseline and backup plan before applying
-it. Do not push it to the current authoritative hosted project until its empty
-migration history is aligned in a separate reviewed operation.
-
----
-
-## Security / RLS model
-
-Supabase's anon key is public in the browser, so client-side filters are **not**
-an access-control boundary. Tenant isolation is enforced by database
-**Row-Level Security** with **workspace-scoped** policies.
-
-The full checklist and verification queries live in
-[**SECURITY_RLS.md**](SECURITY_RLS.md). In summary:
-
-- RLS is enabled on `boards`, `lists`, `tasks`, `workspace_invites` (and
-  related tables); none of these has a permissive `USING (true)` /
-  `WITH CHECK (true)` policy.
-- Policies reference the helper functions `is_workspace_member`,
-  `can_edit_workspace`, and `can_manage_workspace_members` so access is gated
-  on workspace membership/role rather than identity alone.
-- Task reordering goes through the `update_task_positions(jsonb)` RPC so the
-  database validates all task/list/workspace relationships and applies the
-  reorder in a single transaction.
-- See `supabase/tests/database/rls_isolation.test.sql` for executable pgTAP
-  isolation coverage and `supabase/migrations/` for the active policies.
-
-
----
-
-## Internationalization
-
-The interface is available in **English** and **Vietnamese**. Strings live in
-`src/i18n/translations/` (`en.ts` and `vi.ts`) and are resolved through a small
-`useI18n()` hook. The selected language is persisted across sessions and
-switchable in-app.
-
----
-
-## Arcana mini-game
-
-Arcana is a self-contained, offline reward feature:
-
-- A **78-card catalog** (22 Major + 56 Minor Arcana) rendered from pixel-art
-  sprite atlases.
-- A **deterministic** pack-opening draw: pack type → rarity → foil finish →
-  orientation → three-card spread (reproducible from a seed).
-- A **card-specific reading engine** that composes a reflection from the actual
-  drawn cards, their positions, orientation, and the chosen topic/question — in
-  the active language.
-- Optional anchoring to a local tarot reading corpus.
-
-The reading corpus JSON under `public/arcana/data/` is generated from a tarot
-dataset and committed as a runtime asset. `scripts/pull_hf_tarot.py` documents
-the local preprocessing path: it reads `public/tarot_readings.parquet` when
-present, or pulls `barissglc/tarot` from Hugging Face during regeneration. The
-browser runtime only fetches the static JSON under `public/arcana/data/`.
-
----
-
-## Design Lab
-
-`src/design-lab/` is a development-only preview sandbox for UI exploration. It
-is gated behind dev builds (or an explicit `VITE_ENABLE_DESIGN_LAB="true"`
-opt-in) and is unreachable at runtime in a normal production build — a disabled
-`/design-lab/*` visit falls through to the app (which shows NotFound).
-
-> Note: the lab is `React.lazy`-imported and gated, but the build may still emit
-> a small `DesignLab` chunk. It is not executed unless the opt-in/env enables
-> the lab; do **not** assume the chunk is fully stripped from the bundle
-> without verifying the production build output for your configuration.
-
-```dotenv
-# opt in for a production build (rarely needed):
-VITE_ENABLE_DESIGN_LAB=true
-```
-
----
-
-## Accessibility & motion
-
-- [Task workflow and interaction rules](docs/task-workflow.md) cover contextual details, completion, keyboard dragging, retained view state and motion ownership.
-- Interactive elements expose clear focus states.
-- Decorative animation honors the OS-level "Reduce Motion" setting.
-- An offline banner and error boundaries keep the app usable under failures.
-
----
-
-## Known limitations and project status
-
-- **Local mode is a persistent demo mode.** It runs without any backend, stores
-  data in `localStorage` (scoped per mock user/workspace), and does **not**
-  support real authentication, multi-workspace collaboration, invites,
-  realtime sync, or cover-image uploads. It's ideal for evaluation and demos
-  but is not a multi-user deployment.
-- **Supabase mode requires the full setup.** You must run the local Supabase
-  stack (or point at a hosted project) and apply all migrations; without the
-  database, RLS policies, and storage bucket, collaborative features won't
-  function.
-- **Hosted migration history is not aligned yet.** Empty local reset, strict
-  lint, schema comparison, and multi-user RLS tests are now reproducible, but
-  the authoritative hosted project's migration-history table is still empty.
-  No `migration repair` or baseline push has been run; that remains a backed-up,
-  separately reviewed production operation.
-- Arcana card/pack art is derived from GPL-3.0 third-party assets — review
-  those obligations before any public/commercial release (see [License](#license)
-  and `src/features/arcana/ATTRIBUTION.md`).
-- The project is actively developed; expect rough edges and breaking changes
-  to the schema/UI. Not production-hardened.
-
----
+Contributors: the UI uses the Astryx design system. Read
+[docs/design-system.md](docs/design-system.md) before adding controls.
 
 ## License
 
-- **Project code** is licensed under the **MIT License** — see
-  [`LICENSE`](LICENSE).
-- **Arcana card/pack art** under `public/arcana/atlas/` is derived from the
-  **DX-Tarots (Deluxe Consumables)** Balatro mod by JeffVi, licensed under
-  **GPL-3.0**. Bundling this art carries GPL obligations, and the underlying
-  card imagery may itself derive from Balatro. Verify license compatibility and
-  asset provenance before any public/commercial release; if the obligations are
-  unacceptable, replace `public/arcana/atlas/*` with original art (the rest of
-  the feature is asset-path driven and will keep working). See
-  [`src/features/arcana/ATTRIBUTION.md`](src/features/arcana/ATTRIBUTION.md)
-  for the full attribution and the Hugging Face `barissglc/tarot` corpus
-  notes.
+The code is under the [MIT License](LICENSE). Some bundled assets carry their own
+licenses: the tarot art and dataset are listed in [NOTICE](NOTICE), and the
+hi-hat model's terms are in [third-party/cnn-hihat](third-party/cnn-hihat).

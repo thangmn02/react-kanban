@@ -18,7 +18,7 @@ input phase/context differences from downstream event loss. Renderer-only
 generated events are explicitly excluded from recognition evidence.
 
 The generated `ar-listening-guide.html` gives exact source/control steps.
-The [discrepancy report](../../plans/reports/engineering-261016-0447-hat-playback-discrepancy.md)
+The discrepancy report
 keeps recognition, CPU-load robustness, perceptual acceptance and physical
 synchronization gates separate. A bounded load can expire/reacquire capture
 and revoke typed buffering; no indefinite delay or qualification is implied.
@@ -45,7 +45,7 @@ actual-browser verifier checks classifier/version identity, preview mode,
 output delay and viewport-visible percussion within the selected passage.
 DOM visibility does not establish physical timing or auditory acceptance.
 
-See the [focused investigation report](../../plans/reports/engineering-261016-0215-xo-percussion-recovery.md)
+See the focused investigation report
 for acoustic controls, exact source identities, delivery losses and the
 BLOCKED independent natural-accuracy gate. Provisional human marks never
 qualify that gate.
@@ -80,7 +80,7 @@ Fault and lifecycle tests cover post-ready failure, stalled fetch/worklet/worker
 silent progressing inference, bounded retries, late callbacks, thirty handoffs,
 unresponsive stop, delayed old clock stops and pane-demand changes. Final
 release results and user acceptance limits are recorded in
-[the release report](../../plans/reports/validation-261013-1920-beat-grid-release.md).
+the release report.
 
 The versioned sections below are historical measurements. Their older five-row,
 Spleeter and delayed-playback behavior does not describe this release.

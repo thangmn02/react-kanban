@@ -94,7 +94,7 @@ detectors continue unchanged. Original audio remains immediate.
 Pause/seek/source changes clear stale scheduled events. Previously downloaded
 model data is left inert rather than deleted from user profiles. See the
 [cache contract](../docs/beat-event-cache.md) and current
-[quality report](../plans/reports/diagnosis-261007-1024-five-row-quality.md).
+quality report.
 
 ## Development and distribution
 

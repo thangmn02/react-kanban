@@ -275,7 +275,7 @@ be reconstructed. Collect during the failure before changing source or closing
 the dock.
 
 The initial map and verified failure points are in the
-[Phase 0 report](../../plans/reports/diagnosis-261006-1534-beat-telemetry.md).
+Phase 0 report.
 
 ## Beat Grid recovery
 
@@ -308,7 +308,7 @@ returning audio or resumed delivery after a miss. `delivery-coalesced` and
 `delivery-late` identify transport recovery. No replacement semantic events are
 fabricated.
 
-See the [recovery report](../../plans/reports/diagnosis-261006-1659-beat-recovery.md)
+See the recovery report
 for tests and browser-validation limits.
 
 ### Private live timing investigation
@@ -342,7 +342,7 @@ separates Bass deadlines from learned percussion delay, and preserves missing
 measurements instead of treating them as zero. These tools do not measure
 physical speaker-to-pixel timing or acoustic recognition accuracy.
 
-See the [provider live report](../../plans/reports/engineering-261019-0549-provider-live-upgrade.md)
+See the provider live report
 for current observed support, repeated measurements and remaining gates.
 
 `scripts/analyze-percussion-latency-floor.mjs` audits the frozen decision path
@@ -350,7 +350,7 @@ against saved activation streams and optional `--delivery=<trace.json>` joins.
 It preserves unknown batch phase as a range and separates input age from output
 clock estimates. `scripts/verify-beat-runtime.mjs` accepts an optional
 `KORA_BEAT_PROOF_RESULT` JSON basename to retain independent proof receipts.
-The [latency checkpoint](../../plans/reports/engineering-261019-1101-low-latency-semantic.md)
+The latency checkpoint
 records the current structural floor, rapid-control failures and required
 architecture review. Neither tool qualifies physical synchronization.
 
@@ -369,8 +369,8 @@ Reload the unpacked private extension and refresh Kora plus the source tab after
 updating. Use the existing private server at `http://127.0.0.1:1420/music`
 (`node scripts/serve-hybrid-beta.mjs` if stopped). Live comparison requires no
 calibration or intentional audio delay. The private package contains its
-standalone guide; the [comparison report](../../plans/reports/engineering-261019-1717-early-percussion-decisions.md)
-and [Vietnamese listening guide](../../plans/261019-1101-low-latency-semantic/listening-guide-l1-vi.md)
+standalone guide; the comparison report
+and Vietnamese listening guide
 record measured benefits, worse tails and remaining acceptance limits.
 L1 is experimental and is not offline H0 or a physical synchronization pass.
 
