@@ -132,6 +132,10 @@ src/features/music/MusicPlayer.tsx	· Path:
 src/features/music/MusicPlayer.tsx	· Playback:
 src/features/music/MusicPlayer.tsx	· Snare / Clap:
 src/features/music/MusicPlayer.tsx	· Snare:
+src/features/music/dock-demo.ts	A track without cover art, with a title long enough to wrap
+src/features/music/dock-demo.ts	Fern Canopy
+src/features/music/dock-demo.ts	Night Drive
+src/features/music/dock-demo.ts	Sunrise Loop
 src/features/music/event-track.ts	Invalid response bound
 src/features/music/event-track.ts	Missing EventTrack body
 src/features/music/event-track.ts	Oversized EventTrack
