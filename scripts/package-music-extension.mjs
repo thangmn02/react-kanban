@@ -180,7 +180,7 @@ if(privateCandidate) {
   if(hatCandidate){value.name+=hatCandidate==='A'?' Hat Baseline A':' Hat Visual Recovery R';value.version_name=value.version+` hat-${hatCandidate} UNVERIFIED DETECTOR PREVIEW`;}
   manifest.bytes=Buffer.from(JSON.stringify(value,null,2)+'\n');
 }
-for (const name of ['percussion-capability.js', 'percussion-classifier.js', 'causal-percussion-classifier.js', 'percussion-features.js', 'percussion-worklet.js',
+for (const name of ['percussion-capability.js', 'percussion-classifier.js', 'snare-rescue.js', 'causal-percussion-classifier.js', 'percussion-features.js', 'percussion-worklet.js',
   'percussion-worker.js', 'percussion-runtime.js', 'lead-audio-authorization.js', 'lead-audio-tap.js', 'lead-audio-worklet.js']) files.push({ name, bytes: await readFile(join(extension, name)) });
 if(privateCandidate&&!xoCandidate&&!hatCandidate)files.push({name:'early-percussion-classifier.js',bytes:await readFile(join(extension,'early-percussion-classifier.js'))});
 else {
