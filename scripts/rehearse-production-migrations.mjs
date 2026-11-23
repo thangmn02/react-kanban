@@ -58,7 +58,7 @@ await withProductionClone({manifestFile:arg('manifest'),output:arg('output')},as
  }transaction+='commit;';
  await writeFile(join(output,'reconciliation.sql'),transaction);
  sql(transaction);
- const afterRows=JSON.parse(sql(rowQuery));verifyPreservedRows(beforeRows,afterRows,{'public.tasks':['repeat_interval']});
+ const afterRows=JSON.parse(sql(rowQuery));verifyPreservedRows(beforeRows,afterRows,{'public.tasks':['repeat_interval'],'public.notes':['archived_at']});
  const legacyCompatibility={preservedContracts:verifyLegacySchema(legacyBefore,legacySchemaSnapshot(sql)),writes:exerciseLegacyTaskWrites(sql),scope:'Existing SQL/RLS and 0.1.31 task request shapes; not an installed-binary compatibility claim.'};
  await writeFile(join(output,'legacy-compatibility.json'),JSON.stringify(legacyCompatibility,null,2));
  const afterHistory=JSON.parse(sql("select json_agg(jsonb_build_object('version',version,'name',name,'statements',statements) order by version) from supabase_migrations.schema_migrations"));
