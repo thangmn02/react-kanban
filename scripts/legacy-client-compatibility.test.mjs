@@ -16,3 +16,10 @@ test('rejects a new required field that old INSERT requests cannot supply',()=>{
  const source=before(),next=structuredClone(source);next.columns['public.tasks.required_value']={type:'pg_catalog.text',nullable:'NO',default:null};
  assert.throws(()=>verifyLegacySchema(source,next),/mandatory column/);
 });
+test('a declared function keeps owner and permissions, a declared constraint its one definition, and nothing else may change',()=>{
+ const state=()=>({columns:{},functions:{f:{definition:'old',owner:'o',acl:['a']},g:{definition:'old',owner:'o',acl:['a']}},policies:{},constraints:{c:'one'},buckets:{},grants:{},publications:{}});
+ const declared={functions:['f'],constraints:{c:'two'}};const changed=edit=>{const next=state();next.functions.f.definition='new';next.constraints.c='two';edit?.(next);return next;};
+ assert.doesNotThrow(()=>verifyLegacySchema(state(),changed(),declared));
+ assert.throws(()=>verifyLegacySchema(state(),changed()),/contract changed/);
+ for(const edit of [next=>{next.functions.f.owner='x';},next=>{next.functions.f.acl=[];},next=>{delete next.functions.f;},next=>{next.constraints.c='three';},next=>{next.functions.g.definition='new';}])assert.throws(()=>verifyLegacySchema(state(),changed(edit),declared));
+});

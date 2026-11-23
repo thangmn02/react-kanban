@@ -15,16 +15,63 @@ export function legacySchemaSnapshot(sql){
   )`));
 }
 
-export function verifyLegacySchema(before,after){
+/** `declared` names the only existing contracts a batch may change, each exactly: a function may get a new definition
+ * (same owner and permissions; its behaviour is proven separately) and a constraint one stated definition. */
+export function verifyLegacySchema(before,after,declared={}){
   const totals={};
   for(const group of ['columns','functions','policies','constraints','buckets','grants','publications']){
-    for(const [key,value]of Object.entries(before[group]))assert.ok(isDeepStrictEqual(after[group]?.[key],value),'An existing '+group+' contract changed; private details withheld.');
+    for(const [key,value]of Object.entries(before[group])){
+      if(group==='functions'&&declared.functions?.includes(key)){
+        const next=after.functions?.[key];
+        assert.ok(next&&isDeepStrictEqual(next.owner,value.owner)&&isDeepStrictEqual(next.acl,value.acl),'A declared function changed its owner or permissions.');
+        continue;
+      }
+      if(group==='constraints'&&Object.hasOwn(declared.constraints??{},key)){
+        assert.ok(after.constraints?.[key]===declared.constraints[key],'A declared constraint differs from its stated definition.');
+        continue;
+      }
+      assert.ok(isDeepStrictEqual(after[group]?.[key],value),'An existing '+group+' contract changed; private details withheld.');
+    }
     totals[group]=Object.keys(before[group]).length;
   }
   // New mandatory fields can break an old INSERT even if every old field remains.
   const oldTables=new Set(Object.keys(before.columns).map(key=>key.slice(0,key.lastIndexOf('.'))));
   for(const[key,value]of Object.entries(after.columns))if(!Object.hasOwn(before.columns,key)&&oldTables.has(key.slice(0,key.lastIndexOf('.'))))assert.ok(value.nullable==='YES'||value.default!==null,'A new mandatory column lacks a legacy-compatible default.');
   return totals;
+}
+
+/** Old-shape note documents (no labels) must get the same verdict from the replaced validator, for every stored
+ * document and for fixtures on both sides of each limit. Runs in the offline clone only. */
+export const noteValidator={key:'app_private.valid_note_document(document jsonb)',
+  constraint:{'public.notes.notes_content_schema_version_check':'CHECK ((content_schema_version = ANY (ARRAY[1, 2])))'}};
+export function keepOldNoteValidator(sql){
+  const definition=sql("select pg_get_functiondef('app_private.valid_note_document(jsonb)'::regprocedure)");
+  const copy=definition.replace('FUNCTION app_private.valid_note_document(','FUNCTION kora_proof.valid_note_document(');
+  assert.ok(copy!==definition,'The current validator must be copied exactly.');
+  sql('create schema kora_proof;'+copy+';');
+}
+const item=(extra={})=>({id:'a',text:'b',isDone:false,...extra});
+export const oldNoteFixtures=[{html:'',checklist:[]},{html:'<p>x</p>',checklist:[item()]},{html:'x',checklist:[],convertedTaskId:null},{html:'x',checklist:[],other:1},
+  {html:'x'.repeat(60000),checklist:[]},{html:'x'.repeat(60001),checklist:[]},{html:'x',checklist:Array(100).fill(item())},{html:'x',checklist:Array(101).fill(item())},
+  {html:'x',checklist:[item({id:''})]},{html:'x',checklist:[item({id:'a'.repeat(101)})]},{html:'x',checklist:[item({text:'t'.repeat(500)})]},{html:'x',checklist:[item({text:'t'.repeat(501)})]},
+  {html:'x',checklist:[item({isDone:'no'})]},{html:'x',checklist:[1]},{html:'x',checklist:{}},{html:'x'},{checklist:[]},{html:1,checklist:[]},{},[],null,'x',1,
+  {html:'x',checklist:[],pad:'p'.repeat(262144)}];
+export function proveNoteValidator(sql){
+  const fixtures=JSON.stringify(oldNoteFixtures).replaceAll("'","''");
+  const stored=`select content as document from public.notes union all select content from public.note_revisions`;
+  const result=JSON.parse(sql(`with stored as (${stored}),fixture as (select value as document from jsonb_array_elements('${fixtures}'::jsonb)),
+    every as (select document from stored union all select document from fixture)
+    select jsonb_build_object('stored',(select count(*) from stored),'fixtures',(select count(*) from fixture),
+      'accepted',(select count(*) from fixture where kora_proof.valid_note_document(document)),
+      'labelled',(select count(*) from stored where document ? 'labels'),
+      'different',(select count(*) from every where kora_proof.valid_note_document(document) is distinct from app_private.valid_note_document(document)),
+      'versions',(select coalesce(jsonb_agg(distinct content_schema_version),'[]') from public.notes))`));
+  assert.equal(result.different,0,'The replaced validator judges an old-shape note differently.');
+  assert.equal(result.labelled,0,'Stored notes predate labels.');
+  assert.ok(result.accepted>0&&result.accepted<result.fixtures,'The fixtures must cover accepted and refused notes.');
+  assert.ok(result.versions.every(version=>version===1),'Every existing note stays at schema version 1.');
+  sql('drop schema kora_proof cascade');
+  return {status:'PASS',storedDocuments:result.stored,fixtures:result.fixtures,acceptedFixtures:result.accepted,hostedWrites:false};
 }
 
 export function exerciseLegacyTaskWrites(sql){
