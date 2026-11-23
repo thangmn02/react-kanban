@@ -19,7 +19,7 @@ impl Default for Bounds { fn default()->Self { Self{x:120,y:100,width:360,height
 struct Placement { expanded:Bounds,bubble:Bounds,always_on_top:bool,#[serde(default="default_opacity")]opacity:f64,#[serde(default)]opened:bool,#[serde(default)]hidden:bool,#[serde(default)]collapsed:bool,#[serde(default)]local:bool }
 fn default_opacity()->f64{0.96}
 impl Default for Placement { fn default()->Self {Self{expanded:Bounds::default(),bubble:Bounds{width:64,height:64,..Bounds::default()},always_on_top:true,opacity:default_opacity(),opened:false,hidden:false,collapsed:false,local:false}} }
-struct Entry { context:Context,placement:Placement,collapsed:bool,ghost:bool,peek:bool,shake:Option<Shake>,ignore_move_until:Instant,save_generation:u64,operation:Arc<tokio::sync::Mutex<()>>,edit_writer:String,edit_version:u64,edit_settled:u64,close_nonce:String,close_ready:bool }
+struct Entry { context:Context,placement:Placement,collapsed:bool,ghost:bool,peek:bool,shake:Option<Shake>,ignore_move_until:Instant,save_generation:u64,operation:Arc<tokio::sync::Mutex<()>>,edit_writer:String,edit_version:u64,edit_settled:u64,close_nonce:String,close_ready:bool,focus_on_load:bool }
 fn reset_frame_writer(entry:&mut Entry){entry.edit_writer=uuid::Uuid::new_v4().to_string();entry.edit_version=0;entry.edit_settled=0;entry.close_ready=false;}
 struct Shake { started:Instant,last_x:i32,last_y:i32,direction:i32,turns:u32,travel:i32 }
 #[derive(Default)]
@@ -129,14 +129,33 @@ fn request_quit(app:&AppHandle){
         if let Some(main)=handle.get_webview_window("main"){let _=main.show();let _=main.unminimize();let _=main.emit_to("main","kora-notes-command",json!({"action":"quit_blocked"}));}
     });
 }
-fn open_window(app:&AppHandle,state:&NativeNotes,context:Context,focus:bool,preserve_hidden:bool)->Result<String,String>{
+/// Physical bounds of the main window (the Focus Dock while it is docked).
+fn main_rect(app:&AppHandle)->Option<(i32,i32,i32,i32)>{let main=app.get_webview_window("main")?;let position=main.outer_position().ok()?;let size=main.outer_size().ok()?;Some((position.x,position.y,size.width as i32,size.height as i32))}
+fn intersects(bounds:&Bounds,(x,y,width,height):(i32,i32,i32,i32))->bool{bounds.x<x+width&&bounds.x+bounds.width as i32>x&&bounds.y<y+height&&bounds.y+bounds.height as i32>y}
+/// A note-sized slot beside the main window on its monitor: left of it when there is room, else right.
+/// `step` staggers several notes opened from the Dock so they do not stack exactly.
+fn beside_main(app:&AppHandle,step:i32)->Option<Bounds>{
+    let main=app.get_webview_window("main")?;let (x,y,width,height)=main_rect(app)?;let monitor=main.current_monitor().ok()??;let area=monitor.work_area();let scale=monitor.scale_factor();
+    let (note_width,note_height,gap)=((360.0*scale) as i32,(460.0*scale) as i32,(12.0*scale) as i32);let offset=step*(28.0*scale) as i32;
+    let (left,top,right,bottom)=(area.position.x,area.position.y,area.position.x+area.size.width as i32,area.position.y+area.size.height as i32);
+    let note_x=if x-gap-note_width-offset>=left{x-gap-note_width-offset}else if x+width+gap+note_width+offset<=right{x+width+gap+offset}else{left};
+    let note_y=(y+height-note_height-offset).clamp(top,(bottom-note_height).max(top));
+    Some(Bounds{x:note_x,y:note_y,width:note_width.max(1) as u32,height:note_height.max(1) as u32,scale})
+}
+fn open_window(app:&AppHandle,state:&NativeNotes,context:Context,focus:bool,preserve_hidden:bool,place_beside_main:bool)->Result<String,String>{
     let label={let inner=lock(state)?;check_scope(&inner.identity,&context)?;inner.entries.iter().find(|(_,entry)|entry.context.user_id==context.user_id&&entry.context.note_id==context.note_id&&entry.context.workspace_id==context.workspace_id&&entry.context.local==context.local).map(|(label,_)|label.clone())};
-    if let Some(label)=label {if let Some(window)=app.get_webview_window(&label){if !preserve_hidden{{let mut inner=lock(state)?;let entry=inner.entries.get_mut(&label).ok_or("Note window closed")?;entry.placement.hidden=false;entry.ghost=false;entry.peek=false;}window.set_ignore_cursor_events(false).map_err(|e|e.to_string())?;window.show().map_err(|e|e.to_string())?;let flags={let inner=lock(state)?;flags_payload(inner.entries.get(&label).ok_or("Note window closed")?)};window.emit_to(window.label(),"kora-note-flags",flags).map_err(|e|e.to_string())?;persist_placement(app,state,&label,None)?;}if focus{window.set_focus().map_err(|e|e.to_string())?;}return Ok(label);}}
+    if let Some(label)=label {if let Some(window)=app.get_webview_window(&label){if !preserve_hidden{{let mut inner=lock(state)?;let entry=inner.entries.get_mut(&label).ok_or("Note window closed")?;entry.placement.hidden=false;entry.ghost=false;entry.peek=false;}window.set_ignore_cursor_events(false).map_err(|e|e.to_string())?;window.show().map_err(|e|e.to_string())?;let flags={let inner=lock(state)?;flags_payload(inner.entries.get(&label).ok_or("Note window closed")?)};window.emit_to(window.label(),"kora-note-flags",flags).map_err(|e|e.to_string())?;persist_placement(app,state,&label,None)?;}if focus{window.set_focus().map_err(|e|e.to_string())?;let _=window.as_ref().set_focus();}return Ok(label);}}
     let path=placement_path(app,&context)?;
     let data_directory=root(app)?.join("webviews").join(&context.user_id);
-    let mut placement=std::fs::read(path).ok().and_then(|bytes|serde_json::from_slice::<Placement>(&bytes).ok()).unwrap_or_default();placement.opened=true;placement.local=context.local;if !preserve_hidden{placement.hidden=false;}placement.opacity=placement.opacity.clamp(0.3,1.0);
+    let saved=std::fs::read(path).ok().and_then(|bytes|serde_json::from_slice::<Placement>(&bytes).ok());let had_placement=saved.is_some();
+    let mut placement=saved.unwrap_or_default();placement.opened=true;
+    // From the Focus Dock: a new note (or one saved on top of the Dock) opens beside it and never covers it.
+    let step={lock(state)?.entries.len() as i32};
+    if place_beside_main&&(!had_placement||main_rect(app).is_some_and(|rect|intersects(&placement.expanded,rect))){if let Some(bounds)=beside_main(app,step){placement.expanded=bounds;placement.collapsed=false;}}
+    // New notes elsewhere are staggered so they never open exactly on top of another note.
+    else if !had_placement{placement.expanded.x+=step*28;placement.expanded.y+=step*28;}placement.local=context.local;if !preserve_hidden{placement.hidden=false;}placement.opacity=placement.opacity.clamp(0.3,1.0);
     let label=format!("note-{}",uuid::Uuid::new_v4());
-    {let mut inner=lock(state)?;check_scope(&inner.identity,&context)?;inner.entries.insert(label.clone(),Entry{context,placement:placement.clone(),collapsed:placement.collapsed,ghost:false,peek:false,shake:None,ignore_move_until:Instant::now()+Duration::from_millis(700),save_generation:0,operation:Arc::new(tokio::sync::Mutex::new(())),edit_writer:uuid::Uuid::new_v4().to_string(),edit_version:0,edit_settled:0,close_nonce:String::new(),close_ready:false});}
+    {let mut inner=lock(state)?;check_scope(&inner.identity,&context)?;inner.entries.insert(label.clone(),Entry{context,placement:placement.clone(),collapsed:placement.collapsed,ghost:false,peek:false,shake:None,ignore_move_until:Instant::now()+Duration::from_millis(700),save_generation:0,operation:Arc::new(tokio::sync::Mutex::new(())),edit_writer:uuid::Uuid::new_v4().to_string(),edit_version:0,edit_settled:0,close_nonce:String::new(),close_ready:false,focus_on_load:focus});}
     let result=WebviewWindowBuilder::new(app,&label,WebviewUrl::App("index.html#/native-note".into())).data_directory(data_directory).title("Kora Note").decorations(false).transparent(true).shadow(false).resizable(true).always_on_top(placement.always_on_top).focused(false).visible(false).inner_size(360.0,460.0).build();
     let window=match result{Ok(window)=>window,Err(error)=>{lock(state)?.entries.remove(&label);return Err(error.to_string());}};
     let configure=||->Result<(),String>{window.set_min_size(Some(tauri::LogicalSize::new(if placement.collapsed{64.0}else{280.0},if placement.collapsed{64.0}else{280.0}))).map_err(|e|e.to_string())?;let bounds=clamp_bounds(&window,if placement.collapsed{&placement.bubble}else{&placement.expanded},placement.collapsed)?;apply_bounds(&window,&bounds)?;let handle=app.clone();let event_label=label.clone();window.on_window_event(move|event|on_window_event(&handle,&event_label,event));persist_placement(app,state,&label,None)?;if !placement.hidden{window.show().map_err(|e|e.to_string())?;}if focus{window.set_focus().map_err(|e|e.to_string())?;}Ok(())};
@@ -180,7 +199,7 @@ pub async fn native_notes_control(window:WebviewWindow,app:AppHandle,state:tauri
             let (labels,old)={let mut inner=lock(&state)?;if inner.identity==identity{return Ok(Value::Null);}let old=inner.shortcut.take();inner.shortcut_down=false;inner.identity=identity;inner.capture_pending=false;inner.pending.clear();(inner.entries.drain().map(|(label,_)|label).collect::<Vec<_>>(),old)};
             if let Some(old)=old{let _=app.global_shortcut().unregister(old);}for label in labels{if let Some(note)=app.get_webview_window(&label){let _=note.destroy();}}Ok(Value::Null)
         },
-        "open"=>{let _windows=state.window_operation.lock().await;let context:Context=serde_json::from_value(payload["context"].clone()).map_err(|_|"Invalid note context")?;Ok(json!(open_window(&app,&state,context,payload["focus"].as_bool().unwrap_or(false),payload["preserveHidden"].as_bool().unwrap_or(false))?))},
+        "open"=>{let _windows=state.window_operation.lock().await;let context:Context=serde_json::from_value(payload["context"].clone()).map_err(|_|"Invalid note context")?;Ok(json!(open_window(&app,&state,context,payload["focus"].as_bool().unwrap_or(false),payload["preserveHidden"].as_bool().unwrap_or(false),payload["besideMain"].as_bool().unwrap_or(false))?))},
         "catalog"=>{let _serial=state.journal.lock().map_err(|_|"Placement storage is unavailable")?;let identity=lock(&state)?.identity.clone().ok_or("Sign in before restoring Notes")?;catalog(&app,&identity)},
         "restore"=>{restore_all(&app).await?;Ok(Value::Null)},
         "await_settled"=>{
@@ -190,7 +209,7 @@ pub async fn native_notes_control(window:WebviewWindow,app:AppHandle,state:tauri
             cancel_close(&app,&state)?;Err("An external note still has an unsaved edit or did not respond. Retry or export it before leaving.".into())
         },
         "cancel_close"=>{cancel_close(&app,&state)?;Ok(Value::Null)},
-        "windows"=>{let inner=lock(&state)?;Ok(json!(inner.entries.iter().map(|(label,entry)|json!({"label":label,"context":entry.context})).collect::<Vec<_>>()))},
+        "windows"=>{let inner=lock(&state)?;Ok(json!(inner.entries.iter().map(|(label,entry)|json!({"label":label,"context":entry.context,"hidden":entry.placement.hidden})).collect::<Vec<_>>()))},
         "close"=>{let _windows=state.window_operation.lock().await;let label=payload["label"].as_str().ok_or("Missing window identity")?;context_for(&state,label)?;{let mut inner=lock(&state)?;inner.entries.get_mut(label).ok_or("Note window closed")?.placement.opened=false;}persist_placement(&app,&state,label,None)?;{lock(&state)?.entries.remove(label);}if let Some(note)=app.get_webview_window(label){note.destroy().map_err(|e|e.to_string())?;}Ok(Value::Null)},
         "capture_finished"=>{lock(&state)?.capture_pending=false;Ok(Value::Null)},
         "local_read"|"local_save"|"local_history"|"local_drafts"|"local_draft_write"|"local_draft_remove"=>{
@@ -229,14 +248,16 @@ pub async fn native_notes_control(window:WebviewWindow,app:AppHandle,state:tauri
 pub async fn native_note_request(window:WebviewWindow,app:AppHandle,state:tauri::State<'_,NativeNotes>,action:String,payload:Value)->Result<Value,String>{
     let context=context_for(&state,window.label())?;if payload.to_string().len()>3_000_000{return Err("Note request exceeds its size limit".into());}
     match action.as_str(){
-        "context"=>{let mut inner=lock(&state)?;let entry=inner.entries.get_mut(window.label()).ok_or("Note is unavailable")?;reset_frame_writer(entry);let mut flags=flags_payload(entry);flags["context"]=serde_json::to_value(context).map_err(|_|"Invalid note context")?;flags["writerId"]=json!(entry.edit_writer);flags["closeNonce"]=json!(entry.close_nonce);Ok(flags)},
+        "context"=>{let mut inner=lock(&state)?;let entry=inner.entries.get_mut(window.label()).ok_or("Note is unavailable")?;reset_frame_writer(entry);let mut flags=flags_payload(entry);flags["context"]=serde_json::to_value(context).map_err(|_|"Invalid note context")?;flags["writerId"]=json!(entry.edit_writer);flags["closeNonce"]=json!(entry.close_nonce);flags["focusOnLoad"]=json!(std::mem::take(&mut entry.focus_on_load));Ok(flags)},
         "edit_state"=>{let mut inner=lock(&state)?;let entry=inner.entries.get_mut(window.label()).ok_or("Note is unavailable")?;if payload["writerId"].as_str()!=Some(entry.edit_writer.as_str()){return Err("This note frame was replaced".into());}let version=payload["version"].as_u64().ok_or("Invalid frame revision")?;if payload["settled"].as_bool().unwrap_or(false){entry.edit_settled=entry.edit_settled.max(version.min(entry.edit_version));}else{entry.edit_version=entry.edit_version.max(version);entry.close_ready=false;}Ok(Value::Null)},
         "close_ready"=>{let mut inner=lock(&state)?;let entry=inner.entries.get_mut(window.label()).ok_or("Note is unavailable")?;if payload["writerId"].as_str()!=Some(entry.edit_writer.as_str())||payload["nonce"].as_str()!=Some(entry.close_nonce.as_str()){return Err("The note close request was replaced".into());}entry.close_ready=true;Ok(Value::Null)},
+        // A new Quick Note is typed into at once: the window and its WebView take keyboard focus once loaded.
+        "focus"=>{window.set_focus().map_err(|e|e.to_string())?;window.as_ref().set_focus().map_err(|e|e.to_string())?;Ok(Value::Null)},
         "drag"=>{window.start_dragging().map_err(|e|e.to_string())?;Ok(Value::Null)},
         "resize"=>{window.as_ref().window().start_resize_dragging(tauri_runtime::ResizeDirection::SouthEast).map_err(|e|e.to_string())?;Ok(Value::Null)},
         "hide"=>{hide_window(&app,&state,window.label()).await?;Ok(Value::Null)},
         "flags"=>update_flags(&app,&state,window.label(),payload,false).await,
-        "read"|"change"|"retry"|"media_upload"|"media_download"|"media_list"|"open_task"|"recover"=>{
+        "read"|"change"|"retry"|"media_upload"|"media_download"|"media_list"|"open_task"|"recover"|"discard_empty"=>{
             let nonce=uuid::Uuid::new_v4().to_string();{let mut inner=lock(&state)?;inner.pending.retain(|_,(_,at)|at.elapsed()<Duration::from_secs(60));if inner.pending.values().filter(|(label,_)|label==window.label()).count()>=20{return Err("Wait for pending note operations".into());}inner.pending.insert(nonce.clone(),(window.label().into(),Instant::now()));}
             app.emit_to("main","kora-note-request",json!({"nonce":nonce,"label":window.label(),"context":context,"action":action,"payload":payload})).map_err(|e|e.to_string())?;Ok(json!({"nonce":nonce}))
         },_=>Err("Unsupported note operation".into())
@@ -246,7 +267,14 @@ pub async fn native_note_request(window:WebviewWindow,app:AppHandle,state:tauri:
 #[cfg(test)]
 mod tests{
     use super::*;
-    fn entry()->Entry{Entry{context:Context{user_id:"actor".into(),workspace_id:None,note_id:uuid::Uuid::new_v4().to_string(),local:true},placement:Placement{opened:true,..Placement::default()},collapsed:false,ghost:false,peek:false,shake:None,ignore_move_until:Instant::now(),save_generation:0,operation:Arc::new(tokio::sync::Mutex::new(())),edit_writer:uuid::Uuid::new_v4().to_string(),edit_version:1,edit_settled:0,close_nonce:String::new(),close_ready:false}}
+    fn entry()->Entry{Entry{context:Context{user_id:"actor".into(),workspace_id:None,note_id:uuid::Uuid::new_v4().to_string(),local:true},placement:Placement{opened:true,..Placement::default()},collapsed:false,ghost:false,peek:false,shake:None,ignore_move_until:Instant::now(),save_generation:0,operation:Arc::new(tokio::sync::Mutex::new(())),edit_writer:uuid::Uuid::new_v4().to_string(),edit_version:1,edit_settled:0,close_nonce:String::new(),close_ready:false,focus_on_load:false}}
+    #[test]
+    fn beside_dock_slot_detects_overlap_with_the_dock(){
+        let dock=(1000,600,320,200);
+        assert!(intersects(&Bounds{x:900,y:500,width:360,height:460,scale:1.0},dock));
+        assert!(!intersects(&Bounds{x:628,y:340,width:360,height:460,scale:1.0},dock));
+        assert!(!intersects(&Bounds{x:1320,y:600,width:360,height:460,scale:1.0},dock));
+    }
     #[test]
     fn replacement_writer_invalidates_acknowledgement_but_retains_pending_close(){
         let mut replacement=entry();replacement.close_nonce="active-close".into();replacement.close_ready=true;replacement.edit_settled=1;let old_writer=replacement.edit_writer.clone();reset_frame_writer(&mut replacement);assert_ne!(replacement.edit_writer,old_writer);assert!(!replacement.close_ready);assert_eq!(replacement.close_nonce,"active-close");assert_eq!(replacement.edit_version,0);assert_eq!(replacement.edit_settled,0);

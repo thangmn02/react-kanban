@@ -18,4 +18,4 @@ export const readDeviceDrafts=async(scope:string,prefix:string)=>isTauri()?(awai
 export const retireDeviceDraft=async(scope:string,key:string,expected:string)=>{const retired=isTauri()?await nativeNotesControl<boolean>('local_draft_remove',{scope,key,expected}):await removeBrowserDraft(key,expected);if(!retired)throw Error('This retained device draft changed. Its newer version is preserved.');};
 export interface NativeNoteContext { userId: string; workspaceId: string | null; noteId: string; local: boolean }
 export interface NativeNoteFlags { alwaysOnTop: boolean; opacity:number; collapsed: boolean; ghost: boolean; peek: boolean }
-export interface NativeNoteSnapshot { note: StickyNote; readOnly: boolean; status: string; error: string; conflict: boolean }
+export interface NativeNoteSnapshot { note: StickyNote; readOnly: boolean; status: string; error: string; conflict: boolean; taskTitle?: string }

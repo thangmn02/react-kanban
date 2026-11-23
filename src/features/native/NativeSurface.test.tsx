@@ -28,6 +28,7 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 const props: FloatingFocusProps = { activeTask: null, focusTasks: [], cycleTotal: 4, remainingSeconds: 1500,
   timerState: { mode: 'focus', activeTaskId: null, isRunning: false, remainingSeconds: 1500, startedAt: null, endsAt: null, plannedSeconds: null },
   onStart: vi.fn(), onPause: vi.fn(), onReset: vi.fn() };
+const modes = () => nativeInvoke.mock.calls.filter(([command]) => command === 'native_window_mode').map(([, args]) => (args as { mode: string }).mode);
 it('allows the hosted Beat cache in both native connection policies', () => {
   for (const policy of [nativeConfig.app.security.csp, nativeConfig.app.security.devCsp]) {
     const connections = policy.split(';').find((directive) => directive.trim().startsWith('connect-src '))!.trim().split(/\s+/);
@@ -43,15 +44,15 @@ it('opens Tabs at its ring size once and keeps the timer and user resizing acros
   const shadow = view.container.querySelector('.native-dock-host')!.shadowRoot!;
   const start = shadow.querySelector('.dock-start')!;
   const ring = shadow.querySelector('.dock-ring')!;
-  await waitFor(() => expect(nativeWindow.setSize).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ width: 520, height: 580 })));
-  expect(nativeWindow.setMinSize).toHaveBeenCalledWith(expect.objectContaining({ width: 320, height: 360 }));
+  await waitFor(() => expect(modes()).toEqual(['dock']));
   fireEvent.click(shadow.querySelectorAll('[role="tab"]')[2]);
   expect(shadow.querySelectorAll('.beat-channel')).toHaveLength(4);
   expect(shadow.querySelectorAll('.beat-square')).toHaveLength(32);
   expect(shadow.querySelector('[aria-label="Lead availability"]')).toBeNull();
   expect(shadow.querySelector('.dock-start')).toBe(start);
   expect(shadow.querySelector('.dock-ring')).toBe(ring);
-  expect(nativeWindow.setSize).toHaveBeenCalledOnce();
+  expect(modes()).toEqual(['dock']);
+  expect(nativeWindow.setSize).not.toHaveBeenCalled();
   fireEvent.pointerDown(shadow.querySelector('.dock-toolbar')!, { button: 0 });
   expect(nativeWindow.startDragging).toHaveBeenCalledOnce();
   fireEvent.click(start); expect(props.onStart).toHaveBeenCalledOnce();
@@ -115,6 +116,26 @@ it('falls back to the window API when the native pin command is missing', async 
   render(<I18nProvider><NativeSurface dock focusProps={props}>Workspace</NativeSurface></I18nProvider>);
   await waitFor(() => expect(nativeWindow.setAlwaysOnTop).toHaveBeenCalledWith(true));
 });
+it('names each mode to the native command, in order, and never sizes the window itself', async () => {
+  const surface = (dock: boolean, onToggle?: () => void) => <I18nProvider><NativeSurface dock={dock} onToggle={onToggle} focusProps={props}>Workspace</NativeSurface></I18nProvider>;
+  const toggle = vi.fn();
+  // Loading and sign-in must not be remembered as the Tasks position.
+  const view = render(surface(false));
+  view.rerender(surface(true, toggle));
+  view.rerender(surface(false, toggle));
+  view.rerender(surface(true, toggle));
+  await waitFor(() => expect(modes()).toEqual(['setup', 'dock', 'tasks', 'dock']));
+  expect(nativeWindow.setSize).not.toHaveBeenCalled();
+  expect(nativeWindow.setMinSize).not.toHaveBeenCalled();
+});
+it('gives the window mode command the same permission as the other dock commands', async () => {
+  const [permissions, build, main] = await Promise.all([
+    import('../../../src-tauri/permissions/notes.toml?raw'), import('../../../src-tauri/build.rs?raw'), import('../../../src-tauri/src/main.rs?raw')]);
+  expect(permissions.default.split('notes-frame')[0]).toContain('"native_window_mode"');
+  expect(permissions.default.split('notes-frame')[1]).not.toContain('native_window_mode');
+  expect(build.default).toContain('"native_window_mode"');
+  expect(main.default).toContain('window_bounds::native_window_mode');
+});
 it('gives the pin command the same permission as the other dock commands', async () => {
   const [permissions, build, main] = await Promise.all([
     import('../../../src-tauri/permissions/notes.toml?raw'), import('../../../src-tauri/build.rs?raw'), import('../../../src-tauri/src/main.rs?raw')]);
@@ -176,7 +197,7 @@ it('updates Companion from dock settings and shows progress and the confirmed ve
   await waitFor(() => expect(shadow.querySelector('[role="status"]')).toHaveTextContent(`Companion ${__KORA_VERSION__} is ready`));
   expect(setup).not.toBeDisabled();
 });
-it('does not let dock auto-sizing undo maximize, and restores before swapping surfaces', async () => {
+it('keeps the maximised state for the native command to save when swapping surfaces', async () => {
   const swap = vi.fn();
   nativeWindow.isMaximized.mockResolvedValue(true);
   const view = render(<I18nProvider><NativeSurface dock onToggle={swap} focusProps={props}>Workspace</NativeSurface></I18nProvider>);
@@ -188,8 +209,7 @@ it('does not let dock auto-sizing undo maximize, and restores before swapping su
   view.rerender(<I18nProvider><NativeSurface dock={false} onToggle={swap} focusProps={props}>Workspace</NativeSurface></I18nProvider>);
   fireEvent.click(view.getByRole('button', { name: 'Dock' }));
   await waitFor(() => expect(swap).toHaveBeenCalledOnce());
-  expect(nativeWindow.unmaximize).toHaveBeenCalledOnce();
-  expect(nativeWindow.unmaximize.mock.invocationCallOrder[0]).toBeLessThan(swap.mock.invocationCallOrder[0]);
+  expect(nativeWindow.unmaximize).not.toHaveBeenCalled();
 });
 
 it('badges the update button and offers one quiet note for a Kora update, then for an older browser Companion', async () => {

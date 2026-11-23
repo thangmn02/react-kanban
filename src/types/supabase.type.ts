@@ -21,6 +21,7 @@ export type Database = Omit<GeneratedDatabase, 'public'> & {
       save_note: NoteRpc;
       set_note_access: NoteRpc;
       set_note_deleted: NoteRpc;
+      set_note_archived: NoteRpc;
       save_note_presentation: NoteRpc;
       mutate_note_comment: NoteRpc;
       reserve_note_image: NoteRpc;

@@ -1,6 +1,6 @@
 import {runNotesTransition} from './features/notes/native-notes-lifecycle';
 import { translateNow } from './i18n/context';
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import ViewContextBoundary from './app/ViewContextBoundary';
 import { useTaskWorkflowSync } from './hooks/use-task-workflow-sync';
@@ -238,6 +238,12 @@ function AppLayout() {
     activeBoardId,
     activeBoardSummary,
   });
+  // Quick Notes from the Focus Dock link to the task the Dock shows; a task on the open board also carries its board.
+  const noteTasks = useMemo(() => Object.values(boardData.task).map(task => ({ id: task.id, title: task.title })), [boardData.task]);
+  // A Focus task keeps its name on a note even while another board is open.
+  const noteTaskTitle = useCallback((taskId: string) => boardData.task[taskId]?.title ?? focusSession.focusTasks.find(task => task.id === taskId)?.title, [boardData.task, focusSession.focusTasks]);
+  const focusNoteTask = () => { const taskId = (focusSession.selectedTimerTask || focusSession.activeFocusTask)?.id; return { taskId, boardId: taskId && boardData.task[taskId] ? activeBoardId ?? undefined : focusSession.focusTasks.find(task => task.id === taskId)?.boardId }; };
+  const focusNoteRequest = (fromDock: boolean) => ({ ...focusNoteTask(), fromDock, create: true });
   useTaskWorkflowSync(activeWorkspaceId,user?.id,focusSession);
   const {
     activeFocusTask,
@@ -447,7 +453,7 @@ function AppLayout() {
       openShutdown: () => planning.setIsShutdownRitualOpen(true),
     },
     featureDock: {
-      onOpenNotes: NOTES_PREVIEW_ENABLED ? () => openQuickNotes({taskId:focusSession.activeFocusTask?.id}) : undefined,
+      onOpenNotes: NOTES_PREVIEW_ENABLED ? () => openQuickNotes(focusNoteRequest(false)) : undefined,
       activeTab: focusIntegration.dockTab, onTabChange: focusIntegration.handleDockTabChange,
       isMinimized: focusSession.isFocusDockCollapsed,
       activeTask: focusSession.selectedTimerTask || focusSession.activeFocusTask,
@@ -518,18 +524,18 @@ function AppLayout() {
       {shouldRenderOverlays && sharedDialogs}
     </FocusSessionProvider>
   );
-  const notesLayer=NOTES_PREVIEW_ENABLED&&user&&<QuickNotesLayer key={`${user.id}:${activeWorkspaceId}`} user={user} workspace={activeWorkspace} onManager={()=>{setNativeDock(false);navigate('/notes');}} onOpenOriginal={source=>{void(async()=>{if(source.workspaceId&&source.workspaceId!==activeWorkspaceId)await setActiveWorkspaceId(source.workspaceId);setNativeDock(false);const query=new URLSearchParams();if(source.taskId){query.set('task',source.taskId);if(source.boardId)query.set('taskBoard',source.boardId);}if(source.commentId)query.set('comment',source.commentId);if(source.noteId){query.set('note',source.noteId);if(!source.workspaceId)query.set('scope','personal');}navigate(`/notes?${query}`);})().catch(reason=>notify.error(String(reason)));}}/>;
+  const notesLayer=NOTES_PREVIEW_ENABLED&&user&&<QuickNotesLayer key={`${user.id}:${activeWorkspaceId}`} user={user} workspace={activeWorkspace} tasks={noteTasks} taskTitle={noteTaskTitle} boardId={activeBoardId} docked={native&&nativeDock} dockTask={focusNoteTask()} onLeaveDock={()=>setNativeDock(false)} onManager={()=>{setNativeDock(false);navigate('/notes');}} onOpenOriginal={source=>{void(async()=>{if(source.workspaceId&&source.workspaceId!==activeWorkspaceId)await setActiveWorkspaceId(source.workspaceId);setNativeDock(false);const query=new URLSearchParams();if(source.taskId){query.set('task',source.taskId);if(source.boardId)query.set('taskBoard',source.boardId);}if(source.commentId)query.set('comment',source.commentId);if(source.noteId){query.set('note',source.noteId);if(!source.workspaceId)query.set('scope','personal');}navigate(`/notes?${query}`);})().catch(reason=>notify.error(String(reason)));}}/>;
   if (!native) return <>{content}{notesLayer}</>;
   const showDock = nativeDock && shouldRenderOverlays;
   // The existing AppLayout controller owns both native views. Switching to
   // Tasks never creates a second Pomodoro timer or a second session log.
   return <FocusSessionProvider value={focusSession}>
     {notesLayer}
-    {NOTES_PREVIEW_ENABLED && <NativeNotesOwner user={user} workspace={activeWorkspace} onManager={() => {setNativeDock(false);navigate('/notes');}} onOpenTask={(taskId,boardId)=>{setNativeDock(false);navigate(`/notes?task=${taskId}&taskBoard=${boardId}`);}} />}
+    {NOTES_PREVIEW_ENABLED && <NativeNotesOwner user={user} workspace={activeWorkspace} taskTitle={noteTaskTitle} captureSource={() => ({ docked: nativeDock, ...focusNoteTask() })} onManager={() => {setNativeDock(false);navigate('/notes');}} onOpenTask={(taskId,boardId)=>{setNativeDock(false);navigate(`/notes?task=${taskId}&taskBoard=${boardId}`);}} />}
     <NativeSurface dock={showDock}
     onToggle={shouldRenderOverlays ? () => setNativeDock((current) => !current) : undefined}
     focusProps={{
-      onOpenNotes: NOTES_PREVIEW_ENABLED ? () => openQuickNotes({taskId:focusSession.activeFocusTask?.id}) : undefined,
+      onOpenNotes: NOTES_PREVIEW_ENABLED ? () => openQuickNotes(focusNoteRequest(true)) : undefined,
       activeTab: focusIntegration.dockTab, onTabChange: focusIntegration.handleDockTabChange,
       activeTask: focusSession.selectedTimerTask || focusSession.activeFocusTask,
       nextStep: focusSession.nextSteps[(focusSession.selectedTimerTask || focusSession.activeFocusTask)?.id ?? '']?.text,

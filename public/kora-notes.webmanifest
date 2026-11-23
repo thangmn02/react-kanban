@@ -1,0 +1,17 @@
+{
+  "id": "/phone",
+  "name": "Kora Notes",
+  "short_name": "Kora Notes",
+  "description": "Read your Kora notes on your phone.",
+  "start_url": "/phone",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    { "src": "/icons/kora-notes-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/kora-notes-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/kora-notes-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -74,6 +74,8 @@
       muted: false, canSeek: false, canPrevious: Boolean(button('skip-back')), canNext: Boolean(button('skip-forward')), observed: true };
     const audio = player.audio(snapshot);
     if (audio) Object.assign(snapshot, { volume: audio.volume, muted: audio.muted || audio.volume === 0, canSeek: audio.seekable.length > 0 });
+    const shown = globalThis.__kanbanMusicMedia?.siteVolume?.(player)?.get();
+    if (shown !== undefined) snapshot.volume = shown;
     return snapshot;
   };
   player.snapshot = () => {

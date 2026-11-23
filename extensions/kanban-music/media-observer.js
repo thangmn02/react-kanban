@@ -1,7 +1,7 @@
 // MAIN-world, document-start hook. Some players keep new Audio() outside the
 // DOM. Observe standard media APIs, not site-specific controls or page state.
 (() => {
-  if (globalThis.__kanbanMusicMedia?.version === 4) return;
+  if (globalThis.__kanbanMusicMedia?.version === 5) return;
   globalThis.__kanbanMusicMedia?.dispose();
   const entries = new Map();
   const ids = new WeakMap();
@@ -160,6 +160,64 @@
     state.interval = setInterval(state.report, 100);
     state.report();
   };
+  // The number a site's own slider shows, and a way to move that slider, so Kora, the site and the site's stored
+  // preference agree. Sites map the slider to loudness differently (YouTube Music: 50 is 20% loud) and ignore volume
+  // set on the element from outside. Returns undefined where no adapter applies; the element is used then.
+  const unit = value => Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : undefined;
+  const siteVolume = (media) => {
+    const host = location.hostname, player = document.querySelector('#movie_player');
+    if (host === 'music.youtube.com') {
+      const slider = document.querySelector('ytmusic-player-bar #volume-slider, #volume-slider');
+      if (!slider || !Number.isFinite(Number(slider.value)) || !media.closest?.('#movie_player, ytmusic-player')) return undefined;
+      return { get: () => unit(Number(slider.value) / 100), set: (value) => {
+        if (value > 0) player?.unMute?.();
+        slider.value = Math.round(value * 100);
+        slider.dispatchEvent(new CustomEvent('change', { bubbles: true }));
+        media.muted = value === 0;
+      } };
+    }
+    if (/(^|\.)youtube\.com$/.test(host)) {
+      if (typeof player?.setVolume !== 'function' || typeof player.getVolume !== 'function' || !player.contains(media)) return undefined;
+      return { get: () => unit(player.getVolume() / 100), set: (value) => {
+        // Muting keeps the site's level, so unmuting on either side returns to it.
+        if (value === 0) { player.mute?.(); return; }
+        player.unMute?.(); player.setVolume(Math.round(value * 100));
+      } };
+    }
+    if (/(^|\.)soundcloud\.com$/.test(host)) {
+      const slider = document.querySelector('.volume__sliderWrapper'), track = document.querySelector('.volume__sliderBackground');
+      const now = () => unit(Number.parseFloat(slider.getAttribute('aria-valuenow')));
+      if (!slider || !track || now() === undefined) return undefined;
+      return { get: now, set: (value) => {
+        // The slider answers to its own pointer handling only. Aim, read what it shows, and correct for its offset.
+        let aim = value;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const box = track.getBoundingClientRect();
+          if (!box.height) throw new Error('Volume unavailable.');
+          const at = { bubbles: true, cancelable: true, button: 0, clientX: box.left + box.width / 2, clientY: box.bottom - box.height * aim };
+          slider.dispatchEvent(new MouseEvent('mousedown', { ...at, buttons: 1 }));
+          document.dispatchEvent(new MouseEvent('mousemove', { ...at, buttons: 1 }));
+          document.dispatchEvent(new MouseEvent('mouseup', at));
+          const error = now() - value;
+          if (!(Math.abs(error) > .005)) break;
+          aim -= error;
+        }
+        slider.closest('.volume')?.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body }));
+        media.muted = value === 0;
+      } };
+    }
+    if (host === 'open.spotify.com') {
+      const range = document.querySelector('[data-testid="volume-bar"] input[type="range"]');
+      const max = Number(range?.max) || 1;
+      if (!range || unit(Number(range.value) / max) === undefined) return undefined;
+      return { get: () => unit(Number(range.value) / max), set: (value) => {
+        // React listens for the native setter, not for a plain assignment.
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(range, String(value * max));
+        range.dispatchEvent(new Event('input', { bubbles: true })); range.dispatchEvent(new Event('change', { bubbles: true }));
+      } };
+    }
+    return undefined;
+  };
   const originalPlay = HTMLMediaElement.prototype.play;
   const observedPlay = function (...args) { track(this); return Reflect.apply(originalPlay, this, args); };
   HTMLMediaElement.prototype.play = observedPlay;
@@ -170,7 +228,7 @@
   });
   globalThis.Audio = ObservedAudio;
   document.addEventListener('kanban-music-media-watch', receive);
-  globalThis.__kanbanMusicMedia = { version: 4, entries: list, sourceFacts, videoPalette, hueBins,
+  globalThis.__kanbanMusicMedia = { version: 5, siteVolume, entries: list, sourceFacts, videoPalette, hueBins,
     mediaEntries: () => Array.from(entries.values()).flatMap(reference => reference.deref() ? [reference.deref()] : []),
     dispose() {
       stop();

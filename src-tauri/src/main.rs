@@ -9,6 +9,7 @@ mod browser_audio;
 mod browser_audio_windows;
 #[cfg(windows)]
 mod browser_process;
+mod window_bounds;
 mod window_chrome;
 mod note_windows;
 mod note_journal;
@@ -22,8 +23,11 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(|app| {
+            let bounds = window_bounds::WindowBounds::default();
+            app.manage(bounds.clone());
             if let Some(window) = app.get_webview_window("main") {
                 window_chrome::initialize(&window).map_err(std::io::Error::other)?;
+                window_bounds::watch(&window, bounds);
                 window.show()?;
             }
             app.manage(window_chrome::WindowShape::default());
@@ -43,6 +47,7 @@ fn main() {
             browser_audio::native_audio_stop,
             window_chrome::native_dock_shape,
             window_chrome::native_pin_dock,
+            window_bounds::native_window_mode,
             note_windows::native_notes_control,
             note_windows::native_note_request
         ])

@@ -2,6 +2,16 @@
   --island-ink: #1a1a1a;
   --island-muted: #73737d;
   --island-line: rgba(20, 20, 35, .1);
+  --island-face: rgba(255, 255, 255, .78);
+  --island-solid-face: #fff;
+  --island-shadow: 0 16px 44px rgba(30, 30, 60, .14), 0 2px 8px rgba(30, 30, 60, .08);
+  --island-border: #e4e4e9;
+  --island-control: #f5f5f7;
+  --island-tile: #f2f3f5;
+  --island-on-ink: #fff;
+  --island-grip: #9a9aa3;
+  --island-text: #30333b;
+  --island-success: #276647;
   position: fixed;
   right: 20px;
   bottom: 20px;
@@ -14,12 +24,28 @@
   max-width: calc(100vw - 40px);
   color: var(--island-ink);
 }
+/* Dark appearance: the same surfaces in the dark palette the rest of Kora uses. */
+:root[data-theme='dark'] .focus-island {
+  --island-ink: #f5f5f7;
+  --island-muted: #a1a1a8;
+  --island-line: rgba(255, 255, 255, .12);
+  --island-face: rgba(36, 36, 40, .94);
+  --island-solid-face: #242428;
+  --island-shadow: 0 16px 44px rgba(0, 0, 0, .5), 0 2px 8px rgba(0, 0, 0, .35);
+  --island-border: rgba(255, 255, 255, .12);
+  --island-control: rgba(255, 255, 255, .08);
+  --island-tile: rgba(255, 255, 255, .06);
+  --island-on-ink: #111113;
+  --island-grip: #8e8e93;
+  --island-text: #e5e5ea;
+  --island-success: #6ee7a8;
+}
 .focus-island .island-glass {
-  background: rgba(255, 255, 255, .78);
+  background: var(--island-face);
   -webkit-backdrop-filter: blur(18px) saturate(1.4);
   backdrop-filter: blur(18px) saturate(1.4);
   border: 1px solid var(--island-line);
-  box-shadow: 0 16px 44px rgba(30, 30, 60, .14), 0 2px 8px rgba(30, 30, 60, .08);
+  box-shadow: var(--island-shadow);
 }
 .focus-island button { cursor: pointer; }
 .focus-island button:focus-visible { outline: 2px solid #647fbc; outline-offset: 3px; }
@@ -35,7 +61,7 @@
   user-select: none;
 }
 .focus-island .island-bar:active { cursor: grabbing; }
-.focus-island .island-grip { width: 14px; flex-shrink: 0; color: #9a9aa3; cursor: grab; }
+.focus-island .island-grip { width: 14px; flex-shrink: 0; color: var(--island-grip); cursor: grab; }
 .island-grip svg { width: 14px; height: 22px; }
 .island-live { width: 8px; height: 8px; border-radius: 50%; background: #b4b8bc; flex-shrink: 0; }
 .island-live.is-running { background: #4caf7d; }
@@ -43,10 +69,10 @@
 .island-cycle, .island-time { font-family: 'JetBrains Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .island-cycle { font-size: 11px; color: var(--island-muted); }
 .island-time { font-size: 17px; font-weight: 700; color: var(--island-ink); }
-.island-divider { height: 22px; width: 1px; background: #e4e4e9; flex-shrink: 0; }
-.focus-island .island-icon { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; flex-shrink: 0; border-radius: 50%; border: 1px solid #e4e4e9; background: #f5f5f7; color: var(--island-ink); }
+.island-divider { height: 22px; width: 1px; background: var(--island-border); flex-shrink: 0; }
+.focus-island .island-icon { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; flex-shrink: 0; border-radius: 50%; border: 1px solid var(--island-border); background: var(--island-control); color: var(--island-ink); }
 .island-icon svg { width: 16px; height: 16px; }
-.focus-island .island-icon-solid { background: var(--island-ink); border-color: var(--island-ink); color: #fff; }
+.focus-island .island-icon-solid { background: var(--island-ink); border-color: var(--island-ink); color: var(--island-on-ink); }
 .focus-island button.island-icon:hover { box-shadow: 0 0 0 3px rgba(100, 110, 130, .1); }
 .island-icon[aria-pressed=true] { box-shadow: 0 0 0 2px #cdd1d9; }
 .island-music, .island-details { width: 480px; max-width: calc(100vw - 40px); border-radius: 22px; padding: 18px 22px 20px; }
@@ -57,7 +83,7 @@
 .island-score { display: grid; gap: 10px; }
 .island-score-row { display: grid; grid-template-columns: 18px repeat(8, minmax(0, 1fr)); align-items: center; gap: 8px; }
 .island-score-row svg { width: 18px; height: 18px; color: var(--channel); }
-.island-score-row span { aspect-ratio: 1.5; border-radius: 7px; border: 1px solid #e4e4e9; background: #eef0f3; }
+.island-score-row span { aspect-ratio: 1.5; border-radius: 7px; border: 1px solid var(--island-border); background: var(--island-tile); }
 .island-score-row .is-lit { background: var(--channel); border-color: transparent; }
 .island-kick { --channel: #c26d43; }
 .island-snare { --channel: #5f9e9b; }
@@ -65,14 +91,14 @@
 .island-bass { --channel: #8a76c2; }
 .focus-island .island-music-note { margin: 16px 0 0; font-size: 11px; line-height: 1.6; color: var(--island-muted); }
 .island-details { max-height: calc(100dvh - 180px); overflow-y: auto; overscroll-behavior: contain; }
-/* Keep the shared timer and task controls intact; light treatment is dock-only. */
-.island-details [class~='text-white'], .island-details [class~='text-slate-100'], .island-details [class~='text-slate-200'], .island-details [class~='text-slate-300'], .island-details [class~='text-sky-200'], .island-details [class~='text-sky-300'] { color: #30333b; }
-.island-details [class~='text-slate-400'] { color: #73737d; }
-.island-details [class~='text-emerald-100'], .island-details [class~='text-emerald-200'] { color: #276647; }
-.island-details [class~='border-white/10'], .island-details [class~='border-white/15'] { border-color: #e4e4e9; }
-.island-details [class~='bg-white/5'], .island-details [class~='bg-white/10'], .island-details [class~='bg-white/15'], .island-details [class~='bg-slate-950/40'] { background-color: #f2f3f5; }
-.island-details [class~='bg-blue-600'] { background-color: #1a1a1a; color: #fff; }
-.island-details h2 { font-size: 16px; color: #1a1a1a; }
+/* Keep the shared timer and task controls intact; these colours are dock-only and follow the theme. */
+.island-details [class~='text-white'], .island-details [class~='text-slate-100'], .island-details [class~='text-slate-200'], .island-details [class~='text-slate-300'], .island-details [class~='text-sky-200'], .island-details [class~='text-sky-300'] { color: var(--island-text); }
+.island-details [class~='text-slate-400'] { color: var(--island-muted); }
+.island-details [class~='text-emerald-100'], .island-details [class~='text-emerald-200'] { color: var(--island-success); }
+.island-details [class~='border-white/10'], .island-details [class~='border-white/15'] { border-color: var(--island-border); }
+.island-details [class~='bg-white/5'], .island-details [class~='bg-white/10'], .island-details [class~='bg-white/15'], .island-details [class~='bg-slate-950/40'] { background-color: var(--island-tile); }
+:root .focus-island .island-details [class~='bg-blue-600'] { background-color: var(--island-ink); color: var(--island-on-ink); }
+.island-details h2 { font-size: 16px; color: var(--island-ink); }
 @media (max-width: 520px) {
   .focus-island { right: 12px; bottom: 12px; }
   .focus-island .island-bar { gap: 7px; padding: 9px 10px; }
@@ -85,5 +111,5 @@
   .island-grip { display: none; }
 }
 @media (prefers-reduced-transparency: reduce) {
-  .focus-island .island-glass { background: #fff; backdrop-filter: none; }
+  .focus-island .island-glass { background: var(--island-solid-face); backdrop-filter: none; }
 }

@@ -1,0 +1,47 @@
+/* Solid surfaces: one panel, one card, one hairline and one accent per theme, taken from the song that is playing. Nothing is blurred behind moving content. */
+.floating-focus.glass[data-style='tabs'][data-dock-panel] {
+  --s-panel:#f6f6f7; --s-card:#ffffff; --s-line:#e2e2e6; --s-text:#1c1c1f; --s-dim:#5a5a63; --s-fill:#ececef; --s-accent:#6b4fc4; --s-on-accent:#ffffff;
+  --dock-inner-glow:none; --dock-ink:var(--s-text); --dock-dim:var(--s-dim); --dock-line:var(--s-line); --hairline:var(--s-line); --dock-glass-face:var(--s-panel); --dock-player-face:var(--s-card);
+  color:var(--s-text); background:var(--s-panel); border-color:var(--s-line); box-shadow:none;
+}
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance='dark'] {
+  --s-panel:#1c1c1e; --s-card:#262629; --s-line:#38383c; --s-text:#ececef; --s-dim:#a6a6ae; --s-fill:#303034; --s-accent:#ab96f2; --s-on-accent:#17131f;
+}
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance]::before, .floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .dock-scaffold { content:none; display:none; }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] :is(.dock-work-pane,.dock-beat-pane,.dock-track-pane,.dock-settings) { background:var(--s-card); border:1px solid var(--s-line); box-shadow:none; }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .dock-settings { box-shadow:0 12px 32px rgba(0,0,0,.28); color:var(--s-text); backdrop-filter:none; -webkit-backdrop-filter:none; }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .dock-settings :is(label,legend,p) { color:var(--s-text); }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .dock-settings :is(select,input:not([type='checkbox'])) { background:var(--s-panel); color:var(--s-text); border-color:var(--s-line); }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .dock-tabbar { background:var(--s-fill); }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .dock-tab-pill { background:var(--s-card); box-shadow:inset 0 0 0 1px var(--s-line); }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .dock-tabbar button.active { color:var(--s-accent); font-weight:650; }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .music-now-playing-strip { background:var(--s-card); border-color:var(--s-line); }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .dock-start { background:var(--s-accent); color:var(--s-on-accent); border-color:transparent; }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] :is(.dock-reset,.dock-next,.dock-plan-link) { background:var(--s-card); color:var(--s-text); border-color:var(--s-line); }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .dock-ring-track { stroke:var(--s-fill); }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .dock-ring-progress { stroke:var(--s-accent); filter:none; }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] :is(.dock-style-name,.cycle,.muted,.eyebrow,.dock-cycle,.music-now-playing-label) { color:var(--s-dim); }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .dock-work-current { color:var(--s-accent); }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .dock-track-pane:is(::before,::after) { content:none; }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .dock-track-pane::before, .floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .dock-track-pane::after { content:none; }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .dock-track-pane :is(h2,p,span,button,.text-button,.music-times,.music-sync-status) { color:var(--s-text); }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .dock-track-pane :is(.track-artist,.music-status,.music-queue-title,.music-queue-copy > small,.music-queue-now,.dock-empty) { color:var(--s-dim); }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .dock-track-pane .music-play { background:var(--s-accent); color:var(--s-on-accent); }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .dock-track-pane .music-queue button[aria-current='true'] { background:var(--s-fill); }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .dock-track-pane :is(.music-sessions,.music-access) { background:var(--s-panel); color:var(--s-text); border-color:var(--s-line); }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .dock-track-pane input[type='range'] { accent-color:var(--s-accent); }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] button:focus-visible { outline-color:var(--s-accent); }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] :is(.music-timeline,.music-volume) input::-webkit-slider-runnable-track { background:linear-gradient(to right,var(--s-accent) var(--music-progress),var(--s-line) var(--music-progress)); }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] :is(.music-timeline,.music-volume) input::-webkit-slider-thumb { background:var(--s-accent); box-shadow:none; }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .music-art { box-shadow:none; }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance], .floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] :is(.glass,.dock-track-pane) { backdrop-filter:none; -webkit-backdrop-filter:none; }
+/* The accent follows the song: its hue, at a fixed lightness per theme so text on it and in it stays readable.
+   Without a track (or with video colours off) the accent stays Kora purple. */
+@supports (color:oklch(from red l c h)) {
+  .floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance][data-track-accent] { --s-accent:oklch(from hsl(var(--track-hue) 85% 50%) .46 .13 h); }
+  .floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance][data-track-accent][data-appearance='dark'] { --s-accent:oklch(from hsl(var(--track-hue) 85% 50%) .81 .11 h); --s-on-accent:#141416; }
+}
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .dock-track-pane.dock-track-pane.dock-track-pane h2, .floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .music-now-playing-title { color:var(--s-accent); }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] :is(.dock-start,.music-play,.dock-ring-progress,.dock-track-pane h2,.music-now-playing-title,.dock-tabbar button) { transition:background-color .5s ease,color .5s ease,stroke .5s ease; }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .music-dot { background:var(--s-accent); }
+@media(prefers-reduced-motion:reduce) { .floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] :is(.dock-start,.music-play,.dock-ring-progress,.dock-track-pane h2,.music-now-playing-title,.dock-tabbar button) { transition:none; } }

@@ -79,7 +79,7 @@ export default function FloatingFocus(props: FloatingFocusProps) {
   }, [props.isWidget]);
   // Demo-only paths (saved demo tracks, track accent) stay off in live builds; see dockDemoEnabled.
   const [demo] = useState(dockDemoEnabled);
-  const music = useDockDemoMusic(useBrowserMusic(selectedTab === 'beat' && visible && !props.isMinimized), demo);
+  const music = useDockDemoMusic(useBrowserMusic(selectedTab === 'beat' && visible && !props.isMinimized, selectedTab === 'music' && visible && !props.isMinimized), demo);
   const preferences = useDockPreferences();
   const appearance = useAppearance();
   const trackPalette = useTrackPalette(music.selected, demo);
@@ -90,6 +90,8 @@ export default function FloatingFocus(props: FloatingFocusProps) {
   const groupId = useId();
   const settingsId = useId();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // Only the Mini size tier hides the tabs; this shows them in place of the timer.
+  const [panelsOpen, setPanelsOpen] = useState(false);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
   const timeButtonRef = useRef<HTMLButtonElement>(null);
@@ -123,12 +125,15 @@ export default function FloatingFocus(props: FloatingFocusProps) {
 
   return <LayoutGroup id={groupId}>
     <section ref={dockRef} className="floating-focus glass" aria-label={t('app.floatingFocus')} data-style="tabs" data-appearance={appearance.resolved}
-      data-dock-panel="" data-dock-demo={demo || undefined} data-widget={props.isWidget || undefined} data-demo-beats={demo && music.playing && music.selected?.id.startsWith('dock-demo') || undefined} data-track-accent={accentHue !== undefined ? "" : undefined} style={accentHue !== undefined ? { ...(demo && trackPalette ? trackPaletteVariables(trackPalette, appearance.resolved) : {}),
-        ...trackAccentVariables({ hue: accentHue, saturation: 68 }), ...(music.selected?.artwork ? { '--track-art': `url("${music.selected.artwork}")` } : {}) } as CSSProperties : undefined}>
+      data-dock-panel="" data-panels-open={panelsOpen || undefined} data-dock-demo={demo || undefined} data-widget={props.isWidget || undefined} data-demo-beats={demo && music.playing && music.selected?.id.startsWith('dock-demo') || undefined} data-track-accent={accentHue !== undefined ? "" : undefined} style={accentHue !== undefined ? { ...(demo && trackPalette ? trackPaletteVariables(trackPalette, appearance.resolved) : {}),
+        ...trackAccentVariables({ hue: accentHue, saturation: 68 }), '--track-hue': Math.round(accentHue), ...(music.selected?.artwork ? { '--track-art': `url("${music.selected.artwork}")` } : {}) } as CSSProperties : undefined}>
       <div className="dock-toolbar" ref={toolbarRef} data-draggable={Boolean(props.onDragStart)} onPointerDown={(event) => {
         if (event.button === 0 && !(event.target as HTMLElement).closest('button, a, input, select, textarea, [role="dialog"]')) props.onDragStart?.();
       }}>
         <span className="dock-style-name">{t('dock.title')}</span>
+        <button type="button" className="dock-icon-button dock-panels-toggle" aria-expanded={panelsOpen} aria-controls={`${groupId}-panels`}
+          aria-label={t(panelsOpen ? 'dock.hidePanels' : 'dock.showPanels')} title={t(panelsOpen ? 'dock.hidePanels' : 'dock.showPanels')} onClick={() => setPanelsOpen((current) => !current)}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d={panelsOpen ? 'm8 14 4-4 4 4' : 'm8 10 4 4 4-4'} /></svg></button>
         <button ref={settingsButtonRef} type="button" className="dock-icon-button" aria-label={t('dock.settings')} title={t('dock.settings')}
           aria-expanded={settingsOpen} aria-controls={settingsId} aria-haspopup="dialog" onClick={() => setSettingsOpen((current) => !current)}><DockIcon kind="settings" /></button>
         <button type="button" className="dock-icon-button" aria-label={props.returnLabel || t(props.isWidget ? 'dock.return' : 'dock.widget')}
@@ -223,7 +228,10 @@ export default function FloatingFocus(props: FloatingFocusProps) {
               <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">{timerState.isRunning ? <path d="M7 5h4v14H7zm6 0h4v14h-4z" /> : <path d="m8 5 11 7-11 7z" />}</svg>
               <span>{timerState.isRunning ? t('focus.timer.pause') : t('focus.timer.start')}</span></button>
             <button className="dock-reset" type="button" onClick={onReset}>{t(timerState.plannedSeconds === COUNT_UP_CAP_SECONDS ? 'focus.timer.finish' : 'focus.timer.reset')}</button>
-            <button className="dock-next" type="button" disabled={!taskId || !onMarkDoneAndNext || activeTask?.isDone} onClick={() => onMarkDoneAndNext?.(taskId)}>{t('floating.completeNext')}</button>
+            <button className="dock-next" type="button" disabled={!taskId || !onMarkDoneAndNext || activeTask?.isDone} onClick={() => onMarkDoneAndNext?.(taskId)}
+              aria-label={t('floating.completeNext')} title={t('floating.completeNext')}>
+              <svg className="dock-next-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m3 12 4 4 7-8M15 8l4 4-4 4" /></svg>
+              <span>{t('floating.completeNext')}</span></button>
           </div>
         </motion.section>
         <div className="dock-now-playing mini-player-wrapper" data-reserved={hasMusic && activeTab !== 'music'}>
@@ -231,7 +239,7 @@ export default function FloatingFocus(props: FloatingFocusProps) {
             {hasMusic && <MusicNowPlaying music={music} showPaused={demo} />}
           </div>
         </div>
-        <div className="tab-content-area">
+        <div className="tab-content-area" id={`${groupId}-panels`}>
         <section id={`${groupId}-focus`} className="dock-panel dock-work-pane" role="tabpanel" aria-labelledby={`${groupId}-focus-tab`}
           tabIndex={0} hidden={activeTab !== 'focus'}>
           <p className="eyebrow">{t('dock.focusTasks')}</p>

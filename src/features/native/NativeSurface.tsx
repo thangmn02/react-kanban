@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { invoke } from '@tauri-apps/api/core';
-import { currentMonitor, getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import FloatingFocus, { type FloatingFocusProps } from '../../components/focus/FloatingFocus';
 import dockCss from '../../components/focus/floatingFocus.css?inline';
 import nativeDockCss from './nativeDock.css?inline';
+import dockSurfacesCss from './nativeDockSurfaces.css?inline';
 import { useI18n } from '../../i18n';
 import './nativeSurface.css';
 import NativeUpdateDialog from './NativeUpdateDialog';
@@ -40,27 +41,11 @@ function NativeDock({ props }: { props: FloatingFocusProps }) {
     if (!node) return;
     const shadow = node.shadowRoot || node.attachShadow({ mode: 'open' });
     const style = document.createElement('style');
-    style.textContent = `${dockCss}\n${nativeDockCss}`;
+    style.textContent = `${dockCss}\n${nativeDockCss}\n${dockSurfacesCss}`;
     const root = document.createElement('div');
     shadow.replaceChildren(style, root);
     setTarget(root);
     return () => { shadow.replaceChildren(); };
-  }, []);
-  useEffect(() => {
-    // Fit Tabs once when opening; tab changes preserve the user's resized window.
-    let active = true;
-    const fit = async () => {
-      const nativeWindow = getCurrentWindow();
-      const monitor = await currentMonitor().catch(() => null);
-      const maxWidth = monitor ? monitor.workArea.size.width / monitor.scaleFactor : 1100;
-      const maxHeight = monitor ? monitor.workArea.size.height / monitor.scaleFactor : 900;
-      if (!active) return;
-      await nativeWindow.setMinSize(new LogicalSize(Math.min(320, maxWidth), Math.min(360, maxHeight)));
-      if (await nativeWindow.isMaximized() || !active) return;
-      await nativeWindow.setSize(new LogicalSize(Math.min(520, maxWidth), Math.min(580, maxHeight)));
-    };
-    void fit().catch(() => {});
-    return () => { active = false; };
   }, []);
   return <div ref={attach} className="native-dock-host">{target && createPortal(<FloatingFocus {...props}
     isWidget />, target)}</div>;
@@ -91,14 +76,18 @@ export default function NativeSurface({ dock, onToggle, focusProps, children }: 
   ];
   const notice = <UpdateNotice items={notices} laterLabel={vi ? 'Để sau' : 'Later'} />;
   const effectQueue = useRef(Promise.resolve());
+  const mode = dock ? 'dock' : onToggle ? 'tasks' : 'setup';
   useEffect(() => {
-    // Serialize surface changes so an older backdrop request cannot overwrite
-    // the normal Tasks window after a rapid Dock → Tasks switch.
+    // The native command saves the bounds of the mode being left (including maximised) and restores those of the
+    // mode being entered, so nothing here may resize or unmaximise the window around a switch.
+    effectQueue.current = effectQueue.current.then(() => invoke<void>('native_window_mode', { mode })).catch(() => {});
+  }, [mode]);
+  useEffect(() => {
+    // Serialize surface changes so an older request cannot overwrite the current one after a rapid switch.
     effectQueue.current = effectQueue.current.then(async () => {
-      // The native command owns both enabling and clearing the material. A
-      // webview remount must not clear frost while its shape remains cached.
+      // The native command owns the window's shape and clears any system material.
       await updateNativeShape(dock);
-    }).catch(() => {}); // Unsupported effects retain the CSS glass fallback.
+    }).catch(() => {}); // The page paints its own solid surface either way.
   }, [dock]);
   useEffect(() => {
     // Tasks is a normal app window; only the compact dock stays above other apps.
@@ -137,10 +126,6 @@ export default function NativeSurface({ dock, onToggle, focusProps, children }: 
   }, [dock]);
   useEffect(() => {
     document.documentElement.dataset.nativeSurface = dock ? 'dock' : 'workspace';
-    if (!dock) {
-      void getCurrentWindow().setMinSize(new LogicalSize(560, 540)).catch(() => {});
-      void getCurrentWindow().setSize(new LogicalSize(1100, 780)).catch(() => {});
-    }
     return () => { delete document.documentElement.dataset.nativeSurface;
       document.documentElement.style.removeProperty('--native-dock-radius'); };
   }, [dock]);
@@ -149,25 +134,20 @@ export default function NativeSurface({ dock, onToggle, focusProps, children }: 
     await getCurrentWindow().toggleMaximize();
     setMaximized(await getCurrentWindow().isMaximized());
   });
-  const switchSurface = () => action(async () => {
-    // Return to a compact dock, not a monitor-sized transparent window.
-    if (await getCurrentWindow().isMaximized()) await getCurrentWindow().unmaximize();
-    onToggle?.();
-  });
   const maximizeLabel = maximized ? (vi ? 'Khôi phục' : 'Restore') : (vi ? 'Phóng to' : 'Maximize');
   return <div className={`native-surface native-${dock ? 'dock' : 'workspace'}`}>
     {!dock && <div className="native-chrome">
       <span data-tauri-drag-region onPointerDown={(event) => {
         if (event.button === 0) action(() => getCurrentWindow().startDragging());
       }} onDoubleClick={toggleMaximize}>Kora</span>
-      {onToggle && <button type="button" onClick={switchSurface}>Dock</button>}
+      {onToggle && <button type="button" onClick={onToggle}>Dock</button>}
       <button type="button" className={appBadge ? 'native-update-badge' : undefined} aria-label={updateLabel} title={updateLabel} onClick={() => setUpdateOpen(true)}>{vi ? 'Cập nhật' : 'Update'}</button>
       <button type="button" aria-label={vi ? 'Thu nhỏ' : 'Minimize'} onClick={() => action(() => getCurrentWindow().minimize())}>−</button>
       <button type="button" aria-label={maximizeLabel} title={maximizeLabel} onClick={toggleMaximize}>{maximized ? '❐' : '□'}</button>
       <button type="button" aria-label={vi ? 'Đóng ứng dụng' : 'Close app'} onClick={() => action(() => getCurrentWindow().close())}>×</button>
     </div>}
     {dock ? <>
-      <div className="native-dock-scroll"><NativeDock props={{ ...focusProps, onReturnToTab: onToggle ? switchSurface : undefined,
+      <div className="native-dock-scroll"><NativeDock props={{ ...focusProps, onReturnToTab: onToggle,
         returnLabel: vi ? 'Công việc' : 'Tasks',
         onDragStart: () => action(() => getCurrentWindow().startDragging()),
         onMusicSetup: nativeCompanionPreviewEnabled()?undefined:() => void companion.run(),

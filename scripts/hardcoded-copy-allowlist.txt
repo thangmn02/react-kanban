@@ -179,6 +179,9 @@ src/features/notes/mini-editor.tsx	https://…
 src/features/notes/native-note-window.tsx	`${t('notes.restoreExternal')}: ${note.title||t('notes.quick.untitled')}`
 src/features/notes/native-note-window.tsx	line-through opacity-60
 src/features/notes/note-image-node.ts	noteImage
+src/features/notes/notes-manager.tsx	columns-[15rem] gap-3
+src/features/notes/notes-manager.tsx	line-through opacity-60
+src/features/notes/notes-manager.tsx	mx-auto max-w-2xl
 src/features/notes/sticky-note.tsx	`${t('notes.moveNote')}: ${label}`
 src/features/notes/sticky-note.tsx	`${t('notes.noteLabel')}: ${label}`
 src/features/notes/sticky-note.tsx	line-through opacity-60
@@ -229,3 +232,6 @@ src/utils/profile-image.ts	Choose a still image.
 src/utils/profile-image.ts	Image editing is unavailable in this browser.
 src/utils/profile-image.ts	Image processing failed.
 src/utils/profile-image.ts	This image cannot be processed safely. Choose a smaller valid image.
+src/features/notes/note-editor-lists.ts	koraBulletToChecklist
+src/pages/phone/phone-notes-route.tsx	Kora Notes
+src/pages/phone/phone-notes-route.tsx	line-through opacity-60

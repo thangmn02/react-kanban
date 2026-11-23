@@ -6,7 +6,10 @@ pub struct WindowShape(Arc<Mutex<Option<(bool, u32, u32, bool)>>>);
 
 pub fn initialize(window: &WebviewWindow) -> Result<(), String> {
     #[cfg(windows)]
-    frameless::attach(window.hwnd().map_err(|e| e.to_string())?.0 as _, false)?;
+    {
+        let _ = frameless::WINDOW.set(window.clone());
+        frameless::attach(window.hwnd().map_err(|e| e.to_string())?.0 as _, false)?;
+    }
     #[cfg(not(windows))]
     let _ = window;
     Ok(())
@@ -16,7 +19,17 @@ pub fn initialize(window: &WebviewWindow) -> Result<(), String> {
 mod frameless {
     use windows_sys::Win32::{Foundation::{HWND, LPARAM, LRESULT, WPARAM},
         UI::{Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass},
-            WindowsAndMessaging::{WM_NCACTIVATE, WM_NCDESTROY, WM_NCPAINT, WM_EXITSIZEMOVE}}};
+            WindowsAndMessaging::{WM_NCACTIVATE, WM_NCDESTROY, WM_NCPAINT, WM_EXITSIZEMOVE, WM_ENTERSIZEMOVE, GetWindowRect}}, Foundation::RECT};
+    use std::sync::{atomic::{AtomicI64, Ordering}, OnceLock};
+
+    /// The size when a drag began: a drag that also changed the size was a resize or a Windows snap, not a move.
+    static DRAG_SIZE: AtomicI64 = AtomicI64::new(0);
+    pub static WINDOW: OnceLock<tauri::WebviewWindow> = OnceLock::new();
+    fn size_key(hwnd: HWND) -> i64 {
+        let mut rect = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+        unsafe { GetWindowRect(hwnd, &mut rect); }
+        i64::from(rect.right - rect.left) << 32 | i64::from(rect.bottom - rect.top)
+    }
 
     const FRAME_SUBCLASS: usize = 0x4b4f5241;
 
@@ -29,7 +42,7 @@ mod frameless {
     }
 
     unsafe extern "system" fn window_proc(hwnd: HWND, message: u32, wparam: WPARAM,
-        lparam: LPARAM, id: usize, glass: usize) -> LRESULT {
+        lparam: LPARAM, id: usize, dock: usize) -> LRESULT {
         // The webview paints the entire frameless surface. DefWindowProc's
         // non-client painting otherwise leaks a caption and border through it.
         if let Some(result) = paint_result(message) { return result; }
@@ -38,15 +51,18 @@ mod frameless {
         }
         // Preserve Tauri's resize hit testing, activation, DPI and close handling.
         let result = DefSubclassProc(hwnd, message, wparam, lparam);
-        if message == WM_EXITSIZEMOVE && glass != 0 {
-            let _ = super::accent::apply(hwnd, true);
+        if message == WM_ENTERSIZEMOVE { DRAG_SIZE.store(size_key(hwnd), Ordering::Relaxed); }
+        if message == WM_EXITSIZEMOVE && dock != 0 {
+            if DRAG_SIZE.load(Ordering::Relaxed) == size_key(hwnd) {
+                if let Some(window) = WINDOW.get() { crate::window_bounds::snap_dock(window); }
+            }
         }
         result
     }
 
-    pub fn attach(hwnd: HWND, glass: bool) -> Result<(), String> {
+    pub fn attach(hwnd: HWND, dock: bool) -> Result<(), String> {
         // SetWindowSubclass must run on the thread that owns the window.
-        if unsafe { SetWindowSubclass(hwnd, Some(window_proc), FRAME_SUBCLASS, glass as usize) } == 0 {
+        if unsafe { SetWindowSubclass(hwnd, Some(window_proc), FRAME_SUBCLASS, dock as usize) } == 0 {
             return Err("Could not disable native frame painting".into());
         }
         Ok(())
@@ -66,52 +82,37 @@ mod frameless {
     }
 }
 
-#[cfg(windows)]
-mod accent {
-    use std::{ffi::c_void, mem::size_of};
-    use windows_sys::Win32::{Foundation::HWND,
-        System::LibraryLoader::{GetModuleHandleW, GetProcAddress}};
+/// The radius Windows 11 clips a rounded window to, and the one Kora cuts itself on older Windows.
+/// The page paints with whichever is active (`--native-dock-radius`), so the clip and the card always agree.
+const COMPOSITOR_RADIUS: u32 = 8;
+const REGION_RADIUS: u32 = 22;
 
-    #[repr(C)]
-    struct Policy { state: u32, flags: u32, tint: u32, animation: u32 }
-    #[repr(C)]
-    struct Composition { attribute: u32, data: *mut c_void, size: usize }
-
-    pub fn apply(hwnd: HWND, enabled: bool) -> Result<(), String> {
-        // The system backdrop chooses an opaque inactive tint. An acrylic
-        // accent lets the dock keep its translucent frost while working in
-        // another window. Resolve dynamically for older Windows versions.
-        let mut policy = Policy { state: if enabled { 4 } else { 0 }, flags: 0,
-            tint: 0x20fff1f5, animation: 0 };
-        let mut composition = Composition { attribute: 19,
-            data: &mut policy as *mut _ as _, size: size_of::<Policy>() };
-        unsafe {
-            let library = GetModuleHandleW(windows_sys::w!("user32.dll"));
-            let function = GetProcAddress(library, windows_sys::s!("SetWindowCompositionAttribute"))
-                .ok_or("Native frost is unavailable on this Windows version")?;
-            let apply: unsafe extern "system" fn(HWND, *mut Composition) -> i32 = std::mem::transmute(function);
-            if apply(hwnd, &mut composition) == 0 { return Err("Could not apply native frost".into()); }
-        }
-        Ok(())
-    }
+/// Windows never rounds a maximised window, so the page must not either.
+fn corner_radius(compositor: bool, maximized: bool) -> u32 {
+    if maximized { 0 } else if compositor { COMPOSITOR_RADIUS } else { REGION_RADIUS }
 }
 
 fn geometry(width: u32, height: u32, scale: f64) -> Result<(i32, i32, i32), String> {
     let width = i32::try_from(width).map_err(|_| "Window width is too large")?;
     let height = i32::try_from(height).map_err(|_| "Window height is too large")?;
-    // Match the 22 logical-pixel CSS radius at every display scale.
-    let diameter = (44.0 * scale).round().clamp(1.0, width.min(height).max(1) as f64) as i32;
+    // Match the CSS radius at every display scale.
+    let diameter = (f64::from(REGION_RADIUS * 2) * scale).round().clamp(1.0, width.min(height).max(1) as f64) as i32;
     Ok((width, height, diameter))
 }
 
 #[cfg(windows)]
-fn backdrop_attributes(rounded: bool) -> [(u32, u32); 2] {
+fn backdrop_attributes() -> [(u32, u32); 2] {
     use windows_sys::Win32::Graphics::Dwm::{DWMWA_SYSTEMBACKDROP_TYPE,
         DWMWA_USE_IMMERSIVE_DARK_MODE, DWMSBT_NONE};
-    let _ = rounded;
-    // Clear the opaque system material before applying the translucent accent.
+    // The page paints solid surfaces, so no system material shows through the Dock or its corners.
     [(DWMWA_USE_IMMERSIVE_DARK_MODE as _, 0),
         (DWMWA_SYSTEMBACKDROP_TYPE as _, DWMSBT_NONE as _)]
+}
+
+#[cfg(windows)]
+fn border_color(rounded: bool) -> u32 {
+    use windows_sys::Win32::Graphics::Dwm::{DWMWA_COLOR_DEFAULT, DWMWA_COLOR_NONE};
+    if rounded { DWMWA_COLOR_NONE } else { DWMWA_COLOR_DEFAULT }
 }
 
 #[tauri::command]
@@ -167,32 +168,33 @@ fn apply_shape(window: WebviewWindow, state: Arc<Mutex<Option<(bool, u32, u32, b
     #[cfg(windows)]
     frameless::attach(window.hwnd().map_err(|e| e.to_string())?.0 as _, rounded)?;
     let size = window.outer_size().map_err(|e| e.to_string())?;
-    if size.width == 0 || size.height == 0 { return Ok(8); }
+    if size.width == 0 || size.height == 0 { return Ok(COMPOSITOR_RADIUS); }
     #[cfg(not(windows))]
     let compositor_corners = false;
     #[cfg(windows)]
     let compositor_corners = {
         use windows_sys::Win32::Graphics::Dwm::{DwmSetWindowAttribute,
-            DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND, DWMWCP_DONOTROUND};
-        let preference = if rounded { DWMWCP_ROUND } else { DWMWCP_DONOTROUND };
+            DWMWA_BORDER_COLOR, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND};
+        // Dock and Tasks are both rounded; `rounded` only tells the Dock from the Tasks window.
+        let preference = DWMWCP_ROUND;
         let hwnd = window.hwnd().map_err(|e| e.to_string())?.0;
-        for (attribute, value) in backdrop_attributes(rounded) {
-            // Compositor corners still own clipping; the accent owns frost.
+        for (attribute, value) in backdrop_attributes() {
             unsafe { DwmSetWindowAttribute(hwnd as _, attribute,
                 &value as *const _ as _, std::mem::size_of_val(&value) as _); }
         }
-        // DWM clips both the webview and glass. A GDI cut-out instead leaves
-        // opaque corner blocks in the compositor's rectangular backdrop.
+        // The card paints its own hairline. The system border would add a second, darker ring outside the Dock's corners.
+        let border = border_color(rounded);
+        unsafe { DwmSetWindowAttribute(hwnd as _, DWMWA_BORDER_COLOR as _, &border as *const _ as _, std::mem::size_of_val(&border) as _); }
+        // DWM clips the webview smoothly; the region below is the fallback for older Windows.
         (unsafe { DwmSetWindowAttribute(window.hwnd().map_err(|e| e.to_string())?.0 as _,
             DWMWA_WINDOW_CORNER_PREFERENCE as _, &preference as *const _ as _, std::mem::size_of_val(&preference) as _) }) >= 0
     };
-    let radius = if compositor_corners { 8 } else { 22 };
+    let maximized = window.is_maximized().map_err(|e| e.to_string())?;
+    let radius = corner_radius(compositor_corners, maximized);
     let mut previous = state.lock().map_err(|_| "Window shape unavailable")?;
-    #[cfg(windows)]
-    if previous.as_ref().is_none_or(|old| old.0 != rounded) {
-        // An unavailable material must not prevent rounded CSS/region fallback.
-        let _ = accent::apply(window.hwnd().map_err(|e| e.to_string())?.0 as _, rounded);
-    }
+    let cut = !compositor_corners && !maximized;
+    #[cfg(not(windows))]
+    let _ = cut;
     let key = (rounded, size.width, size.height, compositor_corners);
     if *previous == Some(key) { return Ok(radius); }
     #[cfg(windows)]
@@ -201,11 +203,11 @@ fn apply_shape(window: WebviewWindow, state: Arc<Mutex<Option<(bool, u32, u32, b
         let hwnd = window.hwnd().map_err(|e| e.to_string())?.0;
         // Windows owns HRGN only on successful SetWindowRgn; delete failed allocations.
         unsafe {
-            let region = if rounded && !compositor_corners {
+            let region = if cut {
                 let (width, height, diameter) = geometry(size.width, size.height, window.scale_factor().map_err(|e| e.to_string())?)?;
                 CreateRoundRectRgn(0, 0, width, height, diameter, diameter)
             } else { std::ptr::null_mut() };
-            if rounded && !compositor_corners && region.is_null() { return Err("Could not round window".into()); }
+            if cut && region.is_null() { return Err("Could not round window".into()); }
             if SetWindowRgn(hwnd as _, region, 1) == 0 {
                 if !region.is_null() { DeleteObject(region as _); }
                 return Err("Could not update window shape".into());
@@ -218,7 +220,20 @@ fn apply_shape(window: WebviewWindow, state: Arc<Mutex<Option<(bool, u32, u32, b
 
 #[cfg(test)]
 mod tests {
-    use super::geometry;
+    use super::{corner_radius, geometry};
+    #[test]
+    fn one_radius_follows_the_active_clip_and_a_maximised_dock_is_square() {
+        assert_eq!(corner_radius(true, false), 8);
+        assert_eq!(corner_radius(false, false), 22);
+        assert_eq!(corner_radius(true, true), 0);
+        assert_eq!(corner_radius(false, true), 0);
+    }
+    #[cfg(windows)]
+    #[test]
+    fn only_the_dock_drops_the_system_border() {
+        assert_eq!(super::border_color(true), 0xFFFF_FFFE);
+        assert_eq!(super::border_color(false), 0xFFFF_FFFF);
+    }
     #[test]
     fn corners_follow_display_scale_without_changing_window_bounds() {
         assert_eq!(geometry(520, 460, 1.0).unwrap(), (520, 460, 44));
@@ -234,8 +249,7 @@ mod tests {
     }
     #[cfg(windows)]
     #[test]
-    fn dock_uses_light_compositor_glass_and_tasks_clear_the_backdrop() {
-        assert_eq!(super::backdrop_attributes(true), [(20, 0), (38, 1)]);
-        assert_eq!(super::backdrop_attributes(false), [(20, 0), (38, 1)]);
+    fn no_system_material_is_left_behind_either_surface() {
+        assert_eq!(super::backdrop_attributes(), [(20, 0), (38, 1)]);
     }
 }

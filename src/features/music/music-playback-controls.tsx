@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useI18n } from '../../i18n';
 import type { BrowserMusicController } from './useBrowserMusic';
 
@@ -13,6 +13,9 @@ export default function MusicPlaybackControls({ music, showRemaining = false }: 
     const timer = setInterval(() => setNow(Date.now()), 500);
     return () => clearInterval(timer);
   }, [music.playing]);
+  // Muting a site whose slider drops to zero must not lose the level to return to.
+  const audible = useRef<{ id: string; volume: number }>(undefined);
+  useEffect(() => { if (selected?.volume && !selected.muted) audible.current = { id: selected.id, volume: selected.volume }; }, [selected]);
   if (!selected) return null;
   const duration = selected.duration || 0;
   const elapsed = music.playing && selected.sampledAt ? Math.max(0, (now - selected.sampledAt) / 1000) * (selected.playbackRate || 1) : 0;
@@ -48,7 +51,7 @@ export default function MusicPlaybackControls({ music, showRemaining = false }: 
     </div>
     <div className="music-volume">
       <button type="button" className="music-mute" aria-label={t(volume ? 'music.mute' : 'music.unmute')}
-        disabled={disabled || selected.volume === undefined} onClick={() => void control('media.volume', volume ? 0 : selected.volume || .5)}>
+        disabled={disabled || selected.volume === undefined} onClick={() => void control('media.volume', volume ? 0 : selected.volume || (audible.current?.id === selected.id ? audible.current.volume : .5))}>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
           <path d="M4 9h4l5-4v14l-5-4H4z" />{volume === 0 ? <path d="m17 9 5 6m0-6-5 6" /> : <><path d="M17 8q5 4 0 8" />{volume > .5 && <path d="M20 5q7 7 0 14" />}</>}
         </svg>

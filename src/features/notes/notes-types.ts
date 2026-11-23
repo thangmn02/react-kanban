@@ -1,6 +1,7 @@
 import type { Json } from '../../types/database.types';
 import type { StickyNote } from './notes-store';
 import { notePresentationPreferences } from './note-presentation';
+import { normalizeLabels } from './note-labels';
 
 export type NotePermission = 'view' | 'comment' | 'edit' | 'manage';
 export type NoteRow = {
@@ -8,6 +9,8 @@ export type NoteRow = {
   content: Json; content_schema_version: number; visibility: 'private' | 'workspace';
   revision: number; write_token: string; import_key: string | null;
   created_at: string; updated_at: string; deleted_at: string | null;
+  /** Present once the Keep-style migration is applied. */
+  archived_at?: string | null;
 }
 export type NoteAccessRow = { note_id: string; user_id: string; permission: NotePermission; created_at: string };
 export type NoteComment = { id: string; note_id: string; author_user_id: string; body: string; revision: number; created_at: string; updated_at: string };
@@ -18,4 +21,4 @@ export type NotePresentation = Pick<StickyNote, 'x' | 'y' | 'width' | 'height' |
 export interface ConnectedNote { row: NoteRow; note: StickyNote; permission: NotePermission }
 export const notePermissionRank: Record<NotePermission, number> = { view: 1, comment: 2, edit: 3, manage: 4 };
 export const notePresentation = (note: StickyNote): NotePresentation => ({ x: note.x, y: note.y, width: note.width, height: note.height, pinned: note.pinned, minimized: note.minimized, expanded: note.expanded, ...notePresentationPreferences(note) });
-export const noteContent = (note: StickyNote): Json => ({ html: note.html, checklist: note.checklist.map(item => ({ id: item.id, text: item.text, isDone: item.isDone })), convertedTaskId: note.convertedTaskId });
+export const noteContent = (note: StickyNote): Json => ({ html: note.html, checklist: note.checklist.map(item => ({ id: item.id, text: item.text, isDone: item.isDone })), convertedTaskId: note.convertedTaskId, labels: normalizeLabels(note.labels) });

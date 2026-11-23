@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import Placeholder from '@tiptap/extension-placeholder';
 import { stripTaskHtml } from '../../utils/taskCollections';
 import { safeNoteHtml } from './safe-note-html';
 import { NoteImageNode } from './note-image-node';
+import { noteChecklistClasses, noteListExtensions } from './note-editor-lists';
 import { useNoteMedia } from './note-media-context';
 import { noteImageIds, type UploadedNoteImage } from './note-media';
 import { useI18n } from '../../i18n';
 
-export default function MiniEditor({ html, onChange, compact, readOnly = false, minimal=false, onConvertSelection, conversionPending = false }: { html: string; onChange: (html: string) => void; compact: boolean; readOnly?: boolean; minimal?:boolean; onConvertSelection?: (text: string) => void; conversionPending?: boolean }) {
+export default function MiniEditor({ html, onChange, compact, readOnly = false, minimal=false, placeholder, onConvertSelection, conversionPending = false }: { placeholder?: string; html: string; onChange: (html: string) => void; compact: boolean; readOnly?: boolean; minimal?:boolean; onConvertSelection?: (text: string) => void; conversionPending?: boolean }) {
   const { t } = useI18n();
   const change = useRef(onChange);
   const media = useNoteMedia(), mediaRef = useRef(media), imageInput = useRef<HTMLInputElement>(null), pendingUpload = useRef(false);
@@ -17,12 +19,20 @@ export default function MiniEditor({ html, onChange, compact, readOnly = false, 
   const [recoveredImages,setRecoveredImages]=useState<(UploadedNoteImage&{createdAt:string})[]|null>(null);
   const [link, setLink] = useState<string | null>(null), [error, setError] = useState('');
   useEffect(() => { change.current = onChange; }, [onChange]);
+  // The HTML this editor last loaded or produced. Only a different value from outside is loaded again, so equivalent
+  // HTML written elsewhere (a checklist ticked on a card) does not reset the caret when the note opens.
+  const applied = useRef(html);
+  // After the user types, the editor waits for that exact HTML to come back from the save before it accepts outside
+  // changes again, so an older copy that arrives late (a slower first save of a new note) cannot erase what was typed.
+  const echo = useRef<string | null>(null);
   const uploadRef = useRef<(file: File) => void>(() => {});
-  const editor = useEditor({ extensions: [StarterKit.configure({ link: { openOnClick: false, protocols: ['http', 'https', 'mailto'] } }), NoteImageNode], content: html, immediatelyRender: false,
-    editorProps: { transformPastedHTML: safeNoteHtml, handlePaste: (_view, event) => { const file = [...(event.clipboardData?.files || [])].find(item => item.type.startsWith('image/')); if (!file || !mediaRef.current) return false; event.preventDefault(); uploadRef.current(file); return true; }, attributes: { 'aria-label': 'Note content', role: 'textbox', 'aria-multiline': 'true', class: 'min-h-24 rounded-lg p-2 text-[length:var(--note-font-size,14px)] leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-blue-500 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-2 [&_h1]:text-xl [&_h2]:text-lg [&_h3]:font-semibold [&_a]:text-blue-700 [&_a]:underline [&_pre]:overflow-auto [&_pre]:rounded [&_pre]:bg-black/5 [&_pre]:p-2' } },
-    onUpdate: ({ editor }) => change.current(editor.getHTML()) });
-  const active = useEditorState({ editor, selector: ({ editor }) => ({ bold: editor?.isActive('bold'), italic: editor?.isActive('italic'), underline: editor?.isActive('underline'), strike: editor?.isActive('strike'), heading: editor?.getAttributes('heading').level as number | undefined }) });
-  useEffect(() => { if (editor && editor.getHTML() !== html) editor.commands.setContent(html, { emitUpdate: false }); }, [editor, html]);
+  const editor = useEditor({ extensions: [StarterKit.configure({ link: { openOnClick: false, protocols: ['http', 'https', 'mailto'] } }), NoteImageNode, ...noteListExtensions(t('task.checklistItem')), ...(placeholder ? [Placeholder.configure({ placeholder })] : [])], content: html, immediatelyRender: false,
+    editorProps: { transformPastedHTML: safeNoteHtml, handlePaste: (_view, event) => { const file = [...(event.clipboardData?.files || [])].find(item => item.type.startsWith('image/')); if (!file || !mediaRef.current) return false; event.preventDefault(); uploadRef.current(file); return true; }, attributes: { 'aria-label': 'Note content', role: 'textbox', 'aria-multiline': 'true', class: 'min-h-24 rounded-lg p-2 text-[length:var(--note-font-size,14px)] leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-blue-500 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-2 [&_h1]:text-xl [&_h2]:text-lg [&_h3]:font-semibold [&_a]:text-blue-700 [&_a]:underline [&_pre]:overflow-auto [&_pre]:rounded [&_pre]:bg-black/5 [&_pre]:p-2 [&_p.is-editor-empty:first-child]:before:pointer-events-none [&_p.is-editor-empty:first-child]:before:float-left [&_p.is-editor-empty:first-child]:before:h-0 [&_p.is-editor-empty:first-child]:before:opacity-70 [&_p.is-editor-empty:first-child]:before:content-[attr(data-placeholder)] ' + noteChecklistClasses } },
+    onUpdate: ({ editor }) => { const next = editor.getHTML(); applied.current = next; echo.current = next; change.current(next); },
+    // Leaving the editor ends the wait, so a later outside change (such as restoring history) always shows.
+    onBlur: () => { echo.current = null; } });
+  const active = useEditorState({ editor, selector: ({ editor }) => ({ bold: editor?.isActive('bold'), italic: editor?.isActive('italic'), underline: editor?.isActive('underline'), strike: editor?.isActive('strike'), heading: editor?.getAttributes('heading').level as number | undefined, taskList: editor?.isActive('taskList') }) });
+  useEffect(() => { if (!editor) return; if (echo.current !== null) { if (html === echo.current) echo.current = null; return; } if (html === applied.current) return; applied.current = html; if (editor.getHTML() === html) return; const { from, to } = editor.state.selection; editor.commands.setContent(html, { emitUpdate: false }); const end = editor.state.doc.content.size; editor.commands.setTextSelection({ from: Math.min(from, end), to: Math.min(to, end) }); }, [editor, html]);
   useEffect(() => { editor?.setEditable(!readOnly,false); }, [editor, readOnly]);
   useEffect(()=>{uploadRef.current = file => {
     if (!mediaRef.current || !editor || !editor.isEditable || pendingUpload.current) return;
@@ -40,6 +50,7 @@ export default function MiniEditor({ html, onChange, compact, readOnly = false, 
       <button type="button" aria-label={t('notes.strikethrough')} aria-pressed={active?.strike ?? false} className="h-8 rounded px-2 line-through hover:bg-black/5" onMouseDown={event => event.preventDefault()} onClick={() => editor?.chain().focus().toggleStrike().run()}>S</button>
       <select aria-label={t('notes.textStyle')} value={active?.heading || 0} className="h-8 max-w-28 rounded border border-black/10 bg-transparent px-1 text-xs" onChange={event => { const level = Number(event.target.value); if (level) editor?.chain().focus().toggleHeading({ level: level as 1 | 2 | 3 }).run(); else editor?.chain().focus().setParagraph().run(); }}><option value={0}>{t('notes.paragraph')}</option><option value={1}>{t('notes.heading1')}</option><option value={2}>{t('notes.heading2')}</option><option value={3}>{t('notes.heading3')}</option></select>
       <button type="button" aria-label={t('task.bulletList')} className="h-8 rounded px-2 text-xs hover:bg-black/5" onClick={() => editor?.chain().focus().toggleBulletList().run()}>{t('notes.list')}</button>
+      <button type="button" aria-label={t('notes.checklistLines')} title={t('notes.checklistLinesHint')} aria-pressed={active?.taskList ?? false} className="h-8 rounded px-2 text-xs hover:bg-black/5" onMouseDown={event => event.preventDefault()} onClick={() => editor?.chain().focus().toggleTaskList().run()}>{t('notes.checklistButton')}</button>
       <button type="button" aria-label={t('notes.undoNoteEdit')} className="h-8 rounded px-2 text-xs hover:bg-black/5" onClick={() => editor?.chain().focus().undo().run()}>{t('app.undo')}</button>
       <details className="relative"><summary className="min-h-8 cursor-pointer rounded px-2 py-1 text-xs hover:bg-black/5">{t('app.more')}</summary><div className="absolute right-0 z-10 flex w-44 flex-wrap gap-1 rounded-lg border border-slate-200 bg-white p-2 text-slate-800 shadow-lg"><button type="button" className="min-h-8 px-2 text-xs" onClick={() => editor?.chain().focus().toggleOrderedList().run()}>{t('notes.numberedList')}</button><button type="button" className="min-h-8 px-2 text-xs" onClick={() => editor?.chain().focus().toggleCode().run()}>{t('notes.inlineCode')}</button><button type="button" className="min-h-8 px-2 text-xs" onClick={() => editor?.chain().focus().toggleCodeBlock().run()}>{t('notes.codeBlock')}</button><button type="button" className="min-h-8 px-2 text-xs" onClick={() => { setLink(String(editor?.getAttributes('link').href || '')); setError(''); }}>{t('notes.link')}</button><button type="button" aria-label={t('notes.redoNoteEdit')} className="min-h-8 px-2 text-xs" onClick={() => editor?.chain().focus().redo().run()}>{t('notes.redo')}</button></div></details>
       {onConvertSelection && <button type="button" disabled={conversionPending} className="h-8 rounded px-2 text-xs hover:bg-black/5 disabled:opacity-50" onMouseDown={event => event.preventDefault()} onClick={() => { if (editor) { const { from, to } = editor.state.selection; const text = editor.state.doc.textBetween(from, to, '\n').trim(); if (text) onConvertSelection(text); } }}>{t('notes.selectedTextToTask')}</button>}

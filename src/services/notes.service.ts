@@ -3,6 +3,7 @@ import type { AppUser, WorkspaceRole } from '../types/auth.type';
 import type { Json } from '../types/database.types';
 import { newNote, type StickyNote } from '../features/notes/notes-store';
 import { notePresentationPreferences } from '../features/notes/note-presentation';
+import { normalizeLabels } from '../features/notes/note-labels';
 import { noteContent, notePresentation, type ConnectedNote, type NoteAccessRow, type NoteComment, type NotePermission, type NoteRow } from '../features/notes/notes-types';
 
 function result<T>(value: { data: T; error: { message: string; code?: string } | null }): T {
@@ -28,7 +29,7 @@ export async function fetchConnectedNotes(user: AppUser, workspaceId: string | n
   const taskBoards = taskLinks.length ? result(await client.from('tasks').select('id,board_id').in('id', taskLinks.map(link => link.task_id))) ?? [] : [];
   await assertAccount();
   return rows.map((row, index) => {
-    const content = row.content as { html?: string; checklist?: StickyNote['checklist']; convertedTaskId?: string | null };
+    const content = row.content as { html?: string; checklist?: StickyNote['checklist']; convertedTaskId?: string | null; labels?: unknown };
     const stored = presentations.find(item => item.note_id === row.id)?.presentation as Partial<StickyNote> | undefined;
     const layout = stored ? {
       ...notePresentationPreferences(stored),
@@ -41,7 +42,7 @@ export async function fetchConnectedNotes(user: AppUser, workspaceId: string | n
     const base: NotePermission = row.owner_user_id === user.id ? 'manage' : row.visibility === 'workspace' && currentRole && currentRole !== 'viewer' ? 'edit' : 'view';
     const ranks = { view: 1, comment: 2, edit: 3, manage: 4 };
     const permission = explicit && ranks[explicit] > ranks[base] ? explicit : base;
-    return { row, permission, note: { ...newNote(index), ...layout, id: row.id, title: row.title, html: content.html ?? '', checklist: content.checklist ?? [], convertedTaskId: content.convertedTaskId ?? null, taskId: link?.task_id ?? null, taskBoardId: taskBoards.find(task => task.id === link?.task_id)?.board_id ?? null, revision: row.revision, writeToken: row.write_token, updatedAt: row.updated_at, peek: false } };
+    return { row, permission, note: { ...newNote(index), ...layout, id: row.id, title: row.title, html: content.html ?? '', checklist: content.checklist ?? [], convertedTaskId: content.convertedTaskId ?? null, labels: normalizeLabels(content.labels), archivedAt: row.archived_at ?? null, taskId: link?.task_id ?? null, taskBoardId: taskBoards.find(task => task.id === link?.task_id)?.board_id ?? null, revision: row.revision, writeToken: row.write_token, updatedAt: row.updated_at, peek: false } };
   });
 }
 function bounded(value: unknown, min: number, max: number, fallback: number) {
@@ -62,6 +63,10 @@ export async function setNoteAccess(row: NoteRow, changes: { userId?: string; pe
 }
 export async function setNoteDeleted(row: NoteRow, deleted: boolean, actorUserId: string): Promise<NoteRow> {
   return result(await requireSupabaseClient().rpc('set_note_deleted', { request: { id: row.id, expectedRevision: row.revision, deleted, actorUserId } })) as unknown as NoteRow;
+}
+/** Archive is a shared row state; it does not bump the revision, so collaborators' edits keep flowing. */
+export async function setNoteArchived(row: NoteRow, archived: boolean, actorUserId: string): Promise<NoteRow> {
+  return result(await requireSupabaseClient().rpc('set_note_archived', { request: { id: row.id, archived, actorUserId } })) as unknown as NoteRow;
 }
 export async function moveConnectedNote(row:NoteRow,workspaceId:string|null,clearTaskLink:boolean,actorUserId:string):Promise<NoteRow>{
   return result(await requireSupabaseClient().rpc('move_note',{request:{id:row.id,workspaceId,clearTaskLink,expectedRevision:row.revision,actorUserId}})) as unknown as NoteRow;

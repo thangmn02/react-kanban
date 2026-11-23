@@ -3,11 +3,11 @@ import { translateNow } from '../../i18n/context';
 
 export type NoteMode = 'NORMAL' | 'TRANSLUCENT' | 'PEEK' | 'CLICK_THROUGH' | 'COLLAPSED';
 export const noteColors = {
-  paper: { get label() { return translateNow('notes.paper'); }, surface: '#fffbea', text: '#253047', border: '#e8dfba' },
-  mint: { get label() { return translateNow('notes.mint'); }, surface: '#edf8f0', text: '#203f33', border: '#bfdcc8' },
-  sky: { get label() { return translateNow('notes.sky'); }, surface: '#eef5fc', text: '#243d58', border: '#c5d8ec' },
-  rose: { get label() { return translateNow('notes.rose'); }, surface: '#fff1f3', text: '#543039', border: '#edcbd1' },
-  slate: { get label() { return translateNow('appearance.dark'); }, surface: '#253047', text: '#f1f5f9', border: '#475569' },
+  paper: { get label() { return translateNow('notes.paper'); }, surface: '#fffbea', text: '#253047', border: '#e8dfba', scheme: 'light' },
+  mint: { get label() { return translateNow('notes.mint'); }, surface: '#edf8f0', text: '#203f33', border: '#bfdcc8', scheme: 'light' },
+  sky: { get label() { return translateNow('notes.sky'); }, surface: '#eef5fc', text: '#243d58', border: '#c5d8ec', scheme: 'light' },
+  rose: { get label() { return translateNow('notes.rose'); }, surface: '#fff1f3', text: '#543039', border: '#edcbd1', scheme: 'light' },
+  slate: { get label() { return translateNow('appearance.dark'); }, surface: '#253047', text: '#f1f5f9', border: '#475569', scheme: 'dark' },
 } as const;
 const bound = (value: number | undefined, min: number, max: number, fallback: number) => typeof value === 'number' && Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback;
 export function notePresentationPreferences(note: Partial<StickyNote>) {

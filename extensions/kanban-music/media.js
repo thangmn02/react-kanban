@@ -34,7 +34,7 @@ export function readMedia(ensureObserved = false, paletteWanted = false) {
       currentTime: Number.isFinite(media.currentTime) ? media.currentTime : 0,
       playbackRate: media.playbackRate, sampledAt: Date.now(), muted: media.muted || media.volume === 0,
       duration: Number.isFinite(media.duration) && media.duration > 0 ? media.duration : undefined,
-      volume: media.volume, canSeek: Number.isFinite(media.duration) && media.duration > 0 && media.seekable.length > 0,
+      volume: globalThis.__kanbanMusicMedia?.siteVolume?.(media)?.get() ?? media.volume, canSeek: Number.isFinite(media.duration) && media.duration > 0 && media.seekable.length > 0,
       canPrevious: Boolean(skip()[0]), canNext: Boolean(skip()[1]),
       assetUrl: assetUrl?.slice(0, 2048), protectedMedia: Boolean(media.mediaKeys), observed: Boolean(globalThis.__kanbanMusicMedia),
       mediaFacts: globalThis.__kanbanMusicMedia?.sourceFacts?.(media) || { kind:'unknown' },
@@ -66,6 +66,9 @@ export async function controlMedia(index, expectedSource, action, value) {
     const snapshot = media.snapshot();
     if (!snapshot || snapshot.src !== expectedSource) throw new Error('Track changed. Refresh and try again.');
     if (!['media.seek', 'media.volume'].includes(action)) return media.control(expectedSource, action, value);
+    const site = action === 'media.volume' && Number.isFinite(value) && value >= 0 && value <= 1
+      ? globalThis.__kanbanMusicMedia?.siteVolume?.(media) : undefined;
+    if (site) { site.set(value); return true; }
     media = media.audio(snapshot);
     if (!media) throw new Error('Playback control unavailable.');
     expectedSource = media.currentSrc;
@@ -84,7 +87,8 @@ export async function controlMedia(index, expectedSource, action, value) {
   }
   else if (action === 'media.volume') {
     if (!Number.isFinite(value) || value < 0 || value > 1) throw new Error('Invalid volume.');
-    media.volume = value; media.muted = value === 0;
+    const site = globalThis.__kanbanMusicMedia?.siteVolume?.(media);
+    if (site) site.set(value); else { media.volume = value; media.muted = value === 0; }
   }
   else if (action === 'media.previous' || action === 'media.next') {
     const selector = action === 'media.previous'

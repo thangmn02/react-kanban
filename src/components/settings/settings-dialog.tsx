@@ -8,6 +8,7 @@ import { uiFade } from '../../shared/motion';
 import { renderAvatarCrop,type AvatarCrop } from '../../utils/profile-image';
 import AvatarEditor from './avatar-editor';
 import AppearanceSettings from './appearance-settings';
+import QuickNotesSettings from './quick-notes-settings';
 
 export default function SettingsDialog({user,onClose,onOpenFocus}:{user:AppUser;onClose:()=>void;onOpenFocus:()=>void}){
  const auth=useAuth(),{t,language,setLanguage}=useI18n(),reduced=useReducedMotion();
@@ -38,6 +39,7 @@ export default function SettingsDialog({user,onClose,onOpenFocus}:{user:AppUser;
      <label className="block text-sm text-slate-700">{t('app.language.label')}<select aria-label={t('app.language.label')} value={language} onChange={event=>setLanguage(event.target.value as Language)} className="mt-2 block w-full rounded-lg border border-slate-200 px-3 py-2"><option value="en">English</option><option value="vi">Tiếng Việt</option></select></label>
      <p className="text-xs text-slate-500">{t('settings.instant')}</p>
      <AppearanceSettings/>
+     <QuickNotesSettings/>
      <button type="button" disabled={saving||dirty} onClick={()=>{onClose();onOpenFocus();}} className="min-h-10 rounded-lg border border-slate-200 px-3 text-sm text-slate-700">{t('settings.focusPreferences')}</button>
     </section>
    </form>

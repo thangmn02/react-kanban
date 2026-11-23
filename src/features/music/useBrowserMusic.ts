@@ -39,7 +39,7 @@ function updateSelection(current: MusicSelection, next: BrowserMusicSession[], t
 }
 
 // Keep discovery alive even while the music panel is hidden.
-export function useBrowserMusic(beatDemand = false) {
+export function useBrowserMusic(beatDemand = false, volumeVisible = false) {
   const beta=useLocalHybridMusic(beatDemand);
   const { t } = useI18n();
   const [{ sessions, selectedId }, setMusic] = useState<MusicSelection>({ sessions: [], selectedId: '', explicitSelection: false, selectionToken: '' });
@@ -50,6 +50,9 @@ export function useBrowserMusic(beatDemand = false) {
   const [checking, setChecking] = useState(true);
   // Polls at once when the playing song stops on its own (a new song in the same tab), so its beats return sooner.
   const pollNow = useRef<() => void>(() => {});
+  // While the desktop Dock shows the volume slider, changes made on the site must show within 300 ms.
+  const pollEvery = useRef(2000);
+  useEffect(() => { const fast = volumeVisible && isNativeWidget(); pollEvery.current = fast ? 200 : 2000; if (fast) pollNow.current(); }, [volumeVisible]);
 
   useEffect(() => {
     let cancelled = false;
@@ -65,7 +68,7 @@ export function useBrowserMusic(beatDemand = false) {
         if (!cancelled) { setMusic((current) => ({ ...current, sessions: [], selectedId: '', explicitSelection: false })); setConnected(false); setChecking(false); setError(reason instanceof MusicBridgeError && reason.code === 'not-installed' ? '' : t('music.reconnect')); }
       } finally {
         inFlight = false;
-        if (!cancelled) timeout = setTimeout(poll, soon ? 150 : 2000);
+        if (!cancelled) timeout = setTimeout(poll, soon ? 150 : pollEvery.current);
         soon = false;
       }
     };

@@ -10,6 +10,9 @@ import type { StickyNote } from './notes-store';
 import { downloadNotesFile } from './note-transfer';
 import './native-note-window.css';
 import { useI18n } from '../../i18n';
+import { bodyPatch, hasAutomaticTitle } from './note-title';
+import NoteSourceChip from './note-source-chip';
+import { isEmptyNote, noteSaveState, noteSaveStateKey } from './note-save-state';
 
 type Reply = { nonce:string; result:unknown; error:string|null };
 export default function NativeNoteWindow() {
@@ -19,7 +22,8 @@ export default function NativeNoteWindow() {
   const send=useRef<<T,>(action:string,payload?:unknown)=>Promise<T>>(()=>Promise.reject(Error('The note is preparing.')));
   const context=useRef<NativeNoteContext|null>(null);
   const acknowledged=useRef<NativeNoteSnapshot|null>(null),failed=useRef(false),writerId=useRef(''),editVersion=useRef(0),closing=useRef(false),closeCancellation=useRef(0);
-  const [preparingClose,setPreparingClose]=useState(false);
+  const [preparingClose,setPreparingClose]=useState(false),[online,setOnline]=useState(()=>navigator.onLine),[local,setLocal]=useState(false),[titled,setTitled]=useState(false),[pendingWrites,setPendingWrites]=useState(0);
+  useEffect(()=>{const update=()=>setOnline(navigator.onLine);window.addEventListener('online',update);window.addEventListener('offline',update);return()=>{window.removeEventListener('online',update);window.removeEventListener('offline',update);};},[]);
   useEffect(()=>{
     const noteWindow=getCurrentWebviewWindow(),pendingRequests=requests.current,earlyReplies=early.current,listeners=mediaListeners.current;active.current=true;document.documentElement.classList.add('native-note-document');const cleanups:(()=>void)[]=[];
     const apply=(value:NativeNoteSnapshot)=>{if(context.current?.noteId&&value.note.id!==context.current.noteId)return false;latest.current=value;if(!writing.current&&!failed.current){setSnapshot(value);if(/^(Saved locally|All changes saved)/.test(value.status))acknowledged.current=value;}return true;};
@@ -40,8 +44,9 @@ export default function NativeNoteWindow() {
       const closeStop=await noteWindow.listen<{nonce:string}>('kora-note-prepare-close',event=>prepareClose(event.payload.nonce));if(!active.current){closeStop();return;}cleanups.push(closeStop);
       const cancelStop=await noteWindow.listen('kora-note-close-cancel',()=>{closeCancellation.current++;closing.current=false;setPreparingClose(false);});if(!active.current){cancelStop();return;}cleanups.push(cancelStop);
       const contextCancellation=closeCancellation.current;
-      const initial=await nativeNoteRequest<NativeNoteFlags&{context:NativeNoteContext;writerId:string;closeNonce?:string}>('context');if(!active.current)return;context.current=initial.context;writerId.current=initial.writerId;setFlags(initial);if(initial.closeNonce&&contextCancellation===closeCancellation.current)prepareClose(initial.closeNonce);
-      const first=await send.current<NativeNoteSnapshot>('read');acknowledged.current=first;apply(first);
+      const initial=await nativeNoteRequest<NativeNoteFlags&{context:NativeNoteContext;writerId:string;closeNonce?:string;focusOnLoad?:boolean}>('context');if(!active.current)return;context.current=initial.context;setLocal(initial.context.local);writerId.current=initial.writerId;setFlags(initial);if(initial.closeNonce&&contextCancellation===closeCancellation.current)prepareClose(initial.closeNonce);
+      const first=await send.current<NativeNoteSnapshot>('read');acknowledged.current=first;setTitled(!hasAutomaticTitle(first.note));apply(first);
+      if(initial.focusOnLoad)await nativeNoteRequest('focus').catch(()=>{});
       requestAnimationFrame(()=>document.querySelector<HTMLElement>('[contenteditable="true"]')?.focus());
     })().catch(reason=>{if(active.current)setError(String(reason));});
     return()=>{active.current=false;cleanups.forEach(stop=>stop());pendingRequests.forEach(pending=>{clearTimeout(pending.timer);pending.reject(Error('The note window closed.'));});pendingRequests.clear();earlyReplies.clear();listeners.clear();document.documentElement.classList.remove('native-note-document');};
@@ -60,33 +65,36 @@ export default function NativeNoteWindow() {
     if(patch.opacity!==undefined){void nativeNoteRequest('flags',{opacity:patch.opacity}).catch(reason=>setError(String(reason)));return;}
     if(patch.collapsed!==undefined){void nativeNoteRequest('flags',{collapsed:patch.collapsed}).catch(reason=>setError(String(reason)));return;}
     if(patch.clickThrough||patch.peek){void nativeNoteRequest('flags',{ghost:true,peek:!!patch.peek}).catch(reason=>setError(String(reason)));return;}
-    const version=++editVersion.current;writing.current++;setSnapshot(previous=>previous?{...previous,note:{...previous.note,...patch},status:'Saving locally…'}:previous);
-    void nativeNoteRequest('edit_state',{writerId:writerId.current,version,settled:false}).then(()=>send.current<NativeNoteSnapshot>('change',{patch})).then(value=>{latest.current=value;acknowledged.current=value;if(!failed.current)setError('');}).catch(reason=>{failed.current=true;setHasFailed(true);setError(String(reason));setSnapshot(current=>current?{...current,status:'Local save failed. Export the retained draft before closing.'}:current);}).finally(()=>{writing.current--;if(!writing.current&&!failed.current&&latest.current){setSnapshot(latest.current);void nativeNoteRequest('edit_state',{writerId:writerId.current,version:editVersion.current,settled:true}).catch(()=>{});}});
+    const version=++editVersion.current;writing.current++;setPendingWrites(value=>value+1);setSnapshot(previous=>previous?{...previous,note:{...previous.note,...patch},status:'Saving locally…'}:previous);
+    void nativeNoteRequest('edit_state',{writerId:writerId.current,version,settled:false}).then(()=>send.current<NativeNoteSnapshot>('change',{patch})).then(value=>{latest.current=value;acknowledged.current=value;if(!failed.current)setError('');}).catch(reason=>{failed.current=true;setHasFailed(true);setError(String(reason));setSnapshot(current=>current?{...current,status:'Local save failed. Export the retained draft before closing.'}:current);}).finally(()=>{writing.current--;setPendingWrites(value=>value-1);if(!writing.current&&!failed.current&&latest.current){setSnapshot(latest.current);void nativeNoteRequest('edit_state',{writerId:writerId.current,version:editVersion.current,settled:true}).catch(()=>{});}});
   };
+  // × discards a note that is still empty; any other note is hidden (restore it from the tray or Notes).
+  const close=()=>{if(snapshot&&!snapshot.readOnly&&isEmptyNote(snapshot.note)&&!writing.current){void send.current<{discarded:boolean}>('discard_empty').then(value=>{if(!value.discarded)void nativeNoteRequest('hide');}).catch(()=>{void nativeNoteRequest('hide');});return;}void nativeNoteRequest('hide');};
   if(!snapshot)return <div role="status" className="m-1 rounded-xl bg-amber-50 p-4 text-sm text-slate-800">{error||'Opening Kora Note…'}</div>;
+  const saveState=noteSaveState({status:/^Saving/i.test(snapshot.status)?'':snapshot.status,error:error||snapshot.error,writing:pendingWrites>0,failed:hasFailed,online,local});
   const note=snapshot.note,presentation=notePresentationPreferences(note),color=noteColors[presentation.color];
   return <NoteMediaProvider media={media}>
     <div className="native-note-root" style={{'--note-font-size':`${presentation.fontSize}px`,color:color.text} as React.CSSProperties}>
-      <article style={{display:flags.collapsed?'none':undefined,background:color.surface,borderColor:color.border,opacity:flags.peek?0.08:flags.opacity}} className="native-note-card">
+      <article style={{display:flags.collapsed?'none':undefined,background:color.surface,borderColor:color.border,colorScheme:color.scheme,opacity:flags.peek?0.08:flags.opacity}} className="native-note-card">
         <header className="flex shrink-0 items-center gap-1 border-b border-black/10 p-1.5">
           <button type="button" aria-label={t('notes.moveExternalNote')} className="min-h-8 cursor-grab px-2" onPointerDown={()=>{void nativeNoteRequest('drag').catch(reason=>setError(String(reason)));}}>⠿</button>
           <span className="min-w-0 flex-1 truncate text-xs font-semibold">{note.title||'Kora Note'}</span>
           <button type="button" aria-label={t('notes.alwaysOnTop')} aria-pressed={flags.alwaysOnTop} className="min-h-8 rounded px-2 text-xs hover:bg-black/5" onClick={()=>{void nativeNoteRequest('flags',{alwaysOnTop:!flags.alwaysOnTop}).catch(reason=>setError(String(reason)));}}>{flags.alwaysOnTop?t('notes.onTop'):t('briefing.pin')}</button>
           <button type="button" aria-label={t('notes.collapseExternalNote')} className="min-h-8 px-2" onClick={()=>{void nativeNoteRequest('flags',{collapsed:true});}}>−</button>
-          <button type="button" aria-label={t('notes.hideExternalNote')} className="min-h-8 px-2" onClick={()=>{void nativeNoteRequest('hide');}}>×</button>
+          <button type="button" aria-label={t('notes.hideExternalNote')} className="min-h-8 px-2" onClick={close}>×</button>
         </header>
         <div className="quiet-scroll-fade min-h-0 flex-1 space-y-2 overflow-auto p-3">
-          <input aria-label={t('notes.quick.titleLabel')} value={note.title} maxLength={160} readOnly={snapshot.readOnly||preparingClose} className="w-full bg-transparent text-base font-semibold outline-none focus-visible:ring-2 focus-visible:ring-blue-500" placeholder={t('notes.quick.untitled')} onChange={event=>change({title:event.target.value})}/>
-          <MiniEditor html={note.html} compact={false} minimal readOnly={snapshot.readOnly||preparingClose} onChange={html=>change({html})}/>
+          <NoteSourceChip title={note.taskId?snapshot.taskTitle??t('notes.openLinkedTask'):undefined} onOpen={()=>{void send.current('open_task');}} onUnlink={snapshot.readOnly?undefined:()=>change({taskId:null,taskBoardId:null})}/>
+          {titled&&<input aria-label={t('notes.quick.titleLabel')} value={note.title} maxLength={160} readOnly={snapshot.readOnly||preparingClose} className="w-full bg-transparent text-base font-semibold outline-none focus-visible:ring-2 focus-visible:ring-blue-500" placeholder={t('notes.quick.untitled')} onChange={event=>change({title:event.target.value})}/>}
+          <MiniEditor html={note.html} compact={false} minimal placeholder={t('notes.quick.placeholder')} readOnly={snapshot.readOnly||preparingClose} onChange={html=>change(bodyPatch(note,html))}/>
           {!!note.checklist.length&&<ul className="space-y-2">{note.checklist.map(item=><li key={item.id}><label className="flex gap-2 text-sm"><input type="checkbox" disabled={snapshot.readOnly||preparingClose} checked={item.isDone} onChange={event=>change({checklist:note.checklist.map(row=>row.id===item.id?{...row,isDone:event.target.checked}:row)})}/><span className={item.isDone?'line-through opacity-60':''}>{item.text}</span></label></li>)}</ul>}
-          {note.taskId&&<button type="button" className="min-h-8 text-xs underline" onClick={()=>{void send.current('open_task');}}>{t('notes.openLinkedTask')}</button>}
           {(error||snapshot.error)&&<p role="alert" className="rounded bg-white p-2 text-xs text-rose-700">{error||snapshot.error}{hasFailed&&<button type="button" className="ml-2 min-h-8 underline" onClick={()=>downloadNotesFile(snapshot.note,'kora-native-draft.json')}>{t('notes.exportRetainedDraft')}</button>}</p>}
           {snapshot.conflict&&<button type="button" className="min-h-8 text-xs underline" onClick={()=>{void send.current<NativeNoteSnapshot>('recover').then(setSnapshot).catch(reason=>setError(String(reason)));}}>{t('notes.reviewRetainedDraftInNotesManager')}</button>}
         </div>
         <footer className="flex shrink-0 items-center justify-between gap-1 border-t border-black/10 px-2 py-1">
-          <div className="min-w-0"><p role="status" className="truncate text-[10px] opacity-80">{snapshot.status||'Editing'}</p><button type="button" className="min-h-6 text-[10px] underline" disabled={preparingClose} onClick={()=>{const version=editVersion.current,action=failed.current?'change':'retry',payload=failed.current?{expectedRevision:acknowledged.current?.note.revision,expectedToken:acknowledged.current?.note.writeToken,patch:{title:snapshot.note.title,html:snapshot.note.html,checklist:snapshot.note.checklist}}:{};writing.current++;void send.current<NativeNoteSnapshot>(action,payload).then(value=>{acknowledged.current=value;latest.current=value;if(editVersion.current!==version||writing.current!==1){failed.current=true;setHasFailed(true);setError(t('notes.newerEditsRemainInThisFrame'));return;}failed.current=false;setHasFailed(false);setError('');setSnapshot(value);void nativeNoteRequest('edit_state',{writerId:writerId.current,version,settled:true}).catch(()=>{});}).catch(reason=>setError(String(reason))).finally(()=>{writing.current--;});}}>{t('notes.retrySaveSync')}</button></div>
+          <div className="min-w-0"><p role="status" data-save-state={saveState} className="truncate text-[10px] opacity-80">{t(noteSaveStateKey(saveState))}</p>{(saveState==='failed'||saveState==='offline')&&<button type="button" className="min-h-6 text-[10px] underline" disabled={preparingClose} onClick={()=>{const version=editVersion.current,action=failed.current?'change':'retry',payload=failed.current?{expectedRevision:acknowledged.current?.note.revision,expectedToken:acknowledged.current?.note.writeToken,patch:{title:snapshot.note.title,html:snapshot.note.html,checklist:snapshot.note.checklist}}:{};writing.current++;void send.current<NativeNoteSnapshot>(action,payload).then(value=>{acknowledged.current=value;latest.current=value;if(editVersion.current!==version||writing.current!==1){failed.current=true;setHasFailed(true);setError(t('notes.newerEditsRemainInThisFrame'));return;}failed.current=false;setHasFailed(false);setError('');setSnapshot(value);void nativeNoteRequest('edit_state',{writerId:writerId.current,version,settled:true}).catch(()=>{});}).catch(reason=>setError(String(reason))).finally(()=>{writing.current--;});}}>{t('notes.retrySaveSync')}</button>}</div>
           <NoteAppearance note={{...note,opacity:flags.opacity}} onChange={change} onHide={()=>{void nativeNoteRequest('hide');}}/>
-          <button type="button" aria-label={t('notes.resizeExternalNote')} className="min-h-8 cursor-nwse-resize px-2" onPointerDown={()=>{void nativeNoteRequest('resize').catch(reason=>setError(String(reason)));}}>↘</button>
+          <button type="button" aria-label={t('notes.resizeExternalNote')} className="min-h-8 cursor-nwse-resize px-2" onPointerDown={()=>{void nativeNoteRequest('resize').catch(reason=>setError(String(reason)));}}>{"↘︎"}</button>
         </footer>
       </article>
       {flags.collapsed&&<button type="button" aria-label={`${t('notes.restoreExternal')}: ${note.title||t('notes.quick.untitled')}`} title={t('notes.clickToRestoreDragToMove')} className="native-note-bubble" style={{background:color.surface}} onClick={()=>{void nativeNoteRequest('flags',{collapsed:false});}} onPointerDown={event=>{const start={x:event.clientX,y:event.clientY};const move=(next:PointerEvent)=>{if(Math.hypot(next.clientX-start.x,next.clientY-start.y)>6){window.removeEventListener('pointermove',move);void nativeNoteRequest('drag');}};window.addEventListener('pointermove',move);window.addEventListener('pointerup',()=>window.removeEventListener('pointermove',move),{once:true});}}>▤</button>}

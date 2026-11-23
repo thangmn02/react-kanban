@@ -15,7 +15,7 @@ vi.mock('./mini-editor',()=>({default:({html,readOnly,onChange}:{html:string;rea
 vi.mock('./note-appearance',()=>({default:()=>null}));
 let snapshot:NativeNoteSnapshot;
 beforeEach(()=>{
-  mocks.events.clear();mocks.request.mockReset();snapshot={note:newNote(),readOnly:false,status:'Saved locally on this device.',error:'',conflict:false};
+  mocks.events.clear();mocks.request.mockReset();snapshot={note:{...newNote(),title:'Own title'},readOnly:false,status:'Saved locally on this device.',error:'',conflict:false};
   mocks.request.mockImplementation(async(action:string)=>{
     if(action==='context')return{writerId:'frame-writer',context:{noteId:snapshot.note.id},alwaysOnTop:true,opacity:0.96,collapsed:false,ghost:false,peek:false};
     if(action==='read'){queueMicrotask(()=>mocks.events.get('kora-note-reply')?.({payload:{nonce:'read',result:snapshot,error:null}}));return{nonce:'read'};}
@@ -64,4 +64,16 @@ it('does not revive a canceled close from a delayed initial context response',as
 
 it('keeps the established original when a snapshot names another note',async()=>{
  await ready();const original=snapshot.note.id;await act(async()=>mocks.events.get('kora-note-snapshot')!({payload:{...snapshot,note:{...snapshot.note,id:'another-note',title:'Wrong original'}}}));expect(screen.getByLabelText('Note title')).toHaveValue(snapshot.note.title);expect(screen.getByLabelText('Note title')).not.toHaveValue('Wrong original');await act(async()=>mocks.events.get('kora-note-snapshot')!({payload:{...snapshot,note:{...snapshot.note,id:original,title:'Current original update'}}}));expect(screen.getByLabelText('Note title')).toHaveValue('Current original update');
+});
+it('opens a new note with only its source chip and body, and names it by the first line',async()=>{
+  snapshot={...snapshot,note:{...newNote(),title:'',taskId:'task-1',taskBoardId:'board-1'},taskTitle:'Practise kanji'};
+  render(<NativeNoteWindow/>);const body=await screen.findByLabelText('Note content');
+  expect(screen.queryByLabelText('Note title')).toBeNull();
+  expect(screen.getByRole('button',{name:'Linked to Practise kanji'})).toHaveTextContent('Practise kanji');
+  const sent=()=>mocks.request.mock.calls.filter(([action])=>action==='change').map(([,payload])=>(payload as {patch:unknown}).patch);
+  fireEvent.change(body,{target:{value:'<p>First line</p><p>More</p>'}});
+  await waitFor(()=>expect(sent()).toContainEqual({html:'<p>First line</p><p>More</p>',title:'First line'}));
+  fireEvent.click(screen.getByRole('button',{name:'Remove task link'}));
+  await waitFor(()=>expect(sent()).toContainEqual({taskId:null,taskBoardId:null}));
+  expect(document.querySelector('[data-note-source="kora"]')).toHaveTextContent('Kora');
 });

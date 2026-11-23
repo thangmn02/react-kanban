@@ -19,7 +19,7 @@ function NotesLinks({ item, close, sharing, search }: { item: string; close: () 
   const query = new URLSearchParams(search), personal = query.get('scope') === 'personal', active = query.get('filter') || 'all';
   const scope = personal ? '&scope=personal' : '';
   const selected = 'bg-white font-semibold text-slate-900 shadow-sm';
-  const filters = (['all', 'pinned', 'recent', ...(sharing && !personal ? ['shared'] as const : []), 'trash'] as const);
+  const filters = (['all', 'pinned', 'recent', ...(sharing && !personal ? ['shared'] as const : []), 'archive', 'trash'] as const);
   return <>
     <div role="group" aria-label={t('notes.scope')} className="mb-3 grid grid-cols-2 gap-1 rounded-lg bg-black/5 p-1">
       {([false, true] as const).map(value => <Link key={String(value)} to={value ? '/notes?scope=personal' : '/notes'} onClick={close}

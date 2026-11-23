@@ -9,7 +9,9 @@ import { NOTES_CHANGED, notesKey, readNotes, type StickyNote } from './notes-sto
 import { nativeNotesControl, type NativeNoteContext, type NativeNoteSnapshot } from './native-note-bridge';
 import { deviceNotesRepository,prepareDeviceNotesToClose } from './device-notes-session';
 
-import {DETACH_NOTE} from './native-notes-events';
+import {DETACH_NOTE,type DetachRequest} from './native-notes-events';
+import {isEmptyNote} from './note-save-state';
+import {setNoteDeleted} from '../../services/notes.service';
 import {sequenceNativeNotesLifecycle,runNotesTransition} from './native-notes-lifecycle';
 
 type Request = { nonce: string; label: string; context: NativeNoteContext; action: string; payload: Record<string, unknown> };
@@ -17,8 +19,8 @@ const patchKeys = new Set(['title','html','checklist','taskId','taskBoardId','pi
 const base64 = async (blob: Blob) => { const bytes = new Uint8Array(await blob.arrayBuffer()); let result = ''; for (let at=0;at<bytes.length;at+=16384) result+=String.fromCharCode(...bytes.subarray(at,at+16384)); return btoa(result); };
 
 /** The only native Notes auth/repository owner; note WebViews receive no session. */
-export default function NativeNotesOwner({ user, workspace, onManager, onOpenTask }: { user: AppUser | null; workspace: WorkspaceSummary | null; onManager: () => void; onOpenTask: (taskId: string, boardId: string) => void }) {
-  const routes=useRef({onManager,onOpenTask});useEffect(()=>{routes.current={onManager,onOpenTask};},[onManager,onOpenTask]);const readUser=useEffectEvent(()=>user);
+export default function NativeNotesOwner({ user, workspace, onManager, onOpenTask, taskTitle, captureSource }: { user: AppUser | null; workspace: WorkspaceSummary | null; onManager: () => void; onOpenTask: (taskId: string, boardId: string) => void; taskTitle?: (taskId: string) => string | undefined; /** Where the capture shortcut was pressed: from the Dock, a note belongs to the Focus task. */ captureSource?: () => { docked: boolean; taskId?: string; boardId?: string } }) {
+  const routes=useRef({onManager,onOpenTask,taskTitle,captureSource});useEffect(()=>{routes.current={onManager,onOpenTask,taskTitle,captureSource};},[onManager,onOpenTask,taskTitle,captureSource]);const readUser=useEffectEvent(()=>user);
   useEffect(() => {
     if (!isTauri()) return;const user=readUser(),mainWindow=getCurrentWebviewWindow();
     let active=true; const subscriptions=new Map<string,{release:()=>void;unsubscribe:()=>void;repository:ReturnType<typeof connectedNotesRepository>} >(), media=new Map<string,NoteMedia>();
@@ -39,8 +41,8 @@ export default function NativeNotesOwner({ user, workspace, onManager, onOpenTas
     const getRepository=(context:NativeNoteContext)=>{verify(context);return connectedNotesRepository(user!,context.workspaceId,context.workspaceId?workspace?.role:undefined);};
     const snapshot=(context:NativeNoteContext):NativeNoteSnapshot=>{
       verify(context);
-      if(context.local){const state=localRepository(context).session.getSnapshot(),note=state.notes.find(note=>note.id===context.noteId&&!note.deletedAt);if(!note)throw Error('This device note is unavailable.');return{note,readOnly:false,status:state.status||'Saved locally on this device.',error:state.error,conflict:false};}
-      const state=getRepository(context).session.getSnapshot(),entry=state.notes.find(row=>row.note.id===context.noteId&&!row.row.deleted_at);if(!entry)throw Error('Note access is unavailable.');return{note:entry.note,readOnly:!['edit','manage'].includes(entry.permission)||state.conflicts.includes(context.noteId),status:state.status,error:state.error,conflict:state.conflicts.includes(context.noteId)};
+      if(context.local){const state=localRepository(context).session.getSnapshot(),note=state.notes.find(note=>note.id===context.noteId&&!note.deletedAt);if(!note)throw Error('This device note is unavailable.');return{note,readOnly:false,status:state.status||'Saved locally on this device.',error:state.error,conflict:false,taskTitle:note.taskId?routes.current.taskTitle?.(note.taskId):undefined};}
+      const state=getRepository(context).session.getSnapshot(),entry=state.notes.find(row=>row.note.id===context.noteId&&!row.row.deleted_at);if(!entry)throw Error('Note access is unavailable.');return{note:entry.note,readOnly:!['edit','manage'].includes(entry.permission)||state.conflicts.includes(context.noteId),status:state.status,error:state.error,conflict:state.conflicts.includes(context.noteId),taskTitle:entry.note.taskId?routes.current.taskTitle?.(entry.note.taskId):undefined};
     };
     const publish=async(label:string,context:NativeNoteContext)=>{try{await nativeNotesControl('snapshot',{label,snapshot:snapshot(context)});}catch{if(active){await nativeNotesControl('close',{label}).catch(()=>{});const previous=subscriptions.get(label);previous?.unsubscribe();previous?.release();subscriptions.delete(label);media.delete(label);}}};
     const register=async(label:string,context:NativeNoteContext)=>{
@@ -50,11 +52,13 @@ export default function NativeNotesOwner({ user, workspace, onManager, onOpenTas
       const unsubscribe=repository.session.subscribe(()=>{void publish(label,context);});subscriptions.set(label,{release,unsubscribe,repository});
       await repository.session.refresh();
     };
-    const open=async(context:NativeNoteContext,focus=false,preserveHidden=false)=>{await ready;verify(context);if(!context.local){const repository=getRepository(context),release=repository.acquire();try{await repository.session.refresh();snapshot(context);const label=await nativeNotesControl<string>('open',{context,focus,preserveHidden});await register(label,context);return label;}finally{release();}}await localRepository(context).session.whenReady();snapshot(context);return nativeNotesControl<string>('open',{context,focus,preserveHidden});};
+    const open=async(context:NativeNoteContext,focus=false,preserveHidden=false,besideMain=false)=>{await ready;verify(context);if(!context.local){const repository=getRepository(context),release=repository.acquire();try{await repository.session.refresh();snapshot(context);const label=await nativeNotesControl<string>('open',{context,focus,preserveHidden,besideMain});await register(label,context);return label;}finally{release();}}await localRepository(context).session.whenReady();snapshot(context);return nativeNotesControl<string>('open',{context,focus,preserveHidden,besideMain});};
+    /** Close one floating note window and drop its subscriptions (the five-window limit, empty-note discard). */
+    const closeWindow=async(label:string)=>{const previous=subscriptions.get(label);previous?.unsubscribe();previous?.release();subscriptions.delete(label);media.delete(label);await nativeNotesControl('close',{label});};
     const restoreCatalog=async()=>{await ready;if(!active||!user)return;const saved=await nativeNotesControl<{contexts:NativeNoteContext[];retainedErrors:number}>('catalog');for(const context of saved.contexts){if(!active)return;verify(context);if(context.local!==user.isMock)continue;try{await open(context,false,true);}catch{/* Keep inaccessible/offline entries for a later authorized recovery. */}}if(saved.retainedErrors)window.dispatchEvent(new CustomEvent('kora:note-error',{detail:`${saved.retainedErrors} damaged placement records were retained. Open their original notes from Notes Manager.`}));};
     const online=()=>{void restoreCatalog().catch(reason=>{if(active)window.dispatchEvent(new CustomEvent('kora:note-error',{detail:String(reason)}));});};online();window.addEventListener('online',online);
     const localChanged=()=>{void nativeNotesControl<{label:string;context:NativeNoteContext}[]>('windows').then(windows=>Promise.all(windows.filter(entry=>entry.context.local).map(entry=>publish(entry.label,entry.context)))).catch(()=>{});};
-    const onDetach=(event:Event)=>{void open((event as CustomEvent<NativeNoteContext>).detail).catch(reason=>window.dispatchEvent(new CustomEvent('kora:note-error',{detail:String(reason)})));};
+    const onDetach=(event:Event)=>{const request=(event as CustomEvent<DetachRequest>).detail,context:NativeNoteContext={userId:request.userId,workspaceId:request.workspaceId,noteId:request.noteId,local:request.local};void(async()=>{if(request.replaceLabel)await closeWindow(request.replaceLabel);await open(context,!!request.focus,false,!!request.besideMain);})().then(()=>request.done?.(),reason=>{if(request.done)request.done(String(reason));else window.dispatchEvent(new CustomEvent('kora:note-error',{detail:String(reason)}));});};
     window.addEventListener(DETACH_NOTE,onDetach);window.addEventListener(NOTES_CHANGED,localChanged);
     const handle=async(request:Request)=>{
       try{
@@ -68,6 +72,13 @@ export default function NativeNotesOwner({ user, workspace, onManager, onOpenTas
           if(context.local){const session=localRepository(context).session;const note=request.payload.expectedRevision!==undefined?await session.retryFrame(context.noteId,patch,request.payload.expectedToken as string|undefined,request.label):(await session.change(context.noteId,patch,request.label),await session.whenNoteDurable(context.noteId));result={...snapshot(context),note};}
           else{const session=getRepository(context).session;if(request.payload.expectedRevision!==undefined&&!session.canRetryFrame(context.noteId,request.payload.expectedRevision,request.label))throw Error('The original changed in another session. Export the retained frame draft before reviewing it.');session.change(context.noteId,patch,request.label);const note=await session.whenDurable(context.noteId);if(!note)throw Error('The original note is unavailable.');result={...snapshot(context),note};}
         }else if(request.action==='retry'){if(context.local){const session=localRepository(context).session;await session.retry(context.noteId);const note=await session.whenNoteDurable(context.noteId);result={...snapshot(context),note};}else{const session=getRepository(context).session;session.retry();const note=await session.whenDurable(context.noteId);if(!note)throw Error('The original note is unavailable.');result={...snapshot(context),note};}}
+        else if(request.action==='discard_empty'){
+          // Closing an empty floating note discards it (Trash) and closes its window instead of hiding it.
+          const current=snapshot(context);if(current.readOnly||!isEmptyNote(current.note)){result={discarded:false};}
+          else{if(context.local){await localRepository(context).session.change(context.noteId,{deletedAt:new Date().toISOString()});}
+            else{const session=getRepository(context).session;await session.flush(context.noteId);const entry=session.getSnapshot().notes.find(row=>row.row.id===context.noteId);if(entry&&entry.permission==='manage'&&!entry.row.deleted_at){await setNoteDeleted(entry.row,true,user!.id);await session.refresh();}}
+            result={discarded:true};const label=request.label;setTimeout(()=>{void closeWindow(label).catch(()=>{});},0);}
+        }
         else if(request.action==='open_task'){const note=snapshot(context).note;if(note.taskId&&note.taskBoardId)routes.current.onOpenTask(note.taskId,note.taskBoardId);}
         else if(request.action==='recover'){if(!context.local){const session=getRepository(context).session;const draft=session.getSnapshot().drafts.find(row=>row.draft.note.id===context.noteId);if(draft)session.recover(draft.key,false);result=snapshot(context);}}
         else if(request.action==='media_upload'||request.action==='media_download'||request.action==='media_list'){
@@ -88,10 +99,13 @@ export default function NativeNotesOwner({ user, workspace, onManager, onOpenTas
       if(event.payload.action==='window_closed'&&event.payload.label){const label=event.payload.label,previous=subscriptions.get(label);previous?.unsubscribe();previous?.release();subscriptions.delete(label);media.delete(label);window.dispatchEvent(new CustomEvent('kora:note-error',{detail:'An external note closed unexpectedly. Restore it from the tray or Notes Manager; its saved draft is retained.'}));}
       if(event.payload.action==='quit_blocked')window.dispatchEvent(new CustomEvent('kora:notes-quit-blocked',{detail:'Notes did not confirm durable storage. Retry or export retained edits before quitting.'}));
       if(event.payload.action==='capture'){
-        try{if(!user)throw Error('Sign in before creating a note.');const context:NativeNoteContext={userId:user.id,workspaceId:null,noteId:'',local:user.isMock};
-          if(user.isMock){context.noteId=await localRepository(context).session.create({expanded:true,floating:true});}
-          else{const repository=getRepository(context),release=repository.acquire();try{await repository.session.refresh();context.noteId=repository.session.create({expanded:true,floating:true});await repository.session.whenDurable(context.noteId);await open(context,true);}finally{release();}}
-          if(user.isMock)await open(context,true);
+        try{if(!user)throw Error('Sign in before creating a note.');const source=routes.current.captureSource?.(),docked=!!source?.docked;
+          const linked=docked&&source?.taskId&&workspace&&workspace.role!=='viewer'?workspace:null;
+          const link=linked?{taskId:source!.taskId!,taskBoardId:source!.boardId??null}:{};
+          const context:NativeNoteContext={userId:user.id,workspaceId:linked?.id??null,noteId:'',local:user.isMock};
+          if(user.isMock){context.noteId=await localRepository(context).session.create({expanded:true,floating:true,...link});}
+          else{const repository=getRepository(context),release=repository.acquire();try{await repository.session.refresh();context.noteId=repository.session.create({expanded:true,floating:true,...link});await repository.session.whenDurable(context.noteId);await open(context,true,false,docked);}finally{release();}}
+          if(user.isMock)await open(context,true,false,docked);
         }finally{await nativeNotesControl('capture_finished');}
       }
       if(event.payload.action==='quit'){

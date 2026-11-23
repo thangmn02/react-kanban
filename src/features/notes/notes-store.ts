@@ -13,6 +13,10 @@ export interface StickyNote {
   opacity?: number; color?: 'paper' | 'mint' | 'sky' | 'rose' | 'slate'; fontSize?: number;
   floating?: boolean; hidden?: boolean; collapsed?: boolean; clickThrough?: boolean;
   bubbleX?: number; bubbleY?: number; headerVisible?: boolean; deletedAt?: string | null;
+  /** Content labels (synced with the note). Nested labels use `/`. */
+  labels?: string[];
+  /** Archive is shared by every collaborator, unlike pin and colour. */
+  archivedAt?: string | null;
 }
 export const NOTES_CHANGED = 'kora:notes-changed';
 export const notesKey = (scope: StorageScope) => buildStorageKey(scope, 'notes-preview');

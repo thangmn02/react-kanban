@@ -20,6 +20,7 @@ const CalendarRoute = lazy(() => import('./pages/board/CalendarRoute'));
 const TableRoute = lazy(() => import('./pages/board/TableRoute'));
 const WorkspaceMembersRoute = lazy(() => import('./pages/workspace/WorkspaceMembersRoute'));
 const ArcanaRoute = lazy(() => import('./pages/arcana/ArcanaRoute'));
+const PhoneNotesRoute = lazy(() => import('./pages/phone/phone-notes-route'));
 const NotFoundRoute = lazy(() => import('./pages/not-found/NotFoundRoute'));
 const SharedBoardRoute = lazy(() => import('./pages/share/SharedBoardRoute'));
 
@@ -33,6 +34,8 @@ export default function App() {
         <Routes>
           {/* Public and read-only: outside the app layout, so it needs no session and shows no app chrome. */}
           <Route path="share/:token" element={<SharedBoardRoute />} />
+          {/* Kora Notes for phones: notes only, outside the full workspace shell. */}
+          <Route path="phone" element={<PhoneNotesRoute />} />
           <Route element={<AppLayout />}>
             <Route index element={<HomeRoute />} />
             <Route path="home" element={<HomeRoute />} />

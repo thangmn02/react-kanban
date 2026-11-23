@@ -48,7 +48,7 @@ async function geometry(page: Page) {
     // Every icon renders inside its own button, and the timer label inside its ring.
     for (const button of dock.querySelectorAll('button')) {
       const icon = button.querySelector(':scope > svg');
-      if (icon && visible(button)) contained.push({ child: box(icon, `icon of ${button.getAttribute('aria-label') || button.className}`), parent: box(button, button.getAttribute('aria-label') || button.className) });
+      if (icon && visible(button) && visible(icon)) contained.push({ child: box(icon, `icon of ${button.getAttribute('aria-label') || button.className}`), parent: box(button, button.getAttribute('aria-label') || button.className) });
     }
     const ring = dock.querySelector('.dock-ring'), time = ring?.querySelector('.time');
     if (ring && time && visible(ring)) contained.push({ child: box(time, 'timer label'), parent: box(ring, 'timer ring') });

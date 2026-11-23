@@ -526,3 +526,4 @@
 .floating-focus[data-demo-beats] .music-pattern .beat-square:nth-child(8) { animation-delay:1.5s; }
 .floating-focus[data-demo-beats] .music-pattern .beat-square:nth-child(9) { animation-delay:1.75s; }
 @media(prefers-reduced-motion:reduce) { .floating-focus[data-demo-beats] .music-pattern .beat-square { animation:none !important; } }
+.dock-next-icon, .dock-panels-toggle { display:none; } /* Shown by the desktop Dock's small size tiers (nativeDock.css). */

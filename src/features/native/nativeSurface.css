@@ -1,12 +1,17 @@
 html[data-native-surface], html[data-native-surface] body, html[data-native-surface] #root { margin:0; background:transparent !important; }
 .native-surface { color:#25222d; font-family:Inter,system-ui,sans-serif; height:100dvh; display:flex; flex-direction:column; overflow:hidden; }
-.native-workspace { background:#f7f8fa; }
+.native-workspace { background:#f7f8fa; border-radius:var(--native-dock-radius,8px); }
 .native-chrome { display:flex; align-items:center; min-height:32px; gap:3px; padding:0 8px; background:rgba(255,255,255,.78); border-bottom:1px solid #71648920; }
 .native-chrome span { flex:1; align-self:stretch; display:flex; align-items:center; font-size:11px; color:#787182; user-select:none; cursor:grab; }
 .native-chrome button { font:500 12px system-ui; padding:2px 9px; border:0; border-radius:6px; background:transparent; color:#63586f; cursor:pointer; }
 .native-chrome button:hover { background:#9a88bb20; }
 .native-dock-scroll { overflow:hidden; flex:1; min-height:0; }
-.native-dock { border-radius:var(--native-dock-radius,8px); }
+/* One radius for the whole Dock: native_dock_shape reports what the window is clipped to. Whatever sits at the bottom
+   (the card, or a status bar under it) follows it; a card with a bar below ends square, or the gap shows through. */
+.native-dock { border-radius:var(--native-dock-radius,8px); --native-card-bottom-radius:var(--native-dock-radius,8px); }
+.native-dock > [role='status'] { background:#f6f6f7; border-color:#e2e2e6; }
+:root[data-theme='dark'] .native-dock > [role='status'] { background:#1c1c1e; border-color:#38383c; }
+.native-dock:has(> [role='status']) { --native-card-bottom-radius:0px; }
 .native-dock-host { height:100%; min-height:0; }
 .native-workspace-content { overflow:auto; flex:1; min-height:0; }
 .native-error { margin:0; padding:5px 10px; font-size:11px; background:#fff; }
