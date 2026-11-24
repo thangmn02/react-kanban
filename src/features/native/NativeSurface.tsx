@@ -116,10 +116,18 @@ export default function NativeSurface({ dock, onToggle, focusProps, children }: 
       if (active) setMaximized(next);
     };
     void update().catch(() => {});
-    void nativeWindow.onResized(() => {
-      void update().catch(() => {});
-      void updateNativeShape(dock).catch(() => {});
-    }).then((stop) => {
+    // A drag-resize reports far more often than the screen draws: at most one round trip is open, plus one for the final size.
+    let busy = false, again = false;
+    const settle = async () => {
+      if (busy) { again = true; return; }
+      busy = true;
+      do {
+        again = false;
+        await Promise.all([update().catch(() => {}), updateNativeShape(dock).catch(() => {}), new Promise(resolve => setTimeout(resolve, 16))]);
+      } while (again && active);
+      busy = false;
+    };
+    void nativeWindow.onResized(() => { void settle(); }).then((stop) => {
       if (active) unlisten = stop; else stop();
     }).catch(() => {});
     return () => { active = false; unlisten?.(); };
