@@ -192,7 +192,8 @@ export function useFocusSessionController({
       // A Pomodoro can run without a task. Keep the same timer, persistence,
       // completion and logging path rather than fabricating a focus task.
       setIsFocusDockCollapsed(false);
-      pomodoro.startTimer();
+      // A session that is over must not lend its old task to a new one.
+      pomodoro.startTimer(pomodoro.timerState.startedAt === null ? null : undefined);
       return true;
     }
 
@@ -232,6 +233,17 @@ export function useFocusSessionController({
     setIsFocusDockCollapsed,
   });
 
+  // One answer for the pill, the Dock header and the Dock's Tasks tab: the session's task while it is unfinished (a task that
+  // left the list only while its session runs), else the next open focus task. Everything names this, so they cannot disagree.
+  const sessionTask = pomodoro.selectedTimerTask;
+  const currentTask = sessionTask && !sessionTask.isDone
+    && (pomodoro.timerState.isRunning || focusTasksApi.isFocusTask(sessionTask.id))
+    ? sessionTask : focusTasksApi.activeFocusTask;
+  const { removeFocusTask } = focusTasksApi;
+  const { forgetTask } = pomodoro;
+  /** For a task that was deleted, archived or is missing from the workspace. */
+  const dropMissingTask = useCallback((taskId: string) => { removeFocusTask(taskId); forgetTask(taskId); }, [forgetTask, removeFocusTask]);
+
   const closeFocusCompletion = useCallback(() => setFocusCompletion(null), []);
   const keepWorkingFromCompletion = useCallback(() => {
     const taskId = focusCompletion?.task.id;
@@ -246,6 +258,8 @@ export function useFocusSessionController({
     ...focusTasksApi,
     ...pomodoro,
     ...handlers,
+    currentTask,
+    dropMissingTask,
     dailyFocusStats,
     nextSteps,
     saveNextStep,

@@ -20,6 +20,7 @@ interface FocusDockProps {
   nextSteps?: Record<string, { text: string }>;
   focusTasks: FocusTask[];
   showWhenEmpty?: boolean;
+  route?: string;
   activeTaskId: string | null;
   isCollapsed: boolean;
   timerState: PomodoroTimerState;
@@ -46,6 +47,7 @@ function FocusDock({
   nextSteps,
   focusTasks,
   showWhenEmpty = false,
+  route,
   activeTaskId,
   isCollapsed,
   timerState,
@@ -69,8 +71,9 @@ function FocusDock({
 }: FocusDockProps) {
   const shouldReduceMotion = useReducedMotion();
   const { t } = useI18n();
-  const { ref: islandRef, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onKeyDown } = useIslandPosition(focusTasks.length > 0 || showWhenEmpty);
-  const activeTask = focusTasks.find((task) => task.id === (timerState.activeTaskId || activeTaskId)) || focusTasks[0];
+  const { ref: islandRef, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onKeyDown } = useIslandPosition(focusTasks.length > 0 || showWhenEmpty, route);
+  const unfinished = focusTasks.filter((task) => !task.isDone);
+  const activeTask = unfinished.find((task) => task.id === activeTaskId);
   const cycle = Math.min((timerState.completedCycleFocus || 0) + 1, timerSettings.longBreakEvery);
 
   if (focusTasks.length === 0 && !showWhenEmpty) {
@@ -79,7 +82,8 @@ function FocusDock({
 
   return (
     <div ref={islandRef} className="focus-island">
-      <div className="island-bar island-glass" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerCancel}>
+      {/* One focus widget at a time: the open panel has its own timer, so the pill steps aside. */}
+      {isCollapsed && <div className="island-bar island-glass" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerCancel}>
         <button type="button" data-drag-handle className="island-grip" onKeyDown={onKeyDown} aria-label={t('focus.island.move')} title={t('focus.island.move')}>
           <svg viewBox="0 0 16 24" aria-hidden="true" fill="currentColor"><circle cx="5" cy="6" r="1.3" /><circle cx="11" cy="6" r="1.3" /><circle cx="5" cy="12" r="1.3" /><circle cx="11" cy="12" r="1.3" /><circle cx="5" cy="18" r="1.3" /><circle cx="11" cy="18" r="1.3" /></svg>
         </button>
@@ -97,7 +101,7 @@ function FocusDock({
         <button type="button" className="island-icon" onClick={onPopOutTimer} disabled={!isPictureInPictureSupported} aria-label={t('dock.widget')} title={t('dock.widget')}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2" /><rect x="11" y="11" width="8" height="7" rx="1" /></svg>
         </button>
-      </div>
+      </div>}
       {!isCollapsed && (
           <motion.aside
             key="focus-dock-panel"
@@ -109,7 +113,7 @@ function FocusDock({
             aria-label={t('focus.dock.title')}
           >
             <FocusDockHeader
-              taskCount={focusTasks.length}
+              taskCount={unfinished.length}
               onCollapse={() => onCollapseChange(true)}
               onOpenShutdown={onOpenShutdown}
             />

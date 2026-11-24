@@ -104,9 +104,10 @@ export function useFocusTasks(boardData: BoardData, scope: StorageScope) {
   ), [focusTasks]);
 
   const resolvedActiveFocusTaskId = useMemo(() => (
-    focusTasksWithCurrentBoardState.some((focusTask) => focusTask.id === activeFocusTaskId)
+    // A finished task stays on the list but is never the current one.
+    focusTasksWithCurrentBoardState.some((focusTask) => focusTask.id === activeFocusTaskId && !focusTask.isDone)
       ? activeFocusTaskId
-      : focusTasksWithCurrentBoardState[0]?.id || null
+      : focusTasksWithCurrentBoardState.find((focusTask) => !focusTask.isDone)?.id || null
   ), [activeFocusTaskId, focusTasksWithCurrentBoardState]);
 
   const activeFocusTask = useMemo(() => (

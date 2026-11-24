@@ -16,6 +16,9 @@ import { NOTES_PREVIEW_ENABLED } from '../../constants/features';
 
 interface Params {
   focus: FocusSessionValue;
+  /** What the Dock may show; restored tasks wait until they are known to exist. */
+  shownTask: FocusTask | null;
+  shownFocusTasks: FocusTask[];
   board: ReturnType<typeof useBoardPageController>;
   workspaceId: string | null;
   user: AppUser | null;
@@ -28,6 +31,8 @@ interface Params {
 
 export function useAppFocusIntegration({
   focus,
+  shownTask,
+  shownFocusTasks,
   board,
   workspaceId,
   user,
@@ -158,9 +163,9 @@ export function useAppFocusIntegration({
     isMinimized: isFocusPage && focus.isFocusDockCollapsed,
     onDismiss: () => navigate('/home'),
     onAddTask,
-    activeTask: focus.selectedTimerTask || focus.activeFocusTask,
-    nextStep: focus.nextSteps[(focus.selectedTimerTask || focus.activeFocusTask)?.id ?? '']?.text,
-    focusTasks: focus.focusTasks,
+    activeTask: shownTask,
+    nextStep: focus.nextSteps[shownTask?.id ?? '']?.text,
+    focusTasks: shownFocusTasks,
     timerState: focus.timerState,
     remainingSeconds: focus.remainingSeconds,
     cycleTotal: focus.timerSettings.longBreakEvery,

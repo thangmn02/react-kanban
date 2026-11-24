@@ -13,8 +13,8 @@
   --island-text: #30333b;
   --island-success: #276647;
   position: fixed;
-  right: 20px;
-  bottom: 20px;
+  left: 16px;
+  bottom: 16px;
   z-index: 40;
   display: flex;
   flex-direction: column;
@@ -90,7 +90,7 @@
 .island-hat { --channel: #bd9847; }
 .island-bass { --channel: #8a76c2; }
 .focus-island .island-music-note { margin: 16px 0 0; font-size: 11px; line-height: 1.6; color: var(--island-muted); }
-.island-details { max-height: calc(100dvh - 180px); overflow-y: auto; overscroll-behavior: contain; }
+.island-details { max-height: calc(100dvh - 120px); overflow-y: auto; overscroll-behavior: contain; }
 /* Keep the shared timer and task controls intact; these colours are dock-only and follow the theme. */
 .island-details [class~='text-white'], .island-details [class~='text-slate-100'], .island-details [class~='text-slate-200'], .island-details [class~='text-slate-300'], .island-details [class~='text-sky-200'], .island-details [class~='text-sky-300'] { color: var(--island-text); }
 .island-details [class~='text-slate-400'] { color: var(--island-muted); }
@@ -100,7 +100,6 @@
 :root .focus-island .island-details [class~='bg-blue-600'] { background-color: var(--island-ink); color: var(--island-on-ink); }
 .island-details h2 { font-size: 16px; color: var(--island-ink); }
 @media (max-width: 520px) {
-  .focus-island { right: 12px; bottom: 12px; }
   .focus-island .island-bar { gap: 7px; padding: 9px 10px; }
   .focus-island .island-task { max-width: 105px; font-size: 12px; }
   .island-cycle { font-size: 10px; }

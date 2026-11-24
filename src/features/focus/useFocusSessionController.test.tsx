@@ -70,3 +70,47 @@ it('starts each task in one click, keeps every task its own Next step, and enfor
   expect(result.current.timerState.activeTaskId).toBe('b');
   expect(result.current.timerState.isRunning).toBe(true);
 });
+const controller = () => renderHook(() => useFocusSessionController({ user: null, workspaceId: 'workspace', boardData: { columns: [], task: {}, list: {} }, activeBoardId: null, activeBoardSummary: null }), { wrapper: I18nProvider });
+it('forgets a deleted task everywhere, keeps its time as a session without a task, and does not bring it back after a restart', () => {
+  vi.useFakeTimers();
+  const first = controller();
+  act(() => first.result.current.handleStartFocusTaskFromHome(summary('kanji')));
+  act(() => { vi.advanceTimersByTime(90_000); });
+  act(() => first.result.current.dropMissingTask('kanji'));
+  const state = first.result.current.timerState;
+  expect([state.activeTaskId, state.sessionTask, state.isRunning]).toEqual([null, null, false]);
+  expect(state.startedAt).not.toBeNull();
+  expect(first.result.current.remainingSeconds).toBe(1410);
+  expect(first.result.current.currentTask).toBeNull();
+  first.unmount();
+  const again = controller();
+  expect(again.result.current.currentTask).toBeNull();
+  expect(again.result.current.selectedTimerTask).toBeNull();
+});
+it('moves on when the current task is finished, is empty when all are, and never starts a new session on an old task', () => {
+  const { result } = controller();
+  act(() => result.current.handleStartFocusTaskFromHome(summary('a')));
+  act(() => result.current.handleToggleFocusTaskFromHome(summary('b')));
+  act(() => result.current.handleStartFocusTimer('a'));
+  act(() => result.current.pauseTimer());
+  expect(result.current.currentTask?.id).toBe('a');
+  act(() => result.current.updateFocusedTask('a', { isDone: true }));
+  expect(result.current.currentTask?.id).toBe('b');
+  act(() => result.current.updateFocusedTask('b', { isDone: true }));
+  expect(result.current.currentTask).toBeNull();
+  act(() => result.current.resetTimer());
+  act(() => { result.current.removeFocusTask('a'); result.current.removeFocusTask('b'); });
+  act(() => { result.current.startFocusSessionNow(); });
+  expect(result.current.timerState.isRunning).toBe(true);
+  expect(result.current.timerState.activeTaskId).toBeNull();
+  expect(result.current.currentTask).toBeNull();
+});
+it('names a task that left the list only while its session runs', () => {
+  const { result } = controller();
+  act(() => result.current.handleStartFocusTaskFromHome(summary('a')));
+  act(() => result.current.handleStartFocusTimer('a'));
+  act(() => result.current.removeFocusTask('a'));
+  expect(result.current.currentTask?.id).toBe('a');
+  act(() => result.current.pauseTimer());
+  expect(result.current.currentTask).toBeNull();
+});

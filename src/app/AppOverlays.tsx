@@ -52,7 +52,10 @@ interface Props {
   };
   progressReport: { isOpen: boolean; onClose: () => void };
   quickTask: { isOpen: boolean; initialTitle: string; onClose: () => void; onSave: (title: string) => Promise<boolean>; onMore: (title: string) => void; onFullFormClosed: () => void };
+  shownFocusTasks: FocusSessionValue['focusTasks'];
+  currentTaskId: string | null;
   isHomeFocusActive?: boolean;
+  route?: string;
   hideCompactFocusDock?: boolean;
   onOpenNativeDock?: () => void;
 }
@@ -115,8 +118,9 @@ export default function AppOverlays(props: Props) {
       {!props.hideCompactFocusDock && (!props.isHomeFocusActive || isNativeWidget()) && (
         <FocusDock
           showWhenEmpty={isNativeWidget()}
-          focusTasks={focus.focusTasks}
-          activeTaskId={focus.timerState.activeTaskId || focus.activeFocusTaskId}
+          route={props.route}
+          focusTasks={props.shownFocusTasks}
+          activeTaskId={props.currentTaskId}
           isCollapsed={focus.isFocusDockCollapsed}
           timerState={focus.timerState}
           timerSettings={focus.timerSettings}

@@ -364,9 +364,9 @@ export function usePomodoroTimer({
     resolveTimerTask(timerState)
   ), [resolveTimerTask, timerState]);
 
-  const startTimer = useCallback((taskId?: string) => {
+  const startTimer = useCallback((taskId?: string | null) => {
     const currentState = timerStateRef.current;
-    const nextTaskId = taskId || currentState.activeTaskId || activeFocusTask?.id || null;
+    const nextTaskId = taskId === null ? null : taskId || currentState.activeTaskId || activeFocusTask?.id || null;
     const sameTask = nextTaskId === currentState.activeTaskId;
     const now = Date.now();
     const remainingSeconds = sameTask
@@ -453,7 +453,22 @@ export function usePomodoroTimer({
     });
   }, [activeFocusTask, commitTimerState, focusTasks, reportInterruption]);
 
+  /** The task no longer exists: stop, keep the time already spent as a session without a task, and forget the saved copy. */
+  const forgetTask = useCallback((taskId: string) => {
+    const currentState = timerStateRef.current;
+    if (currentState.activeTaskId !== taskId && currentState.sessionTask?.id !== taskId) return;
+    commitTimerState({
+      ...currentState,
+      activeTaskId: currentState.activeTaskId === taskId ? null : currentState.activeTaskId,
+      sessionTask: null,
+      isRunning: false,
+      remainingSeconds: getRemainingSeconds(currentState),
+      endsAt: null,
+    });
+  }, [commitTimerState]);
+
   return {
+    forgetTask,
     timerState,
     timerSettings,
     updateTimerSettings,

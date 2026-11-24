@@ -117,7 +117,8 @@ export default function FloatingFocus(props: FloatingFocusProps) {
   }, [settingsOpen, props.isWidget]);
 
   const { activeTask, focusTasks, timerState, remainingSeconds, cycleTotal, onStart, onPause, onReset, onActiveTaskChange, onMarkDoneAndNext } = props;
-  const taskId = activeTask?.id || timerState.activeTaskId || '';
+  const taskId = activeTask && !activeTask.isDone ? activeTask.id : '';
+  const allDone = focusTasks.length > 0 && focusTasks.every((task) => task.isDone);
   const tasks = activeTask && !focusTasks.some((task) => task.id === activeTask.id) ? [activeTask, ...focusTasks] : focusTasks;
   const modeLabel = timerState.mode === 'focus' ? t('focus.mode.focus') : timerState.mode === 'shortBreak' ? t('focus.mode.shortBreak') : t('focus.mode.longBreak');
   const hasMusic = music.sessions.length > 0;
@@ -187,9 +188,9 @@ export default function FloatingFocus(props: FloatingFocusProps) {
               {t(props.musicSetupPending ? 'music.companionUpdating' : 'music.installCompanion')}</button>}
             {props.musicSetupMessage && <p role="status" className="muted" style={{ overflowWrap: 'anywhere' }}>{props.musicSetupMessage}</p>}
             {props.musicSetupFolder && <CopyFolderButton folder={props.musicSetupFolder} />}
-          </motion.div>}
             {props.musicVersions && <p className="muted" data-versions="">{t('dock.versions', { kora: props.musicVersions.kora,
               companion: props.musicVersions.companions.join(', ') || t('dock.companionNotConnected') })}</p>}
+          </motion.div>}
         </AnimatePresence>
       </div>
 
@@ -215,6 +216,7 @@ export default function FloatingFocus(props: FloatingFocusProps) {
             <select className="dock-task-select task-select" aria-label={t('focus.timer.chooseTask')} value={taskId} disabled={!tasks.length || !onActiveTaskChange}
               onChange={(event) => onActiveTaskChange?.(event.target.value)}>
               {!tasks.length && <option value="">{t('home.focusEmptyTitle')}</option>}
+              {tasks.length > 0 && !taskId && <option value="">{t('home.focusEmptyTitle')}</option>}
               {tasks.map((task) => <option key={task.id} value={task.id} disabled={task.isDone}>{task.title}</option>)}</select>
             <span className="cycle">{cycle}/{cycleTotal}</span>
           </motion.div>
@@ -232,7 +234,7 @@ export default function FloatingFocus(props: FloatingFocusProps) {
           {props.nextStep && !activeTask?.isDone && <p className="max-w-full truncate text-xs text-slate-400" title={props.nextStep}>{t('focus.dock.nextStep', { step: props.nextStep })}</p>}
           <div className="dock-focus-actions">
             <button type="button" className="solid dock-start" onClick={timerState.isRunning ? onPause : onStart}
-              disabled={!timerState.isRunning && timerState.mode === 'focus' && Boolean(activeTask?.isDone)}
+              disabled={!timerState.isRunning && timerState.mode === 'focus' && Boolean(activeTask ? activeTask.isDone : allDone)}
               aria-label={timerState.isRunning ? t('focus.timer.pause') : t('focus.timer.start')}>
               <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">{timerState.isRunning ? <path d="M7 5h4v14H7zm6 0h4v14h-4z" /> : <path d="m8 5 11 7-11 7z" />}</svg>
               <span>{timerState.isRunning ? t('focus.timer.pause') : t('focus.timer.start')}</span></button>

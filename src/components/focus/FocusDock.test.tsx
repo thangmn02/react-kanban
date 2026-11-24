@@ -62,12 +62,14 @@ it('starts a standalone session and opens the native widget from the expanded em
     isPictureInPictureSupported: true });
   expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
   const startButtons = screen.getAllByRole('button', { name: 'Start' });
-  expect(startButtons).toHaveLength(2);
+  // The open panel replaces the pill, so there is one timer on screen.
+  expect(startButtons).toHaveLength(1);
+  expect(screen.queryByRole('button', { name: /Move island/ })).toBeNull();
   startButtons.forEach(button => {
     expect(button).toBeEnabled();
     fireEvent.click(button);
   });
-  expect(props.onStartTimer).toHaveBeenCalledTimes(2);
+  expect(props.onStartTimer).toHaveBeenCalledTimes(1);
   fireEvent.click(screen.getByRole('button', { name: 'Open floating focus timer' }));
   expect(props.onPopOutTimer).toHaveBeenCalledOnce();
 });
@@ -83,8 +85,8 @@ it('offers a direct widget button only when the browser supports Document PiP', 
 
 it('pauses through the existing controller and remembers keyboard movement', () => {
   const { props } = setup();
-  fireEvent.keyDown(screen.getByRole('button', { name: /Move island/ }), { key: 'ArrowLeft' });
-  expect(localStorage.getItem('focus-island-position-v1')).not.toBeNull();
+  fireEvent.keyDown(screen.getByRole('button', { name: /Move island/ }), { key: 'ArrowRight' });
+  expect(JSON.parse(localStorage.getItem('focus-island-position-v2')!)).toEqual({ corner: 'bottom-right' });
   cleanup();
   setup({ timerState: { ...props.timerState, isRunning: true }, onPauseTimer: props.onPauseTimer });
   fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
@@ -97,4 +99,60 @@ it('shows where to pick a task up on its card, and nothing when there is no next
   first.unmount();
   setup({ isCollapsed: false, nextSteps: {} });
   expect(screen.queryByText(/^Next:/)).toBeNull();
+});
+
+it('never names a finished task as the current one, and counts only unfinished work', () => {
+  const focusTasks = [{ id: 'done', boardId: 'board', boardTitle: 'Project', title: 'Finished', isDone: true }, { id: 'next', boardId: 'board', boardTitle: 'Project', title: 'Still open' }];
+  const first = setup({ focusTasks, activeTaskId: 'done' });
+  expect(screen.queryByText('Finished')).toBeNull();
+  first.unmount();
+  setup({ focusTasks, activeTaskId: 'done', isCollapsed: false });
+  expect(screen.getByText('1 active task')).toBeInTheDocument();
+});
+
+const resize = (width: number, height: number) => {
+  Object.assign(window, { innerWidth: width, innerHeight: height });
+  Object.defineProperty(document.documentElement, 'clientWidth', { configurable: true, value: width });
+  fireEvent(window, new Event('resize'));
+};
+
+it('keeps its corner when the window shrinks and grows, and never saves from a resize', () => {
+  resize(1280, 800);
+  localStorage.setItem('focus-island-position-v2', JSON.stringify({ corner: 'bottom-right' }));
+  const { container } = setup();
+  const island = container.querySelector<HTMLElement>('.focus-island')!;
+  const place = () => [island.style.left, island.style.right, island.style.top, island.style.bottom];
+  expect(place()).toEqual(['auto', '16px', 'auto', '16px']);
+  const write = vi.spyOn(Storage.prototype, 'setItem');
+  resize(520, 580); resize(1920, 1080);
+  expect(place()).toEqual(['auto', '16px', 'auto', '16px']);
+  expect(write).not.toHaveBeenCalled();
+  write.mockRestore();
+});
+
+it('reads an old pixel position once, as its nearest corner, and only in a window as large as the one it came from', () => {
+  localStorage.setItem('focus-island-position-v1', JSON.stringify({ x: 900, y: 100 }));
+  resize(520, 580);
+  setup();
+  expect(localStorage.getItem('focus-island-position-v1')).not.toBeNull();
+  expect(localStorage.getItem('focus-island-position-v2')).toBeNull();
+  resize(1280, 800);
+  expect(JSON.parse(localStorage.getItem('focus-island-position-v2')!)).toEqual({ corner: 'top-right' });
+  expect(localStorage.getItem('focus-island-position-v1')).toBeNull();
+  cleanup(); localStorage.clear();
+  localStorage.setItem('focus-island-position-v1', '"broken"');
+  const { container } = setup();
+  expect(localStorage.getItem('focus-island-position-v1')).toBeNull();
+  expect(container.querySelector('.focus-island')).toHaveAttribute('data-corner', 'bottom-left');
+});
+
+it('measures nothing while the window is the native Dock', () => {
+  document.documentElement.dataset.nativeSurface = 'dock';
+  try {
+    localStorage.setItem('focus-island-position-v1', JSON.stringify({ x: 900, y: 100 }));
+    resize(1280, 800);
+    const { container } = setup();
+    expect(container.querySelector('.focus-island')).not.toHaveAttribute('data-corner');
+    expect(localStorage.getItem('focus-island-position-v2')).toBeNull();
+  } finally { delete document.documentElement.dataset.nativeSurface; }
 });

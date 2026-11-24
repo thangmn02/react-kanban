@@ -238,13 +238,16 @@ function AppLayout() {
     activeBoardId,
     activeBoardSummary,
   });
+  // A restored task shows only once it is known to exist; a session that is running keeps its name meanwhile.
+  const focusConfirmed = useTaskWorkflowSync(activeWorkspaceId,user?.id,focusSession);
+  const shownTask = focusConfirmed || focusSession.timerState.isRunning ? focusSession.currentTask : null;
+  const shownFocusTasks = focusConfirmed ? focusSession.focusTasks : shownTask ? [shownTask] : [];
   // Quick Notes from the Focus Dock link to the task the Dock shows; a task on the open board also carries its board.
   const noteTasks = useMemo(() => Object.values(boardData.task).map(task => ({ id: task.id, title: task.title })), [boardData.task]);
   // A Focus task keeps its name on a note even while another board is open.
   const noteTaskTitle = useCallback((taskId: string) => boardData.task[taskId]?.title ?? focusSession.focusTasks.find(task => task.id === taskId)?.title, [boardData.task, focusSession.focusTasks]);
-  const focusNoteTask = () => { const taskId = (focusSession.selectedTimerTask || focusSession.activeFocusTask)?.id; return { taskId, boardId: taskId && boardData.task[taskId] ? activeBoardId ?? undefined : focusSession.focusTasks.find(task => task.id === taskId)?.boardId }; };
+  const focusNoteTask = () => { const taskId = shownTask?.id; return { taskId, boardId: taskId && boardData.task[taskId] ? activeBoardId ?? undefined : focusSession.focusTasks.find(task => task.id === taskId)?.boardId }; };
   const focusNoteRequest = (fromDock: boolean) => ({ ...focusNoteTask(), fromDock, create: true });
-  useTaskWorkflowSync(activeWorkspaceId,user?.id,focusSession);
   const {
     activeFocusTask,
     pauseTimer,
@@ -313,6 +316,8 @@ function AppLayout() {
 
   const focusIntegration = useAppFocusIntegration({
     focus: focusSession,
+    shownTask,
+    shownFocusTasks,
     board: boardController,
     workspaceId: activeWorkspaceId,
     user,
@@ -331,13 +336,13 @@ function AppLayout() {
   }, [handleOpenTaskFromHome]);
 
   const planning = usePlanningController({
+    userId: user?.id ?? null,
+    workspaceId: activeWorkspaceId,
     focus: focusSession,
     onOpenToday: () => setActiveViewWithPath('today'),
     t,
   });
   const { handleOpenQuickPlan } = planning;
-    userId: user?.id ?? null,
-    workspaceId: activeWorkspaceId,
 
   const commandPaletteActions = useCommandPaletteActions({
     setActiveViewWithPath,
@@ -419,6 +424,8 @@ function AppLayout() {
       boardDialogs={boardDialogs}
       taskEditor={taskEditor}
       focus={focusSession}
+      shownFocusTasks={shownFocusTasks}
+      currentTaskId={shownTask?.id ?? null}
       focusIntegration={{ ...focusIntegration, handleOpenFocusTask }}
       planning={planning}
       commandPalette={{
@@ -437,6 +444,7 @@ function AppLayout() {
         onClose: () => setIsProgressReportOpen(false),
       }}
       isHomeFocusActive={['/', '/home'].includes(location.pathname) && focusSession.focusTasks.some((task) => task.id === focusViewId && task.id === focusSession.timerState.activeTaskId && !task.isDone)}
+      route={location.pathname}
       hideCompactFocusDock={['music', 'beat-grid', 'focus'].includes(activeView)}
       onOpenNativeDock={native ? () => setNativeDock(true) : undefined}
     />
@@ -458,9 +466,9 @@ function AppLayout() {
       onOpenNotes: NOTES_PREVIEW_ENABLED ? () => openQuickNotes(focusNoteRequest(false)) : undefined,
       activeTab: focusIntegration.dockTab, onTabChange: focusIntegration.handleDockTabChange,
       isMinimized: focusSession.isFocusDockCollapsed,
-      activeTask: focusSession.selectedTimerTask || focusSession.activeFocusTask,
-      nextStep: focusSession.nextSteps[(focusSession.selectedTimerTask || focusSession.activeFocusTask)?.id ?? '']?.text,
-      focusTasks: focusSession.focusTasks, timerState: focusSession.timerState,
+      activeTask: shownTask,
+      nextStep: focusSession.nextSteps[shownTask?.id ?? '']?.text,
+      focusTasks: shownFocusTasks, timerState: focusSession.timerState,
       remainingSeconds: focusSession.remainingSeconds, cycleTotal: focusSession.timerSettings.longBreakEvery,
       timerSettings: focusSession.timerSettings, onTimerSettingsChange: focusSession.updateTimerSettings, onModeChange: focusSession.setMode,
       onStart: () => { focusSession.startFocusSessionNow(); }, onPause: pauseTimer, onReset: resetTimer,
@@ -515,7 +523,7 @@ function AppLayout() {
       {showNavigation && <AppNavigation activeView={activeView} onNavigate={setActiveViewWithPath} />}
       <div className={showNavigation ? 'min-h-screen bg-white lg:ml-14 lg:flex' : undefined}>
         {showNavigation && <ContextSidebar key={`${user?.id}:${activeWorkspaceId}`} activeView={activeView} workspaceId={activeWorkspaceId} workspaceName={activeWorkspace?.name} boards={boardController.boardSummaries} activeBoardId={activeBoardId} boardData={boardData} onBoard={boardController.handleOpenBoardFromHome} onHighPriority={filterHighPriority} onDueToday={filterDueToday} onClearFilters={clearBoardFilters} notesSharing={Boolean(user && !user.isMock)} />}
-        <div className="min-w-0 flex-1 bg-white">
+        <div data-content-area className="min-w-0 flex-1 bg-white">
         <ViewContextBoundary key={`${user?.id ?? 'public'}:${activeWorkspaceId ?? 'none'}`} ready={!boardController.isBoardLoading}>
           <Suspense fallback={<div role="status" className="min-h-48 bg-canvas px-6 py-10 text-sm text-slate-500">{t('ux.loadingView')}</div>}>
             <Outlet context={routeContext} />
@@ -539,9 +547,9 @@ function AppLayout() {
     focusProps={{
       onOpenNotes: NOTES_PREVIEW_ENABLED ? () => openQuickNotes(focusNoteRequest(true)) : undefined,
       activeTab: focusIntegration.dockTab, onTabChange: focusIntegration.handleDockTabChange,
-      activeTask: focusSession.selectedTimerTask || focusSession.activeFocusTask,
-      nextStep: focusSession.nextSteps[(focusSession.selectedTimerTask || focusSession.activeFocusTask)?.id ?? '']?.text,
-      focusTasks: focusSession.focusTasks, timerState: focusSession.timerState,
+      activeTask: shownTask,
+      nextStep: focusSession.nextSteps[shownTask?.id ?? '']?.text,
+      focusTasks: shownFocusTasks, timerState: focusSession.timerState,
       remainingSeconds: focusSession.remainingSeconds, cycleTotal: focusSession.timerSettings.longBreakEvery,
       timerSettings: focusSession.timerSettings, onTimerSettingsChange: focusSession.updateTimerSettings, onModeChange: focusSession.setMode,
       onStart: () => { focusSession.startFocusSessionNow(); }, onPause: pauseTimer, onReset: resetTimer,

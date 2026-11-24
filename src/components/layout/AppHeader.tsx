@@ -1,3 +1,4 @@
+import { useLayoutEffect } from 'react';
 import { MoreMenu } from '@astryxdesign/core/MoreMenu';
 import type { AppUser, AuthMode, WorkspaceSummary } from '../../types/auth.type';
 import CommandTrigger from './CommandTrigger';
@@ -48,6 +49,7 @@ export default function AppHeader({
   activeView = 'home',
   onNavigate,
 }: AppHeaderProps) {
+  useLayoutEffect(() => { window.dispatchEvent(new Event('kora:header-ready')); }, []);
   const { t } = useI18n();
   // Phone-only overflow: the top bar stays one row and these stay one tap away.
   const more = [
@@ -57,7 +59,7 @@ export default function AppHeader({
   ];
 
   return (
-    <header className="sticky top-0 z-50 overflow-visible border-b border-slate-200/70 bg-white/88 backdrop-blur-xl">
+    <header data-app-header className="sticky top-0 z-50 overflow-visible border-b border-slate-200/70 bg-white/88 backdrop-blur-xl">
       <div className="flex min-h-14 items-center gap-2 px-3 py-2 sm:min-h-16 sm:flex-wrap sm:gap-3 sm:px-6">
         <button
           type="button"
