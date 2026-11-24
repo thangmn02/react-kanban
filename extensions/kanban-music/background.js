@@ -75,9 +75,9 @@ async function scan() {
 
 const publicSessions = (items, percussionAvailable = false) => items.map((session) => {
   const { id, title, artist, source, paused, playing, currentTime, playbackRate, sampledAt, selectionToken,
-    duration, volume, muted, canSeek, canPrevious, canNext, asset, palette } = session;
+    duration, volume, muted, canSeek, canPrevious, canNext, asset, artwork, palette } = session;
   return { id, title, artist, source, paused, playing, currentTime, playbackRate, sampledAt,
-    duration, volume, muted, canSeek, canPrevious, canNext, asset, ...(palette ? { palette } : {}),
+    duration, volume, muted, canSeek, canPrevious, canNext, asset, ...(artwork ? { artwork } : {}), ...(palette ? { palette } : {}),
     canAnalyze: Boolean(chrome.offscreen && chrome.tabCapture?.getMediaStreamId && chrome.runtime.getContexts), learnedPercussion: percussionAvailable, syncState: beats.status(session),
   ...(selectionToken ? { selectionToken } : {}),
   };

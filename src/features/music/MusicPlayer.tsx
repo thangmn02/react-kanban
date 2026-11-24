@@ -58,7 +58,7 @@ export function MusicTrack({ music, demo = false }: { music: BrowserMusicControl
     && sessions.findIndex(other => other.title === session.title && other.artist === session.artist) === index);
   return <>
     <div className="music-heading">
-      <div className="music-art" aria-hidden="true">{selected?.artwork ? <img src={selected.artwork} alt="" /> : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 18V5l11-2v13M9 8l11-2" /><ellipse cx="6" cy="18" rx="3" ry="2" /><ellipse cx="17" cy="16" rx="3" ry="2" /></svg>}</div>
+      <div className="music-art" aria-hidden="true">{selected?.artwork ? <img src={selected.artwork} alt="" referrerPolicy="no-referrer" /> : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 18V5l11-2v13M9 8l11-2" /><ellipse cx="6" cy="18" rx="3" ry="2" /><ellipse cx="17" cy="16" rx="3" ry="2" /></svg>}</div>
       <div className="track-copy">
         <p className="eyebrow">{t('focus.island.music')}</p>
         <h2 title={selected?.title}>{selected?.title || t('music.nothingPlaying')}</h2>
@@ -73,7 +73,7 @@ export function MusicTrack({ music, demo = false }: { music: BrowserMusicControl
     {selected&&(!isNativeWidget()||nativeCompanionPreviewEnabled())&&<ExperimentalBeatControl key={`experimental:${selected.id}`} session={selected} refresh={music.refresh} compensationOnly={nativeCompanionPreviewEnabled()}/>}
     {demo && sessions.length > 1 ? queue.length > 1 && <div><p className="music-queue-title" id="music-queue-title">{t('music.upNext')}</p><ul className="music-queue" aria-labelledby="music-queue-title">{queue.map(session => <li key={session.id}>
       <button type="button" data-session-id={session.id} aria-current={session.id === selected?.id ? 'true' : undefined} onClick={() => setSelectedId(session.id)}>
-        <span className="music-queue-art" aria-hidden="true">{session.artwork ? <img src={session.artwork} alt="" /> : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 18V5l11-2v13M9 8l11-2" /><ellipse cx="6" cy="18" rx="3" ry="2" /><ellipse cx="17" cy="16" rx="3" ry="2" /></svg>}</span>
+        <span className="music-queue-art" aria-hidden="true">{session.artwork ? <img src={session.artwork} alt="" referrerPolicy="no-referrer" /> : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 18V5l11-2v13M9 8l11-2" /><ellipse cx="6" cy="18" rx="3" ry="2" /><ellipse cx="17" cy="16" rx="3" ry="2" /></svg>}</span>
         <span className="music-queue-copy"><span>{session.title}</span><small>{[session.artist, session.source].filter(Boolean).join(' · ')}</small></span>
         {session.id === selected?.id && <span className="music-queue-now">{t('dock.nowPlaying')}</span>}
       </button></li>)}</ul></div>

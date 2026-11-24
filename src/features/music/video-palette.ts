@@ -79,24 +79,19 @@ export function huePeaks(bins: HueBins, pixels = 256, limit = 5): number[] {
 }
 export const hueDistance = (a: number, b: number) => { const d = Math.abs(((a - b) % 360 + 360) % 360); return Math.min(d, 360 - d); };
 
-/** Fixed hue offsets from the anchor, named by instrument (from the "Mỹ Miều" review: rows must not look alike). */
-export const rowHueOffsets: Record<BeatBand, number> = { kick: 35, clap: 0, hat: -65, bass: -25, melody: 70 };
 const ROW_ORDER: BeatBand[] = ['kick', 'clap', 'hat', 'bass', 'melody'];
-export const MIN_ROW_HUE_GAP = 28;
+/** Between rows that share one video colour: near enough to stay that colour, far enough to tell the rows apart. */
+export const SHARED_HUE_STEP = 16;
+const SHARED_OFFSETS = [0, 1, -1, 2, -2];
 
-/** One hue per row. A row too close to an earlier one moves further along its own direction from the anchor. */
-export function rowHues(anchor: number, second?: number, rows: BeatBand[] = ROW_ORDER): Record<BeatBand, number> {
-  const hues = {} as Record<BeatBand, number>, placed: number[] = [];
-  for (const band of ROW_ORDER) {
-    const offset = rowHueOffsets[band], direction = offset < 0 ? -1 : 1;
-    let hue = anchor + offset;
-    // A second strong colour in the video may colour the hi-hat when it keeps clear of the other rows.
-    if (band === 'hat' && second !== undefined && placed.every(other => hueDistance(other, second) >= MIN_ROW_HUE_GAP)) hue = second;
-    for (let guard = 0; guard < 36 && rows.includes(band) && placed.some(other => hueDistance(other, hue) < MIN_ROW_HUE_GAP); guard++) hue += direction * 4;
-    hues[band] = ((hue % 360) + 360) % 360;
-    if (rows.includes(band)) placed.push(hues[band]);
-  }
-  return hues;
+/** The video's own hues, one per row, strongest first. With fewer hues than rows, rows share a hue as close neighbours. */
+export function rowHues(peaks: number[], rows: BeatBand[] = ROW_ORDER): Record<BeatBand, number> {
+  // Visible rows choose first, so a hidden row never takes a colour from one that shows.
+  const order = [...ROW_ORDER.filter(band => rows.includes(band)), ...ROW_ORDER.filter(band => !rows.includes(band))];
+  return Object.fromEntries(order.map((band, index) => {
+    const hue = peaks[index % peaks.length] + SHARED_OFFSETS[Math.floor(index / peaks.length)] * SHARED_HUE_STEP;
+    return [band, ((hue % 360) + 360) % 360];
+  })) as Record<BeatBand, number>;
 }
 
 /**
@@ -139,9 +134,9 @@ export function rampFromHue(hue: number, appearance: Appearance): RowColours {
 }
 export const rampLightness = (appearance: Appearance) => RAMPS[appearance];
 
-/** Every row's colours for one anchor hue; `second` is the video's next strongest hue, if any. */
-export function videoRowColours(anchor: number, appearance: Appearance, second?: number, rows?: BeatBand[]): Record<BeatBand, RowColours> {
-  const hues = rowHues(anchor, second, rows);
+/** Every row's colours from the video's hues, main hue first. */
+export function videoRowColours(peaks: number[], appearance: Appearance, rows?: BeatBand[]): Record<BeatBand, RowColours> {
+  const hues = rowHues(peaks, rows);
   return Object.fromEntries(ROW_ORDER.map(band => [band, rampFromHue(hues[band], appearance)])) as Record<BeatBand, RowColours>;
 }
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  clampOklch, contrastRatio, dockSurface, hueBins, hueDistance, huePeaks, maxChroma, MIN_ROW_HUE_GAP, oklchToRgb, phraseAnchor,
-  phraseIndex, rampFromHue, rgbToOklab, rowHues, videoRowColours, type Rgb,
+  clampOklch, contrastRatio, dockSurface, hueBins, hueDistance, huePeaks, maxChroma, oklchToRgb, phraseAnchor,
+  phraseIndex, rampFromHue, rgbToOklab, rowHues, SHARED_HUE_STEP, videoRowColours, type Rgb,
 } from './video-palette';
 
 const parse = (css: string): Rgb => css.match(/\d+/g)!.slice(0, 3).map(Number) as Rgb;
@@ -51,21 +51,23 @@ describe('ramps', () => {
 });
 
 describe('rows', () => {
-  it('keeps every pair of rows at least 28 degrees apart for any anchor', () => {
-    for (let anchor = 0; anchor < 360; anchor += 7) {
-      const hues = Object.values(rowHues(anchor));
-      for (let i = 0; i < hues.length; i++) for (let j = i + 1; j < hues.length; j++) expect(hueDistance(hues[i], hues[j])).toBeGreaterThanOrEqual(MIN_ROW_HUE_GAP);
+  it('gives each row a hue the video holds, strongest first', () => {
+    expect(rowHues([20, 230, 120, 300], ['kick', 'clap', 'hat', 'bass'])).toMatchObject({ kick: 20, clap: 230, hat: 120, bass: 300 });
+  });
+  it('never invents a colour the video does not hold, for any video of one to five hues', () => {
+    for (let anchor = 0; anchor < 360; anchor += 7) for (let count = 1; count <= 5; count++) {
+      const peaks = Array.from({ length: count }, (_, index) => (anchor + index * 70) % 360), rows = ['kick', 'clap', 'hat', 'bass'] as const;
+      const hues = rowHues(peaks, [...rows]);
+      for (const row of rows) expect(Math.min(...peaks.map(peak => hueDistance(peak, hues[row])))).toBeLessThanOrEqual(2 * SHARED_HUE_STEP);
     }
   });
-  it('colours the hi-hat with a second video hue only when it stays clear of the other rows', () => {
-    expect(rowHues(200, 40).hat).toBe(40);
-    expect(rowHues(200, 205).hat).not.toBe(205);
+  it('keeps rows that share a hue apart', () => {
+    const hues = Object.values(rowHues([200]));
+    for (let i = 0; i < hues.length; i++) for (let j = i + 1; j < hues.length; j++) expect(hueDistance(hues[i], hues[j])).toBeGreaterThanOrEqual(SHARED_HUE_STEP);
   });
-  it('makes four visibly different, coloured rows for a lavender video (the "Mỹ Miều" case)', () => {
-    const rows = videoRowColours(lch([190, 170, 235]).h, 'light');
-    const mids = (['kick', 'clap', 'hat', 'bass'] as const).map(band => lch(parse(rows[band].mid)));
-    for (let i = 0; i < mids.length; i++) for (let j = i + 1; j < mids.length; j++) expect(hueDistance(mids[i].h, mids[j].h)).toBeGreaterThanOrEqual(MIN_ROW_HUE_GAP - 3);
-    expect(lch(parse(rows.hat.mid)).C).toBeGreaterThan(0.12);
+  it('makes a lavender video flash lavender in every row', () => {
+    const hue = lch([190, 170, 235]).h, rows = videoRowColours([hue], 'light', ['kick', 'clap', 'hat', 'bass']);
+    for (const band of ['kick', 'clap', 'hat', 'bass'] as const) expect(hueDistance(lch(parse(rows[band].mid)).h, hue)).toBeLessThanOrEqual(2 * SHARED_HUE_STEP + 3);
   });
   it('converts back to the requested hue', () => {
     expect(hueDistance(lch(oklchToRgb({ L: 0.62, C: 0.15, h: 140 })).h, 140)).toBeLessThan(2);

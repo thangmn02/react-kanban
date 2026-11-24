@@ -151,7 +151,7 @@ export function SemanticMotionPattern({session,beat,profile,reduced=false,active
   const peaks=useVideoPalette(session,videoColours);
   const bpm=beat.tempo?.locked?beat.tempo.bpm:null,phrase=phraseIndex(reshuffleEpoch(session?.currentTime||0,bpm),bpm);
   const ambientHue=phraseAnchor(peaks,phrase),gridHue=profile==='dynamic'?ambientHue:peaks[0];
-  const rowColours=useMemo(()=>gridHue===undefined?undefined:videoRowColours(gridHue,appearance,peaks.find(hue=>hue!==gridHue),visible),
+  const rowColours=useMemo(()=>gridHue===undefined?undefined:videoRowColours([gridHue,...peaks.filter(hue=>hue!==gridHue)],appearance,visible),
     // visible.join keeps the memo stable across renders that rebuild the array.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [gridHue,appearance,peaks.join(),visible.join()]);

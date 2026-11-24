@@ -10,6 +10,7 @@ import { EnhancedBeatSyncSetting } from '../../features/music/source-audio-delay
 import { useDockPreferences, beatPalettes } from './useDockPreferences';
 import { useAppearance, type Appearance } from '../../features/appearance/appearance';
 import { dockDemoEnabled, useDockDemoMusic, useTrackPalette } from '../../features/music/dock-demo';
+import { oklchToRgb } from '../../features/music/video-palette';
 import { trackAccentVariables } from '../../features/music/track-accent';
 import { rgbToHueSaturation, trackPaletteVariables } from '../../features/music/track-palette';
 import { useVideoPalette } from '../../features/music/use-video-palette';
@@ -63,6 +64,8 @@ function DockIcon({ kind }: { kind: 'settings' | 'widget' | 'return' | 'close' }
   </svg>;
 }
 
+const KORA_HUE = 257;
+
 export default function FloatingFocus(props: FloatingFocusProps) {
   const { t } = useI18n();
   const [tab, setTab] = useState<Card>(props.initialTab ?? 'focus');
@@ -85,7 +88,10 @@ export default function FloatingFocus(props: FloatingFocusProps) {
   const trackPalette = useTrackPalette(music.selected, demo);
   // The music panel takes its background from the same video hue as the Beat Grid; demo covers use their own sample.
   const videoHues = useVideoPalette(music.selected, preferences.videoColours === 'on');
-  const accentHue = videoHues[0] ?? (trackPalette ? rgbToHueSaturation(trackPalette.kick).hue : undefined);
+  // Video hues are OKLCH angles; the panel and the accent are drawn from an HSL hue, where the same colour has another angle.
+  const accentHue = videoHues.length ? rgbToHueSaturation(oklchToRgb({ L: .62, C: .2, h: videoHues[0] })).hue : (trackPalette ? rgbToHueSaturation(trackPalette.kick).hue
+    // A cover without colour, or whose host does not let it be read, still fills the panel; the accent stays Kora purple.
+    : music.selected?.artwork && preferences.videoColours === 'on' ? KORA_HUE : undefined);
   const reducedMotion = useReducedMotion();
   const groupId = useId();
   const settingsId = useId();

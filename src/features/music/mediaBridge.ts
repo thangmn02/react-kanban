@@ -13,7 +13,7 @@ export interface BrowserMusicSession {
   title: string;
   artist: string;
   source: string;
-  /** Cover art URL. Only the dock demo supplies one today; live sources leave it unset. */
+  /** Cover art URL the playing site gives the browser, sent by the Companion; YouTube covers are added from the video id. */
   artwork?: string;
   paused: boolean;
   playing?: boolean;
@@ -78,12 +78,18 @@ export function getMusicInstallUrl(language: 'en' | 'vi'): string {
   return `/music-companion.html?lang=${language}`;
 }
 
+/** An https address with no quote, so it cannot end a CSS url(). */
+function isCoverUrl(value: unknown): boolean {
+  return typeof value === 'string' && value.length <= 1000 && value.startsWith('https://') && !value.includes('"');
+}
+
 export function isMusicSession(value: unknown): value is BrowserMusicSession {
   if (!value || typeof value !== 'object') return false;
   const item = value as Record<string, unknown>;
   return ['id', 'title', 'artist', 'source'].every((key) => typeof item[key] === 'string' && (item[key] as string).length <= 1000)
     && typeof item.paused === 'boolean'
     && (item.playing === undefined || typeof item.playing === 'boolean')
+    && (item.artwork === undefined || isCoverUrl(item.artwork))
     && (item.canControl === undefined || typeof item.canControl === 'boolean')
     && (item.canAnalyze === undefined || typeof item.canAnalyze === 'boolean')
     && (item.asset === undefined || Boolean(parseMediaAsset(item.asset)))

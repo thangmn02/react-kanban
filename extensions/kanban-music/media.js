@@ -10,6 +10,18 @@ export function readMedia(ensureObserved = false, paletteWanted = false) {
   const skip = () => buttons ??= [navigation('.ytp-prev-button, ytmusic-player-bar .previous-button, [data-testid="control-button-skip-back"], .skipControl__previous, .player-previous'),
     navigation('.ytp-next-button, ytmusic-player-bar .next-button, [data-testid="control-button-skip-forward"], .skipControl__next, .player-next')];
   const entries = globalThis.__kanbanMusicMedia?.entries() || Array.from(document.querySelectorAll('audio,video'), (media, index) => ({ media, index }));
+  // The cover the site hands to the browser (SoundCloud, Spotify, Apple Music, Deezer, Tidal…), or the one in its player
+  // bar. YouTube covers come from the video id instead. The smallest cover of 256px or more is enough.
+  const cover = () => {
+    if (/(^|\.)youtube\.com$/.test(location.hostname)) return undefined;
+    const size = art => Number.parseInt(art?.sizes, 10) || 0;
+    const listed = [...(metadata?.artwork || [])].sort((a, b) => size(a) - size(b));
+    const bar = document.querySelector('[data-testid="now-playing-widget"] [data-testid="cover-art-image"], .playbackSoundBadge__avatar span.image__full');
+    for (const value of [(listed.find(art => size(art) >= 256) || listed.at(-1))?.src, bar?.src, /url\("?([^")]+)/.exec(bar?.style?.backgroundImage || '')?.[1]]) {
+      try { const url = new URL(value, location.href); if (url.protocol === 'https:' && url.href.length <= 1000) return url.href; } catch { /* Not a usable cover. */ }
+    }
+    return undefined;
+  };
   // A browsing page is not necessarily the currently playing asset. Only
   // publish identity from the player, or an unambiguous YouTube video page.
   const playerLink = document.querySelector('[data-testid="nowplaying-track-link"], .playbackSoundBadge__titleLink');
@@ -18,7 +30,7 @@ export function readMedia(ensureObserved = false, paletteWanted = false) {
   return entries.flatMap(({ media, index }) => {
     if (media.snapshot) {
       const song = media.snapshot();
-      return song ? [{ ...song, index }] : [];
+      return song ? [{ ...song, artwork: cover(), index }] : [];
     }
     if (media.tagName === 'VIDEO' && (media.muted || media.volume === 0)
       && (media.loop || location.hostname === 'open.spotify.com')) return [];
@@ -29,7 +41,7 @@ export function readMedia(ensureObserved = false, paletteWanted = false) {
     const assetUrl = playerLink?.href || (media.closest('#movie_player, ytmusic-player') || entries.length === 1 ? youtubeUrl : undefined)
       || (entries.length === 1 && media.isConnected
         && /^https:\/\/[^/?#]+\/kora-lead-test\/[a-f0-9]{64}\.wav$/.test(media.currentSrc) ? media.currentSrc : undefined);
-    return [{ index, src, title: (metadata?.title || document.title || 'Untitled media').slice(0, 500), artist: (metadata?.artist || '').slice(0, 500), source: location.hostname, paused: media.paused,
+    return [{ index, src, title: (metadata?.title || document.title || 'Untitled media').slice(0, 500), artist: (metadata?.artist || '').slice(0, 500), source: location.hostname, artwork: cover(), paused: media.paused,
       playing: !media.paused && !media.seeking && media.readyState >= 3,
       currentTime: Number.isFinite(media.currentTime) ? media.currentTime : 0,
       playbackRate: media.playbackRate, sampledAt: Date.now(), muted: media.muted || media.volume === 0,

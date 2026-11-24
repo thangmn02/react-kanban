@@ -6,15 +6,16 @@ const SAMPLE = 16;
 const thumbnails = new Map<string, Promise<HueBins | null>>();
 const MAX_THUMBNAILS = 64;
 
-/** A 16×16 read of the video's own thumbnail (i.ytimg.com serves it with CORS). Seeds colours before video frames. */
-function thumbnailBins(videoId: string): Promise<HueBins | null> {
-  const known = thumbnails.get(videoId);
+/** A 16×16 read of the track's cover, from hosts that allow it (YouTube, SoundCloud, Spotify, Apple Music…). Seeds colours before video frames. */
+function thumbnailBins(source: string): Promise<HueBins | null> {
+  const known = thumbnails.get(source);
   if (known) return known;
   const loading = new Promise<HueBins | null>(resolve => {
     if (typeof Image === 'undefined' || typeof document === 'undefined') { resolve(null); return; }
     const image = new Image();
     image.crossOrigin = 'anonymous';
     image.decoding = 'async';
+    image.referrerPolicy = 'no-referrer';
     image.onload = () => {
       try {
         const canvas = document.createElement('canvas');
@@ -26,9 +27,9 @@ function thumbnailBins(videoId: string): Promise<HueBins | null> {
       } catch { resolve(null); }
     };
     image.onerror = () => resolve(null);
-    image.src = `https://i.ytimg.com/vi/${encodeURIComponent(videoId)}/mqdefault.jpg`;
+    image.src = source;
   });
-  thumbnails.set(videoId, loading);
+  thumbnails.set(source, loading);
   if (thumbnails.size > MAX_THUMBNAILS) thumbnails.delete(thumbnails.keys().next().value!);
   return loading;
 }
@@ -39,16 +40,17 @@ function thumbnailBins(videoId: string): Promise<HueBins | null> {
  */
 export function useVideoPalette(session: BrowserMusicSession | undefined, enabled: boolean): number[] {
   const videoId = enabled && session?.asset?.provider === 'youtube' && /^[\w-]{6,20}$/.test(session.asset.id) ? session.asset.id : undefined;
+  const cover = videoId ? `https://i.ytimg.com/vi/${encodeURIComponent(videoId)}/mqdefault.jpg` : enabled && session?.artwork?.startsWith('https:') ? session.artwork : undefined;
   const [thumbnail, setThumbnail] = useState<{ id: string; bins: HueBins | null }>();
   useEffect(() => {
-    if (!videoId) return;
+    if (!cover) return;
     let current = true;
-    void thumbnailBins(videoId).then(bins => { if (current) setThumbnail({ id: videoId, bins }); });
+    void thumbnailBins(cover).then(bins => { if (current) setThumbnail({ id: cover, bins }); });
     return () => { current = false; };
-  }, [videoId]);
+  }, [cover]);
   const frames = enabled ? session?.palette : undefined;
   const framesKey = frames ? JSON.stringify(frames) : '';
-  const thumbnailBinsForTrack = thumbnail?.id === videoId ? thumbnail?.bins : null;
+  const thumbnailBinsForTrack = thumbnail?.id === cover ? thumbnail?.bins : null;
   return useMemo(() => {
     if (!enabled) return [];
     const fromFrames = frames ? huePeaks(frames.bins, frames.pixels) : [];

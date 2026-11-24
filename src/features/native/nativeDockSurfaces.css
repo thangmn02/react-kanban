@@ -22,26 +22,30 @@
 .floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .dock-ring-progress { stroke:var(--s-accent); filter:none; }
 .floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] :is(.dock-style-name,.cycle,.muted,.eyebrow,.dock-cycle,.music-now-playing-label) { color:var(--s-dim); }
 .floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .dock-work-current { color:var(--s-accent); }
-.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .dock-track-pane:is(::before,::after) { content:none; }
-.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .dock-track-pane::before, .floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .dock-track-pane::after { content:none; }
-.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .dock-track-pane :is(h2,p,span,button,.text-button,.music-times,.music-sync-status) { color:var(--s-text); }
-.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .dock-track-pane :is(.track-artist,.music-status,.music-queue-title,.music-queue-copy > small,.music-queue-now,.dock-empty) { color:var(--s-dim); }
-.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .dock-track-pane .music-play { background:var(--s-accent); color:var(--s-on-accent); }
-.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .dock-track-pane .music-queue button[aria-current='true'] { background:var(--s-fill); }
-.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .dock-track-pane :is(.music-sessions,.music-access) { background:var(--s-panel); color:var(--s-text); border-color:var(--s-line); }
-.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .dock-track-pane input[type='range'] { accent-color:var(--s-accent); }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance]:not([data-track-accent]) .dock-track-pane:is(::before,::after) { content:none; }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance]:not([data-track-accent]) .dock-track-pane::before, .floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance]:not([data-track-accent]) .dock-track-pane::after { content:none; }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance]:not([data-track-accent]) .dock-track-pane :is(h2,p,span,button,.text-button,.music-times,.music-sync-status) { color:var(--s-text); }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance]:not([data-track-accent]) .dock-track-pane :is(.track-artist,.music-status,.music-queue-title,.music-queue-copy > small,.music-queue-now,.dock-empty) { color:var(--s-dim); }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance]:not([data-track-accent]) .dock-track-pane .music-play { background:var(--s-accent); color:var(--s-on-accent); }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance]:not([data-track-accent]) .dock-track-pane .music-queue button[aria-current='true'] { background:var(--s-fill); }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance]:not([data-track-accent]) .dock-track-pane :is(.music-sessions,.music-access) { background:var(--s-panel); color:var(--s-text); border-color:var(--s-line); }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance]:not([data-track-accent]) .dock-track-pane input[type='range'] { accent-color:var(--s-accent); }
 .floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] button:focus-visible { outline-color:var(--s-accent); }
-.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] :is(.music-timeline,.music-volume) input::-webkit-slider-runnable-track { background:linear-gradient(to right,var(--s-accent) var(--music-progress),var(--s-line) var(--music-progress)); }
-.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] :is(.music-timeline,.music-volume) input::-webkit-slider-thumb { background:var(--s-accent); box-shadow:none; }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance]:not([data-track-accent]) :is(.music-timeline,.music-volume) input::-webkit-slider-runnable-track { background:linear-gradient(to right,var(--s-accent) var(--music-progress),var(--s-line) var(--music-progress)); }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance]:not([data-track-accent]) :is(.music-timeline,.music-volume) input::-webkit-slider-thumb { background:var(--s-accent); box-shadow:none; }
 .floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .music-art { box-shadow:none; }
 .floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance], .floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] :is(.glass,.dock-track-pane) { backdrop-filter:none; -webkit-backdrop-filter:none; }
 /* The accent follows the song: its hue, at a fixed lightness per theme so text on it and in it stays readable.
    Without a track (or with video colours off) the accent stays Kora purple. */
 @supports (color:oklch(from red l c h)) {
-  .floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance][data-track-accent] { --s-accent:oklch(from hsl(var(--track-hue) 85% 50%) .46 .13 h); }
-  .floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance][data-track-accent][data-appearance='dark'] { --s-accent:oklch(from hsl(var(--track-hue) 85% 50%) .81 .11 h); --s-on-accent:#141416; }
+  .floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance][data-track-accent] { --s-accent:oklch(from hsl(var(--track-hue) 85% 50%) .48 .16 h); }
+  .floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance][data-track-accent][data-appearance='dark'] { --s-accent:oklch(from hsl(var(--track-hue) 85% 50%) .75 .15 h); --s-on-accent:#141416; }
 }
-.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .dock-track-pane.dock-track-pane.dock-track-pane h2, .floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .music-now-playing-title { color:var(--s-accent); }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance]:not([data-track-accent]) .dock-track-pane.dock-track-pane.dock-track-pane h2, .floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .music-now-playing-title { color:var(--s-accent); }
 .floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] :is(.dock-start,.music-play,.dock-ring-progress,.dock-track-pane h2,.music-now-playing-title,.dock-tabbar button) { transition:background-color .5s ease,color .5s ease,stroke .5s ease; }
 .floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] .music-dot { background:var(--s-accent); }
 @media(prefers-reduced-motion:reduce) { .floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance] :is(.dock-start,.music-play,.dock-ring-progress,.dock-track-pane h2,.music-now-playing-title,.dock-tabbar button) { transition:none; } }
+/* With a song playing, the Music card is its artwork: blurred cover, fixed scrim, white text and controls (floatingFocus.css). */
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance][data-track-accent] { --dock-player-face:var(--track-accent-face); }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance][data-track-accent] .dock-track-pane { background:var(--dock-player-face); border-color:color-mix(in srgb,var(--s-accent) 45%,var(--s-line)); }
+.floating-focus.glass[data-style='tabs'][data-dock-panel][data-appearance][data-track-accent] .dock-track-pane :is(.muted,.eyebrow,.track-artist,.music-status,.music-sync-status,.music-queue-title,.music-queue-copy > small,.music-queue-now) { color:rgba(255,255,255,.84); }

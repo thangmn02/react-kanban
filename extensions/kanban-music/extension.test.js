@@ -99,3 +99,17 @@ it('reads metadata and controls the real media element, rejecting a changed sour
   expect(pause).toHaveBeenCalledOnce(); expect(play).toHaveBeenCalledOnce();
   await expect(controlMedia(0, 'https://changed.example/track', 'media.play')).rejects.toThrow('Track changed');
 });
+
+it.each([
+  ['a site that lists several sizes', [{ src: 'https://cdn.example/96.jpg', sizes: '96x96' }, { src: 'https://cdn.example/1200.jpg', sizes: '1200x1200' }, { src: 'https://cdn.example/300.jpg', sizes: '300x300' }], 'https://cdn.example/300.jpg'],
+  ['a site that lists one without a size', [{ src: 'https://is1-ssl.mzstatic.com/cover.webp' }], 'https://is1-ssl.mzstatic.com/cover.webp'],
+  ['a cover that is not https', [{ src: 'blob:https://cdn.example/1' }], undefined],
+  ['no cover', [], undefined],
+])('reads the cover from %s', (_name, artwork, expected) => {
+  vi.stubGlobal('navigator', { mediaSession: { metadata: { title: 'Song', artist: 'Artist', artwork } } });
+  const audio = document.createElement('audio');
+  Object.defineProperties(audio, { currentSrc: { value: 'blob:song' }, readyState: { value: 4 }, paused: { value: false } });
+  document.body.append(audio);
+  expect(readMedia()[0].artwork).toBe(expected);
+  audio.remove();
+});
