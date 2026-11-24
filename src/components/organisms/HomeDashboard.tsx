@@ -275,7 +275,7 @@ function HomeBriefing({ currentUser, activeWorkspace, onOpenTask, onOpenBoard,
           <section aria-labelledby="briefing-boards">
             <h2 id="briefing-boards" className={sectionLabel}>{t('briefing.boards')}</h2>
             <ul className="mt-2 space-y-2">
-              {(data?.recentBoards ?? []).slice(0, 4).map((board) => <li key={board.id}><button type="button" aria-label={`${t('home.openBoard')}: ${board.title}`} onClick={() => onOpenBoard(board.id)} className="w-full cursor-pointer rounded py-2 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"><span className="block break-words text-sm font-semibold text-slate-800">{board.title}</span><span className="mt-1 block text-xs text-slate-500">{t('home.taskCount', { count: board.taskCount })}</span></button></li>)}
+              {(data?.recentBoards ?? []).slice(0, 4).map((board) => <li key={board.id}><button type="button" aria-label={`${t('home.openBoard')}: ${board.title}`} onClick={() => onOpenBoard(board.id)} className="w-full cursor-pointer rounded py-2 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"><span className="block break-words text-sm font-semibold text-slate-800">{board.title}</span><span className="mt-1 block text-xs text-slate-500">{t('home.taskCount', { count: board.taskCount, plural: board.taskCount === 1 ? '' : 's' })}</span></button></li>)}
             </ul>
             {!data?.recentBoards.length && <p className="mt-3 text-sm text-slate-500">{t('home.noBoardsTitle')}</p>}
             {onCreateBoard && <button type="button" className={`${quietButton} mt-1 -ml-3`} onClick={onCreateBoard}>{t('home.createBoard')}</button>}

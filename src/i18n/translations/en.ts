@@ -574,7 +574,7 @@ const en = {
   'home.continuePlanningHelper': "Recent boards, kept secondary to today's work.",
   'home.updatedOn': 'Updated {date}',
   'home.noRecentActivity': 'No recent activity',
-  'home.taskCount': '{count} tasks',
+  'home.taskCount': '{count} task{plural}',
   'home.noBoardsTitle': 'No boards yet',
   'home.noBoardsDescription': 'Create your first board to start organizing tasks.',
     'home.createBoard': 'Create board',
