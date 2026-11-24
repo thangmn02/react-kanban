@@ -81,6 +81,7 @@ for (const width of [600, 900, 1280]) {
       expect(result!.dockOverflow, 'no horizontal overflow inside the dock').toBeLessThanOrEqual(1);
       for (const pair of result!.contained) expect(inside(pair), `${pair.child.name} stays inside ${pair.parent.name}: ${JSON.stringify(pair)}`).toBe(true);
       const controls = result!.controls;
+      for (const control of controls) expect(control.x >= result!.dock.x - 1 && control.x + control.w <= result!.dock.x + result!.dock.w + 1, `${control.name} is cut off at the side of the Dock`).toBe(true);
       for (let i = 0; i < controls.length; i++) for (let j = i + 1; j < controls.length; j++) {
         if (contains(controls[i], controls[j]) || contains(controls[j], controls[i])) continue;
         expect(overlaps(controls[i], controls[j]), `${controls[i].name} overlaps ${controls[j].name}`).toBe(false);

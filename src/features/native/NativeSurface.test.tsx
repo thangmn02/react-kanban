@@ -238,3 +238,40 @@ it('badges the update button and offers one quiet note for a Kora update, then f
     expect(shadow.querySelector('.dock-update-badge')).not.toBeNull();
   } finally { vi.useRealTimers(); }
 });
+
+it('keeps saying the browser runs an old Companion beside the music controls until it really changed', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  try {
+    localStorage.clear();
+    let setup: unknown = { version: __KORA_COMPANION_VERSION__, status: 'reload-required', folder: 'C:\\Companion\\extension', browsersReady: 0, folderOpened: true };
+    updater.check.mockResolvedValue(null);
+    nativeInvoke.mockImplementation(async (command: string, args?: { action?: string }) => command === 'native_music_setup' ? setup
+      : command === 'native_music_request' && args?.action === 'companion.status' ? { ok: true, companions: [{ peerId: 'peer', version: '0.3.30', verified: true }] } : undefined);
+    const view = render(<I18nProvider><NativeSurface dock focusProps={{ ...props, activeTab: 'music' }}>Workspace</NativeSurface></I18nProvider>);
+    const shadow = view.container.querySelector('.native-dock-host')!.shadowRoot!;
+    const note = () => view.getByRole('status');
+    await act(async () => { vi.advanceTimersByTime(5_100); });
+    await waitFor(() => expect(note()).toHaveTextContent('still runs Companion 0.3.30'));
+    expect(view.queryByRole('button', { name: 'Later' })).toBeNull();
+    fireEvent.click(view.getByRole('button', { name: 'Update' }));
+    await waitFor(() => expect(note()).toHaveTextContent('click Reload'));
+    setup = { ...(setup as object), status: 'ready' };
+    fireEvent.click(view.getByRole('button', { name: 'Update' }));
+    await waitFor(() => expect(view.queryByRole('status')).toBeNull());
+    fireEvent.click(shadow.querySelector('[aria-haspopup="dialog"]')!);
+    expect(shadow.querySelector('[data-versions]')).toHaveTextContent(`Kora ${__KORA_VERSION__} · Companion 0.3.30`);
+  } finally { vi.useRealTimers(); }
+});
+
+it('sends a resize storm to the native window at most once per frame and ends on the final size', async () => {
+  render(<I18nProvider><NativeSurface dock focusProps={props}>Workspace</NativeSurface></I18nProvider>);
+  await waitFor(() => expect(nativeInvoke).toHaveBeenCalledWith('native_dock_shape', { rounded: true }));
+  nativeInvoke.mockClear();
+  const resized = nativeWindow.onResized.mock.calls.at(-1)![0];
+  const calls = () => nativeInvoke.mock.calls.filter(([command]) => command === 'native_dock_shape').length;
+  await act(async () => { for (let index = 0; index < 200; index++) resized(); });
+  expect(calls()).toBe(1);
+  await waitFor(() => expect(calls()).toBe(2));
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 60)); });
+  expect(calls()).toBe(2);
+});

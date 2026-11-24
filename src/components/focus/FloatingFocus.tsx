@@ -46,6 +46,7 @@ export interface FloatingFocusProps {
   widgetError?: string;
   onDragStart?: () => void;
   onMusicSetup?: () => void;
+  musicVersions?: { kora: string; companions: string[] };
   musicSetupPending?: boolean;
   musicSetupMessage?: string;
   musicSetupFolder?: string;
@@ -187,6 +188,8 @@ export default function FloatingFocus(props: FloatingFocusProps) {
             {props.musicSetupMessage && <p role="status" className="muted" style={{ overflowWrap: 'anywhere' }}>{props.musicSetupMessage}</p>}
             {props.musicSetupFolder && <CopyFolderButton folder={props.musicSetupFolder} />}
           </motion.div>}
+            {props.musicVersions && <p className="muted" data-versions="">{t('dock.versions', { kora: props.musicVersions.kora,
+              companion: props.musicVersions.companions.join(', ') || t('dock.companionNotConnected') })}</p>}
         </AnimatePresence>
       </div>
 

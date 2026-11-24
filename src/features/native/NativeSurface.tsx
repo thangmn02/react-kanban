@@ -23,11 +23,12 @@ async function availableAppUpdate() {
   await next?.close().catch(() => {});
   return version;
 }
-// Whether a connected browser runs an older Companion than the one this Kora installs.
-async function companionOutdated() {
+// The Companion versions connected browsers run, and whether any is older than the one this Kora installs.
+async function companionVersions() {
   const response = await requestNativeMusic('companion.status');
   const companions = response.companions as { version?: string | null; verified?: boolean }[] | undefined;
-  return Boolean(companions?.some(peer => peer.verified && olderThan(peer.version ?? undefined, __KORA_COMPANION_VERSION__)));
+  const running = [...new Set((companions ?? []).flatMap(peer => peer.verified && peer.version ? [peer.version] : []))];
+  return { running, outdated: running.some(version => olderThan(version, __KORA_COMPANION_VERSION__)) };
 }
 
 async function updateNativeShape(rounded: boolean) {
@@ -54,25 +55,30 @@ function NativeDock({ props }: { props: FloatingFocusProps }) {
 export default function NativeSurface({ dock, onToggle, focusProps, children }: {
   dock: boolean; onToggle?: () => void; focusProps: FloatingFocusProps; children: ReactNode;
 }) {
-  const { language } = useI18n();
+  const { language, t } = useI18n();
   const vi = language === 'vi';
   const [error, setError] = useState('');
   const [maximized, setMaximized] = useState(false);
   const [updateOpen, setUpdateOpen] = useState(false);
   const companion = useCompanionSetup();
   const appUpdate = usePeriodicCheck(true, availableAppUpdate, APP_CHECK_DELAY_MS, APP_CHECK_EVERY_MS);
-  const companionOld = usePeriodicCheck(!nativeCompanionPreviewEnabled() && Boolean(__KORA_COMPANION_VERSION__), companionOutdated, 5_000, COMPANION_CHECK_EVERY_MS);
+  const companionStatus = usePeriodicCheck(!nativeCompanionPreviewEnabled() && Boolean(__KORA_COMPANION_VERSION__), companionVersions, 5_000, COMPANION_CHECK_EVERY_MS);
   // Updating from the note retires it for this session; the next check shows it again only if a browser is still behind.
   const [companionHandled, setCompanionHandled] = useState(false);
+  const companionOld = Boolean(companionStatus?.outdated) && !companion.ready;
+  // Beside the music controls an old Companion is the reason they misbehave, so the note stays until the browser runs the new one.
+  const pinned = dock && focusProps.activeTab === 'music';
+  const oldCompanion = companionStatus?.running.find(version => olderThan(version, __KORA_COMPANION_VERSION__));
   const updateCompanion = () => { setCompanionHandled(true); void companion.run(); };
   const appBadge = Boolean(appUpdate);
   const updateLabel = appBadge ? (vi ? 'Có bản cập nhật Kora' : 'Kora update ready') : (vi ? 'Cập nhật Kora' : 'Update Kora');
   const notices = [
     ...(appUpdate ? [{ key: `app:${appUpdate}`, message: vi ? 'Đã có bản cập nhật Kora.' : 'A Kora update is ready.',
       action: vi ? 'Cập nhật' : 'Update', onAction: () => setUpdateOpen(true) }] : []),
-    ...(companionOld && !companionHandled ? [{ key: `companion:${__KORA_COMPANION_VERSION__}`,
-      message: vi ? 'Music Companion trong trình duyệt có bản mới.' : 'Your browser’s Music Companion has an update.',
-      action: vi ? 'Cập nhật' : 'Update', onAction: updateCompanion }] : []),
+    ...(companionOld && (pinned || !companionHandled) ? [{ key: `companion:${__KORA_COMPANION_VERSION__}`,
+      message: pinned ? companion.message || t('dock.companionOutdated', { version: oldCompanion ?? '' })
+        : vi ? 'Music Companion trong trình duyệt có bản mới.' : 'Your browser’s Music Companion has an update.', pinned,
+      action: vi ? 'Cập nhật' : 'Update', disabled: companion.updating, onAction: updateCompanion }] : []),
   ];
   const notice = <UpdateNotice items={notices} laterLabel={vi ? 'Để sau' : 'Later'} />;
   const effectQueue = useRef(Promise.resolve());
@@ -159,6 +165,7 @@ export default function NativeSurface({ dock, onToggle, focusProps, children }: 
         returnLabel: vi ? 'Công việc' : 'Tasks',
         onDragStart: () => action(() => getCurrentWindow().startDragging()),
         onMusicSetup: nativeCompanionPreviewEnabled()?undefined:() => void companion.run(),
+        musicVersions: { kora: __KORA_VERSION__, companions: companionStatus?.running ?? [] },
         musicSetupPending: companion.updating,
         musicSetupMessage: companion.message,
         musicSetupFolder: companion.folder,

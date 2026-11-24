@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 // Quiet checks: they only show a badge and one note. Nothing downloads or installs until the person chooses Update.
 export const APP_CHECK_DELAY_MS = 15_000;
 export const APP_CHECK_EVERY_MS = 6 * 60 * 60_000;
-export const COMPANION_CHECK_EVERY_MS = 5 * 60_000;
+export const COMPANION_CHECK_EVERY_MS = 90_000;
 export const WEB_CHECK_EVERY_MS = 10 * 60_000;
 const DISMISSED_KEY = 'kora.updateNotice.dismissed.v1';
 
