@@ -25,6 +25,7 @@ import {connectedQuickStore,deviceQuickStore,discardIfEmpty,resolveQuickNote,typ
 import {MAX_FLOATING_NOTES,useFloatingQuickNotes} from './quick-notes-preferences';
 import {noteSaveState,noteSaveStateKey} from './note-save-state';
 import NoteSourceChip from './note-source-chip';
+import {clampToArea} from '../../utils/window-position';
 import {bodyPatch,hasAutomaticTitle} from './note-title';
 import {noteColors,notePresentationPreferences} from './note-presentation';
 
@@ -99,14 +100,15 @@ function QuickDestination({user,workspace,workspaceId,tasks,taskTitle,boardId,do
 }
 
 function useOnline(){return useSyncExternalStore(listener=>{window.addEventListener('online',listener);window.addEventListener('offline',listener);return()=>{window.removeEventListener('online',listener);window.removeEventListener('offline',listener);};},()=>navigator.onLine,()=>true);}
-const clampPosition=(position:{right:number;bottom:number})=>({right:Math.max(8,Math.min(innerWidth-288,position.right)),bottom:Math.max(8,Math.min(innerHeight-160,position.bottom))});
+// Measured from the bottom-right corner, where the same rule keeps the card's handle inside the window.
+const clampPosition=(position:{right:number;bottom:number})=>{const {x,y}=clampToArea({x:position.right,y:position.bottom},{width:288,height:160},{left:8,top:8,right:innerWidth,bottom:innerHeight});return{right:x,bottom:y};};
 function cardPosition(){
   let position={right:24,bottom:24};
   try{const saved=JSON.parse(localStorage.getItem(CARD_KEY)??'null');if(saved&&Number.isFinite(saved.right)&&Number.isFinite(saved.bottom))position={right:saved.right,bottom:saved.bottom};}catch{/* The default corner is used. */}
   // Keep clear of a Focus Dock or island in the same corner.
   const dock=document.querySelector('.focus-island, .floating-focus')?.getBoundingClientRect();
   if(dock&&dock.width&&position.bottom<innerHeight-dock.top+12&&innerWidth-position.right>dock.left)position={...position,bottom:Math.round(innerHeight-dock.top+12)};
-  return clampPosition(position);
+  return position;
 }
 
 type CardProps={taskTitle?:(taskId:string)=>string|undefined;user:AppUser;workspace:WorkspaceSummary|null;workspaceId:string|null;entry:{note:StickyNote;readOnly:boolean;owner:boolean};store:QuickNoteStore;snapshot:{status:string;error:string};tasks:{id:string;title:string}[];boardId:string|null;session:unknown;onClose:()=>void;onRequest:(value:QuickNotesRequest)=>void;onManager:()=>void;onOpenOriginal:(source:SavedSource)=>void;onFloat:()=>void};
@@ -116,11 +118,13 @@ function QuickCard({user,workspace,workspaceId,entry,store,snapshot,tasks,taskTi
   const {note,readOnly,owner}=entry;
   // A note that already had its own title keeps its title field while open; a new note is named by its first line.
   const [titled]=useState(()=>!hasAutomaticTitle(note));
-  const [position,setPosition]=useState(cardPosition),[busy,setBusy]=useState(false),[error,setError]=useState(''),[history,setHistory]=useState(false),[linking,setLinking]=useState(false),[writing,setWriting]=useState(0);
+  const [chosen,setPosition]=useState(cardPosition),[,redraw]=useState(0),[busy,setBusy]=useState(false),[error,setError]=useState(''),[history,setHistory]=useState(false),[linking,setLinking]=useState(false),[writing,setWriting]=useState(0);
   const root=useRef<HTMLElement>(null),drag=useRef<{pointer:number;x:number;y:number;right:number;bottom:number}|null>(null);
   const online=useOnline();
   useEffect(()=>{const frame=requestAnimationFrame(()=>root.current?.querySelector<HTMLElement>('[contenteditable="true"]')?.focus());return()=>cancelAnimationFrame(frame);},[]);
-  useEffect(()=>{const keep=()=>setPosition(value=>clampPosition(value));window.addEventListener('resize',keep);return()=>window.removeEventListener('resize',keep);},[]);
+  // A smaller window moves what is drawn, never the place the person chose, so it comes back when the window grows.
+  const position=clampPosition(chosen);
+  useEffect(()=>{const keep=()=>redraw(value=>value+1);window.addEventListener('resize',keep);return()=>window.removeEventListener('resize',keep);},[]);
   const change=(patch:Partial<StickyNote>)=>{setWriting(value=>value+1);void store.change(note.id,patch).catch(reason=>setError(String(reason))).finally(()=>setWriting(value=>value-1));};
   const connected=!user.isMock?session as ReturnType<typeof connectedNotesRepository>['session']:null;
   const state=noteSaveState({status:/^Saving/i.test(snapshot.status)?'':snapshot.status,error:error||snapshot.error,writing:writing>0,online,local:user.isMock});
