@@ -27,6 +27,9 @@ export class ConnectedNotesSession {
   private discarding = new Set<string>();
   private draftCache = new Map<string,string>();
   private ownCommittedTokens=new Map<string,{token:string;source?:string}>();
+  /** Order of this session's confirmed saves, so a list requested earlier is never taken as newer. */
+  private saves = 0;
+  private savedAt = new Map<string, number>();
   private stopped = false;
   private refreshInFlight: Promise<void> | null = null;
   private refreshRequested = false;
@@ -82,9 +85,19 @@ export class ConnectedNotesSession {
     return this.refreshInFlight;
   }
   private async readSnapshot() {
+    const savesBefore = this.saves;
     try {
-      const rows = await fetchConnectedNotes(this.user, this.workspaceId, this.role);
+      const fetched = await fetchConnectedNotes(this.user, this.workspaceId, this.role);
       if (this.stopped) return;
+      // This list may predate a save confirmed while it was loading: keep the saved note, then read again.
+      const rows = [...fetched];
+      for (const [id, at] of this.savedAt) {
+        const local = at > savesBefore ? this.snapshot.notes.find(item => item.note.id === id) : undefined;
+        if (!local) continue;
+        this.refreshRequested = true;
+        const index = rows.findIndex(row => row.note.id === id);
+        if (index < 0) rows.push(local); else if (rows[index].row.revision <= local.row.revision) rows[index] = local;
+      }
       for (const [id, job] of this.pending) {
         const remote = rows.find(row => row.note.id === id);
         if (job.baseRevision > 0 && (!remote || remote.row.deleted_at || job.content && !['edit', 'manage'].includes(remote.permission))) job.blocked = true;
@@ -173,6 +186,7 @@ export class ConnectedNotesSession {
       const row = captured.content ? await saveConnectedNote(captured.note, this.workspaceId, captured.baseRevision, captured.token, this.user.id) : this.snapshot.notes.find(item => item.note.id === id)!.row;
       if (this.stopped) return;
       if(captured.content){
+        this.savedAt.set(id,++this.saves);
         this.ownCommittedTokens.set(id,{token:row.write_token,source:captured.source});
         const current=this.pending.get(id)!;current.baseRevision=row.revision;current.token=crypto.randomUUID();current.firstEdit=Date.now();
         if(current.version===captured.version)current.content=false;
@@ -184,6 +198,7 @@ export class ConnectedNotesSession {
       }
       if (captured.layout) await saveNoteLayout(captured.note, this.user.id);
       if (this.stopped) return;
+      this.savedAt.set(id, ++this.saves);
       if(this.pending.get(id)?.version===captured.version){
         try{await retireNativeDraft(this.key(id),capturedRaw);}catch(error){if(this.pending.get(id)?.version===captured.version)throw error;}
       }

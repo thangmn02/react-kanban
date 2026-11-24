@@ -140,3 +140,42 @@ it('reconciles a committed operation after restart without another write or dupl
 it('reuses the persisted operation token when resuming an uncommitted restart draft',async()=>{
   const entry=makeEntry(),token=crypto.randomUUID(),key=`kora:notes-draft:owner:workspace:${entry.note.id}:old-writer`;mocks.fetch.mockResolvedValue([entry]);mocks.save.mockResolvedValue({...entry.row,revision:2});localStorage.setItem(key,JSON.stringify({note:{...entry.note,title:'Restart draft'},baseRevision:1,token,content:true,layout:false,updatedAt:new Date().toISOString()}));const owner=new ConnectedNotesSession(user,'workspace','owner');await owner.refresh();owner.recover(key,false);await owner.flush(entry.note.id);expect(mocks.save.mock.calls[0][3]).toBe(token);expect(owner.getSnapshot().notes[0].note.id).toBe(entry.note.id);
 });
+/** A list requested before a save reaches the server, and answered after it. */
+async function staleRead(owner: ConnectedNotesSession, act: () => Promise<void>, answer: ConnectedNote[]) {
+  let respond!: (rows: ConnectedNote[]) => void;
+  mocks.fetch.mockImplementationOnce(() => new Promise<ConnectedNote[]>(resolve => { respond = resolve; }));
+  const reading = owner.refresh(); await act(); respond(answer); await reading;
+}
+/** The server stores the note, so every later list has it. */
+const commitNew = async (note: ConnectedNote['note'], _scope: unknown, revision: number, token: string) => {
+  const row = { ...makeEntry().row, id: note.id, title: note.title, revision: revision + 1, write_token: token };
+  mocks.fetch.mockResolvedValue([{ row, note: { ...note, revision: row.revision }, permission: 'manage' }]); return row;
+};
+it('keeps a new note when a list read before its save answers after it', async () => {
+  const owner = new ConnectedNotesSession(user, 'workspace', 'owner'); await owner.refresh();
+  mocks.save.mockImplementation(commitNew);
+  const id = owner.create(); const seen: boolean[] = []; owner.subscribe(() => { seen.push(owner.getSnapshot().notes.some(row => row.note.id === id)); });
+  await staleRead(owner, () => owner.flush(id), []);
+  expect(owner.hasPending(id)).toBe(false); expect(seen).not.toContain(false); expect(owner.getSnapshot().conflicts).toEqual([]);
+});
+it('keeps a new note when the old list answers between its content and layout saves', async () => {
+  const owner = new ConnectedNotesSession(user, 'workspace', 'owner'); await owner.refresh();
+  mocks.save.mockImplementation(commitNew); let layout!: () => void; mocks.layout.mockImplementation(() => new Promise<void>(resolve => { layout = resolve; }));
+  const id = owner.create(); let saving!: Promise<void>;
+  await staleRead(owner, async () => { saving = owner.flush(id); await vi.advanceTimersByTimeAsync(0); expect(layout).toBeDefined(); }, []);
+  expect(owner.getSnapshot().notes.map(row => row.note.id)).toEqual([id]); expect(owner.getSnapshot().conflicts).toEqual([]);
+  layout(); await saving; expect(owner.getSnapshot().notes.map(row => row.note.id)).toEqual([id]);
+});
+it('does not bring back older text when the list read is older than the save', async () => {
+  const entry = makeEntry(); mocks.fetch.mockResolvedValue([entry]); const owner = new ConnectedNotesSession(user, 'workspace', 'owner'); await owner.refresh();
+  mocks.save.mockImplementation(commitNew);
+  owner.change(entry.note.id, { title: 'Newer' });
+  const titles: string[] = []; owner.subscribe(() => { titles.push(owner.getSnapshot().notes[0].note.title); });
+  await staleRead(owner, () => owner.flush(entry.note.id), [entry]);
+  expect(new Set(titles)).toEqual(new Set(['Newer'])); expect(owner.getSnapshot().notes[0].row.revision).toBe(2);
+});
+it('still drops a saved note once a list read after the save no longer has it', async () => {
+  const owner = new ConnectedNotesSession(user, 'workspace', 'owner'); await owner.refresh();
+  mocks.save.mockImplementation(commitNew); const id = owner.create(); await owner.flush(id);
+  mocks.fetch.mockResolvedValue([]); await owner.refresh(); expect(owner.getSnapshot().notes).toEqual([]);
+});
