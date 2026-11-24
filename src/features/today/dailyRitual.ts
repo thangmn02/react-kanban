@@ -1,6 +1,9 @@
+import type { StorageScope } from '../../shared/storage/storageAdapter';
 import type { FocusTask } from '../../types/focus.type';
 
-const dailyRitualStorageKey = 'kanban_daily_ritual_snapshot';
+// A day's plan names tasks, so it belongs to one person in one workspace. The old shared snapshot cannot say whose it was and lasted one day.
+const oldRitualKey = 'kanban_daily_ritual_snapshot';
+export const dailyRitualKey = (scope: StorageScope) => `kora.dailyRitual.v1:${scope.userId ?? 'anon'}:${scope.workspaceId ?? 'none'}`;
 
 export interface DailyRitualTaskSnapshot {
   id: string;
@@ -40,11 +43,12 @@ export function getYesterdayRitualDateKey(date = new Date()) {
   return toDateKey(yesterday);
 }
 
-export function readDailyRitualSnapshot(): DailyRitualSnapshot | null {
+export function readDailyRitualSnapshot(scope: StorageScope): DailyRitualSnapshot | null {
   if (typeof window === 'undefined') return null;
 
   try {
-    const rawValue = window.localStorage.getItem(dailyRitualStorageKey);
+    window.localStorage.removeItem(oldRitualKey);
+    const rawValue = window.localStorage.getItem(dailyRitualKey(scope));
     if (!rawValue) return null;
     const snapshot = JSON.parse(rawValue) as DailyRitualSnapshot;
     if (!snapshot?.dateKey || !Array.isArray(snapshot.tasks)) return null;
@@ -55,6 +59,7 @@ export function readDailyRitualSnapshot(): DailyRitualSnapshot | null {
 }
 
 export function writeDailyRitualSnapshot(
+  scope: StorageScope,
   focusTasks: FocusTask[],
   completedSessions: number,
   focusedMinutes: number,
@@ -73,12 +78,12 @@ export function writeDailyRitualSnapshot(
     completedAt: new Date().toISOString(),
   };
 
-  window.localStorage.setItem(dailyRitualStorageKey, JSON.stringify(snapshot));
+  window.localStorage.setItem(dailyRitualKey(scope), JSON.stringify(snapshot));
   return snapshot;
 }
 
-export function getYesterdayCarryoverSummary(): DailyCarryoverSummary | null {
-  const snapshot = readDailyRitualSnapshot();
+export function getYesterdayCarryoverSummary(scope: StorageScope): DailyCarryoverSummary | null {
+  const snapshot = readDailyRitualSnapshot(scope);
   if (!snapshot || snapshot.dateKey !== getYesterdayRitualDateKey()) return null;
 
   const totalCount = snapshot.tasks.length;

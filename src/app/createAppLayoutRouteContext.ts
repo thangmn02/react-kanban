@@ -193,6 +193,7 @@ export function useAppLayoutRouteContextValue(params: Params): AppLayoutRouteCon
         onImportCsv: board.handleImportCsv,
       },
       toolbar: {
+        scope: { userId: params.user?.id ?? null, workspaceId: params.activeWorkspaceId },
         searchQuery: board.searchQuery,
         onSearchQueryChange: board.setSearchQuery,
         filterPriority: board.filterPriority,

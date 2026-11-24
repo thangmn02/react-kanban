@@ -336,6 +336,8 @@ function AppLayout() {
     t,
   });
   const { handleOpenQuickPlan } = planning;
+    userId: user?.id ?? null,
+    workspaceId: activeWorkspaceId,
 
   const commandPaletteActions = useCommandPaletteActions({
     setActiveViewWithPath,

@@ -163,7 +163,7 @@ export function useBoardDataManagement({
     return () => { window.removeEventListener(TASK_WORKFLOW_CHANGED, reconcile); window.removeEventListener('storage', storage); };
   }, [activeWorkspaceId, refreshBoardData]);
   // Cached or demo tasks must not notify before this user's workspace loads.
-  useDueDateReminder(boardData, loadedScope === storageScope && !isBoardLoading && !boardErrorMessage
+  useDueDateReminder(boardData, storageScope, loadedScope === storageScope && !isBoardLoading && !boardErrorMessage
     && (authMode === 'mock' || Boolean(userId && activeWorkspaceId)));
 
   return {

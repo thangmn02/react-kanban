@@ -1,7 +1,9 @@
 import type { WorkspaceMember } from '../../types/auth.type';
+import type { StorageScope } from '../../shared/storage/storageAdapter';
 import QuickSearch from '../organisms/QuickSearch';
 
 interface BoardToolbarProps {
+  scope: StorageScope;
   searchQuery: string;
   onSearchQueryChange: (query: string) => void;
   filterPriority: string;

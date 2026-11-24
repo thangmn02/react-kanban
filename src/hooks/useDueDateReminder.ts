@@ -1,19 +1,22 @@
 import { useEffect } from 'react';
 import { translateNow } from '../i18n/context';
-import { isPast, isToday, parseISO, startOfDay } from 'date-fns';
+import { format, isPast, isToday, parseISO, startOfDay } from 'date-fns';
 import { notify } from '../components/organisms/toast/notify';
 
+import type { StorageScope } from '../shared/storage/storageAdapter';
 import type { BoardData } from '../types/task.type';
 
-const reminderStorageKey = 'kanban_due_date_reminder_date';
+export const reminderKey = (scope: StorageScope) => `kora.dueReminder.v1:${scope.userId ?? 'anon'}:${scope.workspaceId ?? 'none'}`;
 
-export function useDueDateReminder(boardData: BoardData, enabled = true) {
+export function useDueDateReminder(boardData: BoardData, scope: StorageScope, enabled = true) {
   useEffect(() => {
     if (!enabled || typeof window === 'undefined') {
       return;
     }
 
-    const todayKey = new Date().toISOString().slice(0, 10);
+    // The person's own day, not the UTC day, which changes mid-morning in Vietnam.
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    const reminderStorageKey = reminderKey(scope);
     const lastReminderDate = window.localStorage.getItem(reminderStorageKey);
 
     if (lastReminderDate === todayKey) {
@@ -39,5 +42,5 @@ export function useDueDateReminder(boardData: BoardData, enabled = true) {
     notify.info(
       translateNow('app.dueSummary', { today: todayTasks.length, overdue: overdueTasks.length })
     );
-  }, [boardData.task, enabled]);
+  }, [boardData.task, enabled, scope]);
 }

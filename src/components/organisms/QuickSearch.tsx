@@ -3,9 +3,12 @@ import { useEffect, useRef, useState } from 'react';
 import type { TaskAssignee } from '../../types/task.type';
 import { mapWorkspaceMembersToAssignees, mockWorkspaceMembers } from '../../utils/workspaceMembers';
 import type { WorkspaceMember } from '../../types/auth.type';
+import type { StorageScope } from '../../shared/storage/storageAdapter';
 import { useI18n } from '../../i18n';
 
-const savedFiltersStorageKey = 'kanban_saved_filters';
+// Filters belong to one person in one workspace. The first person to open them after the update keeps the old shared list.
+const oldSavedFiltersKey = 'kanban_saved_filters';
+const savedFiltersKey = (scope: StorageScope) => `kora.savedFilters.v1:${scope.userId ?? 'anon'}:${scope.workspaceId ?? 'none'}`;
 
 interface SavedTaskFilter {
   id: string;
@@ -17,6 +20,7 @@ interface SavedTaskFilter {
 }
 
 interface QuickSearchProps {
+  scope: StorageScope;
   searchQuery: string;
   onSearchQueryChange: (query: string) => void;
   filterPriority: string;
@@ -29,28 +33,38 @@ interface QuickSearchProps {
   workspaceMembers?: WorkspaceMember[];
 }
 
-function readSavedFilters(): SavedTaskFilter[] {
+function readSavedFilters(key: string): SavedTaskFilter[] {
   if (typeof window === 'undefined') {
     return [];
   }
 
   try {
-    const storedValue = window.localStorage.getItem(savedFiltersStorageKey);
-    return storedValue ? JSON.parse(storedValue) as SavedTaskFilter[] : [];
+    const storedValue = window.localStorage.getItem(key) ?? window.localStorage.getItem(oldSavedFiltersKey);
+    const filters: unknown = storedValue ? JSON.parse(storedValue) : [];
+    return Array.isArray(filters) ? filters as SavedTaskFilter[] : [];
   } catch {
     return [];
   }
 }
 
-function writeSavedFilters(savedFilters: SavedTaskFilter[]) {
+function writeSavedFilters(key: string, savedFilters: SavedTaskFilter[]) {
   if (typeof window === 'undefined') {
     return;
   }
 
-  window.localStorage.setItem(savedFiltersStorageKey, JSON.stringify(savedFilters));
+  try {
+    window.localStorage.setItem(key, JSON.stringify(savedFilters));
+    window.localStorage.removeItem(oldSavedFiltersKey);
+  } catch { /* Filters still work until the board is closed. */ }
 }
 
-export default function QuickSearch({
+export default function QuickSearch(props: QuickSearchProps) {
+  // A different person or workspace starts from its own list.
+  return <QuickSearchBar key={savedFiltersKey(props.scope)} {...props} />;
+}
+
+function QuickSearchBar({
+  scope,
   searchQuery,
   onSearchQueryChange,
   filterPriority,
@@ -63,7 +77,7 @@ export default function QuickSearch({
   workspaceMembers = mockWorkspaceMembers,
 }: QuickSearchProps) {
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
-  const [savedFilters, setSavedFilters] = useState<SavedTaskFilter[]>(readSavedFilters);
+  const [savedFilters, setSavedFilters] = useState<SavedTaskFilter[]>(() => readSavedFilters(savedFiltersKey(scope)));
   const [savedFilterName, setSavedFilterName] = useState('');
   const filterPanelRef = useRef<HTMLDivElement | null>(null);
   const hasActiveFilters = searchQuery !== '' || filterPriority !== '' || filterAssignee !== '' || filterDueDate !== '';
@@ -73,8 +87,8 @@ export default function QuickSearch({
   const { t } = useI18n();
 
   useEffect(() => {
-    writeSavedFilters(savedFilters);
-  }, [savedFilters]);
+    writeSavedFilters(savedFiltersKey(scope), savedFilters);
+  }, [savedFilters, scope]);
 
   useEffect(() => {
     if (!showFilterControls) {
