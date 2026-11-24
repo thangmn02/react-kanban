@@ -6,6 +6,7 @@ import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {parseEnv} from 'node:util';
 import {execFileSync,spawnSync} from 'node:child_process';
+import {assertContainsLastRelease} from './release-ancestry.mjs';
 
 const target=process.argv[2];
 assert.ok(target==='web'||target==='windows','Usage: node scripts/build-release.mjs <web|windows> --env-dir=<checkout holding .env.local>');
@@ -13,6 +14,7 @@ const envDir=process.argv.find(value=>value.startsWith('--env-dir='))?.slice(10)
 assert.ok(envDir,'Supply --env-dir with the production .env.local.');
 const status=execFileSync('git',['status','--porcelain','--untracked-files=no'],{encoding:'utf8'});
 assert.equal(status,'','Release builds come only from a committed tree.');
+assertContainsLastRelease();
 const local=parseEnv(await readFile(join(envDir,'.env.local'),'utf8')),shared=parseEnv(await readFile(join(envDir,'.env'),'utf8'));
 assert.equal(local.VITE_AUTH_MODE,'supabase');
 assert.equal(new URL(local.VITE_SUPABASE_URL).host,'lthlvntvjgnornrdxnms.supabase.co','Release builds target the production project only.');

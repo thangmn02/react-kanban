@@ -8,6 +8,7 @@ import {resolve,join,relative,sep} from 'node:path';
 import {createHash} from 'node:crypto';
 import {parseEnv} from 'node:util';
 import {execFileSync} from 'node:child_process';
+import {assertContainsLastRelease} from './release-ancestry.mjs';
 
 const siteId='0c8406d3-9d2e-4afd-8351-140813bfbaf9',productionRef='lthlvntvjgnornrdxnms',stagingRef='enzzyuhchizfmruxhfhg';
 const arg=name=>process.argv.find(value=>value.startsWith('--'+name+'='))?.slice(name.length+3);
@@ -38,6 +39,7 @@ if(arg('publish')){
 assert.ok(process.argv.includes('--draft')||arg('production-after-draft'),'Use --draft to stage, --publish=<deployId> to promote, or --production-after-draft=<deployId>.');
 const sourceCommit=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
 assert.equal(execFileSync('git',['status','--porcelain','--untracked-files=no'],{encoding:'utf8'}),'','Publish only from a committed tree.');
+assertContainsLastRelease();
 const dist=resolve('dist'),functionsRoot=resolve(arg('linux-functions')||'');
 // Every credential the owner keeps locally; none may appear in a published byte.
 const credentials=[token];
